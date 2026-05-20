@@ -1,0 +1,61 @@
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AppProvider } from './context/AppContext';
+import Sidebar from './components/Sidebar';
+import Dashboard from './modules/Dashboard';
+import Parties from './modules/Parties';
+import MaterialReceipt from './modules/MaterialReceipt';
+import ProductionPlanning from './modules/ProductionPlanning';
+import UnderProcess from './modules/UnderProcess';
+import InvoicesPI from './modules/InvoicesPI';
+import BPR from './modules/BPR';
+import PSD from './modules/PSD';
+import PackingList from './modules/PackingList';
+import DeliveryChallan from './modules/DeliveryChallan';
+import EWayDC from './modules/EWayDC';
+import TaxInvoice from './modules/TaxInvoice';
+import EWayTI from './modules/EWayTI';
+import ProcessingSheet from './modules/ProcessingSheet';
+import PartyDue from './modules/PartyDue';
+import Payments from './modules/Payments';
+import TaskManager from './modules/TaskManager';
+import MasterSetup from './modules/MasterSetup';
+import Inventory from './modules/Inventory';
+import Reports from './modules/Reports';
+
+function App() {
+  return (
+    <AppProvider>
+      <Router>
+        <div className="app-layout">
+          <Sidebar />
+          <main className="app-main">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/master" element={<MasterSetup />} />
+              <Route path="/parties" element={<Parties />} />
+              <Route path="/production-planning" element={<ProductionPlanning />} />
+              <Route path="/material-receipt" element={<MaterialReceipt />} />
+              <Route path="/under-process" element={<UnderProcess />} />
+              <Route path="/invoices-pi" element={<InvoicesPI />} />
+              <Route path="/bpr" element={<BPR />} />
+              <Route path="/psd" element={<PSD />} />
+              <Route path="/packing-list" element={<PackingList />} />
+              <Route path="/dc" element={<DeliveryChallan />} />
+              <Route path="/eway-dc" element={<EWayDC />} />
+              <Route path="/tax-invoice" element={<TaxInvoice />} />
+              <Route path="/eway-ti" element={<EWayTI />} />
+              <Route path="/processing-sheet" element={<ProcessingSheet />} />
+              <Route path="/party-due" element={<PartyDue />} />
+              <Route path="/payments" element={<Payments />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/tasks" element={<TaskManager />} />
+            </Routes>
+          </main>
+        </div>
+      </Router>
+    </AppProvider>
+  );
+}
+
+export default App;
