@@ -16,7 +16,8 @@ const PSD = () => {
     requirement: '90% < 10M',
     result: '90% < 7.77',
     fileName: '',
-    fileSize: ''
+    fileSize: '',
+    notes: ''
   });
 
   const activeMR = selectedMR;
@@ -54,7 +55,8 @@ const PSD = () => {
       requirement: '90% < 10M',
       result: '90% < 7.77',
       fileName: '',
-      fileSize: ''
+      fileSize: '',
+      notes: ''
     });
     setIsModalOpen(true);
   };
@@ -153,6 +155,7 @@ const PSD = () => {
                   <th style={{ padding: '0.75rem' }}>Customer</th>
                   <th style={{ padding: '0.75rem' }}>Product</th>
                   <th style={{ padding: '0.75rem' }}>Spec vs Result</th>
+                  <th style={{ padding: '0.75rem' }}>Notes</th>
                   <th style={{ padding: '0.75rem' }}>File Name</th>
                   <th style={{ padding: '0.75rem' }}>Actions</th>
                 </tr>
@@ -170,7 +173,8 @@ const PSD = () => {
                         <span style={{ fontSize: '0.75rem', display: 'block', color: 'var(--text-muted)' }}>Spec: {psd.requirement}</span>
                         <span style={{ fontSize: '0.75rem', display: 'block', color: '#10b981', fontWeight: 600 }}>Result: {psd.result}</span>
                       </td>
-                      <td style={{ padding: '0.75rem', fontStyle: 'italic', fontSize: '0.8rem' }}>{psd.fileName || 'N/A'}</td>
+                      <td style={{ padding: '0.75rem', fontSize: '0.8rem' }}>{psd.notes || '-'}</td>
+                      <td style={{ padding: '0.75rem', fontStyle: 'italic', fontSize: '0.8rem' }}>{psd.fileName ? <a href="#" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>{psd.fileName}</a> : 'N/A'}</td>
                       <td style={{ padding: '0.75rem' }}>
                         <button onClick={() => deletePSD(psd.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }}><Trash2 size={16} /></button>
                       </td>
@@ -214,6 +218,10 @@ const PSD = () => {
                 <div>
                   <label>PSD Result (e.g. 90% &lt; 7.77M) *</label>
                   <input type="text" className="input-field" required value={form.result} onChange={e => setForm({...form, result: e.target.value})} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Additional Notes / Remarks</label>
+                  <textarea className="input-field" rows="2" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
                 </div>
               </div>
 

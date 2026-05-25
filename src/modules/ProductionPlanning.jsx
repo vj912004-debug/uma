@@ -1,16 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Search, Edit2, Trash2, Calendar, Clock } from 'lucide-react';
+import ExportButton from '../components/ExportButton';
 
 const ProductionPlanning = () => {
-  const { data, updateData, updateItem, setData } = useAppContext();
+  const { data, updateData, updateItem, deleteDataSoftly } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const userRole = data.settings?.userRole || 'Admin';
+
   const [formData, setFormData] = useState({
+    customer: '',
+    productName: '',
     productNickName: '',
+    psdNote: '',
+    batchNo: '',
     qty: '',
+    priorityLevel: 'Normal',
+    specialInstructions: '',
     startDate: new Date().toISOString().split('T')[0],
     startTime: '09:00',
     endDate: new Date().toISOString().split('T')[0],
@@ -20,14 +29,11 @@ const ProductionPlanning = () => {
     notes: ''
   });
 
-  // Automatically calculate processing hours based on dates & times
   useEffect(() => {
     if (!formData.startDate || !formData.startTime || !formData.endDate || !formData.endTime) return;
-
     try {
       const startDateTime = new Date(`${formData.startDate}T${formData.startTime}`);
       const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
-      
       const diffMs = endDateTime - startDateTime;
       if (diffMs > 0) {
         const diffHours = diffMs / (1000 * 60 * 60);
@@ -47,18 +53,21 @@ const ProductionPlanning = () => {
   };
 
   const deletePlan = (id) => {
-    if (window.confirm("Are you sure you want to delete this production plan?")) {
-      setData(prev => ({
-        ...prev,
-        productionPlans: prev.productionPlans.filter(p => p.id !== id)
-      }));
+    if (window.confirm("Delete this production plan?")) {
+      deleteDataSoftly('productionPlans', id);
     }
   };
 
   const handleOpenModal = () => {
     setFormData({
+      customer: '',
+      productName: '',
       productNickName: '',
+      psdNote: '',
+      batchNo: '',
       qty: '',
+      priorityLevel: 'Normal',
+      specialInstructions: '',
       startDate: new Date().toISOString().split('T')[0],
       startTime: '09:00',
       endDate: new Date().toISOString().split('T')[0],
@@ -74,11 +83,6 @@ const ProductionPlanning = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     try {
-      if (!formData.productNickName) {
-        alert("Please select a product.");
-        return;
-      }
-
       if (isEditing) {
         updateItem('productionPlans', isEditing, { ...formData, id: isEditing });
       } else {
@@ -92,36 +96,46 @@ const ProductionPlanning = () => {
       setIsModalOpen(false);
       setIsEditing(null);
     } catch (error) {
-      console.error("Failed to save production plan:", error);
+      console.error(error);
       alert("Error saving production plan.");
     }
   };
 
-  // Collect unique product nicknames configured in parties master
-  const productNicknames = Array.from(
-    new Set(
-      (data.parties || [])
-        .flatMap(p => p.products || [])
-        .map(prod => prod?.nickname)
-        .filter(Boolean)
-    )
+  const productNicknames = Array.from(new Set((data.parties || []).flatMap(p => p.products || []).map(prod => prod?.nickname).filter(Boolean)));
+
+  const plansList = (data.productionPlans || []).filter(p => !p.isDeleted);
+  const filteredPlans = plansList.filter(p => 
+    (p.productNickName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.customer || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.batchNo || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredPlans = (data.productionPlans || []).filter(p => 
-    (p.productNickName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.notes && p.notes.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const exportColumns = [
+    { label: 'Customer', key: 'customer' },
+    { label: 'Product', key: 'productName' },
+    { label: 'Nickname', key: 'productNickName' },
+    { label: 'Batch No', key: 'batchNo' },
+    { label: 'Qty', key: 'qty' },
+    { label: 'Priority', key: 'priorityLevel' },
+    { label: 'Start', key: 'startDate' },
+    { label: 'Status', key: 'status' }
+  ];
 
   return (
     <div>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Production Planning</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Schedule milling batches, track running runtimes, and log machine hours.</p>
+          <p style={{ color: 'var(--text-muted)' }}>Schedule milling batches and track processing.</p>
         </div>
-        <button className="btn btn-primary" onClick={handleOpenModal}>
-          <Plus size={18} /> Schedule Batch
-        </button>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <ExportButton data={filteredPlans} columns={exportColumns} filename="Production_Plan" title="Production Plan Report" />
+          {userRole === 'Admin' && (
+            <button className="btn btn-primary" onClick={handleOpenModal}>
+              <Plus size={18} /> Add Plan Manually
+            </button>
+          )}
+        </div>
       </header>
 
       <div className="premium-card">
@@ -130,65 +144,68 @@ const ProductionPlanning = () => {
           <input 
             type="text" 
             className="input-field" 
-            placeholder="Search by product nickname or notes..." 
+            placeholder="Search by customer, batch no, or nickname..." 
             style={{ paddingLeft: '3rem' }}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="data-table-container">
+          <table className="data-table">
             <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
-                <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Sr. No</th>
-                <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Product Nickname</th>
-                <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Quantity</th>
-                <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Processing Start</th>
-                <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Complete Date</th>
-                <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Processing Hours</th>
-                <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Status</th>
-                <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Actions</th>
+              <tr>
+                <th>Customer</th>
+                <th>Product (Nick)</th>
+                <th>Batch No</th>
+                <th>Qty (Kg)</th>
+                <th>PSD Note</th>
+                <th>Priority</th>
+                <th>Start Date</th>
+                <th>Status</th>
+                {userRole === 'Admin' && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {filteredPlans.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No production plans recorded.</td>
+                  <td colSpan={userRole === 'Admin' ? 9 : 8} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No production plans recorded.</td>
                 </tr>
               ) : (
-                filteredPlans.map((plan, idx) => (
-                  <tr key={plan.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '1rem', fontWeight: 600 }}>{idx + 1}</td>
-                    <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{plan.productNickName}</td>
-                    <td style={{ padding: '1rem', fontWeight: 500 }}>{plan.qty} Kg</td>
-                    <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
-                      <p style={{ margin: 0 }}><Calendar size={12} style={{ display: 'inline', marginRight: '0.25rem' }} /> {plan.startDate}</p>
-                      <p style={{ margin: 0, color: 'var(--text-muted)' }}><Clock size={12} style={{ display: 'inline', marginRight: '0.25rem' }} /> {plan.startTime}</p>
+                filteredPlans.map(plan => (
+                  <tr key={plan.id}>
+                    <td style={{ fontWeight: 600 }}>{plan.customer || 'N/A'}</td>
+                    <td>{plan.productName} {plan.productNickName && <span style={{ color: 'var(--text-muted)' }}>({plan.productNickName})</span>}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{plan.batchNo || 'N/A'}</td>
+                    <td>{plan.qty}</td>
+                    <td><div style={{ fontSize: '0.75rem', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.psdNote || 'None'}</div></td>
+                    <td>
+                      <span style={{
+                        padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
+                        background: plan.priorityLevel === 'High' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                        color: plan.priorityLevel === 'High' ? '#ef4444' : '#10b981'
+                      }}>
+                        {plan.priorityLevel || 'Normal'}
+                      </span>
                     </td>
-                    <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
-                      <p style={{ margin: 0 }}><Calendar size={12} style={{ display: 'inline', marginRight: '0.25rem' }} /> {plan.endDate}</p>
-                      <p style={{ margin: 0, color: 'var(--text-muted)' }}><Clock size={12} style={{ display: 'inline', marginRight: '0.25rem' }} /> {plan.endTime}</p>
-                    </td>
-                    <td style={{ padding: '1rem', fontWeight: 600 }}>{plan.hours} Hrs</td>
-                    <td style={{ padding: '1rem' }}>
+                    <td style={{ fontSize: '0.85rem' }}>{plan.startDate} {plan.startTime}</td>
+                    <td>
                       <span style={{ 
-                        padding: '0.25rem 0.75rem', 
-                        borderRadius: '20px', 
-                        fontSize: '0.75rem',
+                        padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600,
                         background: plan.status === 'Done' ? 'rgba(16, 185, 129, 0.1)' : plan.status === 'Cancel' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                        color: plan.status === 'Done' ? '#10b981' : plan.status === 'Cancel' ? '#ef4444' : '#f59e0b',
-                        fontWeight: 600
+                        color: plan.status === 'Done' ? '#10b981' : plan.status === 'Cancel' ? '#ef4444' : '#f59e0b'
                       }}>
                         {plan.status}
                       </span>
                     </td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={() => handleEdit(plan)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={16} /></button>
-                        <button onClick={() => deletePlan(plan.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }}><Trash2 size={16} /></button>
-                      </div>
-                    </td>
+                    {userRole === 'Admin' && (
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button onClick={() => handleEdit(plan)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={16} /></button>
+                          <button onClick={() => deletePlan(plan.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -198,51 +215,58 @@ const ProductionPlanning = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
-          <div className="premium-card" style={{ width: '600px', maxWidth: '90%' }}>
-            <h2 style={{ marginBottom: '1.5rem' }}>{isEditing ? 'Modify Plan Entry' : 'Schedule New Milling Batch'}</h2>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)', padding: '2rem' }}>
+          <div className="premium-card" style={{ width: '800px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ marginBottom: '1.5rem' }}>{isEditing ? 'Modify Plan Entry' : 'Schedule New Batch'}</h2>
             <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
-                  <label>Product Nickname *</label>
-                  <select 
-                    className="input-field" 
-                    required 
-                    value={formData.productNickName}
-                    onChange={e => setFormData({...formData, productNickName: e.target.value})}
-                  >
-                    <option value="">Select Nickname</option>
-                    {productNicknames.map((nick, idx) => (
-                      <option key={idx} value={nick}>{nick}</option>
-                    ))}
-                  </select>
+                  <label>Customer</label>
+                  <input type="text" className="input-field" value={formData.customer} onChange={e => setFormData({...formData, customer: e.target.value})} />
                 </div>
                 <div>
-                  <label>Quantity (Kg) *</label>
-                  <input type="number" className="input-field" required value={formData.qty} onChange={e => setFormData({...formData, qty: e.target.value})} />
+                  <label>Product Name</label>
+                  <input type="text" className="input-field" value={formData.productName} onChange={e => setFormData({...formData, productName: e.target.value})} />
+                </div>
+                <div>
+                  <label>Product Nickname</label>
+                  <input type="text" className="input-field" value={formData.productNickName} onChange={e => setFormData({...formData, productNickName: e.target.value})} list="nicknames" />
+                  <datalist id="nicknames">
+                    {productNicknames.map((nick, idx) => <option key={idx} value={nick} />)}
+                  </datalist>
+                </div>
+                <div>
+                  <label>Batch No</label>
+                  <input type="text" className="input-field" value={formData.batchNo} onChange={e => setFormData({...formData, batchNo: e.target.value})} />
+                </div>
+                <div>
+                  <label>Quantity (Kg)</label>
+                  <input type="number" className="input-field" value={formData.qty} onChange={e => setFormData({...formData, qty: e.target.value})} />
+                </div>
+                <div>
+                  <label>Priority Level</label>
+                  <select className="input-field" value={formData.priorityLevel} onChange={e => setFormData({...formData, priorityLevel: e.target.value})}>
+                    <option value="Normal">Normal</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </div>
+                <div style={{ gridColumn: 'span 3' }}>
+                  <label>PSD Note / Material Requirement</label>
+                  <input type="text" className="input-field" value={formData.psdNote} onChange={e => setFormData({...formData, psdNote: e.target.value})} />
+                </div>
+                <div style={{ gridColumn: 'span 3' }}>
+                  <label>Special Instructions</label>
+                  <input type="text" className="input-field" value={formData.specialInstructions} onChange={e => setFormData({...formData, specialInstructions: e.target.value})} />
                 </div>
                 
                 <div>
-                  <label>Processing Start Date *</label>
-                  <input type="date" className="input-field" required value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+                  <label>Processing Start Date</label>
+                  <input type="date" className="input-field" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
                 </div>
                 <div>
-                  <label>Processing Start Time *</label>
-                  <input type="time" className="input-field" required value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} />
-                </div>
-
-                <div>
-                  <label>Processing Complete Date *</label>
-                  <input type="date" className="input-field" required value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
-                </div>
-                <div>
-                  <label>Processing Complete Time *</label>
-                  <input type="time" className="input-field" required value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} />
-                </div>
-
-                <div>
-                  <label>Total Processing Hours</label>
-                  <input type="text" className="input-field" value={formData.hours} onChange={e => setFormData({...formData, hours: e.target.value})} style={{ fontWeight: 600, color: 'var(--accent-primary)' }} />
+                  <label>Processing Start Time</label>
+                  <input type="time" className="input-field" value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} />
                 </div>
                 <div>
                   <label>Planning Status</label>
@@ -253,13 +277,21 @@ const ProductionPlanning = () => {
                     <option value="Cancel">Cancel</option>
                   </select>
                 </div>
-                
-                <div style={{ gridColumn: 'span 2' }}>
-                  <label>Notes / Work Instructions</label>
-                  <textarea className="input-field" rows="2" placeholder="Enter batch logs, mesh sizes, sieving specs, etc." value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
+
+                <div>
+                  <label>Complete Date</label>
+                  <input type="date" className="input-field" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
+                </div>
+                <div>
+                  <label>Complete Time</label>
+                  <input type="time" className="input-field" value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} />
+                </div>
+                <div>
+                  <label>Total Processing Hours</label>
+                  <input type="text" className="input-field" value={formData.hours} readOnly style={{ fontWeight: 600, color: 'var(--accent-primary)', background: 'rgba(255,255,255,0.05)' }} />
                 </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
                 <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => { setIsModalOpen(false); setIsEditing(null); }}>Cancel</button>
                 <button type="submit" className="btn btn-primary">{isEditing ? 'Save Changes' : 'Confirm Plan'}</button>
               </div>

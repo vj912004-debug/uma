@@ -22,6 +22,12 @@ import TaskManager from './modules/TaskManager';
 import MasterSetup from './modules/MasterSetup';
 import Inventory from './modules/Inventory';
 import Reports from './modules/Reports';
+import Quotations from './modules/Quotations';
+import PurchaseOrders from './modules/PurchaseOrders';
+import DebitNotes from './modules/DebitNotes';
+import CreditNotes from './modules/CreditNotes';
+import RecycleBin from './modules/RecycleBin';
+import SystemLogs from './modules/SystemLogs';
 
 function App() {
   return (
@@ -50,6 +56,12 @@ function App() {
               <Route path="/payments" element={<Payments />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/tasks" element={<TaskManager />} />
+              <Route path="/quotations" element={<Quotations />} />
+              <Route path="/purchase-orders" element={<PurchaseOrders />} />
+              <Route path="/debit-notes" element={<DebitNotes />} />
+              <Route path="/credit-notes" element={<CreditNotes />} />
+              <Route path="/recycle-bin" element={<RecycleBin />} />
+              <Route path="/system-logs" element={<SystemLogs />} />
             </Routes>
           </main>
         </div>

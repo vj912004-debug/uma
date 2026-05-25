@@ -193,8 +193,11 @@ const MaterialReceipt = () => {
       nickName: '',
       value: '',
       batches: [],
-      totalDrums: 0,
-      totalQty: 0
+    totalDrums: 0,
+    totalQty: 0,
+    charges: { cleaning: false, filterBag: false, processing: false, sieving: false, psdReport: false, liner: false, courier: false, fiberDrum: false, transportation: false, hdpeDrum: false, batchChangeover: false },
+    rates: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
+    qtys: { cleaning: 1, filterBag: 1, processing: 1, sieving: 1, psdReport: 1, liner: 1, courier: 1, fiberDrum: 1, transportation: 1, hdpeDrum: 1, batchChangeover: 1 }
     });
     setIsEditing(null);
     setIsModalOpen(true);
@@ -226,6 +229,35 @@ const MaterialReceipt = () => {
         };
         updateData('materialReceipts', newReceipt);
         incrementSerial('MR');
+        
+        // Auto-fill Production Planning
+        formData.batches.forEach((batch, idx) => {
+          if (!batch.isEmptyDrums) {
+            const party = data.parties.find(p => p.id === formData.partyId);
+            const prodConfig = (party?.products || []).find(p => p.name === formData.productName);
+            
+            const newPlan = {
+              id: Date.now().toString() + '_' + idx,
+              createdAt: new Date().toISOString(),
+              customer: formData.partyName,
+              productName: formData.productName,
+              productNickName: formData.nickName,
+              psdNote: prodConfig?.psdNote || prodConfig?.notes || '',
+              batchNo: batch.batchNo,
+              qty: batch.qty,
+              priorityLevel: 'Normal',
+              specialInstructions: '',
+              status: 'Pending',
+              startDate: formData.date,
+              startTime: '09:00',
+              endDate: formData.date,
+              endTime: '17:00',
+              hours: '8.00',
+              notes: ''
+            };
+            updateData('productionPlans', newPlan);
+          }
+        });
       }
       setIsModalOpen(false);
       setIsEditing(null);
@@ -417,6 +449,59 @@ const MaterialReceipt = () => {
                 <div>
                   <label>Material Declared Value (₹)</label>
                   <input type="number" className="input-field" placeholder="Editable" value={formData.value} onChange={e => setFormData({...formData, value: parseFloat(e.target.value) || ''})} />
+                </div>
+              </div>
+
+              
+              {/* Charges Specification Grid */}
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem' }}>Pre-defined Applicable Charges</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Configure charges here so that Proforma Invoice (PI) and Tax Invoice auto-capture these rates.</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                  {[
+                    { key: 'cleaning', label: 'Minimum cleaning charges (998842)', isQtyRate: true },
+                    { key: 'filterBag', label: 'Filter Bag charges (591190)', isQtyRate: false },
+                    { key: 'processing', label: 'Processing charges (998842)', isQtyRate: true },
+                    { key: 'sieving', label: 'Sieving charges (998842)', isQtyRate: true },
+                    { key: 'psdReport', label: 'PSD report charges (998346)', isQtyRate: false },
+                    { key: 'liner', label: 'Liner (39233090)', isQtyRate: false },
+                    { key: 'courier', label: 'Courier (996812)', isQtyRate: false },
+                    { key: 'fiberDrum', label: 'Fiber Drum (7310)', isQtyRate: false },
+                    { key: 'transportation', label: 'Transportation (996511)', isQtyRate: false },
+                    { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },
+                    { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
+                  ].map(item => (
+                    <div key={item.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={formData.charges[item.key]} 
+                          onChange={() => setFormData(prev => ({ ...prev, charges: { ...prev.charges, [item.key]: !prev.charges[item.key] } }))}
+                        />
+                        {item.label}
+                      </label>
+                      {formData.charges[item.key] && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingLeft: '1.5rem' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Qty:</span>
+                          <input 
+                            type="number" 
+                            className="input-field" 
+                            style={{ padding: '0.2rem', width: '60px', height: 'auto', fontSize: '0.8rem' }}
+                            value={formData.qtys?.[item.key] || 1} 
+                            onChange={e => setFormData(prev => ({ ...prev, qtys: { ...prev.qtys, [item.key]: parseFloat(e.target.value) || 0 } }))}
+                          />
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate: ₹</span>
+                          <input 
+                            type="number" 
+                            className="input-field" 
+                            style={{ padding: '0.2rem', width: '80px', height: 'auto', fontSize: '0.8rem' }}
+                            value={formData.rates[item.key]} 
+                            onChange={e => setFormData(prev => ({ ...prev, rates: { ...prev.rates, [item.key]: parseFloat(e.target.value) || 0 } }))}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
 

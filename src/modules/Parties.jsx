@@ -84,12 +84,14 @@ const Parties = () => {
       nickname: '',
       psdReq: '90% < 10M',
       psdNote: '',
+      notes: '',
       charges: {
         cleaning: 0,
         filterBag: 0,
         processing: 0,
         sieving: 0,
-        psdReport: 0,
+        psdReportDry: 0,
+        psdReportWet: 0,
         liner: 0,
         courier: 0,
         fiberDrum: 0,
@@ -302,8 +304,8 @@ const Parties = () => {
                   <input 
                     type="text" 
                     className="input-field" 
-                    readOnly
                     value={formData.vendorCode}
+                    onChange={e => setFormData({...formData, vendorCode: e.target.value})}
                     style={{ background: 'rgba(255,255,255,0.02)', color: 'var(--accent-primary)', fontWeight: 600 }}
                   />
                 </div>
@@ -562,11 +564,24 @@ const Parties = () => {
 
               <h4 style={{ margin: '1rem 0 0.5rem 0', fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>Default Standard Charge Rates (₹)</h4>
               
+              <datalist id="amountOptions">
+                <option value="0" />
+                <option value="5" />
+                <option value="35" />
+                <option value="70" />
+                <option value="500" />
+                <option value="550" />
+                <option value="1350" />
+                <option value="1500" />
+                <option value="3500" />
+                <option value="4500" />
+              </datalist>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.8rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label style={{ fontSize: '0.75rem' }}>Min Cleaning (998842)</label>
                   <input 
-                    type="number" 
+                    type="number" list="amountOptions"
                     className="input-field" 
                     value={productData.charges.cleaning}
                     onChange={e => setProductData({...productData, charges: {...productData.charges, cleaning: parseFloat(e.target.value) || 0}})}
@@ -575,7 +590,7 @@ const Parties = () => {
                 <div>
                   <label style={{ fontSize: '0.75rem' }}>Filter Bag (591190)</label>
                   <input 
-                    type="number" 
+                    type="number" list="amountOptions"
                     className="input-field" 
                     value={productData.charges.filterBag}
                     onChange={e => setProductData({...productData, charges: {...productData.charges, filterBag: parseFloat(e.target.value) || 0}})}
@@ -584,7 +599,7 @@ const Parties = () => {
                 <div>
                   <label style={{ fontSize: '0.75rem' }}>Processing (998842)</label>
                   <input 
-                    type="number" 
+                    type="number" list="amountOptions"
                     className="input-field" 
                     value={productData.charges.processing}
                     onChange={e => setProductData({...productData, charges: {...productData.charges, processing: parseFloat(e.target.value) || 0}})}
@@ -593,25 +608,34 @@ const Parties = () => {
                 <div>
                   <label style={{ fontSize: '0.75rem' }}>Sieving (998842)</label>
                   <input 
-                    type="number" 
+                    type="number" list="amountOptions"
                     className="input-field" 
                     value={productData.charges.sieving}
                     onChange={e => setProductData({...productData, charges: {...productData.charges, sieving: parseFloat(e.target.value) || 0}})}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.75rem' }}>PSD Report (998346)</label>
+                  <label style={{ fontSize: '0.75rem' }}>PSD Report Dry (998346)</label>
                   <input 
-                    type="number" 
+                    type="number" list="amountOptions"
                     className="input-field" 
-                    value={productData.charges.psdReport}
-                    onChange={e => setProductData({...productData, charges: {...productData.charges, psdReport: parseFloat(e.target.value) || 0}})}
+                    value={productData.charges.psdReportDry}
+                    onChange={e => setProductData({...productData, charges: {...productData.charges, psdReportDry: parseFloat(e.target.value) || 0}})}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem' }}>PSD Report Wet (998346)</label>
+                  <input 
+                    type="number" list="amountOptions"
+                    className="input-field" 
+                    value={productData.charges.psdReportWet}
+                    onChange={e => setProductData({...productData, charges: {...productData.charges, psdReportWet: parseFloat(e.target.value) || 0}})}
                   />
                 </div>
                 <div>
                   <label style={{ fontSize: '0.75rem' }}>Liner (39233090)</label>
                   <input 
-                    type="number" 
+                    type="number" list="amountOptions"
                     className="input-field" 
                     value={productData.charges.liner}
                     onChange={e => setProductData({...productData, charges: {...productData.charges, liner: parseFloat(e.target.value) || 0}})}
@@ -620,7 +644,7 @@ const Parties = () => {
                 <div>
                   <label style={{ fontSize: '0.75rem' }}>Courier (996812)</label>
                   <input 
-                    type="number" 
+                    type="number" list="amountOptions"
                     className="input-field" 
                     value={productData.charges.courier}
                     onChange={e => setProductData({...productData, charges: {...productData.charges, courier: parseFloat(e.target.value) || 0}})}
@@ -629,7 +653,7 @@ const Parties = () => {
                 <div>
                   <label style={{ fontSize: '0.75rem' }}>Fiber Drum (7310)</label>
                   <input 
-                    type="number" 
+                    type="number" list="amountOptions"
                     className="input-field" 
                     value={productData.charges.fiberDrum}
                     onChange={e => setProductData({...productData, charges: {...productData.charges, fiberDrum: parseFloat(e.target.value) || 0}})}
@@ -638,7 +662,7 @@ const Parties = () => {
                 <div>
                   <label style={{ fontSize: '0.75rem' }}>Transportation (996511)</label>
                   <input 
-                    type="number" 
+                    type="number" list="amountOptions"
                     className="input-field" 
                     value={productData.charges.transportation}
                     onChange={e => setProductData({...productData, charges: {...productData.charges, transportation: parseFloat(e.target.value) || 0}})}
@@ -647,7 +671,7 @@ const Parties = () => {
                 <div>
                   <label style={{ fontSize: '0.75rem' }}>HDPE Drum (39233090)</label>
                   <input 
-                    type="number" 
+                    type="number" list="amountOptions"
                     className="input-field" 
                     value={productData.charges.hdpeDrum}
                     onChange={e => setProductData({...productData, charges: {...productData.charges, hdpeDrum: parseFloat(e.target.value) || 0}})}
@@ -656,10 +680,20 @@ const Parties = () => {
                 <div style={{ gridColumn: 'span 2' }}>
                   <label style={{ fontSize: '0.75rem' }}>Batch Change Over (998842)</label>
                   <input 
-                    type="number" 
+                    type="number" list="amountOptions"
                     className="input-field" 
                     value={productData.charges.batchChangeover}
                     onChange={e => setProductData({...productData, charges: {...productData.charges, batchChangeover: parseFloat(e.target.value) || 0}})}
+                  />
+                </div>
+                <div style={{ gridColumn: 'span 3' }}>
+                  <label>Additional Notes / Remarks</label>
+                  <textarea 
+                    className="input-field" 
+                    rows="2"
+                    placeholder="Any custom terms or notes for this product"
+                    value={productData.notes}
+                    onChange={e => setProductData({...productData, notes: e.target.value})}
                   />
                 </div>
               </div>

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Plus, Bell, Calendar, Clock, RotateCw, CheckCircle, Trash2 } from 'lucide-react';
+import { Plus, Bell, Calendar, Clock, RotateCw, CheckCircle, Trash2, Edit2 } from 'lucide-react';
 
 const TaskManager = () => {
   const { data, updateData, updateItem, setData } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const [form, setForm] = useState({
@@ -80,17 +81,27 @@ const TaskManager = () => {
     return () => clearInterval(checkAlarms);
   }, [data.tasks]);
 
+  const handleEdit = (task) => {
+    setForm(task);
+    setIsEditing(task.id);
+    setIsModalOpen(true);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.title) return;
 
-    const newTask = {
-      ...form,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-
-    updateData('tasks', newTask);
+    if (isEditing) {
+      updateItem('tasks', isEditing, { ...form });
+    } else {
+      const newTask = {
+        ...form,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString()
+      };
+      updateData('tasks', newTask);
+    }
+    setIsEditing(null);
     setIsModalOpen(false);
     setForm({
       title: '',
@@ -162,6 +173,9 @@ const TaskManager = () => {
                     {task.notes && <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>{task.notes}</p>}
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button onClick={() => handleEdit(task)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} title="Edit Task">
+                      <Edit2 size={16} />
+                    </button>
                     <button onClick={() => toggleTaskStatus(task)} style={{ background: 'transparent', border: 'none', color: 'rgba(16, 185, 129, 0.6)', cursor: 'pointer' }} title="Complete Task">
                       <CheckCircle size={18} />
                     </button>
@@ -202,7 +216,7 @@ const TaskManager = () => {
       {isModalOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)' }}>
           <div className="premium-card" style={{ width: '500px', maxWidth: '90%' }}>
-            <h2 style={{ marginBottom: '1.5rem' }}>Schedule Task reminder</h2>
+            <h2 style={{ marginBottom: '1.5rem' }}>{isEditing ? 'Edit Task Reminder' : 'Schedule Task reminder'}</h2>
             
             <form onSubmit={handleSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1.5rem' }}>

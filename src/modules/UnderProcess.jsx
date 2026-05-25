@@ -9,7 +9,8 @@ import { exportToPDF } from '../utils/pdfExport';
 
 const UnderProcess = () => {
   const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
-  const [activeModal, setActiveModal] = useState(null); // 'PI' | 'BPR' | 'PSD' | 'PL' | 'DC' | 'EWDC' | 'TI' | 'EWTI' | null
+  const [activeModal, setActiveModal] = useState(null);
+  const [activeTab, setActiveTab] = useState('All');
   const [modalContext, setModalContext] = useState(null); // Active M.R. record
   const [editingDoc, setEditingDoc] = useState(null); // If editing an existing doc
   const [showDocPopover, setShowDocPopover] = useState(null); // { cellType, doc, mrId } for blue click
@@ -91,6 +92,27 @@ const UnderProcess = () => {
         <p style={{ color: 'var(--text-muted)' }}>Interactive workflow command center. Monitor real-time progress and generate downstream documents.</p>
       </header>
 
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+        {['All', 'Pending', 'Completed'].map(tab => (
+          <button 
+            key={tab} 
+            onClick={() => setActiveTab(tab)} 
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              padding: '0.5rem 1rem', 
+              fontSize: '1rem', 
+              fontWeight: 600, 
+              color: activeTab === tab ? 'var(--accent-primary)' : 'var(--text-muted)',
+              borderBottom: activeTab === tab ? '2px solid var(--accent-primary)' : 'none',
+              cursor: 'pointer'
+            }}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
       {/* Process Matrix */}
       <div className="premium-card" style={{ padding: '1rem', overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
@@ -118,7 +140,18 @@ const UnderProcess = () => {
                 </td>
               </tr>
             ) : (
-              (data.materialReceipts || []).map(mr => {
+              (data.materialReceipts || []).filter(mr => {
+                  const pi = getPI(mr.id);
+                  const bpr = getBPR(mr.id);
+                  const psd = getPSD(mr.id);
+                  const pl = getPL(mr.id);
+                  const dc = getDC(mr.id);
+                  const ti = getTI(mr.id);
+                  const isComplete = pi && bpr && psd && pl && dc && ti;
+                  if (activeTab === 'Completed') return isComplete;
+                  if (activeTab === 'Pending') return !isComplete;
+                  return true;
+                }).map(mr => {
                 const pi = getPI(mr.id);
                 const bpr = getBPR(mr.id);
                 const psd = getPSD(mr.id);
@@ -136,9 +169,14 @@ const UnderProcess = () => {
                     {/* 1. Performa Invoice (PI) */}
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                       {pi ? (
-                        <button onClick={(e) => handleBlueClick(mr.id, 'PI', pi, e)} style={blueStyle}>
-                          {pi.invoiceNo.split('/').slice(-1)[0]}
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
+                          <button onClick={() => exportToPDF('PI', pi)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View PDF">
+                            <FileText size={14} />
+                          </button>
+                          <button onClick={(e) => handleBlueClick(mr.id, 'PI', pi, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
+                            {pi.invoiceNo.split('/').slice(-1)[0]}
+                          </button>
+                        </div>
                       ) : (
                         <button onClick={() => handlePendingClick(mr, 'PI')} style={yellowStyle}>Pending</button>
                       )}
@@ -147,9 +185,14 @@ const UnderProcess = () => {
                     {/* 2. BPR */}
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                       {bpr ? (
-                        <button onClick={(e) => handleBlueClick(mr.id, 'BPR', bpr, e)} style={blueStyle}>
-                          {bpr.bprNo.split('/').slice(-1)[0]}
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
+                          <button onClick={() => exportToPDF('BPR', bpr)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View PDF">
+                            <FileText size={14} />
+                          </button>
+                          <button onClick={(e) => handleBlueClick(mr.id, 'BPR', bpr, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
+                            {bpr.bprNo.split('/').slice(-1)[0]}
+                          </button>
+                        </div>
                       ) : (
                         <button onClick={() => handlePendingClick(mr, 'BPR')} style={yellowStyle}>Pending</button>
                       )}
@@ -158,9 +201,14 @@ const UnderProcess = () => {
                     {/* 3. PSD Uploader */}
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                       {psd ? (
-                        <button onClick={(e) => handleBlueClick(mr.id, 'PSD', psd, e)} style={blueStyle}>
-                          {psd.psdNo.split('/').slice(-1)[0]}
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
+                          <button onClick={() => exportToPDF('PSD', psd)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View PDF">
+                            <FileText size={14} />
+                          </button>
+                          <button onClick={(e) => handleBlueClick(mr.id, 'PSD', psd, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
+                            {psd.psdNo.split('/').slice(-1)[0]}
+                          </button>
+                        </div>
                       ) : (
                         <button onClick={() => handlePendingClick(mr, 'PSD')} style={yellowStyle}>Pending</button>
                       )}
@@ -169,9 +217,14 @@ const UnderProcess = () => {
                     {/* 4. Packing List (PL) */}
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                       {pl ? (
-                        <button onClick={(e) => handleBlueClick(mr.id, 'PL', pl, e)} style={blueStyle}>
-                          {pl.plNo.split('/').slice(-1)[0]}
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
+                          <button onClick={() => exportToPDF('PL', pl)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View PDF">
+                            <FileText size={14} />
+                          </button>
+                          <button onClick={(e) => handleBlueClick(mr.id, 'PL', pl, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
+                            {pl.plNo.split('/').slice(-1)[0]}
+                          </button>
+                        </div>
                       ) : (
                         <button onClick={() => handlePendingClick(mr, 'PL')} style={yellowStyle} disabled={!bpr}>Pending</button>
                       )}
@@ -180,9 +233,14 @@ const UnderProcess = () => {
                     {/* 5. Delivery Challan (DC) */}
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                       {dc ? (
-                        <button onClick={(e) => handleBlueClick(mr.id, 'DC', dc, e)} style={blueStyle}>
-                          {dc.dcNo.split('/').slice(-1)[0]}
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
+                          <button onClick={() => exportToPDF('DC', dc)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View PDF">
+                            <FileText size={14} />
+                          </button>
+                          <button onClick={(e) => handleBlueClick(mr.id, 'DC', dc, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
+                            {dc.dcNo.split('/').slice(-1)[0]}
+                          </button>
+                        </div>
                       ) : (
                         <button onClick={() => handlePendingClick(mr, 'DC')} style={yellowStyle} disabled={!pl}>Pending</button>
                       )}
@@ -202,9 +260,14 @@ const UnderProcess = () => {
                     {/* 7. Tax Invoice */}
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                       {ti ? (
-                        <button onClick={(e) => handleBlueClick(mr.id, 'TI', ti, e)} style={blueStyle}>
-                          {ti.invoiceNo.split('/').slice(-1)[0]}
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
+                          <button onClick={() => exportToPDF('TI', ti)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View PDF">
+                            <FileText size={14} />
+                          </button>
+                          <button onClick={(e) => handleBlueClick(mr.id, 'TI', ti, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
+                            {ti.invoiceNo.split('/').slice(-1)[0]}
+                          </button>
+                        </div>
                       ) : (
                         <button onClick={() => handlePendingClick(mr, 'TI')} style={yellowStyle} disabled={!pl}>Pending</button>
                       )}

@@ -22,9 +22,21 @@ export const AppProvider = ({ children }) => {
       psds: [],
       productionPlans: [],
       stockAdjustments: [],
+      quotations: [],
+      debitNotes: [],
+      creditNotes: [],
+      purchaseOrders: [],
+      auditLogs: [],
+      users: [
+        { id: 1, username: 'Admin', role: 'Admin', active: true },
+        { id: 2, username: 'Staff1', role: 'Staff', permissions: [], active: true },
+        { id: 3, username: 'Staff2', role: 'Staff', permissions: [], active: true },
+        { id: 4, username: 'Staff3', role: 'Staff', permissions: [], active: true }
+      ],
+      currentUser: { id: 1, username: 'Admin', role: 'Admin' },
       settings: {
         userRole: 'Admin',
-        serials: { MR: 1, BPR: 1, PL: 1, INV: 1, PI: 1, DC: 1, MI: 1, VC: 1, PSD: 1, TI: 1, EWDC: 1, EWTI: 1 }
+        serials: { MR: 1, BPR: 1, PL: 1, INV: 1, PI: 1, DC: 1, MI: 1, VC: 1, PSD: 1, TI: 1, EWDC: 1, EWTI: 1, QT: 1, DN: 1, CN: 1, PO: 1 }
       }
     };
 
@@ -47,7 +59,14 @@ export const AppProvider = ({ children }) => {
         payments: parsed.payments || [],
         bprs: parsed.bprs || [],
         packingLists: parsed.packingLists || [],
-        invoices: parsed.invoices || []
+        invoices: parsed.invoices || [],
+        quotations: parsed.quotations || [],
+        debitNotes: parsed.debitNotes || [],
+        creditNotes: parsed.creditNotes || [],
+        purchaseOrders: parsed.purchaseOrders || [],
+        auditLogs: parsed.auditLogs || [],
+        users: parsed.users || baseState.users,
+        currentUser: parsed.currentUser || baseState.currentUser
       };
     } catch (e) {
       return baseState;
@@ -62,6 +81,20 @@ export const AppProvider = ({ children }) => {
     }
   }, [data]);
 
+  // Helper for audit logging
+  const logAudit = (prevData, action, module, oldValue, newValue) => {
+    const newLog = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+      action,
+      module,
+      oldValue,
+      newValue,
+      user: prevData.currentUser ? prevData.currentUser.username : 'System',
+      timestamp: new Date().toISOString()
+    };
+    return [...(prevData.auditLogs || []), newLog];
+  };
+
   const updateData = (module, newItem) => {
     if (!data[module]) {
       console.error(`Module ${module} not found in state.`);
@@ -69,15 +102,46 @@ export const AppProvider = ({ children }) => {
     }
     setData(prev => ({
       ...prev,
-      [module]: [...(prev[module] || []), newItem]
+      [module]: [...(prev[module] || []), newItem],
+      auditLogs: logAudit(prev, 'CREATE', module, null, newItem)
     }));
   };
 
   const updateItem = (module, id, updatedItem) => {
-    setData(prev => ({
-      ...prev,
-      [module]: (prev[module] || []).map(item => item.id === id ? updatedItem : item)
-    }));
+    setData(prev => {
+      const oldItem = (prev[module] || []).find(i => i.id === id);
+      return {
+        ...prev,
+        [module]: (prev[module] || []).map(item => item.id === id ? updatedItem : item),
+        auditLogs: logAudit(prev, 'UPDATE', module, oldItem, updatedItem)
+      };
+    });
+  };
+
+  const deleteItemSoftly = (module, id) => {
+    setData(prev => {
+      const oldItem = (prev[module] || []).find(i => i.id === id);
+      if (!oldItem) return prev;
+      const updatedItem = { ...oldItem, isDeleted: true, deletedAt: new Date().toISOString() };
+      return {
+        ...prev,
+        [module]: (prev[module] || []).map(item => item.id === id ? updatedItem : item),
+        auditLogs: logAudit(prev, 'DELETE', module, oldItem, updatedItem)
+      };
+    });
+  };
+
+  const restoreItem = (module, id) => {
+    setData(prev => {
+      const oldItem = (prev[module] || []).find(i => i.id === id);
+      if (!oldItem) return prev;
+      const updatedItem = { ...oldItem, isDeleted: false, deletedAt: undefined };
+      return {
+        ...prev,
+        [module]: (prev[module] || []).map(item => item.id === id ? updatedItem : item),
+        auditLogs: logAudit(prev, 'RESTORE', module, oldItem, updatedItem)
+      };
+    });
   };
 
   const incrementSerial = (docType) => {
@@ -94,7 +158,9 @@ export const AppProvider = ({ children }) => {
   };
 
   return (
-    <AppContext.Provider value={{ data, setData, updateData, updateItem, incrementSerial }}>
+    <AppContext.Provider value={{ 
+      data, setData, updateData, updateItem, deleteItemSoftly, restoreItem, incrementSerial 
+    }}>
       {children}
     </AppContext.Provider>
   );

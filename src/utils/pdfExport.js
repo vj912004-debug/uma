@@ -1,21 +1,26 @@
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export const exportToPDF = (docType, data) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   
-  // Header banner
-  doc.setFillColor(16, 185, 129); // Beautiful UMA Emerald
-  doc.rect(0, 0, pageWidth, 35, 'F');
-  
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(22);
+  // Header section
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(20);
   doc.setFont("helvetica", "bold");
   doc.text("UMA MICRON", 15, 20);
   
-  doc.setFontSize(9);
+  doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text("Process Tracking, Milling & Job Work ERP", 15, 28);
+  doc.text("PLOT NO 1116 G.I.D.C. RANOLI, N.H.NO. 8,", 15, 26);
+  doc.text("VADODARA - 391350, GUJARAT INDIA", 15, 31);
+  doc.text("Tel: +91 97120 00297, Email : umamicron@gmail.com", 15, 36);
+  doc.setFont("helvetica", "bold");
+  doc.text("GSTIN: 24AGBPP8564D1ZE", 15, 41);
+
+  doc.setDrawColor(200, 200, 200);
+  doc.line(15, 45, pageWidth - 15, 45);
   
   // Title
   doc.setTextColor(0, 0, 0);
@@ -27,10 +32,10 @@ export const exportToPDF = (docType, data) => {
                 docType === 'PL' ? 'PACKING LIST' : 
                 docType === 'DC' ? 'DELIVERY CHALLAN' : docType.toUpperCase();
   
-  doc.text(title, 15, 48);
+  doc.text(title, 15, 55);
   
   doc.setDrawColor(200, 200, 200);
-  doc.line(15, 52, pageWidth - 15, 52);
+  doc.line(15, 59, pageWidth - 15, 59);
   
   // Primary Info grid
   doc.setFontSize(10);
@@ -40,28 +45,86 @@ export const exportToPDF = (docType, data) => {
   const docDate = data.date || 'N/A';
   
   doc.setFont("helvetica", "bold");
-  doc.text(`Document No:`, 15, 62);
+  doc.text(`Document No:`, 15, 69);
   doc.setFont("helvetica", "normal");
-  doc.text(`${docNo}`, 45, 62);
+  doc.text(`${docNo}`, 45, 69);
   
   doc.setFont("helvetica", "bold");
-  doc.text(`Date:`, 15, 68);
+  doc.text(`Date:`, 15, 75);
   doc.setFont("helvetica", "normal");
-  doc.text(`${docDate}`, 45, 68);
+  doc.text(`${docDate}`, 45, 75);
   
   doc.setFont("helvetica", "bold");
-  doc.text(`Customer Party:`, 15, 74);
+  doc.text(`Customer Party:`, 15, 81);
   doc.setFont("helvetica", "normal");
-  doc.text(`${data.partyName || 'UMA MICRON CORP'}`, 45, 74);
+  doc.text(`${data.partyName || 'UMA MICRON CORP'}`, 45, 81);
 
   doc.setFont("helvetica", "bold");
-  doc.text(`Product Chemical:`, 15, 80);
+  doc.text(`Product Chemical:`, 15, 87);
   doc.setFont("helvetica", "normal");
-  doc.text(`${data.productName || 'N/A'}`, 45, 80);
+  doc.text(`${data.productName || 'N/A'}`, 45, 87);
   
-  let yPos = 95;
+  let yPos = 102;
   
-  if (docType === 'PI' || docType === 'TI' || data.charges) {
+  if (docType === 'QUOTATION') {
+    doc.setFont("helvetica", "bold");
+    doc.text(`Attn: ${data.contactPerson || 'To whomsoever it may concern'}`, 15, yPos);
+    yPos += 8;
+    doc.text(`Sub: ${data.subject}`, 15, yPos);
+    yPos += 10;
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(`Dear Sir/Madam,`, 15, yPos);
+    yPos += 6;
+    doc.text(`With reference to your inquiry, we are pleased to offer our quotation for Micronizing Job Work for your product ${data.productName} as under:`, 15, yPos, { maxWidth: pageWidth - 30 });
+    yPos += 12;
+
+    doc.setFillColor(245, 245, 245);
+    doc.rect(15, yPos - 5, pageWidth - 30, 8, 'F');
+    doc.setFont("helvetica", "bold");
+    doc.text("Particulars / Description", 18, yPos);
+    doc.text("Rate", 140, yPos);
+    yPos += 8;
+    doc.setFont("helvetica", "normal");
+
+    (data.mainCharges || []).forEach(c => {
+      if (c.description) {
+        doc.text(c.description, 18, yPos);
+        doc.text(c.rate, 140, yPos);
+        yPos += 8;
+      }
+    });
+
+    if (data.optionalCharges && data.optionalCharges.length > 0 && data.optionalCharges.some(c => c.description)) {
+      yPos += 4;
+      doc.setFont("helvetica", "bold");
+      doc.text("Optional / Extra Items (If Required)", 15, yPos);
+      yPos += 6;
+      doc.setFont("helvetica", "normal");
+      data.optionalCharges.forEach(c => {
+        if (c.description) {
+          doc.text(c.description, 18, yPos);
+          doc.text(c.rate, 140, yPos);
+          yPos += 8;
+        }
+      });
+    }
+
+    yPos += 10;
+    doc.setFont("helvetica", "bold");
+    doc.text("Terms & Conditions:", 15, yPos);
+    yPos += 6;
+    doc.setFont("helvetica", "normal");
+    const termsLines = doc.splitTextToSize(data.terms || '', pageWidth - 30);
+    doc.text(termsLines, 15, yPos);
+    yPos += termsLines.length * 5 + 15;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("For UMA MICRON CORP.", pageWidth - 70, yPos);
+    yPos += 20;
+    doc.text("Authorized Signatory", pageWidth - 70, yPos);
+
+  } else if (docType === 'PI' || docType === 'TI' || data.charges) {
     // Render standard invoice charges checklist table
     doc.setFillColor(245, 245, 245);
     doc.rect(15, yPos - 5, pageWidth - 30, 8, 'F');

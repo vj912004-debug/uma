@@ -16,7 +16,13 @@ import {
   DollarSign, 
   CreditCard, 
   Bell,
-  Settings
+  Settings,
+  Archive,
+  DatabaseBackup,
+  PlusSquare,
+  FileMinus,
+  FilePlus,
+  ShoppingCart
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
@@ -28,7 +34,8 @@ const Sidebar = () => {
     {
       title: "Master Data",
       items: [
-        { name: 'Add Party', icon: Users, path: '/parties', roles: ['Admin', 'Staff'] }
+        { name: 'Add Party', icon: Users, path: '/parties', roles: ['Admin', 'Staff'] },
+        { name: 'Quotations', icon: PlusSquare, path: '/quotations', roles: ['Admin', 'Staff'] }
       ]
     },
     {
@@ -47,6 +54,7 @@ const Sidebar = () => {
     {
       title: "Documents & Flows",
       items: [
+        { name: 'Purchase Order (PO)', icon: ShoppingCart, path: '/purchase-orders', roles: ['Admin', 'Staff'] },
         { name: 'Performa Invoice (PI)', icon: FileText, path: '/invoices-pi', roles: ['Admin', 'Staff'] },
         { name: 'Batch Processing Record (BPR)', icon: Activity, path: '/bpr', roles: ['Admin', 'Staff'] },
         { name: 'PSD Upload', icon: UploadCloud, path: '/psd', roles: ['Admin', 'Staff'] },
@@ -54,7 +62,9 @@ const Sidebar = () => {
         { name: 'Delivery Challan (DC)', icon: Truck, path: '/dc', roles: ['Admin', 'Staff'] },
         { name: 'E Way Bill from DC', icon: FileSpreadsheet, path: '/eway-dc', roles: ['Admin', 'Staff'] },
         { name: 'Tax Invoice', icon: FileCheck, path: '/tax-invoice', roles: ['Admin', 'Staff'] },
-        { name: 'E Way Bill from Tax Invoice', icon: FileSpreadsheet, path: '/eway-ti', roles: ['Admin', 'Staff'] }
+        { name: 'E Way Bill from Tax Invoice', icon: FileSpreadsheet, path: '/eway-ti', roles: ['Admin', 'Staff'] },
+        { name: 'Debit Note', icon: FileMinus, path: '/debit-notes', roles: ['Admin', 'Staff'] },
+        { name: 'Credit Note', icon: FilePlus, path: '/credit-notes', roles: ['Admin', 'Staff'] }
       ]
     },
     {
@@ -74,6 +84,13 @@ const Sidebar = () => {
       title: "Productivity",
       items: [
         { name: 'Task Reminder', icon: Bell, path: '/tasks', roles: ['Admin', 'Staff'] }
+      ]
+    },
+    {
+      title: "System",
+      items: [
+        { name: 'Recycle Bin', icon: Archive, path: '/recycle-bin', roles: ['Admin'] },
+        { name: 'Backups & Logs', icon: DatabaseBackup, path: '/system-logs', roles: ['Admin'] }
       ]
     }
   ];
