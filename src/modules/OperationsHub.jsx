@@ -1,3 +1,4 @@
+import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Search, Filter, Download, Calendar, User, Package, FileDown } from 'lucide-react';
@@ -101,7 +102,7 @@ const OperationsHub = () => {
               ) : (
                 filteredList.map(item => (
                   <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }}>
-                    <td style={{ padding: '1rem', fontSize: '0.875rem' }}>{item.date}</td>
+                    <td style={{ padding: '1rem', fontSize: '0.875rem' }}>{formatDate(item.date)}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <User size={14} color="var(--text-muted)" />

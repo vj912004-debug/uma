@@ -2,7 +2,7 @@ import React from 'react';
 import { useAppContext } from '../context/AppContext';
 
 const RecycleBin = () => {
-  const { data, restoreItem } = useAppContext();
+  const { data, restoreItem, hardDeleteItem } = useAppContext();
 
   // Find all items with isDeleted: true across all modules
   const getDeletedItems = () => {
@@ -47,9 +47,18 @@ const RecycleBin = () => {
                   <td style={{textTransform:'capitalize'}}>{item._module}</td>
                   <td>{item.name || item.partyName || item.productName || item.batchNo || item.id}</td>
                   <td>
-                    <button className="btn-secondary" onClick={() => restoreItem(item._module, item.id)}>
-                      Restore
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button className="btn-secondary" onClick={() => restoreItem(item._module, item.id)}>
+                        Restore
+                      </button>
+                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }} onClick={() => {
+                        if (window.confirm("Permanently delete this record? This action cannot be undone.")) {
+                          hardDeleteItem(item._module, item.id);
+                        }
+                      }}>
+                        Permanent Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

@@ -94,10 +94,7 @@ const PackingList = () => {
 
   const deletePL = (id) => {
     if (window.confirm("Delete this Packing List record?")) {
-      setData(prev => ({
-        ...prev,
-        packingLists: prev.packingLists.filter(p => p.id !== id)
-      }));
+      deleteItemSoftly('packingLists', id);
     }
   };
 

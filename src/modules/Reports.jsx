@@ -1,3 +1,4 @@
+import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { BarChart3, PieChart, FileText, Download } from 'lucide-react';
@@ -68,7 +69,7 @@ const SalesTable = ({ data }) => (
         {data.map(inv => (
           <tr key={inv.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
             <td style={{ padding: '1rem' }}>{inv.invoiceNo}</td>
-            <td style={{ padding: '1rem' }}>{inv.date}</td>
+            <td style={{ padding: '1rem' }}>{formatDate(inv.date)}</td>
             <td style={{ padding: '1rem' }}>{inv.partyName}</td>
             <td style={{ padding: '1rem' }}>₹{inv.subtotal.toLocaleString()}</td>
             <td style={{ padding: '1rem' }}>₹{inv.taxAmount.toLocaleString()}</td>
@@ -125,7 +126,7 @@ const PaymentTable = ({ data }) => (
       <tbody>
         {data.map(pay => (
           <tr key={pay.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-            <td style={{ padding: '1rem' }}>{pay.date}</td>
+            <td style={{ padding: '1rem' }}>{formatDate(pay.date)}</td>
             <td style={{ padding: '1rem' }}>{pay.invoiceNo}</td>
             <td style={{ padding: '1rem' }}>{pay.partyName}</td>
             <td style={{ padding: '1rem' }}>{pay.paymentMode}</td>

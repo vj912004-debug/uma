@@ -1,3 +1,4 @@
+import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Search, Filter, ArrowUpDown } from 'lucide-react';
@@ -157,7 +158,7 @@ const ProcessingSheet = () => {
                 filteredRows.map((row, idx) => (
                   <tr key={row.id} style={{ borderBottom: '1px solid var(--border-color)', background: idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent' }}>
                     <td style={{ padding: '0.75rem', fontWeight: 600 }}>{row.srNo}</td>
-                    <td style={{ padding: '0.75rem' }}>{row.date}</td>
+                    <td style={{ padding: '0.75rem' }}>{formatDate(row.date)}</td>
                     <td style={{ padding: '0.75rem', fontWeight: 600, color: 'white' }}>{row.partyName}</td>
                     <td style={{ padding: '0.75rem' }}>{row.productName}</td>
                     <td style={{ padding: '0.75rem', fontWeight: 500 }}>{row.receivedQty} Kg</td>

@@ -1,3 +1,4 @@
+import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, CreditCard, Banknote, Calendar, Search } from 'lucide-react';
@@ -125,7 +126,7 @@ const Payments = () => {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                     <span>{pay.invoiceNo}</span>
-                    <span>{pay.date}</span>
+                    <span>{formatDate(pay.date)}</span>
                   </div>
                 </div>
               ))

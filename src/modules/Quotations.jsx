@@ -6,7 +6,7 @@ import { exportToPDF } from '../utils/pdfExport';
 import { formatDate } from '../utils/dateUtils';
 
 const Quotations = () => {
-  const { data, updateData, deleteDataSoftly, incrementSerial } = useAppContext();
+  const { data, updateData, deleteItemSoftly, incrementSerial } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -123,7 +123,7 @@ const Quotations = () => {
                       <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }} onClick={() => exportToPDF('QUOTATION', q)}>
                         <Download size={14} /> PDF
                       </button>
-                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} onClick={() => deleteDataSoftly('quotations', q.id)}>
+                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} onClick={() => deleteItemSoftly('quotations', q.id)}>
                         <Trash2 size={14} />
                       </button>
                     </div>

@@ -77,10 +77,7 @@ const DeliveryChallan = () => {
 
   const deleteDC = (id) => {
     if (window.confirm("Delete this Delivery Challan record?")) {
-      setData(prev => ({
-        ...prev,
-        deliveryChallans: prev.deliveryChallans.filter(d => d.id !== id)
-      }));
+      deleteItemSoftly('deliveryChallans', id);
     }
   };
 

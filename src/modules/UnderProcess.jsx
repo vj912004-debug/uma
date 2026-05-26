@@ -1,3 +1,4 @@
+import { formatDate } from '../utils/dateUtils';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
@@ -161,7 +162,7 @@ const UnderProcess = () => {
 
                 return (
                   <tr key={mr.id} style={{ borderBottom: '1px solid var(--border-color)', hover: { background: 'rgba(255,255,255,0.01)' } }}>
-                    <td style={{ padding: '1rem', fontWeight: 500 }}>{mr.date}</td>
+                    <td style={{ padding: '1rem', fontWeight: 500 }}>{formatDate(mr.date)}</td>
                     <td style={{ padding: '1rem', fontWeight: 600 }}>{mr.partyName}</td>
                     <td style={{ padding: '1rem' }}>{mr.productName} {mr.nickName ? `(${mr.nickName})` : ''}</td>
                     <td style={{ padding: '1rem', fontWeight: 600 }}>{mr.totalQty || mr.receivedQty || 0}</td>

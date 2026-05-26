@@ -1,3 +1,4 @@
+import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Search, Plus, CreditCard, DollarSign } from 'lucide-react';
@@ -224,7 +225,7 @@ const PartyDue = () => {
                       const due = Math.max(0, (ti?.total || 0) - paidTotal);
                       return (
                         <option key={mr.id} value={mr.id}>
-                          {mr.receiptNo} - {mr.productName} ({mr.date}) - Balance Due: ₹{due.toFixed(2)}
+                          {mr.receiptNo} - {mr.productName} ({formatDate(mr.date)}) - Balance Due: ₹{due.toFixed(2)}
                         </option>
                       );
                     })}

@@ -144,6 +144,22 @@ export const AppProvider = ({ children }) => {
     });
   };
 
+  const hardDeleteItem = (module, id) => {
+    if (data.settings?.userRole === 'Staff') {
+      alert("Staff users do not have permissions to permanently delete records.");
+      return;
+    }
+    setData(prev => {
+      const oldItem = (prev[module] || []).find(i => i.id === id);
+      if (!oldItem) return prev;
+      return {
+        ...prev,
+        [module]: (prev[module] || []).filter(item => item.id !== id),
+        auditLogs: logAudit(prev, 'HARD_DELETE', module, oldItem, null)
+      };
+    });
+  };
+
   const incrementSerial = (docType) => {
     setData(prev => ({
       ...prev,
@@ -159,7 +175,7 @@ export const AppProvider = ({ children }) => {
 
   return (
     <AppContext.Provider value={{ 
-      data, setData, updateData, updateItem, deleteItemSoftly, restoreItem, incrementSerial 
+      data, setData, updateData, updateItem, deleteItemSoftly, restoreItem, hardDeleteItem, incrementSerial 
     }}>
       {children}
     </AppContext.Provider>

@@ -1,3 +1,4 @@
+import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Package, History, SlidersHorizontal, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
@@ -150,7 +151,7 @@ const Inventory = () => {
               <tbody>
                 {data.stockAdjustments.map(adj => (
                   <tr key={adj.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '1rem' }}>{adj.date}</td>
+                    <td style={{ padding: '1rem' }}>{formatDate(adj.date)}</td>
                     <td style={{ padding: '1rem', fontWeight: 600 }}>{adj.item}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: adj.type === 'Increase' ? '#10b981' : '#ef4444' }}>

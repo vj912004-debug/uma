@@ -21,7 +21,10 @@ const BPR = () => {
     totalDrums: 0,
     doubleDispatch: false,
     receivedBatches: [], // Array of { batchNo, drumNo, gross, tare, net }
-    dispatchedBatches: [] // Array of { batchNo, drumNo, gross, tare, net }
+    dispatchedBatches: [], // Array of { batchNo, drumNo, gross, tare, net }
+    cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false },
+    pressureMetrics: { grindingPressure: '', injectionPressure: '' },
+    packingConsumables: { fiberDrumsUsed: 0, hdpeDrumsUsed: 0, linersUsed: 0 }
   });
 
   // Calculate totals in real-time
@@ -60,7 +63,10 @@ const BPR = () => {
       totalDrums: mr.totalDrums || 0,
       doubleDispatch: false,
       receivedBatches: receivedRows,
-      dispatchedBatches: receivedRows.map(r => ({ ...r }))
+      dispatchedBatches: receivedRows.map(r => ({ ...r })),
+      cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false },
+      pressureMetrics: { grindingPressure: '', injectionPressure: '' },
+      packingConsumables: { fiberDrumsUsed: 0, hdpeDrumsUsed: 0, linersUsed: 0 }
     });
 
     setIsModalOpen(true);
@@ -132,10 +138,7 @@ const BPR = () => {
 
   const deleteBPR = (id) => {
     if (window.confirm("Delete this BPR record?")) {
-      setData(prev => ({
-        ...prev,
-        bprs: prev.bprs.filter(b => b.id !== id)
-      }));
+      deleteItemSoftly('bprs', id);
     }
   };
 
@@ -264,6 +267,51 @@ const BPR = () => {
                 <div>
                   <label>PSD Requirement *</label>
                   <input type="text" className="input-field" required value={form.psdRequirement} onChange={e => setForm({...form, psdRequirement: e.target.value})} />
+                </div>
+              </div>
+
+              {/* Checklists and Metrics Section */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.1)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Operational Cleaning</h4>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                    <input type="checkbox" checked={form.cleaningChecklist.equipmentCleaned} onChange={e => setForm({...form, cleaningChecklist: {...form.cleaningChecklist, equipmentCleaned: e.target.checked}})} />
+                    Equipment Cleaned
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                    <input type="checkbox" checked={form.cleaningChecklist.areaCleaned} onChange={e => setForm({...form, cleaningChecklist: {...form.cleaningChecklist, areaCleaned: e.target.checked}})} />
+                    Area Cleaned
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                    <input type="checkbox" checked={form.cleaningChecklist.lineClearance} onChange={e => setForm({...form, cleaningChecklist: {...form.cleaningChecklist, lineClearance: e.target.checked}})} />
+                    Line Clearance Received
+                  </label>
+                </div>
+                <div>
+                  <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Pressure Metrics</h4>
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <label style={{ fontSize: '0.85rem' }}>Grinding Pressure (kg/cm²)</label>
+                    <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.pressureMetrics.grindingPressure} onChange={e => setForm({...form, pressureMetrics: {...form.pressureMetrics, grindingPressure: e.target.value}})} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem' }}>Injection Pressure (kg/cm²)</label>
+                    <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.pressureMetrics.injectionPressure} onChange={e => setForm({...form, pressureMetrics: {...form.pressureMetrics, injectionPressure: e.target.value}})} />
+                  </div>
+                </div>
+                <div>
+                  <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Packing Consumables</h4>
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <label style={{ fontSize: '0.85rem' }}>Fiber Drums Used</label>
+                    <input type="number" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.packingConsumables.fiberDrumsUsed} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, fiberDrumsUsed: parseInt(e.target.value) || 0}})} />
+                  </div>
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <label style={{ fontSize: '0.85rem' }}>HDPE Drums Used</label>
+                    <input type="number" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.packingConsumables.hdpeDrumsUsed} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, hdpeDrumsUsed: parseInt(e.target.value) || 0}})} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem' }}>Liners Used</label>
+                    <input type="number" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.packingConsumables.linersUsed} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, linersUsed: parseInt(e.target.value) || 0}})} />
+                  </div>
                 </div>
               </div>
 

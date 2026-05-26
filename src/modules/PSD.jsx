@@ -13,10 +13,9 @@ const PSD = () => {
   const [form, setForm] = useState({
     psdNo: '',
     date: new Date().toISOString().split('T')[0],
-    requirement: '90% < 10M',
-    result: '90% < 7.77',
-    fileName: '',
-    fileSize: '',
+    reports: [
+      { requirement: '90% < 10M', result: '', fileName: '', fileSize: '' }
+    ],
     notes: ''
   });
 
@@ -29,20 +28,42 @@ const PSD = () => {
       const psdSerial = data.settings?.serials?.PSD || 1;
       const docNo = generateDocNumber('PSD', psdSerial, new Date(form.date));
       setForm(prev => ({
-        ...prev,
-        psdNo: docNo,
         requirement: prodConfig?.psdReq || '90% < 10M'
       }));
+      setForm(prev => {
+        const reps = [...prev.reports];
+        reps[0].requirement = prodConfig?.psdReq || '90% < 10M';
+        return { ...prev, psdNo: docNo, reports: reps };
+      });
     }
   }, [form.date, selectedMR, prodConfig, data.settings?.serials?.PSD]);
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = (e, index) => {
     const file = e.target.files[0];
     if (file) {
+      setForm(prev => {
+        const reps = [...prev.reports];
+        reps[index].fileName = file.name;
+        reps[index].fileSize = `${(file.size / 1024).toFixed(1)} KB`;
+        return { ...prev, reports: reps };
+      });
+    }
+  };
+
+  const addReport = () => {
+    if (form.reports.length < 3) {
       setForm(prev => ({
         ...prev,
-        fileName: file.name,
-        fileSize: `${(file.size / 1024).toFixed(1)} KB`
+        reports: [...prev.reports, { requirement: prev.reports[0].requirement, result: '', fileName: '', fileSize: '' }]
+      }));
+    }
+  };
+
+  const removeReport = (index) => {
+    if (form.reports.length > 1) {
+      setForm(prev => ({
+        ...prev,
+        reports: prev.reports.filter((_, i) => i !== index)
       }));
     }
   };
@@ -52,10 +73,7 @@ const PSD = () => {
     setForm({
       psdNo: '',
       date: new Date().toISOString().split('T')[0],
-      requirement: '90% < 10M',
-      result: '90% < 7.77',
-      fileName: '',
-      fileSize: '',
+      reports: [{ requirement: '90% < 10M', result: '', fileName: '', fileSize: '' }],
       notes: ''
     });
     setIsModalOpen(true);
@@ -63,10 +81,7 @@ const PSD = () => {
 
   const deletePSD = (id) => {
     if (window.confirm("Delete this PSD test report?")) {
-      setData(prev => ({
-        ...prev,
-        psds: prev.psds.filter(p => p.id !== id)
-      }));
+      deleteItemSoftly('psds', id);
     }
   };
 
@@ -170,11 +185,21 @@ const PSD = () => {
                       <td style={{ padding: '0.75rem', fontWeight: 600 }}>{psd.partyName}</td>
                       <td style={{ padding: '0.75rem' }}>{psd.productName}</td>
                       <td style={{ padding: '0.75rem' }}>
-                        <span style={{ fontSize: '0.75rem', display: 'block', color: 'var(--text-muted)' }}>Spec: {psd.requirement}</span>
-                        <span style={{ fontSize: '0.75rem', display: 'block', color: '#10b981', fontWeight: 600 }}>Result: {psd.result}</span>
+                        {(psd.reports || []).map((rep, idx) => (
+                          <div key={idx} style={{ marginBottom: '0.5rem', borderBottom: idx < psd.reports.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', paddingBottom: idx < psd.reports.length - 1 ? '0.5rem' : '0' }}>
+                            <span style={{ fontSize: '0.75rem', display: 'block', color: 'var(--text-muted)' }}>Spec: {rep.requirement}</span>
+                            <span style={{ fontSize: '0.75rem', display: 'block', color: '#10b981', fontWeight: 600 }}>Result: {rep.result}</span>
+                          </div>
+                        ))}
                       </td>
                       <td style={{ padding: '0.75rem', fontSize: '0.8rem' }}>{psd.notes || '-'}</td>
-                      <td style={{ padding: '0.75rem', fontStyle: 'italic', fontSize: '0.8rem' }}>{psd.fileName ? <a href="#" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>{psd.fileName}</a> : 'N/A'}</td>
+                      <td style={{ padding: '0.75rem', fontStyle: 'italic', fontSize: '0.8rem' }}>
+                        {(psd.reports || []).map((rep, idx) => (
+                          <div key={idx}>
+                            {rep.fileName ? <a href="#" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>{rep.fileName}</a> : 'N/A'}
+                          </div>
+                        ))}
+                      </td>
                       <td style={{ padding: '0.75rem' }}>
                         <button onClick={() => deletePSD(psd.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }}><Trash2 size={16} /></button>
                       </td>
@@ -211,30 +236,53 @@ const PSD = () => {
                   <label>Product Name</label>
                   <input type="text" className="input-field" readOnly value={activeMR?.productName} />
                 </div>
-                <div>
-                  <label>PSD Requirement (e.g. 90% &lt; 10M) *</label>
-                  <input type="text" className="input-field" required value={form.requirement} onChange={e => setForm({...form, requirement: e.target.value})} />
-                </div>
-                <div>
-                  <label>PSD Result (e.g. 90% &lt; 7.77M) *</label>
-                  <input type="text" className="input-field" required value={form.result} onChange={e => setForm({...form, result: e.target.value})} />
-                </div>
+                {form.reports.map((rep, idx) => (
+                  <div key={idx} style={{ gridColumn: 'span 2', background: 'rgba(0,0,0,0.1)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Report {idx + 1}</h4>
+                      {form.reports.length > 1 && (
+                        <button type="button" className="btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none' }} onClick={() => removeReport(idx)}>Remove</button>
+                      )}
+                    </div>
+                    <div>
+                      <label>PSD Requirement *</label>
+                      <input type="text" className="input-field" required value={rep.requirement} onChange={e => {
+                        const newReps = [...form.reports];
+                        newReps[idx].requirement = e.target.value;
+                        setForm({...form, reports: newReps});
+                      }} />
+                    </div>
+                    <div>
+                      <label>PSD Result *</label>
+                      <input type="text" className="input-field" required value={rep.result} onChange={e => {
+                        const newReps = [...form.reports];
+                        newReps[idx].result = e.target.value;
+                        setForm({...form, reports: newReps});
+                      }} />
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label>Upload PDF</label>
+                      <input type="file" accept=".pdf" onChange={(e) => handleFileUpload(e, idx)} style={{ marginTop: '0.5rem', fontSize: '0.8rem', display: 'block' }} />
+                      {rep.fileName && (
+                        <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '6px', display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{rep.fileName}</span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({rep.fileSize})</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                
+                {form.reports.length < 3 && (
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <button type="button" className="btn btn-secondary" onClick={addReport}>+ Add Another Report (Max 3)</button>
+                  </div>
+                )}
+                
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Additional Notes / Remarks</label>
                   <textarea className="input-field" rows="2" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
                 </div>
-              </div>
-
-              <div style={{ background: 'rgba(0,0,0,0.2)', border: '2px dashed var(--border-color)', padding: '2rem', borderRadius: '8px', textAlign: 'center', marginBottom: '1.5rem' }}>
-                <UploadCloud size={36} style={{ color: 'var(--accent-primary)', marginBottom: '0.75rem' }} />
-                <p style={{ margin: 0, fontSize: '0.85rem' }}>Drag & drop your PSD PDF report here, or click to browse.</p>
-                <input type="file" accept=".pdf" onChange={handleFileUpload} style={{ marginTop: '1rem', fontSize: '0.8rem' }} />
-                {form.fileName && (
-                  <div style={{ marginTop: '1rem', padding: '0.5rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '6px', display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{form.fileName}</span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({form.fileSize})</span>
-                  </div>
-                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>

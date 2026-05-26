@@ -71,10 +71,7 @@ const Parties = () => {
 
   const deleteParty = (id) => {
     if (window.confirm("Are you sure you want to delete this party?")) {
-      setData(prev => ({
-        ...prev,
-        parties: prev.parties.filter(p => p.id !== id)
-      }));
+      deleteItemSoftly('parties', id);
     }
   };
 

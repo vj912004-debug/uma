@@ -1,3 +1,4 @@
+import { formatDate } from '../utils/dateUtils';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
@@ -169,10 +170,7 @@ const MaterialReceipt = () => {
 
   const deleteReceipt = (id) => {
     if (window.confirm("Delete this material receipt? This will delete stock entries and affect downstream tracking.")) {
-      setData(prev => ({
-        ...prev,
-        materialReceipts: prev.materialReceipts.filter(mr => mr.id !== id)
-      }));
+      deleteItemSoftly('materialReceipts', id);
     }
   };
 
@@ -332,7 +330,7 @@ const MaterialReceipt = () => {
                   return (
                     <tr key={mr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                       <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{mr.receiptNo}</td>
-                      <td style={{ padding: '1rem' }}>{mr.date} {mr.time}</td>
+                      <td style={{ padding: '1rem' }}>{formatDate(mr.date)} {mr.time}</td>
                       <td style={{ padding: '1rem', fontWeight: 600 }}>{mr.partyName}</td>
                       <td style={{ padding: '1rem' }}>
                         <span>{mr.productName}</span>

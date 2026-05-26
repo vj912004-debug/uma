@@ -19,6 +19,10 @@ const TaxInvoice = () => {
     dcDate: '',
     partyDocNo: '',
     partyDocDate: '',
+    billAddress: '',
+    shipAddress: '',
+    gstinBill: '',
+    gstinShip: '',
     charges: {
       cleaning: true,
       filterBag: false,
@@ -71,6 +75,10 @@ const TaxInvoice = () => {
         dcDate: dc?.date || 'N/A',
         partyDocNo: activeMR.partyDocNo,
         partyDocDate: activeMR.partyDocDate,
+        billAddress: activeMR.billAddress || '',
+        shipAddress: activeMR.shipAddress || '',
+        gstinBill: activeMR.gstinBill || '',
+        gstinShip: activeMR.gstinShip || '',
         rates: {
           cleaning: defaultRates.cleaning || 0,
           filterBag: defaultRates.filterBag || 0,
@@ -125,6 +133,10 @@ const TaxInvoice = () => {
       dcDate: '',
       partyDocNo: '',
       partyDocDate: '',
+      billAddress: '',
+      shipAddress: '',
+      gstinBill: '',
+      gstinShip: '',
       charges: {
         cleaning: true,
         filterBag: false,
@@ -166,10 +178,7 @@ const TaxInvoice = () => {
 
   const deleteTI = (id) => {
     if (window.confirm("Delete this Tax Invoice?")) {
-      setData(prev => ({
-        ...prev,
-        invoices: prev.invoices.filter(i => i.id !== id)
-      }));
+      deleteItemSoftly('invoices', id);
     }
   };
 
@@ -353,12 +362,24 @@ const TaxInvoice = () => {
                   <input type="text" className="input-field" readOnly value={form.partyDocDate} />
                 </div>
                 <div>
-                  <label>GSTIN</label>
-                  <input type="text" className="input-field" readOnly value={activeMR?.gstinBill || 'N/A'} />
+                  <label>Bill-To GSTIN</label>
+                  <input type="text" className="input-field" readOnly value={form.gstinBill || 'N/A'} />
+                </div>
+                <div>
+                  <label>Ship-To GSTIN</label>
+                  <input type="text" className="input-field" readOnly value={form.gstinShip || 'N/A'} />
                 </div>
                 <div>
                   <label>Material Micronised Qty</label>
                   <input type="text" className="input-field" readOnly value={`${activePL?.totalWeight || 0} Kg`} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Bill-To Address</label>
+                  <textarea className="input-field" rows="2" readOnly value={form.billAddress || 'N/A'} style={{ background: 'rgba(255,255,255,0.01)', opacity: 0.8 }}></textarea>
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Ship-To Address</label>
+                  <textarea className="input-field" rows="2" readOnly value={form.shipAddress || 'N/A'} style={{ background: 'rgba(255,255,255,0.01)', opacity: 0.8 }}></textarea>
                 </div>
               </div>
 

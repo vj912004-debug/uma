@@ -4,7 +4,7 @@ import { Plus, Search, Edit2, Trash2, Calendar, Clock } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 
 const ProductionPlanning = () => {
-  const { data, updateData, updateItem, deleteDataSoftly } = useAppContext();
+  const { data, updateData, updateItem, deleteItemSoftly } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,9 +24,10 @@ const ProductionPlanning = () => {
     startTime: '09:00',
     endDate: new Date().toISOString().split('T')[0],
     endTime: '17:00',
-    hours: '8.00',
     status: 'Pending',
-    notes: ''
+    notes: '',
+    supervisor: '',
+    delayReason: ''
   });
 
   useEffect(() => {
@@ -54,7 +55,7 @@ const ProductionPlanning = () => {
 
   const deletePlan = (id) => {
     if (window.confirm("Delete this production plan?")) {
-      deleteDataSoftly('productionPlans', id);
+      deleteItemSoftly('productionPlans', id);
     }
   };
 
@@ -72,9 +73,10 @@ const ProductionPlanning = () => {
       startTime: '09:00',
       endDate: new Date().toISOString().split('T')[0],
       endTime: '17:00',
-      hours: '8.00',
       status: 'Pending',
-      notes: ''
+      notes: '',
+      supervisor: '',
+      delayReason: ''
     });
     setIsEditing(null);
     setIsModalOpen(true);
@@ -161,6 +163,8 @@ const ProductionPlanning = () => {
                 <th>Qty (Kg)</th>
                 <th>PSD Note</th>
                 <th>Priority</th>
+                <th>Supervisor</th>
+                <th>Delay Reason</th>
                 <th>Start Date</th>
                 <th>Status</th>
                 {userRole === 'Admin' && <th>Actions</th>}
@@ -182,12 +186,14 @@ const ProductionPlanning = () => {
                     <td>
                       <span style={{
                         padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
-                        background: plan.priorityLevel === 'High' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                        color: plan.priorityLevel === 'High' ? '#ef4444' : '#10b981'
+                        background: plan.priorityLevel === 'Super Urgent' ? 'rgba(153, 27, 27, 0.2)' : plan.priorityLevel === 'High' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                        color: plan.priorityLevel === 'Super Urgent' ? '#f87171' : plan.priorityLevel === 'High' ? '#ef4444' : '#10b981'
                       }}>
                         {plan.priorityLevel || 'Normal'}
                       </span>
                     </td>
+                    <td>{plan.supervisor || 'Unassigned'}</td>
+                    <td><div style={{ fontSize: '0.75rem', maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'rgba(239, 68, 68, 0.8)' }}>{plan.delayReason || '-'}</div></td>
                     <td style={{ fontSize: '0.85rem' }}>{plan.startDate} {plan.startTime}</td>
                     <td>
                       <span style={{ 
@@ -249,6 +255,7 @@ const ProductionPlanning = () => {
                     <option value="Normal">Normal</option>
                     <option value="High">High</option>
                     <option value="Urgent">Urgent</option>
+                    <option value="Super Urgent">Super Urgent</option>
                   </select>
                 </div>
                 <div style={{ gridColumn: 'span 3' }}>
@@ -258,6 +265,18 @@ const ProductionPlanning = () => {
                 <div style={{ gridColumn: 'span 3' }}>
                   <label>Special Instructions</label>
                   <input type="text" className="input-field" value={formData.specialInstructions} onChange={e => setFormData({...formData, specialInstructions: e.target.value})} />
+                </div>
+                <div>
+                  <label>Supervisor</label>
+                  <select className="input-field" value={formData.supervisor} onChange={e => setFormData({...formData, supervisor: e.target.value})}>
+                    <option value="">Unassigned</option>
+                    <option value="Supervisor 1">Supervisor 1</option>
+                    <option value="Supervisor 2">Supervisor 2</option>
+                  </select>
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Delay Reason (If Any)</label>
+                  <input type="text" className="input-field" value={formData.delayReason} onChange={e => setFormData({...formData, delayReason: e.target.value})} placeholder="Machine breakdown, missing materials..." />
                 </div>
                 
                 <div>
