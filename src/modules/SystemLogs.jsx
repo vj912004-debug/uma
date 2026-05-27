@@ -61,10 +61,12 @@ const SystemLogs = () => {
                   </td>
                   <td style={{textTransform:'capitalize'}}>{log.module}</td>
                   <td>
-                    <div style={{ fontSize: '0.8rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {log.action === 'UPDATE' ? 'Record modified' : 
+                    <div style={{ fontSize: '0.8rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.details || ''}>
+                      {log.action === 'UPDATE' ? (log.details || 'Record modified') : 
                        log.action === 'CREATE' ? 'New record created' :
-                       log.action === 'DELETE' ? 'Moved to recycle bin' : 'Restored from recycle bin'}
+                       log.action === 'DELETE' ? 'Moved to recycle bin' : 
+                       log.action === 'RESTORE' ? 'Restored from recycle bin' : 
+                       log.action === 'HARD_DELETE' ? 'Permanently deleted' : 'Action performed'}
                     </div>
                   </td>
                 </tr>

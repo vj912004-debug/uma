@@ -1,3 +1,4 @@
+import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Search, Edit2, ClipboardList } from 'lucide-react';
@@ -99,7 +100,7 @@ const EWayDC = () => {
                       {dc.ewayBillNo ? (
                         <div>
                           <p style={{ margin: 0, fontWeight: 600 }}>No: {dc.ewayBillNo}</p>
-                          <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Date: {dc.ewayBillDate} ({dc.ewayBillPurpose})</p>
+                          <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Date: {formatDate(dc.ewayBillDate)} ({dc.ewayBillPurpose})</p>
                         </div>
                       ) : (
                         <span style={{ color: 'var(--text-muted)' }}>Not yet linked</span>

@@ -83,13 +83,26 @@ export const AppProvider = ({ children }) => {
 
   // Helper for audit logging
   const logAudit = (prevData, action, module, oldValue, newValue) => {
+    let details = '';
+    
+    if (action === 'UPDATE' && oldValue && newValue) {
+      const changes = [];
+      Object.keys(newValue).forEach(key => {
+        if (key !== 'id' && key !== 'updatedAt' && oldValue[key] !== newValue[key]) {
+          if (typeof newValue[key] !== 'object' && typeof oldValue[key] !== 'object') {
+             changes.push(`${key} changed from ${oldValue[key] || 'empty'} → ${newValue[key] || 'empty'}`);
+          }
+        }
+      });
+      details = changes.join(', ');
+    }
+
     const newLog = {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
       action,
       module,
-      oldValue,
-      newValue,
-      user: prevData.currentUser ? prevData.currentUser.username : 'System',
+      details, // Store pre-computed details
+      user: prevData.currentUser ? prevData.currentUser.username : (prevData.settings?.userRole || 'System'),
       timestamp: new Date().toISOString()
     };
     return [...(prevData.auditLogs || []), newLog];
@@ -145,8 +158,9 @@ export const AppProvider = ({ children }) => {
   };
 
   const hardDeleteItem = (module, id) => {
-    if (data.settings?.userRole === 'Staff') {
-      alert("Staff users do not have permissions to permanently delete records.");
+    // Only Admin can hard delete
+    if (data.settings?.userRole !== 'Admin') {
+      alert("Only Admin can permanently delete records.");
       return;
     }
     setData(prev => {

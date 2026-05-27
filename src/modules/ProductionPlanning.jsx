@@ -1,3 +1,4 @@
+import { formatDate } from '../utils/dateUtils';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Search, Edit2, Trash2, Calendar, Clock } from 'lucide-react';
@@ -194,7 +195,7 @@ const ProductionPlanning = () => {
                     </td>
                     <td>{plan.supervisor || 'Unassigned'}</td>
                     <td><div style={{ fontSize: '0.75rem', maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'rgba(239, 68, 68, 0.8)' }}>{plan.delayReason || '-'}</div></td>
-                    <td style={{ fontSize: '0.85rem' }}>{plan.startDate} {plan.startTime}</td>
+                    <td style={{ fontSize: '0.85rem' }}>{formatDate(plan.startDate)} {plan.startTime}</td>
                     <td>
                       <span style={{ 
                         padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600,

@@ -1,3 +1,4 @@
+import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Search, Edit2 } from 'lucide-react';
@@ -97,7 +98,7 @@ const EWayTI = () => {
                       {inv.ewayBillNo ? (
                         <div>
                           <p style={{ margin: 0, fontWeight: 600 }}>No: {inv.ewayBillNo}</p>
-                          <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Date: {inv.ewayBillDate}</p>
+                          <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Date: {formatDate(inv.ewayBillDate)}</p>
                         </div>
                       ) : (
                         <span style={{ color: 'var(--text-muted)' }}>Not yet linked</span>

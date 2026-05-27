@@ -79,38 +79,36 @@ export const exportToPDF = (docType, data) => {
     doc.text(`With reference to your inquiry, we are pleased to offer our quotation for Micronizing Job Work for your product ${data.productName} as under:`, 15, yPos, { maxWidth: pageWidth - 30 });
     yPos += 12;
 
-    doc.setFillColor(245, 245, 245);
-    doc.rect(15, yPos - 5, pageWidth - 30, 8, 'F');
-    doc.setFont("helvetica", "bold");
-    doc.text("Particulars / Description", 18, yPos);
-    doc.text("Rate", 140, yPos);
-    yPos += 8;
-    doc.setFont("helvetica", "normal");
-
-    (data.mainCharges || []).forEach(c => {
-      if (c.description) {
-        doc.text(c.description, 18, yPos);
-        doc.text(c.rate, 140, yPos);
-        yPos += 8;
-      }
+    const mainBody = (data.mainCharges || []).filter(c => c.description).map(c => [c.description, c.rate]);
+    
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Particulars / Description", "Rate"]],
+      body: mainBody,
+      theme: 'grid',
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
+      styles: { fontSize: 10, cellPadding: 3 }
     });
+    
+    yPos = doc.lastAutoTable.finalY + 10;
 
-    if (data.optionalCharges && data.optionalCharges.length > 0 && data.optionalCharges.some(c => c.description)) {
-      yPos += 4;
+    if (data.optionalCharges && data.optionalCharges.some(c => c.description)) {
       doc.setFont("helvetica", "bold");
       doc.text("Optional / Extra Items (If Required)", 15, yPos);
       yPos += 6;
-      doc.setFont("helvetica", "normal");
-      data.optionalCharges.forEach(c => {
-        if (c.description) {
-          doc.text(c.description, 18, yPos);
-          doc.text(c.rate, 140, yPos);
-          yPos += 8;
-        }
+      
+      const optBody = data.optionalCharges.filter(c => c.description).map(c => [c.description, c.rate]);
+      autoTable(doc, {
+        startY: yPos,
+        head: [["Particulars / Description", "Rate"]],
+        body: optBody,
+        theme: 'grid',
+        headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
+        styles: { fontSize: 10, cellPadding: 3 }
       });
+      yPos = doc.lastAutoTable.finalY + 10;
     }
 
-    yPos += 10;
     doc.setFont("helvetica", "bold");
     doc.text("Terms & Conditions:", 15, yPos);
     yPos += 6;
@@ -125,18 +123,6 @@ export const exportToPDF = (docType, data) => {
     doc.text("Authorized Signatory", pageWidth - 70, yPos);
 
   } else if (docType === 'PI' || docType === 'TI' || data.charges) {
-    // Render standard invoice charges checklist table
-    doc.setFillColor(245, 245, 245);
-    doc.rect(15, yPos - 5, pageWidth - 30, 8, 'F');
-    doc.setFont("helvetica", "bold");
-    doc.text("Line Item Description", 18, yPos);
-    doc.text("HSN", 110, yPos);
-    doc.text("Rate Details", 140, yPos);
-    doc.text("Amount (₹)", 175, yPos);
-    
-    yPos += 10;
-    doc.setFont("helvetica", "normal");
-
     const chargesList = [
       { key: 'cleaning', label: 'Cleaning Charges', hsn: '998842', isQty: true },
       { key: 'filterBag', label: 'Filter Bag Charges', hsn: '591190', isQty: false },
@@ -151,132 +137,112 @@ export const exportToPDF = (docType, data) => {
       { key: 'batchChangeover', label: 'Batch Changeover', hsn: '998842', isQty: false }
     ];
 
+    const body = [];
     chargesList.forEach(c => {
       if (data.charges?.[c.key]) {
         const rate = data.rates?.[c.key] || 0;
         const lineAmt = c.isQty ? (parseFloat(data.qty) || 0) * rate : rate;
-        
-        doc.text(c.label, 18, yPos);
-        doc.text(c.hsn, 110, yPos);
-        doc.text(c.isQty ? `${rate}/Kg` : `${rate} Flat`, 140, yPos);
-        doc.text(`₹${lineAmt.toFixed(2)}`, 175, yPos);
-        yPos += 8;
+        body.push([c.label, c.hsn, c.isQty ? `${rate}/Kg` : `${rate} Flat`, `Rs. ${lineAmt.toFixed(2)}`]);
       }
     });
 
-    yPos += 4;
-    doc.line(110, yPos, pageWidth - 15, yPos);
-    yPos += 8;
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Line Item Description", "HSN", "Rate Details", "Amount (Rs.)"]],
+      body: body,
+      theme: 'grid',
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
+      styles: { fontSize: 10, cellPadding: 3 }
+    });
 
+    yPos = doc.lastAutoTable.finalY + 10;
+    
+    doc.setFont("helvetica", "normal");
     doc.text("Subtotal:", 120, yPos);
-    doc.text(`₹${(data.subtotal || 0).toFixed(2)}`, 175, yPos);
+    doc.text(`Rs. ${(data.subtotal || 0).toFixed(2)}`, 175, yPos);
     yPos += 6;
 
     if (data.discount > 0) {
       doc.text("Discount Credit:", 120, yPos);
-      doc.text(`- ₹${(data.discount || 0).toFixed(2)}`, 175, yPos);
+      doc.text(`- Rs. ${(data.discount || 0).toFixed(2)}`, 175, yPos);
       yPos += 6;
     }
 
     doc.text(`GST Tax (${data.taxRate}%):`, 120, yPos);
-    doc.text(`₹${(data.taxAmount || 0).toFixed(2)}`, 175, yPos);
+    doc.text(`Rs. ${(data.taxAmount || 0).toFixed(2)}`, 175, yPos);
     yPos += 8;
     
     doc.setFont("helvetica", "bold");
     doc.text("Grand Total:", 120, yPos);
-    doc.text(`₹${(data.total || 0).toFixed(2)}`, 175, yPos);
+    doc.text(`Rs. ${(data.total || 0).toFixed(2)}`, 175, yPos);
 
   } else if (docType === 'BPR' && data.receivedBatches) {
-    // Twin weight tables
-    doc.text("Raw Material Received weights", 15, yPos - 5);
-    doc.setFillColor(245, 245, 245);
-    doc.rect(15, yPos, 85, 8, 'F');
     doc.setFont("helvetica", "bold");
-    doc.text("Batch", 18, yPos + 5);
-    doc.text("Drum", 38, yPos + 5);
-    doc.text("Gross", 53, yPos + 5);
-    doc.text("Tare", 68, yPos + 5);
-    doc.text("Net", 83, yPos + 5);
+    doc.text("Raw Material Received weights", 15, yPos - 5);
+    
+    const recBody = data.receivedBatches.map(r => [r.batchNo, r.drumNo, r.gross, r.tare, r.net.toFixed(1)]);
+    
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Batch", "Drum", "Gross", "Tare", "Net"]],
+      body: recBody,
+      theme: 'grid',
+      tableWidth: 85,
+      margin: { left: 15 },
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
+      styles: { fontSize: 8, cellPadding: 2 }
+    });
 
-    // Dispatched headers
+    doc.setFont("helvetica", "bold");
     doc.text("Dispatched micronised weights", 110, yPos - 5);
-    doc.rect(110, yPos, 85, 8, 'F');
-    doc.text("Batch", 113, yPos + 5);
-    doc.text("Drum", 133, yPos + 5);
-    doc.text("Gross", 148, yPos + 5);
-    doc.text("Tare", 163, yPos + 5);
-    doc.text("Net", 178, yPos + 5);
-
-    yPos += 12;
-    doc.setFont("helvetica", "normal");
-
-    const maxRows = Math.max(data.receivedBatches.length, data.dispatchedBatches.length);
-    for (let i = 0; i < maxRows; i++) {
-      const rec = data.receivedBatches[i];
-      const disp = data.dispatchedBatches[i];
-
-      if (rec) {
-        doc.text(`${rec.batchNo}`, 18, yPos);
-        doc.text(`${rec.drumNo}`, 38, yPos);
-        doc.text(`${rec.gross}`, 53, yPos);
-        doc.text(`${rec.tare}`, 68, yPos);
-        doc.text(`${rec.net.toFixed(1)}`, 83, yPos);
-      }
-
-      if (disp) {
-        doc.text(`${disp.batchNo}`, 113, yPos);
-        doc.text(`${disp.drumNo}`, 133, yPos);
-        doc.text(`${disp.gross}`, 148, yPos);
-        doc.text(`${disp.tare}`, 163, yPos);
-        doc.text(`${disp.net.toFixed(1)}`, 178, yPos);
-      }
-
-      yPos += 7;
-    }
+    
+    const dispBody = data.dispatchedBatches.map(r => [r.batchNo, r.drumNo, r.gross, r.tare, r.net.toFixed(1)]);
+    
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Batch", "Drum", "Gross", "Tare", "Net"]],
+      body: dispBody,
+      theme: 'grid',
+      tableWidth: 85,
+      margin: { left: 110 },
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
+      styles: { fontSize: 8, cellPadding: 2 }
+    });
 
   } else if (docType === 'PL' && data.batches) {
-    // Packing lists weight sums
-    doc.setFillColor(245, 245, 245);
-    doc.rect(15, yPos - 5, pageWidth - 30, 8, 'F');
-    doc.setFont("helvetica", "bold");
-    doc.text("Sr No", 18, yPos);
-    doc.text("Batch No", 40, yPos);
-    doc.text("Drum No", 80, yPos);
-    doc.text("Gross Weight", 110, yPos);
-    doc.text("Tare Weight", 140, yPos);
-    doc.text("Net Weight", 170, yPos);
-
-    yPos += 10;
-    doc.setFont("helvetica", "normal");
+    const plBody = data.batches.map((b, idx) => [idx + 1, b.batchNo, b.drumNo, `${b.gross} Kg`, `${b.tare} Kg`, `${b.net.toFixed(2)} Kg`]);
     
-    data.batches.forEach((b, idx) => {
-      doc.text(`${idx + 1}`, 18, yPos);
-      doc.text(`${b.batchNo}`, 40, yPos);
-      doc.text(`${b.drumNo}`, 80, yPos);
-      doc.text(`${b.gross} Kg`, 110, yPos);
-      doc.text(`${b.tare} Kg`, 140, yPos);
-      doc.text(`${b.net.toFixed(2)} Kg`, 170, yPos);
-      yPos += 8;
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Sr No", "Batch No", "Drum No", "Gross Weight", "Tare Weight", "Net Weight"]],
+      body: plBody,
+      theme: 'grid',
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
+      styles: { fontSize: 10, cellPadding: 3 }
     });
 
   } else if (docType === 'DC') {
-    // Delivery challan logistics
     doc.setFont("helvetica", "bold");
     doc.text("LOGISTICS & DISPATCH PARTICULARS", 15, yPos);
     doc.setFont("helvetica", "normal");
     
-    yPos += 8;
-    doc.text(`Dispatched Material: ${data.productName}`, 15, yPos);
-    yPos += 6;
-    doc.text(`Quantity Sent: ${data.qty} Kg (${data.totalDrums} Drums)`, 15, yPos);
-    yPos += 6;
-    doc.text(`Vehicle Number: ${data.vehicleNo}`, 15, yPos);
-    yPos += 6;
-    doc.text(`Driver Name: ${data.driverName || 'N/A'}`, 15, yPos);
-    yPos += 6;
-    doc.text(`Declared Value: ₹${(data.value || 0).toLocaleString()}`, 15, yPos);
+    const dcBody = [
+      ["Dispatched Material", data.productName || 'N/A'],
+      ["Quantity Sent", `${data.qty} Kg (${data.totalDrums} Drums)`],
+      ["Vehicle Number", data.vehicleNo || 'N/A'],
+      ["Driver Name", data.driverName || 'N/A'],
+      ["Declared Value", `Rs. ${(data.value || 0).toLocaleString()}`]
+    ];
     
-    yPos += 12;
+    autoTable(doc, {
+      startY: yPos + 5,
+      body: dcBody,
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 3 }
+    });
+    
+    yPos = doc.lastAutoTable.finalY + 10;
+    
     doc.setFont("helvetica", "bold");
     doc.text("Terms & Conditions:", 15, yPos);
     doc.setFont("helvetica", "normal");

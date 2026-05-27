@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
+import { exportToPDF } from '../utils/pdfExport';
 import { Search, UploadCloud, Trash2, Calendar, ClipboardList, CheckCircle } from 'lucide-react';
 
 const PSD = () => {
@@ -201,7 +202,10 @@ const PSD = () => {
                         ))}
                       </td>
                       <td style={{ padding: '0.75rem' }}>
-                        <button onClick={() => deletePSD(psd.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button onClick={() => exportToPDF('PSD', psd)} style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer' }} title="Download PDF"><ClipboardList size={16} /></button>
+                          <button onClick={() => deletePSD(psd.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }} title="Delete"><Trash2 size={16} /></button>
+                        </div>
                       </td>
                     </tr>
                   ))
