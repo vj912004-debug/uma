@@ -125,7 +125,7 @@ label {
 }
 
 /* Table Container (Prevents horizontal overflow and text wrapping) */
-.table-container {
+.data-table-container {
   overflow-x: auto;
   width: 100%;
   border-radius: 12px;
