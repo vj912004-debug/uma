@@ -5,17 +5,20 @@ import { Plus, Search, Edit2, Trash2, Calendar, Clock } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 
 const ProductionPlanning = () => {
-  const { data, updateData, updateItem, deleteItemSoftly } = useAppContext();
+  const { data, updateData, updateItem, deleteItemSoftly, setData } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
 
   const userRole = data.settings?.userRole || 'Admin';
+  const staffVisibleColumns = data.settings?.productionPlanningVisibleColumnsForStaff;
 
   const [formData, setFormData] = useState({
     customer: '',
     productName: '',
     productNickName: '',
+    psdReq: '',
     psdNote: '',
     batchNo: '',
     qty: '',
@@ -114,15 +117,29 @@ const ProductionPlanning = () => {
   );
 
   const exportColumns = [
-    { label: 'Customer', key: 'customer' },
-    { label: 'Product', key: 'productName' },
-    { label: 'Nickname', key: 'productNickName' },
-    { label: 'Batch No', key: 'batchNo' },
+    { label: 'Customer Name', key: 'customer' },
+    { label: 'Product Name', key: 'productName' },
+    { label: 'Product Nickname', key: 'productNickName' },
+    { label: 'PSD Req.', key: 'psdReq' },
+    { label: 'PSD Note', key: 'psdNote' },
+    { label: 'Batch Number', key: 'batchNo' },
     { label: 'Qty', key: 'qty' },
-    { label: 'Priority', key: 'priorityLevel' },
-    { label: 'Start', key: 'startDate' },
+    { label: 'Processing Start', key: 'startDate' },
+    { label: 'Complete Date', key: 'endDate' },
+    { label: 'Processing Hours', key: 'hours' },
+    { label: 'Delay Reason', key: 'delayReason' },
+    { label: 'Supervisor Name', key: 'supervisor' },
+    { label: 'Priority Level', key: 'priorityLevel' },
+    { label: 'Special Notes', key: 'specialInstructions' },
     { label: 'Status', key: 'status' }
   ];
+
+  const allColumnKeys = exportColumns.map(c => c.key);
+  const effectiveVisibleColumns = userRole === 'Admin'
+    ? allColumnKeys
+    : (Array.isArray(staffVisibleColumns) && staffVisibleColumns.length ? staffVisibleColumns : ['customer', 'productName', 'productNickName', 'batchNo', 'qty', 'status']);
+
+  const visibleExportColumns = exportColumns.filter(c => effectiveVisibleColumns.includes(c.key));
 
   return (
     <div>
@@ -132,7 +149,12 @@ const ProductionPlanning = () => {
           <p style={{ color: 'var(--text-muted)' }}>Schedule milling batches and track processing.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <ExportButton data={filteredPlans} columns={exportColumns} filename="Production_Plan" title="Production Plan Report" />
+          <ExportButton data={filteredPlans} columns={visibleExportColumns} filename="Production_Plan" title="Production Plan Report" />
+          {userRole === 'Admin' && (
+            <button className="btn" onClick={() => setIsColumnModalOpen(true)}>
+              Configure Staff View
+            </button>
+          )}
           {userRole === 'Admin' && (
             <button className="btn btn-primary" onClick={handleOpenModal}>
               <Plus size={18} /> Add Plan Manually
@@ -158,16 +180,21 @@ const ProductionPlanning = () => {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Customer</th>
-                <th>Product (Nick)</th>
-                <th>Batch No</th>
-                <th>Qty (Kg)</th>
-                <th>PSD Note</th>
-                <th>Priority</th>
-                <th>Supervisor</th>
-                <th>Delay Reason</th>
-                <th>Start Date</th>
-                <th>Status</th>
+                {effectiveVisibleColumns.includes('customer') && <th>Customer Name</th>}
+                {effectiveVisibleColumns.includes('productName') && <th>Product name</th>}
+                {effectiveVisibleColumns.includes('productNickName') && <th>Product Nickname</th>}
+                {effectiveVisibleColumns.includes('psdReq') && <th>PSD Req.</th>}
+                {effectiveVisibleColumns.includes('psdNote') && <th>PSD Note</th>}
+                {effectiveVisibleColumns.includes('batchNo') && <th>Batch Number</th>}
+                {effectiveVisibleColumns.includes('qty') && <th>Qty</th>}
+                {effectiveVisibleColumns.includes('startDate') && <th>Processing Start</th>}
+                {effectiveVisibleColumns.includes('endDate') && <th>Complete Date</th>}
+                {effectiveVisibleColumns.includes('hours') && <th>Processing Hours</th>}
+                {effectiveVisibleColumns.includes('delayReason') && <th>Delay Reason</th>}
+                {effectiveVisibleColumns.includes('supervisor') && <th>Supervisor Name</th>}
+                {effectiveVisibleColumns.includes('priorityLevel') && <th>Priority Level</th>}
+                {effectiveVisibleColumns.includes('specialInstructions') && <th>Special Notes</th>}
+                {effectiveVisibleColumns.includes('status') && <th>Status</th>}
                 {userRole === 'Admin' && <th>Actions</th>}
               </tr>
             </thead>
@@ -179,12 +206,20 @@ const ProductionPlanning = () => {
               ) : (
                 filteredPlans.map(plan => (
                   <tr key={plan.id}>
-                    <td style={{ fontWeight: 600 }}>{plan.customer || 'N/A'}</td>
-                    <td>{plan.productName} {plan.productNickName && <span style={{ color: 'var(--text-muted)' }}>({plan.productNickName})</span>}</td>
-                    <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{plan.batchNo || 'N/A'}</td>
-                    <td>{plan.qty}</td>
-                    <td><div style={{ fontSize: '0.75rem', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.psdNote || 'None'}</div></td>
-                    <td>
+                    {effectiveVisibleColumns.includes('customer') && <td style={{ fontWeight: 600 }}>{plan.customer || 'N/A'}</td>}
+                    {effectiveVisibleColumns.includes('productName') && <td>{plan.productName || 'N/A'}</td>}
+                    {effectiveVisibleColumns.includes('productNickName') && <td>{plan.productNickName || '-'}</td>}
+                    {effectiveVisibleColumns.includes('psdReq') && <td>{plan.psdReq || '-'}</td>}
+                    {effectiveVisibleColumns.includes('psdNote') && <td><div style={{ fontSize: '0.75rem', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.psdNote || 'None'}</div></td>}
+                    {effectiveVisibleColumns.includes('batchNo') && <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{plan.batchNo || 'N/A'}</td>}
+                    {effectiveVisibleColumns.includes('qty') && <td>{plan.qty}</td>}
+                    {effectiveVisibleColumns.includes('startDate') && <td style={{ fontSize: '0.85rem' }}>{formatDate(plan.startDate)} {plan.startTime}</td>}
+                    {effectiveVisibleColumns.includes('endDate') && <td style={{ fontSize: '0.85rem' }}>{formatDate(plan.endDate)} {plan.endTime}</td>}
+                    {effectiveVisibleColumns.includes('hours') && <td>{plan.hours || '0.00'}</td>}
+                    {effectiveVisibleColumns.includes('delayReason') && <td><div style={{ fontSize: '0.75rem', maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'rgba(239, 68, 68, 0.8)' }}>{plan.delayReason || '-'}</div></td>}
+                    {effectiveVisibleColumns.includes('supervisor') && <td>{plan.supervisor || 'Unassigned'}</td>}
+                    {effectiveVisibleColumns.includes('priorityLevel') && (
+                      <td>
                       <span style={{
                         padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
                         background: plan.priorityLevel === 'Super Urgent' ? 'rgba(153, 27, 27, 0.2)' : plan.priorityLevel === 'High' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
@@ -192,11 +227,11 @@ const ProductionPlanning = () => {
                       }}>
                         {plan.priorityLevel || 'Normal'}
                       </span>
-                    </td>
-                    <td>{plan.supervisor || 'Unassigned'}</td>
-                    <td><div style={{ fontSize: '0.75rem', maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'rgba(239, 68, 68, 0.8)' }}>{plan.delayReason || '-'}</div></td>
-                    <td style={{ fontSize: '0.85rem' }}>{formatDate(plan.startDate)} {plan.startTime}</td>
-                    <td>
+                      </td>
+                    )}
+                    {effectiveVisibleColumns.includes('specialInstructions') && <td><div style={{ fontSize: '0.75rem', maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.specialInstructions || '-'}</div></td>}
+                    {effectiveVisibleColumns.includes('status') && (
+                      <td>
                       <span style={{ 
                         padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600,
                         background: plan.status === 'Done' ? 'rgba(16, 185, 129, 0.1)' : plan.status === 'Cancel' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
@@ -204,7 +239,8 @@ const ProductionPlanning = () => {
                       }}>
                         {plan.status}
                       </span>
-                    </td>
+                      </td>
+                    )}
                     {userRole === 'Admin' && (
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -220,6 +256,43 @@ const ProductionPlanning = () => {
           </table>
         </div>
       </div>
+
+      {isColumnModalOpen && userRole === 'Admin' && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, backdropFilter: 'blur(4px)', padding: '2rem' }}>
+          <div className="premium-card" style={{ width: '700px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ marginBottom: '1rem' }}>Staff Visible Columns (Boss Control)</h2>
+            <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>Staff members can view only selected columns. Admin always sees all columns.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '1rem' }}>
+              {exportColumns.map(col => {
+                const checked = Array.isArray(staffVisibleColumns)
+                  ? staffVisibleColumns.includes(col.key)
+                  : false;
+                return (
+                  <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        const next = new Set(Array.isArray(staffVisibleColumns) ? staffVisibleColumns : []);
+                        if (e.target.checked) next.add(col.key);
+                        else next.delete(col.key);
+                        setData(prev => ({
+                          ...prev,
+                          settings: { ...prev.settings, productionPlanningVisibleColumnsForStaff: Array.from(next) }
+                        }));
+                      }}
+                    />
+                    {col.label}
+                  </label>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem' }}>
+              <button className="btn" onClick={() => setIsColumnModalOpen(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isModalOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)', padding: '2rem' }}>
@@ -262,6 +335,10 @@ const ProductionPlanning = () => {
                 <div style={{ gridColumn: 'span 3' }}>
                   <label>PSD Note / Material Requirement</label>
                   <input type="text" className="input-field" value={formData.psdNote} onChange={e => setFormData({...formData, psdNote: e.target.value})} />
+                </div>
+                <div style={{ gridColumn: 'span 3' }}>
+                  <label>PSD Requirement</label>
+                  <input type="text" className="input-field" value={formData.psdReq || ''} onChange={e => setFormData({ ...formData, psdReq: e.target.value })} />
                 </div>
                 <div style={{ gridColumn: 'span 3' }}>
                   <label>Special Instructions</label>

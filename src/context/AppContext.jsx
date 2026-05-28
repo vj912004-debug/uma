@@ -2,6 +2,14 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AppContext = createContext();
 
+const SERIAL_KEY_ALIASES = {
+  // Historical/legacy keys -> canonical keys
+  QUOTATION: 'QT',
+  INV: 'TI'
+};
+
+const normalizeSerialKey = (key) => SERIAL_KEY_ALIASES[key] || key;
+
 export const AppProvider = ({ children }) => {
   const [data, setData] = useState(() => {
     const savedData = localStorage.getItem('uma_erp_data');
@@ -9,6 +17,11 @@ export const AppProvider = ({ children }) => {
       parties: [],
       items: [],
       materials: [],
+      psdRequirements: [
+        '90% < 10M',
+        'd(0.9) < 10 Micron',
+        'd(0.9) < 20 Micron'
+      ],
       units: ['Kg', 'MT', 'Drum', 'Ltr', 'Pcs'],
       taxes: [{ name: 'GST 18%', rate: 18 }, { name: 'GST 12%', rate: 12 }, { name: 'GST 5%', rate: 5 }],
       materialReceipts: [],
@@ -19,6 +32,7 @@ export const AppProvider = ({ children }) => {
       deliveryChallans: [],
       payments: [],
       tasks: [],
+      attendance: [],
       psds: [],
       productionPlans: [],
       stockAdjustments: [],
@@ -36,7 +50,7 @@ export const AppProvider = ({ children }) => {
       currentUser: { id: 1, username: 'Admin', role: 'Admin' },
       settings: {
         userRole: 'Admin',
-        serials: { MR: 1, BPR: 1, PL: 1, INV: 1, PI: 1, DC: 1, MI: 1, VC: 1, PSD: 1, TI: 1, EWDC: 1, EWTI: 1, QT: 1, DN: 1, CN: 1, PO: 1 }
+        serials: { MR: 1, BPR: 1, PL: 1, PI: 1, DC: 1, MI: 1, VC: 1, PSD: 1, TI: 1, EWDC: 1, EWTI: 1, QT: 1, DN: 1, CN: 1, PO: 1 }
       }
     };
 
@@ -48,7 +62,17 @@ export const AppProvider = ({ children }) => {
       return {
         ...baseState,
         ...parsed,
-        settings: { ...baseState.settings, ...parsed.settings },
+        settings: {
+          ...baseState.settings,
+          ...parsed.settings,
+          serials: {
+            ...baseState.settings.serials,
+            ...(parsed.settings?.serials || {}),
+            // Back-compat: if old keys exist, copy into canonical key (do not overwrite canonical)
+            ...(parsed.settings?.serials?.QUOTATION && !parsed.settings?.serials?.QT ? { QT: parsed.settings.serials.QUOTATION } : {}),
+            ...(parsed.settings?.serials?.INV && !parsed.settings?.serials?.TI ? { TI: parsed.settings.serials.INV } : {})
+          }
+        },
         // Ensure arrays exist
         items: parsed.items || [],
         materials: parsed.materials || [],
@@ -83,27 +107,41 @@ export const AppProvider = ({ children }) => {
 
   // Helper for audit logging
   const logAudit = (prevData, action, module, oldValue, newValue) => {
-    let details = '';
-    
+    const now = new Date();
+    const user = prevData.currentUser ? prevData.currentUser.username : (prevData.settings?.userRole || 'System');
+
+    const changes = [];
     if (action === 'UPDATE' && oldValue && newValue) {
-      const changes = [];
       Object.keys(newValue).forEach(key => {
-        if (key !== 'id' && key !== 'updatedAt' && oldValue[key] !== newValue[key]) {
-          if (typeof newValue[key] !== 'object' && typeof oldValue[key] !== 'object') {
-             changes.push(`${key} changed from ${oldValue[key] || 'empty'} → ${newValue[key] || 'empty'}`);
-          }
+        if (key === 'id' || key === 'updatedAt' || key === 'createdAt') return;
+        if (typeof newValue[key] === 'object' || typeof oldValue[key] === 'object') return;
+        if (oldValue[key] !== newValue[key]) {
+          changes.push({ field: key, from: oldValue[key] ?? '', to: newValue[key] ?? '' });
         }
       });
-      details = changes.join(', ');
     }
+
+    const details =
+      action === 'UPDATE' && changes.length
+        ? changes.map(c => `${c.field} changed from ${c.from || 'empty'} → ${c.to || 'empty'}`).join(', ')
+        : '';
+
+    const message =
+      action === 'UPDATE' && changes.length
+        ? `${details} by ${user} at ${now.toLocaleTimeString()}`
+        : `${action} by ${user} at ${now.toLocaleString()}`;
 
     const newLog = {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
       action,
       module,
-      details, // Store pre-computed details
-      user: prevData.currentUser ? prevData.currentUser.username : (prevData.settings?.userRole || 'System'),
-      timestamp: new Date().toISOString()
+      details,
+      changes,
+      oldValue: action === 'UPDATE' ? oldValue : null,
+      newValue: action === 'UPDATE' ? newValue : null,
+      message,
+      user,
+      timestamp: now.toISOString()
     };
     return [...(prevData.auditLogs || []), newLog];
   };
@@ -133,6 +171,10 @@ export const AppProvider = ({ children }) => {
 
   const deleteItemSoftly = (module, id) => {
     setData(prev => {
+      if (prev.settings?.userRole !== 'Admin') {
+        alert("Only Admin can delete records.");
+        return prev;
+      }
       const oldItem = (prev[module] || []).find(i => i.id === id);
       if (!oldItem) return prev;
       const updatedItem = { ...oldItem, isDeleted: true, deletedAt: new Date().toISOString() };
@@ -175,13 +217,14 @@ export const AppProvider = ({ children }) => {
   };
 
   const incrementSerial = (docType) => {
+    const canonicalKey = normalizeSerialKey(docType);
     setData(prev => ({
       ...prev,
       settings: {
         ...prev.settings,
         serials: {
           ...prev.settings.serials,
-          [docType]: (prev.settings.serials[docType] || 0) + 1
+          [canonicalKey]: (prev.settings.serials[canonicalKey] || 0) + 1
         }
       }
     }));

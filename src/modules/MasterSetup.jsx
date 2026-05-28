@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Plus, Trash2, Tag, Box, Ruler, Percent } from 'lucide-react';
+import { Plus, Trash2, Tag, Box, Ruler, Percent, SlidersHorizontal } from 'lucide-react';
 
 const MasterSetup = () => {
   const { data, setData } = useAppContext();
@@ -53,6 +53,7 @@ const MasterSetup = () => {
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
         <TabButton name="Products" icon={Tag} tabId="Items" />
         <TabButton name="Materials" icon={Box} tabId="Materials" />
+        <TabButton name="PSD Req" icon={SlidersHorizontal} tabId="PSDReq" />
         <TabButton name="Units" icon={Ruler} tabId="Units" />
         <TabButton name="Taxes" icon={Percent} tabId="Taxes" />
       </div>
@@ -74,6 +75,15 @@ const MasterSetup = () => {
             onAdd={(val) => addItem('materials', val)} 
             onRemove={(idx) => removeItem('materials', idx)}
             placeholder="Enter material name..."
+          />
+        )}
+        {activeTab === 'PSDReq' && (
+          <MasterList
+            title="PSD Requirement Master"
+            items={data.psdRequirements || []}
+            onAdd={(val) => addItem('psdRequirements', val)}
+            onRemove={(idx) => removeItem('psdRequirements', idx)}
+            placeholder="Enter PSD requirement (e.g. d(0.9) < 10 Micron)..."
           />
         )}
         {activeTab === 'Units' && (

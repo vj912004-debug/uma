@@ -26,13 +26,15 @@ const Invoices = () => {
   });
 
   const handleCreateInvoice = (pl) => {
-    const typeKey = formData.type === 'Tax Invoice' ? 'INV' : 'PI';
+    const typeKey = formData.type === 'Tax Invoice' ? 'TI' : 'PI';
     const nextSerial = data.settings.serials[typeKey] || 1;
     
     setSelectedPL(pl);
     setFormData({
       ...formData,
-      invoiceNo: generateDocNumber(typeKey, nextSerial),
+      invoiceNo: formData.type === 'Tax Invoice'
+        ? generateDocNumber('IN', nextSerial)
+        : generateDocNumber('PI', nextSerial),
       partyName: pl.partyName,
       items: [
         { 
@@ -83,7 +85,7 @@ const Invoices = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const typeKey = formData.type === 'Tax Invoice' ? 'INV' : 'PI';
+    const typeKey = formData.type === 'Tax Invoice' ? 'TI' : 'PI';
     const newInvoice = {
       ...formData,
       id: Date.now().toString(),

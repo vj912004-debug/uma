@@ -35,6 +35,7 @@ const Parties = () => {
     name: '',
     nickname: '',
     psdReq: '90% < 10M',
+    psdMethodDefault: 'Dry',
     psdNote: '',
     charges: {
       cleaning: 0,
@@ -80,6 +81,7 @@ const Parties = () => {
       name: '',
       nickname: '',
       psdReq: '90% < 10M',
+      psdMethodDefault: 'Dry',
       psdNote: '',
       notes: '',
       charges: {
@@ -538,14 +540,31 @@ const Parties = () => {
                 </div>
                 <div>
                   <label>PSD Requirement *</label>
-                  <input 
-                    type="text" 
-                    className="input-field" 
-                    required 
-                    placeholder="e.g. 90% less than <10M"
+                  <input
+                    type="text"
+                    list="psdReqOptions"
+                    className="input-field"
+                    required
+                    placeholder="Select or type..."
                     value={productData.psdReq}
-                    onChange={e => setProductData({...productData, psdReq: e.target.value})}
+                    onChange={e => setProductData({ ...productData, psdReq: e.target.value })}
                   />
+                  <datalist id="psdReqOptions">
+                    {(data.psdRequirements || []).map((r, idx) => (
+                      <option key={idx} value={r} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <label>Default PSD Method</label>
+                  <select
+                    className="input-field"
+                    value={productData.psdMethodDefault || 'Dry'}
+                    onChange={e => setProductData({ ...productData, psdMethodDefault: e.target.value })}
+                  >
+                    <option value="Dry">Dry</option>
+                    <option value="Wet">Wet</option>
+                  </select>
                 </div>
                 <div>
                   <label>PSD Note (200+ Characters)</label>

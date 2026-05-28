@@ -13,6 +13,7 @@ const PartyDue = () => {
     partyId: '',
     receiptId: '',
     amount: '',
+    tds: '',
     date: new Date().toISOString().split('T')[0],
     chequeNo: '',
     bankName: '',
@@ -55,7 +56,8 @@ const PartyDue = () => {
     const newPayment = {
       ...paymentForm,
       id: Date.now().toString(),
-      amount: parseFloat(paymentForm.amount) || 0
+      amount: parseFloat(paymentForm.amount) || 0,
+      tds: parseFloat(paymentForm.tds) || 0
     };
 
     updateData('payments', newPayment);
@@ -64,6 +66,7 @@ const PartyDue = () => {
       partyId: '',
       receiptId: '',
       amount: '',
+      tds: '',
       date: new Date().toISOString().split('T')[0],
       chequeNo: '',
       bankName: '',
@@ -239,6 +242,10 @@ const PartyDue = () => {
                 <div>
                   <label>Cheque Amount Received (₹) *</label>
                   <input type="number" step="0.01" className="input-field" required placeholder="0.00" value={paymentForm.amount} onChange={e => setPaymentForm({...paymentForm, amount: e.target.value})} />
+                </div>
+                <div>
+                  <label>TDS (₹)</label>
+                  <input type="number" step="0.01" className="input-field" placeholder="0.00" value={paymentForm.tds} onChange={e => setPaymentForm({...paymentForm, tds: e.target.value})} />
                 </div>
 
                 <div>

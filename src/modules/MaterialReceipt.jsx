@@ -96,7 +96,7 @@ const MaterialReceipt = () => {
         productName: prodName,
         nickName: prodConfig.nickname || '',
         batches: [
-          { batchNo: '', drums: 1, qty: 0, psdReq: prodConfig.psdReq || '90% < 10M', psdReport: 'Yes', psdMethod: 'Dry', isEmptyDrums: false }
+          { batchNo: '', drums: 1, qty: 0, psdReq: prodConfig.psdReq || '90% < 10M', psdReport: 'Yes', psdMethod: prodConfig.psdMethodDefault || 'Dry', isEmptyDrums: false }
         ]
       }));
     } else {
@@ -123,7 +123,7 @@ const MaterialReceipt = () => {
           qty: 0, 
           psdReq: prodConfig?.psdReq || '90% < 10M', 
           psdReport: 'Yes', 
-          psdMethod: 'Dry', 
+          psdMethod: prodConfig?.psdMethodDefault || 'Dry', 
           isEmptyDrums: false 
         }
       ]
@@ -240,6 +240,7 @@ const MaterialReceipt = () => {
               customer: formData.partyName,
               productName: formData.productName,
               productNickName: formData.nickName,
+              psdReq: batch.psdReq || prodConfig?.psdReq || '',
               psdNote: prodConfig?.psdNote || prodConfig?.notes || '',
               batchNo: batch.batchNo,
               qty: batch.qty,
@@ -518,6 +519,11 @@ const MaterialReceipt = () => {
                 </div>
 
                 <div style={{ overflowX: 'auto', background: 'rgba(0,0,0,0.15)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <datalist id="psdReqOptions">
+                    {(data.psdRequirements || []).map((r, idx) => (
+                      <option key={idx} value={r} />
+                    ))}
+                  </datalist>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: 'var(--text-muted)' }}>
@@ -578,6 +584,7 @@ const MaterialReceipt = () => {
                             <td style={{ padding: '0.5rem' }}>
                               <input 
                                 type="text" 
+                                list="psdReqOptions"
                                 className="input-field" 
                                 style={{ padding: '0.3rem', fontSize: '0.825rem' }} 
                                 required

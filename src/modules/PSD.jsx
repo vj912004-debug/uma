@@ -15,7 +15,7 @@ const PSD = () => {
     psdNo: '',
     date: new Date().toISOString().split('T')[0],
     reports: [
-      { requirement: '90% < 10M', result: '', fileName: '', fileSize: '' }
+      { batchNo: '', method: 'Dry', requirement: '90% < 10M', result: '', fileName: '', fileSize: '' }
     ],
     notes: ''
   });
@@ -28,12 +28,11 @@ const PSD = () => {
     if (selectedMR) {
       const psdSerial = data.settings?.serials?.PSD || 1;
       const docNo = generateDocNumber('PSD', psdSerial, new Date(form.date));
-      setForm(prev => ({
-        requirement: prodConfig?.psdReq || '90% < 10M'
-      }));
       setForm(prev => {
         const reps = [...prev.reports];
         reps[0].requirement = prodConfig?.psdReq || '90% < 10M';
+        reps[0].method = prodConfig?.psdMethodDefault || 'Dry';
+        reps[0].batchNo = (selectedMR?.batches || []).filter(b => !b.isEmptyDrums)[0]?.batchNo || '';
         return { ...prev, psdNo: docNo, reports: reps };
       });
     }
@@ -55,7 +54,7 @@ const PSD = () => {
     if (form.reports.length < 3) {
       setForm(prev => ({
         ...prev,
-        reports: [...prev.reports, { requirement: prev.reports[0].requirement, result: '', fileName: '', fileSize: '' }]
+        reports: [...prev.reports, { batchNo: prev.reports[0].batchNo, method: prev.reports[0].method, requirement: prev.reports[0].requirement, result: '', fileName: '', fileSize: '' }]
       }));
     }
   };
@@ -74,7 +73,7 @@ const PSD = () => {
     setForm({
       psdNo: '',
       date: new Date().toISOString().split('T')[0],
-      reports: [{ requirement: '90% < 10M', result: '', fileName: '', fileSize: '' }],
+      reports: [{ batchNo: (mr?.batches || []).filter(b => !b.isEmptyDrums)[0]?.batchNo || '', method: 'Dry', requirement: '90% < 10M', result: '', fileName: '', fileSize: '' }],
       notes: ''
     });
     setIsModalOpen(true);
@@ -88,6 +87,19 @@ const PSD = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Enforce max 3 reports per batch
+    const counts = (form.reports || []).reduce((acc, r) => {
+      const k = r.batchNo || '';
+      acc[k] = (acc[k] || 0) + 1;
+      return acc;
+    }, {});
+    const tooMany = Object.entries(counts).find(([batch, c]) => batch && c > 3);
+    if (tooMany) {
+      alert(`Max 3 PSD reports allowed for batch "${tooMany[0]}".`);
+      return;
+    }
+
     const finalDoc = {
       ...form,
       receiptId: selectedMR.id,
@@ -188,6 +200,8 @@ const PSD = () => {
                       <td style={{ padding: '0.75rem' }}>
                         {(psd.reports || []).map((rep, idx) => (
                           <div key={idx} style={{ marginBottom: '0.5rem', borderBottom: idx < psd.reports.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', paddingBottom: idx < psd.reports.length - 1 ? '0.5rem' : '0' }}>
+                            <span style={{ fontSize: '0.75rem', display: 'block', color: 'var(--text-muted)' }}>Batch: {rep.batchNo || '-'}</span>
+                            <span style={{ fontSize: '0.75rem', display: 'block', color: 'var(--text-muted)' }}>Method: {rep.method || '-'}</span>
                             <span style={{ fontSize: '0.75rem', display: 'block', color: 'var(--text-muted)' }}>Spec: {rep.requirement}</span>
                             <span style={{ fontSize: '0.75rem', display: 'block', color: '#10b981', fontWeight: 600 }}>Result: {rep.result}</span>
                           </div>
@@ -247,6 +261,30 @@ const PSD = () => {
                       {form.reports.length > 1 && (
                         <button type="button" className="btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none' }} onClick={() => removeReport(idx)}>Remove</button>
                       )}
+                    </div>
+                    <div>
+                      <label>Batch No *</label>
+                      <select className="input-field" required value={rep.batchNo} onChange={e => {
+                        const newReps = [...form.reports];
+                        newReps[idx].batchNo = e.target.value;
+                        setForm({ ...form, reports: newReps});
+                      }}>
+                        <option value="">-- Select Batch --</option>
+                        {(activeMR?.batches || []).filter(b => !b.isEmptyDrums).map((b, bIdx) => (
+                          <option key={bIdx} value={b.batchNo}>{b.batchNo}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label>Method</label>
+                      <select className="input-field" value={rep.method} onChange={e => {
+                        const newReps = [...form.reports];
+                        newReps[idx].method = e.target.value;
+                        setForm({ ...form, reports: newReps});
+                      }}>
+                        <option value="Dry">Dry</option>
+                        <option value="Wet">Wet</option>
+                      </select>
                     </div>
                     <div>
                       <label>PSD Requirement *</label>

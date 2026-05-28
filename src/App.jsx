@@ -28,6 +28,7 @@ import DebitNotes from './modules/DebitNotes';
 import CreditNotes from './modules/CreditNotes';
 import RecycleBin from './modules/RecycleBin';
 import SystemLogs from './modules/SystemLogs';
+import Attendance from './modules/Attendance';
 
 function App() {
   return (
@@ -40,8 +41,8 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/master" element={<MasterSetup />} />
               <Route path="/parties" element={<Parties />} />
-              <Route path="/production-planning" element={<ProductionPlanning />} />
               <Route path="/material-receipt" element={<MaterialReceipt />} />
+              <Route path="/production-planning" element={<ProductionPlanning />} />
               <Route path="/under-process" element={<UnderProcess />} />
               <Route path="/invoices-pi" element={<InvoicesPI />} />
               <Route path="/bpr" element={<BPR />} />
@@ -60,6 +61,7 @@ function App() {
               <Route path="/purchase-orders" element={<PurchaseOrders />} />
               <Route path="/debit-notes" element={<DebitNotes />} />
               <Route path="/credit-notes" element={<CreditNotes />} />
+              <Route path="/attendance" element={<Attendance />} />
               <Route path="/recycle-bin" element={<RecycleBin />} />
               <Route path="/system-logs" element={<SystemLogs />} />
             </Routes>

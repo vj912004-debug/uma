@@ -6,10 +6,10 @@ import {
   FileText, Activity, UploadCloud, Package, Truck, 
   FileSpreadsheet, FileCheck, CheckCircle, Clock, X, Plus, Edit2, Download, Trash2 
 } from 'lucide-react';
-import { exportToPDF } from '../utils/pdfExport';
+import { exportToPDF, viewPDF } from '../utils/pdfExport';
 
 const UnderProcess = () => {
-  const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
+  const { data, updateData, updateItem, setData, incrementSerial, deleteItemSoftly } = useAppContext();
   const [activeModal, setActiveModal] = useState(null);
   const [activeTab, setActiveTab] = useState('All');
   const [modalContext, setModalContext] = useState(null); // Active M.R. record
@@ -53,18 +53,15 @@ const UnderProcess = () => {
     const { cellType, doc } = showDocPopover;
     if (window.confirm(`Are you sure you want to delete this ${cellType} document?`)) {
       if (cellType === 'PI' || cellType === 'TI') {
-        setData(prev => ({
-          ...prev,
-          invoices: prev.invoices.filter(i => i.id !== doc.id)
-        }));
+        deleteItemSoftly('invoices', doc.id);
       } else if (cellType === 'BPR') {
-        setData(prev => ({ ...prev, bprs: prev.bprs.filter(b => b.id !== doc.id) }));
+        deleteItemSoftly('bprs', doc.id);
       } else if (cellType === 'PSD') {
-        setData(prev => ({ ...prev, psds: prev.psds.filter(p => p.id !== doc.id) }));
+        deleteItemSoftly('psds', doc.id);
       } else if (cellType === 'PL') {
-        setData(prev => ({ ...prev, packingLists: prev.packingLists.filter(p => p.id !== doc.id) }));
+        deleteItemSoftly('packingLists', doc.id);
       } else if (cellType === 'DC') {
-        setData(prev => ({ ...prev, deliveryChallans: prev.deliveryChallans.filter(d => d.id !== doc.id) }));
+        deleteItemSoftly('deliveryChallans', doc.id);
       } else if (cellType === 'EWDC') {
         const dc = getDC(showDocPopover.mrId);
         if (dc) {
@@ -86,6 +83,12 @@ const UnderProcess = () => {
     setShowDocPopover(null);
   };
 
+  const handleViewPDF = () => {
+    const { cellType, doc } = showDocPopover;
+    viewPDF(cellType, doc);
+    setShowDocPopover(null);
+  };
+
   return (
     <div style={{ position: 'relative' }}>
       <header style={{ marginBottom: '2rem' }}>
@@ -94,22 +97,33 @@ const UnderProcess = () => {
       </header>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-        {['All', 'Pending', 'Completed'].map(tab => (
+        {[
+          { id: 'All', label: 'All' },
+          { id: 'PI', label: 'PI Pending' },
+          { id: 'BPR', label: 'BPR Pending' },
+          { id: 'PSD', label: 'PSD Pending' },
+          { id: 'PL', label: 'PL Pending' },
+          { id: 'DC', label: 'DC Pending' },
+          { id: 'EWDC', label: 'E-Way DC Pending' },
+          { id: 'TI', label: 'Tax Invoice Pending' },
+          { id: 'EWTI', label: 'E-Way TI Pending' },
+          { id: 'Done', label: 'Done' }
+        ].map(tab => (
           <button 
-            key={tab} 
-            onClick={() => setActiveTab(tab)} 
+            key={tab.id} 
+            onClick={() => setActiveTab(tab.id)} 
             style={{ 
               background: 'transparent', 
               border: 'none', 
               padding: '0.5rem 1rem', 
               fontSize: '1rem', 
               fontWeight: 600, 
-              color: activeTab === tab ? 'var(--accent-primary)' : 'var(--text-muted)',
-              borderBottom: activeTab === tab ? '2px solid var(--accent-primary)' : 'none',
+              color: activeTab === tab.id ? 'var(--accent-primary)' : 'var(--text-muted)',
+              borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : 'none',
               cursor: 'pointer'
             }}
           >
-            {tab}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -149,8 +163,15 @@ const UnderProcess = () => {
                   const dc = getDC(mr.id);
                   const ti = getTI(mr.id);
                   const isComplete = pi && bpr && psd && pl && dc && ti;
-                  if (activeTab === 'Completed') return isComplete;
-                  if (activeTab === 'Pending') return !isComplete;
+                  if (activeTab === 'Done') return isComplete;
+                  if (activeTab === 'PI') return !pi;
+                  if (activeTab === 'BPR') return !bpr;
+                  if (activeTab === 'PSD') return !psd;
+                  if (activeTab === 'PL') return !pl;
+                  if (activeTab === 'DC') return !dc;
+                  if (activeTab === 'EWDC') return !(dc && dc.ewayBillNo);
+                  if (activeTab === 'TI') return !ti;
+                  if (activeTab === 'EWTI') return !(ti && ti.ewayBillNo);
                   return true;
                 }).map(mr => {
                 const pi = getPI(mr.id);
@@ -171,7 +192,7 @@ const UnderProcess = () => {
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                       {pi ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
-                          <button onClick={() => exportToPDF('PI', pi)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View PDF">
+                          <button onClick={() => viewPDF('PI', pi)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View / Print">
                             <FileText size={14} />
                           </button>
                           <button onClick={(e) => handleBlueClick(mr.id, 'PI', pi, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
@@ -187,7 +208,7 @@ const UnderProcess = () => {
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                       {bpr ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
-                          <button onClick={() => exportToPDF('BPR', bpr)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View PDF">
+                          <button onClick={() => viewPDF('BPR', bpr)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View / Print">
                             <FileText size={14} />
                           </button>
                           <button onClick={(e) => handleBlueClick(mr.id, 'BPR', bpr, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
@@ -203,7 +224,7 @@ const UnderProcess = () => {
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                       {psd ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
-                          <button onClick={() => exportToPDF('PSD', psd)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View PDF">
+                          <button onClick={() => viewPDF('PSD', psd)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View / Print">
                             <FileText size={14} />
                           </button>
                           <button onClick={(e) => handleBlueClick(mr.id, 'PSD', psd, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
@@ -219,7 +240,7 @@ const UnderProcess = () => {
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                       {pl ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
-                          <button onClick={() => exportToPDF('PL', pl)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View PDF">
+                          <button onClick={() => viewPDF('PL', pl)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View / Print">
                             <FileText size={14} />
                           </button>
                           <button onClick={(e) => handleBlueClick(mr.id, 'PL', pl, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
@@ -235,7 +256,7 @@ const UnderProcess = () => {
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                       {dc ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
-                          <button onClick={() => exportToPDF('DC', dc)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View PDF">
+                          <button onClick={() => viewPDF('DC', dc)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View / Print">
                             <FileText size={14} />
                           </button>
                           <button onClick={(e) => handleBlueClick(mr.id, 'DC', dc, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
@@ -262,7 +283,7 @@ const UnderProcess = () => {
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                       {ti ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
-                          <button onClick={() => exportToPDF('TI', ti)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View PDF">
+                          <button onClick={() => viewPDF('TI', ti)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View / Print">
                             <FileText size={14} />
                           </button>
                           <button onClick={(e) => handleBlueClick(mr.id, 'TI', ti, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
@@ -326,6 +347,7 @@ const UnderProcess = () => {
             <p style={{ margin: 0, padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               {showDocPopover.cellType} Actions
             </p>
+            <button style={popBtn} onClick={handleViewPDF}><FileText size={14} /> View / Print</button>
             <button style={popBtn} onClick={handleDownloadPDF}><Download size={14} /> Download PDF</button>
             <button style={popBtn} onClick={handleEditDoc}><Edit2 size={14} /> Edit Document</button>
             <button style={{ ...popBtn, color: '#ef4444' }} onClick={handleDeleteDoc}><Trash2 size={14} /> Delete Entry</button>
@@ -528,7 +550,7 @@ const PerformaInvoiceGenerator = ({ mr, editing, onClose }) => {
           filterBag: defaultRates.filterBag || 0,
           processing: defaultRates.processing || 0,
           sieving: defaultRates.sieving || 0,
-          psdReport: defaultRates.psdReport || 0,
+          psdReport: (prodConfig?.psdMethodDefault === 'Wet' ? (defaultRates.psdReportWet || 0) : (defaultRates.psdReportDry || 0)) || defaultRates.psdReport || 0,
           liner: defaultRates.liner || 0,
           courier: defaultRates.courier || 0,
           fiberDrum: defaultRates.fiberDrum || 0,
@@ -723,13 +745,39 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
   const [form, setForm] = useState({
     bprNo: '',
     date: new Date().toISOString().split('T')[0],
+    customerName: mr.partyName,
     productName: mr.productName,
     totalInputQty: mr.totalQty || mr.receivedQty || 0,
+    batchNo: '',
+    totalNoBatch: 0,
     psdRequirement: prodConfig?.psdReq || '90% < 10M',
     totalDrums: mr.totalDrums || 1,
     doubleDispatch: false,
     receivedBatches: [], // Array of { batchNo, drumNo, gross, tare, net }
-    dispatchedBatches: [] // Array of { batchNo, drumNo, gross, tare, net }
+    dispatchedBatches: [], // Array of { batchNo, drumNo, gross, tare, net }
+    committedBy: '',
+    processingStartDate: new Date().toISOString().split('T')[0],
+    processingStartTime: '09:00',
+    processingSupervisor: '',
+    sizingReportRequired: 'Yes',
+    particleSizeResult: '',
+    isMicronizerCleaned: false,
+    isAreaCleaned: false,
+    isFilterBagPackedLabeled: false,
+    isBagCleanBlackSpotFree: false,
+    pressures: [
+      { sp: '', dp: '', tp: '', fp: '', fip: '' },
+      { sp: '', dp: '', tp: '', fp: '', fip: '' },
+      { sp: '', dp: '', tp: '', fp: '', fip: '' }
+    ],
+    packingMaterials: { whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '' },
+    dispatchQty: { micronizedNet: '', lumpsNet: '', floorDustNet: '', netProcessLoss: '', remark: '' },
+    processCompletionDate: new Date().toISOString().split('T')[0],
+    processCompletionTime: '17:00',
+    isFilterBagPackedStoredAfter: false,
+    remarks: '',
+    operatorSignature: '',
+    plantSupervisorSignature: ''
   });
 
   useEffect(() => {
@@ -765,8 +813,11 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
       setForm(prev => ({
         ...prev,
         bprNo: docNo,
+        customerName: mr.partyName,
         receivedBatches: receivedRows,
-        dispatchedBatches: receivedRows.map(r => ({ ...r }))
+        dispatchedBatches: receivedRows.map(r => ({ ...r })),
+        batchNo: activeMRBatches[0]?.batchNo || '',
+        totalNoBatch: activeMRBatches.length
       }));
     }
   }, [form.date, editing, mr, data.settings?.serials?.BPR]);
@@ -842,12 +893,123 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
           <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
         </div>
         <div>
+          <label>Customer Name</label>
+          <input type="text" className="input-field" value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} />
+        </div>
+        <div>
           <label>Product Name</label>
           <input type="text" className="input-field" readOnly value={form.productName} />
         </div>
         <div>
+          <label>Total Quantity (kg)</label>
+          <input type="text" className="input-field" readOnly value={String(form.totalInputQty)} />
+        </div>
+        <div>
+          <label>Batch No.</label>
+          <input type="text" className="input-field" value={form.batchNo} onChange={e => setForm({ ...form, batchNo: e.target.value })} />
+        </div>
+        <div>
+          <label>Total No. Batch</label>
+          <input type="number" className="input-field" value={form.totalNoBatch} onChange={e => setForm({ ...form, totalNoBatch: parseInt(e.target.value) || 0 })} />
+        </div>
+        <div>
+          <label>Total Drum</label>
+          <input type="number" className="input-field" value={form.totalDrums} onChange={e => setForm({ ...form, totalDrums: parseInt(e.target.value) || 0 })} />
+        </div>
+        <div>
           <label>PSD Requirement *</label>
           <input type="text" className="input-field" required value={form.psdRequirement} onChange={e => setForm({...form, psdRequirement: e.target.value})} />
+        </div>
+      </div>
+
+      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Process Header</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
+          <div>
+            <label>Committed</label>
+            <input type="text" className="input-field" value={form.committedBy} onChange={e => setForm({ ...form, committedBy: e.target.value })} />
+          </div>
+          <div>
+            <label>Processing Start (Date)</label>
+            <input type="date" className="input-field" value={form.processingStartDate} onChange={e => setForm({ ...form, processingStartDate: e.target.value })} />
+          </div>
+          <div>
+            <label>Processing Start (Time)</label>
+            <input type="time" className="input-field" value={form.processingStartTime} onChange={e => setForm({ ...form, processingStartTime: e.target.value })} />
+          </div>
+          <div>
+            <label>Processing Supervisor</label>
+            <input type="text" className="input-field" value={form.processingSupervisor} onChange={e => setForm({ ...form, processingSupervisor: e.target.value })} />
+          </div>
+          <div>
+            <label>Sizing report require</label>
+            <select className="input-field" value={form.sizingReportRequired} onChange={e => setForm({ ...form, sizingReportRequired: e.target.value })}>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div style={{ gridColumn: 'span 3' }}>
+            <label>Particle size result</label>
+            <input type="text" className="input-field" value={form.particleSizeResult} onChange={e => setForm({ ...form, particleSizeResult: e.target.value })} />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Cleaning Checklist</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          {[
+            { key: 'isMicronizerCleaned', label: 'Is the Micronizar cleaned?' },
+            { key: 'isAreaCleaned', label: 'Is the processing Area Cleaned?' },
+            { key: 'isFilterBagPackedLabeled', label: 'Is the filter Bag before process packed and labeled in LDPE Bag ?' },
+            { key: 'isBagCleanBlackSpotFree', label: 'Is the bag is clean and black spot free?' }
+          ].map(item => (
+            <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={Boolean(form[item.key])}
+                onChange={e => setForm({ ...form, [item.key]: e.target.checked })}
+              />
+              {item.label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Pressure Log</h3>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <thead>
+              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <th style={{ padding: '0.4rem' }}>S.P.</th>
+                <th style={{ padding: '0.4rem' }}>D.P.</th>
+                <th style={{ padding: '0.4rem' }}>T.P.</th>
+                <th style={{ padding: '0.4rem' }}>F.P.</th>
+                <th style={{ padding: '0.4rem' }}>Fi.P.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(form.pressures || []).map((row, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  {['sp', 'dp', 'tp', 'fp', 'fip'].map(k => (
+                    <td key={k} style={{ padding: '0.3rem' }}>
+                      <input
+                        className="input-field"
+                        style={{ padding: '0.25rem', fontSize: '0.8rem' }}
+                        value={row[k]}
+                        onChange={e => {
+                          const next = [...(form.pressures || [])];
+                          next[idx] = { ...next[idx], [k]: e.target.value };
+                          setForm({ ...form, pressures: next });
+                        }}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -941,9 +1103,97 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
         </div>
       </div>
 
+      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Packing Materials Used</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '0.75rem' }}>
+          <div>
+            <label>White LD Bags</label>
+            <input className="input-field" value={form.packingMaterials?.whiteLdBags || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, whiteLdBags: e.target.value } })} />
+          </div>
+          <div>
+            <label>Black LD Bags</label>
+            <input className="input-field" value={form.packingMaterials?.blackLdBags || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, blackLdBags: e.target.value } })} />
+          </div>
+          <div>
+            <label>Brow Tapes</label>
+            <input className="input-field" value={form.packingMaterials?.brownTapes || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, brownTapes: e.target.value } })} />
+          </div>
+          <div>
+            <label>Drum Used</label>
+            <input className="input-field" value={form.packingMaterials?.drumUsed || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, drumUsed: e.target.value } })} />
+          </div>
+          <div>
+            <label>Other Details</label>
+            <input className="input-field" value={form.packingMaterials?.otherDetails || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, otherDetails: e.target.value } })} />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Dispatch Material Quantity Details</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.75rem' }}>
+          <div>
+            <label>Micronized Material net weight</label>
+            <input className="input-field" value={form.dispatchQty?.micronizedNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, micronizedNet: e.target.value } })} />
+          </div>
+          <div>
+            <label>Lumps Net weight</label>
+            <input className="input-field" value={form.dispatchQty?.lumpsNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, lumpsNet: e.target.value } })} />
+          </div>
+          <div>
+            <label>Floor Dust Net weight</label>
+            <input className="input-field" value={form.dispatchQty?.floorDustNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, floorDustNet: e.target.value } })} />
+          </div>
+          <div>
+            <label>Net Process Loss</label>
+            <input className="input-field" value={form.dispatchQty?.netProcessLoss || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, netProcessLoss: e.target.value } })} />
+          </div>
+          <div style={{ gridColumn: 'span 4' }}>
+            <label>Remark</label>
+            <input className="input-field" value={form.dispatchQty?.remark || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, remark: e.target.value } })} />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Process Completion</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '0.75rem' }}>
+          <div>
+            <label>Date</label>
+            <input type="date" className="input-field" value={form.processCompletionDate} onChange={e => setForm({ ...form, processCompletionDate: e.target.value })} />
+          </div>
+          <div>
+            <label>Time</label>
+            <input type="time" className="input-field" value={form.processCompletionTime} onChange={e => setForm({ ...form, processCompletionTime: e.target.value })} />
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <input type="checkbox" checked={Boolean(form.isFilterBagPackedStoredAfter)} onChange={e => setForm({ ...form, isFilterBagPackedStoredAfter: e.target.checked })} />
+            Is Filter Bag Packed in HDPE bag and label & stored properly after processing ?
+          </label>
+          <div style={{ gridColumn: 'span 3' }}>
+            <label>Remark</label>
+            <input className="input-field" value={form.remarks} onChange={e => setForm({ ...form, remarks: e.target.value })} />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Signatures</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div>
+            <label>Operator's Signature</label>
+            <input className="input-field" value={form.operatorSignature} onChange={e => setForm({ ...form, operatorSignature: e.target.value })} />
+          </div>
+          <div>
+            <label>Plant Supervisor's Signature</label>
+            <input className="input-field" value={form.plantSupervisorSignature} onChange={e => setForm({ ...form, plantSupervisorSignature: e.target.value })} />
+          </div>
+        </div>
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
         <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
-        <button type="submit" className="btn btn-primary">Save BPR Weights</button>
+        <button type="submit" className="btn btn-primary">Save BPR</button>
       </div>
     </form>
   );
@@ -960,38 +1210,77 @@ const PSDGenerator = ({ mr, editing, onClose }) => {
   const [form, setForm] = useState({
     psdNo: '',
     date: new Date().toISOString().split('T')[0],
-    requirement: prodConfig?.psdReq || '90% < 10',
-    result: '90% < 7.77',
-    fileName: '',
-    fileSize: ''
+    reports: [
+      { batchNo: '', method: (prodConfig?.psdMethodDefault || 'Dry'), requirement: prodConfig?.psdReq || '90% < 10M', result: '', fileName: '', fileSize: '' }
+    ],
+    notes: ''
   });
 
   useEffect(() => {
     if (editing) {
-      setForm(editing);
+      setForm({
+        ...editing,
+        reports: editing.reports || [
+          { batchNo: '', method: (prodConfig?.psdMethodDefault || 'Dry'), requirement: prodConfig?.psdReq || '90% < 10M', result: '', fileName: '', fileSize: '' }
+        ],
+        notes: editing.notes || ''
+      });
     } else {
       const psdSerial = data.settings?.serials?.PSD || 1;
       const docNo = generateDocNumber('PSD', psdSerial, new Date(form.date));
       setForm(prev => ({
         ...prev,
-        psdNo: docNo
+        psdNo: docNo,
+        reports: (prev.reports || []).map(r => ({
+          ...r,
+          requirement: r.requirement || prodConfig?.psdReq || '90% < 10M',
+          method: r.method || (prodConfig?.psdMethodDefault || 'Dry')
+        }))
       }));
     }
   }, [form.date, editing, data.settings?.serials?.PSD]);
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = (e, index) => {
     const file = e.target.files[0];
     if (file) {
       setForm(prev => ({
         ...prev,
-        fileName: file.name,
-        fileSize: `${(file.size / 1024).toFixed(1)} KB`
+        reports: (prev.reports || []).map((r, idx) => idx === index ? ({
+          ...r,
+          fileName: file.name,
+          fileSize: `${(file.size / 1024).toFixed(1)} KB`
+        }) : r)
       }));
     }
   };
 
+  const addReport = () => {
+    setForm(prev => {
+      const next = [...(prev.reports || [])];
+      next.push({ batchNo: '', method: (prodConfig?.psdMethodDefault || 'Dry'), requirement: prodConfig?.psdReq || '90% < 10M', result: '', fileName: '', fileSize: '' });
+      return { ...prev, reports: next };
+    });
+  };
+
+  const removeReport = (idx) => {
+    setForm(prev => ({ ...prev, reports: (prev.reports || []).filter((_, i) => i !== idx) }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Enforce max 3 reports per batch
+    const counts = (form.reports || []).reduce((acc, r) => {
+      const k = r.batchNo || '';
+      acc[k] = (acc[k] || 0) + 1;
+      return acc;
+    }, {});
+    const tooMany = Object.entries(counts).find(([batch, c]) => batch && c > 3);
+    if (tooMany) {
+      alert(`Max 3 PSD reports allowed for batch "${tooMany[0]}".`);
+      return;
+    }
+
     const finalDoc = {
       ...form,
       receiptId: mr.id,
@@ -1028,31 +1317,89 @@ const PSDGenerator = ({ mr, editing, onClose }) => {
           <label>Product Name</label>
           <input type="text" className="input-field" readOnly value={mr.productName} />
         </div>
-        <div>
-          <label>PSD Requirement (ex. 90% &lt; 10) *</label>
-          <input type="text" className="input-field" required value={form.requirement} onChange={e => setForm({...form, requirement: e.target.value})} />
-        </div>
-        <div>
-          <label>PSD Result (ex. 90% &lt; 7.77) *</label>
-          <input type="text" className="input-field" required value={form.result} onChange={e => setForm({...form, result: e.target.value})} />
-        </div>
       </div>
 
-      <div style={{ background: 'rgba(0,0,0,0.2)', border: '2px dashed var(--border-color)', padding: '2rem', borderRadius: '8px', textAlign: 'center', marginBottom: '1.5rem' }}>
-        <UploadCloud size={36} style={{ color: 'var(--accent-primary)', marginBottom: '0.75rem' }} />
-        <p style={{ margin: 0, fontSize: '0.85rem' }}>Drag & drop your PSD PDF report here, or click to browse.</p>
-        <input type="file" accept=".pdf" onChange={handleFileUpload} style={{ marginTop: '1rem', fontSize: '0.8rem' }} />
-        {form.fileName && (
-          <div style={{ marginTop: '1rem', padding: '0.5rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '6px', display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{form.fileName}</span>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({form.fileSize})</span>
+      <div style={{ marginBottom: '1.5rem' }}>
+        {(form.reports || []).map((rep, idx) => (
+          <div key={idx} style={{ background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.06)', padding: '1rem', borderRadius: '10px', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h4 style={{ margin: 0 }}>Report {idx + 1}</h4>
+              {(form.reports || []).length > 1 && (
+                <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none' }} onClick={() => removeReport(idx)}>
+                  Remove
+                </button>
+              )}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label>Batch No *</label>
+                <select className="input-field" required value={rep.batchNo} onChange={e => {
+                  const next = [...(form.reports || [])];
+                  next[idx] = { ...next[idx], batchNo: e.target.value };
+                  setForm({ ...form, reports: next });
+                }}>
+                  <option value="">-- Select Batch --</option>
+                  {(mr.batches || []).filter(b => !b.isEmptyDrums).map((b, bIdx) => (
+                    <option key={bIdx} value={b.batchNo}>{b.batchNo}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label>Method</label>
+                <select className="input-field" value={rep.method} onChange={e => {
+                  const next = [...(form.reports || [])];
+                  next[idx] = { ...next[idx], method: e.target.value };
+                  setForm({ ...form, reports: next });
+                }}>
+                  <option value="Dry">Dry</option>
+                  <option value="Wet">Wet</option>
+                </select>
+              </div>
+              <div>
+                <label>PSD Requirement *</label>
+                <input className="input-field" required value={rep.requirement} onChange={e => {
+                  const next = [...(form.reports || [])];
+                  next[idx] = { ...next[idx], requirement: e.target.value };
+                  setForm({ ...form, reports: next });
+                }} />
+              </div>
+              <div>
+                <label>PSD Result *</label>
+                <input className="input-field" required value={rep.result} onChange={e => {
+                  const next = [...(form.reports || [])];
+                  next[idx] = { ...next[idx], result: e.target.value };
+                  setForm({ ...form, reports: next });
+                }} />
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label>Upload PDF</label>
+                <div style={{ background: 'rgba(0,0,0,0.2)', border: '2px dashed var(--border-color)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                  <UploadCloud size={28} style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }} />
+                  <input type="file" accept=".pdf" onChange={(e) => handleFileUpload(e, idx)} style={{ fontSize: '0.8rem' }} />
+                  {rep.fileName && (
+                    <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      {rep.fileName} ({rep.fileSize})
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        )}
+        ))}
+
+        <button type="button" className="btn btn-secondary" onClick={addReport}>
+          + Add Another Report
+        </button>
+      </div>
+
+      <div style={{ marginBottom: '1.5rem' }}>
+        <label>Note</label>
+        <textarea className="input-field" rows="3" value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
         <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
-        <button type="submit" className="btn btn-primary">Upload PSD Report</button>
+        <button type="submit" className="btn btn-primary">Save PSD Report(s)</button>
       </div>
     </form>
   );
@@ -1461,7 +1808,7 @@ const TaxInvoiceGenerator = ({ mr, editing, onClose }) => {
           filterBag: defaultRates.filterBag || 0,
           processing: defaultRates.processing || 0,
           sieving: defaultRates.sieving || 0,
-          psdReport: defaultRates.psdReport || 0,
+          psdReport: (prodConfig?.psdMethodDefault === 'Wet' ? (defaultRates.psdReportWet || 0) : (defaultRates.psdReportDry || 0)) || defaultRates.psdReport || 0,
           liner: defaultRates.liner || 0,
           courier: defaultRates.courier || 0,
           fiberDrum: defaultRates.fiberDrum || 0,

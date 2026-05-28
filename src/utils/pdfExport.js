@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-export const exportToPDF = (docType, data) => {
+const buildPDF = (docType, data) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   
@@ -30,7 +30,10 @@ export const exportToPDF = (docType, data) => {
                 docType === 'PI' ? 'PROFORMA INVOICE' : 
                 docType === 'BPR' ? 'BATCH PROCESSING RECORD' : 
                 docType === 'PL' ? 'PACKING LIST' : 
-                docType === 'DC' ? 'DELIVERY CHALLAN' : docType.toUpperCase();
+                docType === 'DC' ? 'DELIVERY CHALLAN' :
+                docType === 'DN' ? 'DEBIT NOTE' :
+                docType === 'CN' ? 'CREDIT NOTE' :
+                docType.toUpperCase();
   
   doc.text(title, 15, 55);
   
@@ -41,7 +44,7 @@ export const exportToPDF = (docType, data) => {
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   
-  const docNo = data.invoiceNo || data.bprNo || data.plNo || data.dcNo || data.psdNo || data.receiptNo || 'N/A';
+  const docNo = data.invoiceNo || data.bprNo || data.plNo || data.dcNo || data.psdNo || data.receiptNo || data.noteNo || 'N/A';
   const docDate = data.date || 'N/A';
   
   doc.setFont("helvetica", "bold");
@@ -57,72 +60,141 @@ export const exportToPDF = (docType, data) => {
   doc.setFont("helvetica", "bold");
   doc.text(`Customer Party:`, 15, 81);
   doc.setFont("helvetica", "normal");
-  doc.text(`${data.partyName || 'UMA MICRON CORP'}`, 45, 81);
+  doc.text(`${data.partyName || data.customerName || 'UMA MICRON'}`, 45, 81);
+
+  if (docType === 'TI' || docType === 'PI' || docType === 'DN' || docType === 'CN') {
+    const billLines = doc.splitTextToSize(data.billAddress || '', 70);
+    const shipLines = doc.splitTextToSize(data.shipAddress || '', 70);
+    doc.setFont("helvetica", "bold");
+    doc.text("Bill To:", 15, 93);
+    doc.setFont("helvetica", "normal");
+    doc.text(billLines, 15, 98);
+    doc.setFont("helvetica", "bold");
+    doc.text(`GST:`, 15, 98 + billLines.length * 5 + 2);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${data.gstinBill || ''}`, 28, 98 + billLines.length * 5 + 2);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Ship To:", 110, 93);
+    doc.setFont("helvetica", "normal");
+    doc.text(shipLines, 110, 98);
+    doc.setFont("helvetica", "bold");
+    doc.text(`GST:`, 110, 98 + shipLines.length * 5 + 2);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${data.gstinShip || ''}`, 123, 98 + shipLines.length * 5 + 2);
+  }
 
   doc.setFont("helvetica", "bold");
   doc.text(`Product Chemical:`, 15, 87);
   doc.setFont("helvetica", "normal");
   doc.text(`${data.productName || 'N/A'}`, 45, 87);
   
-  let yPos = 102;
+  let yPos = (docType === 'TI' || docType === 'PI' || docType === 'DN' || docType === 'CN') ? 125 : 102;
   
   if (docType === 'QUOTATION') {
+    // Header fields
     doc.setFont("helvetica", "bold");
-    doc.text(`Attn: ${data.contactPerson || 'To whomsoever it may concern'}`, 15, yPos);
-    yPos += 8;
-    doc.text(`Sub: ${data.subject}`, 15, yPos);
-    yPos += 10;
-    
-    doc.setFont("helvetica", "normal");
-    doc.text(`Dear Sir/Madam,`, 15, yPos);
+    doc.text(`Quotation No: ${data.quotationNo || 'N/A'}`, 15, yPos);
     yPos += 6;
-    doc.text(`With reference to your inquiry, we are pleased to offer our quotation for Micronizing Job Work for your product ${data.productName} as under:`, 15, yPos, { maxWidth: pageWidth - 30 });
-    yPos += 12;
+    doc.text(`Quotation Date: ${data.date || 'N/A'}`, 15, yPos);
+    yPos += 6;
+    doc.text(`Party Name: ${data.partyName || 'N/A'}`, 15, yPos);
+    yPos += 10;
 
-    const mainBody = (data.mainCharges || []).filter(c => c.description).map(c => [c.description, c.rate]);
-    
+    // Letter body (as provided)
+    doc.setFont("helvetica", "normal");
+    const letterLines = [
+      'Dear Sir/Madam,',
+      `Sub: ${data.subject || 'Quotation for Micronization Services.'}`,
+      '',
+      'With reference to the above mentioned subject, Please find attached our offer along with relevant terms and condition for your ready reference.',
+      '',
+      'Uma Micron, Vadodara is a Gujarat based company that offers CONTRACT MICRONIZATION SERVICES dedicated to comply the needs of the pharmaceutical industry. The facility is at Ranoli-Vadodara, operates according to cGMP standards with more than 500 sq.ft processing area and big warehouse facility.',
+      '',
+      'Micronization: Jet micronization is used to mill particles below 10-20 microns. Particle to particle impact facilitated by air flow allows for producing particles less than 10-20 microns in size.',
+      '',
+      'We trust our offer will be in line with your requirement and if you have any techno-commercial queries, please feel free to contact us.',
+      'Thanking You,',
+      '',
+      'For Uma Micron',
+      data.signatoryName || 'Amit Patel'
+    ];
+    const wrapped = doc.splitTextToSize(letterLines.join('\n'), pageWidth - 30);
+    doc.text(wrapped, 15, yPos);
+    yPos += wrapped.length * 5 + 8;
+
+    doc.setFont("helvetica", "bold");
+    doc.text('QUOTATION: MICRONIZATION CHARGE', 15, yPos);
+    yPos += 6;
+
+    const mainBody = (data.mainCharges || [])
+      .filter(c => c.description)
+      .map((c, idx) => [String(idx + 1), c.description, c.psdRequirement || '', c.rate || '']);
+
     autoTable(doc, {
       startY: yPos,
-      head: [["Particulars / Description", "Rate"]],
-      body: mainBody,
+      head: [['Sr. No.', 'Description', 'PSD Requirement', 'Rate']],
+      body: mainBody.length ? mainBody : [['', '—', '—', '—']],
       theme: 'grid',
       headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
-      styles: { fontSize: 10, cellPadding: 3 }
+      styles: { fontSize: 9.5, cellPadding: 3 }
     });
-    
-    yPos = doc.lastAutoTable.finalY + 10;
 
-    if (data.optionalCharges && data.optionalCharges.some(c => c.description)) {
+    yPos = doc.lastAutoTable.finalY + 8;
+
+    // Optional items
+    const optBody = (data.optionalCharges || [])
+      .filter(c => c.description)
+      .map((c, idx) => [String(idx + 1), c.description, c.rate || '']);
+
+    if (optBody.length) {
       doc.setFont("helvetica", "bold");
-      doc.text("Optional / Extra Items (If Required)", 15, yPos);
+      doc.text('BELOW ITEMS IF REQUIRED:', 15, yPos);
       yPos += 6;
-      
-      const optBody = data.optionalCharges.filter(c => c.description).map(c => [c.description, c.rate]);
+
       autoTable(doc, {
         startY: yPos,
-        head: [["Particulars / Description", "Rate"]],
+        head: [['Sr. No.', 'Description', 'Rate']],
         body: optBody,
         theme: 'grid',
         headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
-        styles: { fontSize: 10, cellPadding: 3 }
+        styles: { fontSize: 9.5, cellPadding: 3 }
       });
-      yPos = doc.lastAutoTable.finalY + 10;
+      yPos = doc.lastAutoTable.finalY + 8;
     }
 
+    // Terms & Notes
     doc.setFont("helvetica", "bold");
-    doc.text("Terms & Conditions:", 15, yPos);
+    doc.text('Terms and Condition:', 15, yPos);
     yPos += 6;
     doc.setFont("helvetica", "normal");
     const termsLines = doc.splitTextToSize(data.terms || '', pageWidth - 30);
     doc.text(termsLines, 15, yPos);
-    yPos += termsLines.length * 5 + 15;
+    yPos += termsLines.length * 5 + 6;
+
+    if (data.validityDate) {
+      doc.setFont("helvetica", "bold");
+      doc.text(`Validity:`, 15, yPos);
+      doc.setFont("helvetica", "normal");
+      doc.text(`${data.validityDate}`, 35, yPos);
+      yPos += 8;
+    }
+
+    if (data.notes) {
+      doc.setFont("helvetica", "bold");
+      doc.text('Note:', 15, yPos);
+      yPos += 6;
+      doc.setFont("helvetica", "normal");
+      const noteLines = doc.splitTextToSize(data.notes, pageWidth - 30);
+      doc.text(noteLines, 15, yPos);
+      yPos += noteLines.length * 5 + 10;
+    }
 
     doc.setFont("helvetica", "bold");
-    doc.text("For UMA MICRON CORP.", pageWidth - 70, yPos);
-    yPos += 20;
-    doc.text("Authorized Signatory", pageWidth - 70, yPos);
+    doc.text('For Uma Micron', 15, Math.min(yPos, 270));
+    doc.text(data.signatoryName || 'Amit Patel', 15, Math.min(yPos + 18, 285));
 
-  } else if (docType === 'PI' || docType === 'TI' || data.charges) {
+  } else if (docType === 'PI' || docType === 'TI' || docType === 'DN' || docType === 'CN' || data.charges) {
     const chargesList = [
       { key: 'cleaning', label: 'Cleaning Charges', hsn: '998842', isQty: true },
       { key: 'filterBag', label: 'Filter Bag Charges', hsn: '591190', isQty: false },
@@ -134,7 +206,8 @@ export const exportToPDF = (docType, data) => {
       { key: 'fiberDrum', label: 'Fiber Drum', hsn: '7310', isQty: false },
       { key: 'transportation', label: 'Transportation', hsn: '996511', isQty: false },
       { key: 'hdpeDrum', label: 'HDPE Drum', hsn: '39233090', isQty: false },
-      { key: 'batchChangeover', label: 'Batch Changeover', hsn: '998842', isQty: false }
+      { key: 'batchChangeover', label: 'Batch Changeover', hsn: '998842', isQty: false },
+      { key: 'other', label: 'Other Particulars', hsn: '', isQty: true }
     ];
 
     const body = [];
@@ -177,14 +250,72 @@ export const exportToPDF = (docType, data) => {
     doc.text(`Rs. ${(data.total || 0).toFixed(2)}`, 175, yPos);
 
   } else if (docType === 'BPR' && data.receivedBatches) {
+    // Summary header
     doc.setFont("helvetica", "bold");
-    doc.text("Raw Material Received weights", 15, yPos - 5);
+    doc.text("Batch Processing Record", 15, yPos - 5);
+    yPos += 2;
+
+    const headerRows = [
+      ["Customer Name", data.customerName || data.partyName || ""],
+      ["Product Name", data.productName || ""],
+      ["Total Quantity (kg)", String(data.totalInputQty ?? "")],
+      ["Batch No.", data.batchNo || ""],
+      ["Total No. Batch", String(data.totalNoBatch ?? "")],
+      ["Total Drum", String(data.totalDrums ?? "")],
+      ["Particle size require", data.psdRequirement || ""],
+      ["Sizing report require", data.sizingReportRequired || ""],
+      ["Particle size result", data.particleSizeResult || ""],
+      ["Processing Start", `${data.processingStartDate || ""} ${data.processingStartTime || ""}`.trim()],
+      ["Processing supervisor", data.processingSupervisor || ""]
+    ];
+
+    autoTable(doc, {
+      startY: yPos,
+      body: headerRows,
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 2 },
+      columnStyles: { 0: { cellWidth: 55, fontStyle: 'bold' } }
+    });
+
+    yPos = doc.lastAutoTable.finalY + 6;
+
+    const checklistRows = [
+      ["Is the Micronizar cleaned?", data.isMicronizerCleaned ? "Yes" : "No"],
+      ["Is the processing Area Cleaned?", data.isAreaCleaned ? "Yes" : "No"],
+      ["Is the filter Bag before process packed and labeled in LDPE Bag ?", data.isFilterBagPackedLabeled ? "Yes" : "No"],
+      ["Is the bag is clean and black spot free?", data.isBagCleanBlackSpotFree ? "Yes" : "No"]
+    ];
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Checklist Item", "Answer"]],
+      body: checklistRows,
+      theme: 'grid',
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
+      styles: { fontSize: 9, cellPadding: 2 }
+    });
+    yPos = doc.lastAutoTable.finalY + 6;
+
+    if (Array.isArray(data.pressures) && data.pressures.length) {
+      const pressureBody = data.pressures.map(r => [r.sp || "", r.dp || "", r.tp || "", r.fp || "", r.fip || ""]);
+      autoTable(doc, {
+        startY: yPos,
+        head: [["S.P.", "D.P.", "T.P.", "F.P.", "Fi.P."]],
+        body: pressureBody,
+        theme: 'grid',
+        headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
+        styles: { fontSize: 9, cellPadding: 2 }
+      });
+      yPos = doc.lastAutoTable.finalY + 6;
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Raw Material Received", 15, yPos - 2);
     
-    const recBody = data.receivedBatches.map(r => [r.batchNo, r.drumNo, r.gross, r.tare, r.net.toFixed(1)]);
+    const recBody = (data.receivedBatches || []).map(r => [r.batchNo, r.drumNo, r.gross, r.tare, (r.net ?? 0).toFixed(2)]);
     
     autoTable(doc, {
       startY: yPos,
-      head: [["Batch", "Drum", "Gross", "Tare", "Net"]],
+      head: [["Batch No", "Drum No", "Gross", "Tare", "Net"]],
       body: recBody,
       theme: 'grid',
       tableWidth: 85,
@@ -194,19 +325,70 @@ export const exportToPDF = (docType, data) => {
     });
 
     doc.setFont("helvetica", "bold");
-    doc.text("Dispatched micronised weights", 110, yPos - 5);
+    doc.text("Dispatched (Micronized)", 110, yPos - 2);
     
-    const dispBody = data.dispatchedBatches.map(r => [r.batchNo, r.drumNo, r.gross, r.tare, r.net.toFixed(1)]);
+    const dispBody = (data.dispatchedBatches || []).map(r => [r.batchNo, r.drumNo, r.gross, r.tare, (r.net ?? 0).toFixed(2)]);
     
     autoTable(doc, {
       startY: yPos,
-      head: [["Batch", "Drum", "Gross", "Tare", "Net"]],
+      head: [["Batch No", "Drum No", "Gross", "Tare", "Net"]],
       body: dispBody,
       theme: 'grid',
       tableWidth: 85,
       margin: { left: 110 },
       headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
       styles: { fontSize: 8, cellPadding: 2 }
+    });
+
+    yPos = doc.lastAutoTable.finalY + 6;
+
+    const pm = data.packingMaterials || {};
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Packing Materials Used", "Details"]],
+      body: [
+        ["White LD Bags", pm.whiteLdBags || ""],
+        ["Black LD Bags", pm.blackLdBags || ""],
+        ["Brow Tapes", pm.brownTapes || ""],
+        ["Drum Used", pm.drumUsed || ""],
+        ["Other Details", pm.otherDetails || ""]
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
+      styles: { fontSize: 9, cellPadding: 2 }
+    });
+    yPos = doc.lastAutoTable.finalY + 6;
+
+    const dq = data.dispatchQty || {};
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Dispatch Material Quantity Details", "Value"]],
+      body: [
+        ["Micronized Material net weight", dq.micronizedNet || ""],
+        ["Lumps Net weight", dq.lumpsNet || ""],
+        ["Floor Dust Net weight", dq.floorDustNet || ""],
+        ["Net Process Loss", dq.netProcessLoss || ""],
+        ["Remark", dq.remark || ""]
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
+      styles: { fontSize: 9, cellPadding: 2 }
+    });
+    yPos = doc.lastAutoTable.finalY + 6;
+
+    const completionRows = [
+      ["Process completion", `${data.processCompletionDate || ""} ${data.processCompletionTime || ""}`.trim()],
+      ["Filter Bag Packed & Stored", data.isFilterBagPackedStoredAfter ? "Yes" : "No"],
+      ["Remark", data.remarks || ""],
+      ["Operator's Signature", data.operatorSignature || ""],
+      ["Plant Supervisor's Signature", data.plantSupervisorSignature || ""]
+    ];
+    autoTable(doc, {
+      startY: yPos,
+      body: completionRows,
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 2 },
+      columnStyles: { 0: { cellWidth: 65, fontStyle: 'bold' } }
     });
 
   } else if (docType === 'PL' && data.batches) {
@@ -221,12 +403,48 @@ export const exportToPDF = (docType, data) => {
       styles: { fontSize: 10, cellPadding: 3 }
     });
 
+  } else if (docType === 'PSD' && (data.reports || data.requirement)) {
+    doc.setFont("helvetica", "bold");
+    doc.text("Particle Size Distribution (PSD) Report", 15, yPos);
+    yPos += 6;
+
+    const reports = data.reports || [{
+      batchNo: data.batchNo || '',
+      method: data.method || '',
+      requirement: data.requirement || '',
+      result: data.result || '',
+      fileName: data.fileName || ''
+    }];
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Batch No", "Method", "PSD Requirement", "PSD Result", "File"]],
+      body: reports.map(r => [r.batchNo || '', r.method || '', r.requirement || '', r.result || '', r.fileName || '']),
+      theme: 'grid',
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
+      styles: { fontSize: 9, cellPadding: 2 }
+    });
+
+    yPos = doc.lastAutoTable.finalY + 8;
+
+    if (data.notes) {
+      doc.setFont("helvetica", "bold");
+      doc.text("Note:", 15, yPos);
+      yPos += 6;
+      doc.setFont("helvetica", "normal");
+      const noteLines = doc.splitTextToSize(data.notes, pageWidth - 30);
+      doc.text(noteLines, 15, yPos);
+    }
+
   } else if (docType === 'DC') {
     doc.setFont("helvetica", "bold");
     doc.text("LOGISTICS & DISPATCH PARTICULARS", 15, yPos);
     doc.setFont("helvetica", "normal");
     
     const dcBody = [
+      ["Party Name", data.partyName || 'N/A'],
+      ["Ship To Address", data.shipAddress || 'N/A'],
+      ["GST No", data.gstinShip || data.gstinBill || 'N/A'],
       ["Dispatched Material", data.productName || 'N/A'],
       ["Quantity Sent", `${data.qty} Kg (${data.totalDrums} Drums)`],
       ["Vehicle Number", data.vehicleNo || 'N/A'],
@@ -248,6 +466,15 @@ export const exportToPDF = (docType, data) => {
     doc.setFont("helvetica", "normal");
     yPos += 6;
     doc.text(data.termsAndConditions || 'None', 15, yPos, { maxWidth: pageWidth - 30 });
+
+    // Signature footer (as requested)
+    const sigY = 275;
+    doc.setFont("helvetica", "bold");
+    doc.text("For Uma Microns", 15, sigY);
+    doc.text("Authorised Signatory", 15, sigY + 8);
+
+    doc.text("Received By", pageWidth / 2 - 20, sigY);
+    doc.text("Authorised Signatory", pageWidth / 2 - 20, sigY + 8);
   }
 
   // Footer stamp
@@ -255,7 +482,21 @@ export const exportToPDF = (docType, data) => {
   doc.setTextColor(150, 150, 150);
   doc.text("This is an official, computer-generated record authorized by UMA MICRON CORP.", pageWidth / 2, 285, { align: "center" });
   
+  return { doc, docNo };
+};
+
+export const exportToPDF = (docType, data) => {
+  const { doc, docNo } = buildPDF(docType, data);
   doc.save(`${docType}_${docNo}.pdf`);
+};
+
+export const viewPDF = (docType, data) => {
+  const { doc, docNo } = buildPDF(docType, data);
+  const url = doc.output('bloburl');
+  const win = window.open(url, '_blank');
+  if (win) {
+    win.document.title = `${docType}_${docNo}`;
+  }
 };
 
 export const downloadPDF = (docType, data) => {

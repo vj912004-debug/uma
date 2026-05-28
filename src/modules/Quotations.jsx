@@ -17,19 +17,22 @@ const Quotations = () => {
     partyName: '',
     partyAddress: '',
     contactPerson: '',
-    subject: 'Quotation for Micronising / Pulverising',
+    subject: 'Quotation for Micronization Services.',
     productName: '',
-    mainCharges: [{ description: '', rate: '' }],
+    mainCharges: [{ description: '', psdRequirement: '', rate: '' }],
     optionalCharges: [{ description: '', rate: '' }],
-    terms: '1) GST: 18% Extra\n2) Freight: Extra as actual\n3) Payment: 100% Advance before delivery\n4) Validity: 30 Days'
+    validityDate: '2026-06-21',
+    terms: 'Tax: GST will charge extra.\nLoss: Loss occurs during Processing is on your account.\nSame Batch: Same materials requirement of micronization separately batch wise of different specification of same materials then change over charge @ Rs. 500/- batch or per specification will be applicable.\nCharges: This is only processing charges, all other charges like Transportation, Insurance, Repacking material charges will be extra.\nPayment: 100% Advance against PI\nValidity: 21/06/2026\nNote: If properties of material change then rate will be change and PSD will change then rate will be change.',
+    notes: '1) ABC\n\n2) ABC\n\n3) ABC',
+    signatoryName: 'Amit Patel'
   });
 
   useEffect(() => {
     if (isModalOpen && !formData.id) {
-      const serial = data.settings?.serials?.QUOTATION || 1;
+      const serial = data.settings?.serials?.QT || 1;
       setFormData(prev => ({ ...prev, quotationNo: generateDocNumber('QTN', serial, new Date(prev.date)) }));
     }
-  }, [isModalOpen, data.settings?.serials?.QUOTATION, formData.date, formData.id]);
+  }, [isModalOpen, data.settings?.serials?.QT, formData.date, formData.id]);
 
   const handlePartySelect = (e) => {
     const partyId = e.target.value;
@@ -52,14 +55,14 @@ const Quotations = () => {
       createdAt: new Date().toISOString()
     };
     updateData('quotations', newQuotation);
-    incrementSerial('QUOTATION');
+    incrementSerial('QT');
     setIsModalOpen(false);
   };
 
   const addChargeRow = (type) => {
     setFormData(prev => ({ 
       ...prev, 
-      [type]: [...prev[type], { description: '', rate: '' }] 
+      [type]: [...prev[type], type === 'mainCharges' ? { description: '', psdRequirement: '', rate: '' } : { description: '', rate: '' }]
     }));
   };
 
@@ -170,12 +173,21 @@ const Quotations = () => {
                   <label>Product Name</label>
                   <input type="text" className="input-field" placeholder="e.g. Calcium Carbonate" value={formData.productName} onChange={e => setFormData({...formData, productName: e.target.value})} />
                 </div>
+                <div>
+                  <label>Validity Date</label>
+                  <input type="date" className="input-field" value={formData.validityDate} onChange={e => setFormData({...formData, validityDate: e.target.value})} />
+                </div>
+                <div>
+                  <label>Signatory Name</label>
+                  <input type="text" className="input-field" value={formData.signatoryName} onChange={e => setFormData({...formData, signatoryName: e.target.value})} />
+                </div>
               </div>
 
               <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>Main Charges Table</h3>
               {formData.mainCharges.map((charge, idx) => (
-                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem', marginBottom: '0.5rem' }}>
+                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr', gap: '1rem', marginBottom: '0.5rem' }}>
                   <input type="text" className="input-field" placeholder="Charge Description (e.g. Processing Charges)" value={charge.description} onChange={e => updateChargeRow('mainCharges', idx, 'description', e.target.value)} />
+                  <input type="text" className="input-field" placeholder="PSD Requirement (optional)" value={charge.psdRequirement || ''} onChange={e => updateChargeRow('mainCharges', idx, 'psdRequirement', e.target.value)} />
                   <input type="text" className="input-field" placeholder="Rate (e.g. ₹ 5 / Kg)" value={charge.rate} onChange={e => updateChargeRow('mainCharges', idx, 'rate', e.target.value)} />
                 </div>
               ))}
@@ -193,6 +205,10 @@ const Quotations = () => {
               <div>
                 <label>Terms & Conditions</label>
                 <textarea className="input-field" rows="4" value={formData.terms} onChange={e => setFormData({...formData, terms: e.target.value})}></textarea>
+              </div>
+              <div style={{ marginTop: '1rem' }}>
+                <label>Notes</label>
+                <textarea className="input-field" rows="4" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})}></textarea>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>

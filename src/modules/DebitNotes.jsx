@@ -1,8 +1,9 @@
 import { formatDate } from '../utils/dateUtils';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Plus, Search, Edit2, Trash2, FileMinus } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, FileMinus, FileDown } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
+import { exportToPDF } from '../utils/pdfExport';
 
 const DebitNotes = () => {
   const { data, updateData, updateItem, deleteItemSoftly, incrementSerial } = useAppContext();
@@ -200,6 +201,7 @@ const DebitNotes = () => {
                     <td style={{ fontWeight: 600 }}>₹{parseFloat(note.amount || 0).toFixed(2)}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button onClick={() => exportToPDF('DN', note)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={16} /></button>
                         <button onClick={() => handleEdit(note)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={16} /></button>
                         <button onClick={() => deleteItemSoftly('debitNotes', note.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }}><Trash2 size={16} /></button>
                       </div>

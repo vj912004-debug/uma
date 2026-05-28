@@ -84,7 +84,7 @@ const TaxInvoice = () => {
           filterBag: defaultRates.filterBag || 0,
           processing: defaultRates.processing || 0,
           sieving: defaultRates.sieving || 0,
-          psdReport: defaultRates.psdReport || 0,
+          psdReport: (prodConfig?.psdMethodDefault === 'Wet' ? (defaultRates.psdReportWet || 0) : (defaultRates.psdReportDry || 0)) || defaultRates.psdReport || 0,
           liner: defaultRates.liner || 0,
           courier: defaultRates.courier || 0,
           fiberDrum: defaultRates.fiberDrum || 0,

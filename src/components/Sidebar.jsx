@@ -22,7 +22,8 @@ import {
   PlusSquare,
   FileMinus,
   FilePlus,
-  ShoppingCart
+  ShoppingCart,
+  UserCheck
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
@@ -35,7 +36,14 @@ const Sidebar = () => {
       title: "Master Data",
       items: [
         { name: 'Add Party', icon: Users, path: '/parties', roles: ['Admin', 'Staff'] },
-        { name: 'Quotations', icon: PlusSquare, path: '/quotations', roles: ['Admin', 'Staff'] }
+        { name: 'Quotations', icon: PlusSquare, path: '/quotations', roles: ['Admin', 'Staff'] },
+        { name: 'Attendance', icon: UserCheck, path: '/attendance', roles: ['Admin', 'Staff'] }
+      ]
+    },
+    {
+      title: "Received Material",
+      items: [
+        { name: 'Add Material Received Data', icon: ClipboardList, path: '/material-receipt', roles: ['Admin', 'Staff'] }
       ]
     },
     {
@@ -45,17 +53,26 @@ const Sidebar = () => {
       ]
     },
     {
-      title: "Received Material",
+      title: "Under Process",
       items: [
-        { name: 'Add Material Received Data', icon: ClipboardList, path: '/material-receipt', roles: ['Admin', 'Staff'] },
         { name: 'Under Process', icon: Layers, path: '/under-process', roles: ['Admin', 'Staff'], specialStyle: { color: '#ef4444', fontWeight: 'bold' } }
+      ]
+    },
+    {
+      title: "Purchase Order",
+      items: [
+        { name: 'Purchase Order (PO)', icon: ShoppingCart, path: '/purchase-orders', roles: ['Admin', 'Staff'] }
+      ]
+    },
+    {
+      title: "Proforma Invoice",
+      items: [
+        { name: 'Performa Invoice (PI)', icon: FileText, path: '/invoices-pi', roles: ['Admin', 'Staff'] }
       ]
     },
     {
       title: "Documents & Flows",
       items: [
-        { name: 'Purchase Order (PO)', icon: ShoppingCart, path: '/purchase-orders', roles: ['Admin', 'Staff'] },
-        { name: 'Performa Invoice (PI)', icon: FileText, path: '/invoices-pi', roles: ['Admin', 'Staff'] },
         { name: 'Batch Processing Record (BPR)', icon: Activity, path: '/bpr', roles: ['Admin', 'Staff'] },
         { name: 'PSD Upload', icon: UploadCloud, path: '/psd', roles: ['Admin', 'Staff'] },
         { name: 'Packing List (PL)', icon: Package, path: '/packing-list', roles: ['Admin', 'Staff'] },
