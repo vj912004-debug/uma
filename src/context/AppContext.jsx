@@ -42,10 +42,10 @@ export const AppProvider = ({ children }) => {
       purchaseOrders: [],
       auditLogs: [],
       users: [
-        { id: 1, username: 'Admin', role: 'Admin', active: true },
-        { id: 2, username: 'Staff1', role: 'Staff', permissions: [], active: true },
-        { id: 3, username: 'Staff2', role: 'Staff', permissions: [], active: true },
-        { id: 4, username: 'Staff3', role: 'Staff', permissions: [], active: true }
+        { id: 1, employeeId: 'EMP001', department: 'Management', username: 'Admin', role: 'Admin', active: true },
+        { id: 2, employeeId: 'EMP002', department: 'Production', username: 'Staff1', role: 'Staff', permissions: [], active: true },
+        { id: 3, employeeId: 'EMP003', department: 'Packaging', username: 'Staff2', role: 'Staff', permissions: [], active: true },
+        { id: 4, employeeId: 'EMP004', department: 'Quality Control', username: 'Staff3', role: 'Staff', permissions: [], active: true }
       ],
       currentUser: { id: 1, username: 'Admin', role: 'Admin' },
       settings: {
@@ -89,7 +89,11 @@ export const AppProvider = ({ children }) => {
         creditNotes: parsed.creditNotes || [],
         purchaseOrders: parsed.purchaseOrders || [],
         auditLogs: parsed.auditLogs || [],
-        users: parsed.users || baseState.users,
+        users: (parsed.users || baseState.users).map((u, i) => ({
+          ...u,
+          employeeId: u.employeeId || `EMP00${i + 1}`,
+          department: u.department || 'General'
+        })),
         currentUser: parsed.currentUser || baseState.currentUser
       };
     } catch (e) {

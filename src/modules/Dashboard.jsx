@@ -4,7 +4,12 @@ import {
   TrendingUp, 
   Package, 
   Users, 
-  AlertCircle 
+  AlertCircle,
+  UserCheck,
+  UserX,
+  Clock,
+  Briefcase,
+  Zap
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -42,7 +47,18 @@ const Dashboard = () => {
         <p style={{ color: 'var(--text-muted)' }}>Welcome back, here's what's happening today.</p>
       </header>
 
-      <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
+      <h3 style={{ marginBottom: '1rem', color: 'var(--text-muted)' }}>Today's Attendance Overview</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
+        <StatCard title="Total Employees" value={(data.users || []).length} icon={Users} color="#3b82f6" path="/attendance" />
+        <StatCard title="Present Today" value={(data.attendance || []).filter(a => a.date === new Date().toISOString().split('T')[0] && (a.statusCode === 'P' || a.statusCode === 'HD')).length} icon={UserCheck} color="#10b981" path="/attendance" />
+        <StatCard title="Absent Today" value={(data.attendance || []).filter(a => a.date === new Date().toISOString().split('T')[0] && a.statusCode === 'A').length} icon={UserX} color="#ef4444" path="/attendance" />
+        <StatCard title="Late Employees" value={(data.attendance || []).filter(a => a.date === new Date().toISOString().split('T')[0] && a.isLate).length} icon={Clock} color="#f59e0b" path="/attendance" />
+        <StatCard title="On Leave" value={(data.attendance || []).filter(a => a.date === new Date().toISOString().split('T')[0] && ['CL', 'SL', 'PL', 'LWP'].includes(a.statusCode)).length} icon={Briefcase} color="#8b5cf6" path="/attendance" />
+        <StatCard title="Overtime (OT)" value={(data.attendance || []).filter(a => a.date === new Date().toISOString().split('T')[0] && parseFloat(a.otHours) > 0).length} icon={Zap} color="#ec4899" path="/attendance" />
+      </div>
+
+      <h3 style={{ marginBottom: '1rem', color: 'var(--text-muted)' }}>Business Metrics</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
         <StatCard title="Active Parties" value={data.parties.length} icon={Users} color="#3b82f6" path="/parties" />
         <StatCard title="Material Receipts" value={data.materialReceipts.length} icon={Package} color="#10b981" path="/material-receipt" />
         <StatCard title="Pending BPRs" value={data.bprs.filter(b => b.status === 'Pending').length} icon={AlertCircle} color="#f59e0b" path="/bpr" />
