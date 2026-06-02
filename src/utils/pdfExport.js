@@ -426,19 +426,442 @@ const buildGeneric = (doc, docType, data) => {
    doc.text(JSON.stringify(data, null, 2), 15, 30);
 };
 
+const buildFormattedInvoice = (doc, docType, data) => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const isPI = docType === 'PI';
+  const isPO = docType === 'PO';
+  
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  if (!isPI && !isPO) {
+    doc.text("Original\nDuplicate", pageWidth - 14, 12, { align: "right" });
+  }
+
+  doc.setLineWidth(0.5);
+  doc.setDrawColor(0, 0, 0);
+  doc.rect(14, 15, pageWidth - 28, 30);
+  
+  // Draw Logo
+  drawLogo(doc, 20, 18);
+  
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("UMA MICRON", pageWidth / 2, 21, { align: "center" });
+  
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.text("PLOT NO 1116 G.I.D.C. RANOLI, N.H.NO. 8,", pageWidth / 2, 26, { align: "center" });
+  doc.text("VADODARA - 391350, GUJARAT INDIA", pageWidth / 2, 31, { align: "center" });
+  doc.setFont("helvetica", "bold");
+  const email = (isPI || isPO) ? 'info@umamicron.com' : 'umamicron@gmail.com';
+  doc.text(`Tel: +91 97120 00297, Email : ${email}`, pageWidth / 2, 36, { align: "center" });
+  doc.setFont("helvetica", "bold");
+  doc.text("GSTIN: 24AGBPP8564D1ZE", pageWidth / 2, 41, { align: "center" });
+
+  const titleText = isPO ? 'Purchase Order' : (isPI ? 'Performa Invoice' : 'Tax Invoice');
+  const headerFill = (isPI || isPO) ? [180, 200, 240] : false;
+
+  autoTable(doc, {
+    startY: 45,
+    body: [[{ content: titleText, styles: { halign: 'center', fontStyle: 'bold', fontSize: 16, fillColor: headerFill } }]],
+    theme: 'grid',
+    styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, cellPadding: 2 },
+    margin: { left: 14, right: 14 }
+  });
+  
+  const docNo = data.invoiceNo || data.poNo || 'N/A';
+  const docDate = data.date || 'N/A';
+  const refNo = data.partyDocNo || data.challanNo || '';
+  const refDate = data.partyDocDate || '';
+
+  if (isPI || isPO) {
+    const noLabel = isPO ? 'PO No:' : 'PI No:';
+    const dateLabel = isPO ? 'PO Date:' : 'PI Date:';
+    const refLabel = isPO ? 'Ref No.' : 'Delivery Challan No.';
+    const rDateLabel = isPO ? 'Ref Date :' : 'Date :';
+    
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY,
+      body: [
+        [noLabel, { content: docNo, styles: { fontStyle: 'bold' } }, refLabel, { content: isPO ? refNo : (data.dcNo || 'Verbal'), styles: { fontStyle: 'normal' } }],
+        [dateLabel, { content: docDate, styles: { fontStyle: 'bold' } }, rDateLabel, { content: isPO ? refDate : (data.dcNo ? (data.dcDate || docDate) : ''), styles: { fontStyle: 'normal' } }]
+      ],
+      theme: 'grid',
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, fontStyle: 'bold', cellPadding: 1.5 },
+      columnStyles: { 0: { cellWidth: 35 }, 1: { cellWidth: 56 }, 2: { cellWidth: 35 }, 3: { cellWidth: 56 } },
+      margin: { left: 14, right: 14 }
+    });
+
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY,
+      body: [
+        ['State : GUJARAT', 'Code', '24', { content: '', styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 } } }, { content: '', colSpan: 2, styles: { lineWidth: { top: 0, bottom: 0.5, left: 0, right: 0.5 } } }]
+      ],
+      theme: 'grid',
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, fontStyle: 'bold', cellPadding: 1.5 },
+      columnStyles: { 
+        0: { cellWidth: 60 }, 1: { cellWidth: 15 }, 2: { cellWidth: 16 },
+        3: { cellWidth: 35 }, 4: { cellWidth: 28 }, 5: { cellWidth: 28 } 
+      },
+      margin: { left: 14, right: 14 }
+    });
+  } else {
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY,
+      body: [
+        ['Invoice No:', { content: docNo, styles: { fontStyle: 'bold' } }, 'Invoice Date:', { content: docDate, styles: { fontStyle: 'bold' } }],
+        ['Delivery Challan No.', data.dcNo || '', 'Date :', data.dcDate || ''],
+        [{ content: '', styles: { lineWidth: { top: 0, bottom: 0, left: 0.5, right: 0.5 } } }, { content: '', styles: { lineWidth: { top: 0, bottom: 0, left: 0, right: 0.5 } } }, 'PO No./Challan No.', `${refNo}`]
+      ],
+      theme: 'grid',
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, fontStyle: 'bold', cellPadding: 1.5 },
+      columnStyles: { 0: { cellWidth: 35 }, 1: { cellWidth: 56 }, 2: { cellWidth: 35 }, 3: { cellWidth: 56 } },
+      margin: { left: 14, right: 14 }
+    });
+
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY,
+      body: [
+        ['State : GUJARAT', 'Code', '24', 'Date :', { content: refDate || '', colSpan: 2 }]
+      ],
+      theme: 'grid',
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, fontStyle: 'bold', cellPadding: 1.5 },
+      columnStyles: { 
+        0: { cellWidth: 60 }, 1: { cellWidth: 15 }, 2: { cellWidth: 16 },
+        3: { cellWidth: 35 }, 4: { cellWidth: 28 }, 5: { cellWidth: 28 } 
+      },
+      margin: { left: 14, right: 14 }
+    });
+  }
+
+  if (isPO) {
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY,
+      body: [[{ content: '', styles: { fillColor: headerFill, minCellHeight: 6 } }]],
+      theme: 'grid',
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.5 },
+      margin: { left: 14, right: 14 }
+    });
+    
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY,
+      body: [
+        ['Name :', data.partyName || ''],
+        ['Address :', data.address || data.billAddress || ''],
+        ['State:', data.state || 'GUJARAT'],
+        ['GSTIN:', data.gstin || ''],
+        ['', `Mo: ${data.mobile || ''} E: ${data.email || ''}`]
+      ],
+      theme: 'grid',
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, cellPadding: 1.5, fontStyle: 'bold' },
+      columnStyles: { 0: { cellWidth: 45, halign: 'center' }, 1: { cellWidth: 'auto', fontStyle: 'normal' } },
+      margin: { left: 14, right: 14 }
+    });
+  } else {
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY,
+      body: [
+        [{ content: 'Bill to Party', styles: { halign: 'center', fillColor: headerFill } }, { content: 'Ship to Party', styles: { halign: 'center', fillColor: headerFill } }]
+      ],
+      theme: 'grid',
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, fontStyle: 'bold', cellPadding: 1.5 },
+      columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
+      margin: { left: 14, right: 14 }
+    });
+  }
+
+  if (!isPO) {
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY,
+      body: [
+        [`Name :          ${data.partyName || ''}`, `Name :          ${data.shipName || data.partyName || ''}`]
+      ],
+      theme: 'grid',
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, fontStyle: 'bold', cellPadding: 1.5 },
+      columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
+      margin: { left: 14, right: 14 }
+    });
+
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY,
+      body: [
+        [`Address :\n${data.billAddress || data.address || ''}`, `Address :\n${data.shipAddress || data.address || ''}`]
+      ],
+      theme: 'grid',
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, fontStyle: 'normal', cellPadding: 1.5 },
+      columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
+      margin: { left: 14, right: 14 }
+    });
+
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY,
+      body: [
+        ['State : GUJARAT', 'Code', '24', 'State : GUJARAT', 'Code', '24']
+      ],
+      theme: 'grid',
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, fontStyle: 'bold', cellPadding: 1.5 },
+      columnStyles: { 
+        0: { cellWidth: 60 }, 1: { cellWidth: 15 }, 2: { cellWidth: 16 },
+        3: { cellWidth: 60 }, 4: { cellWidth: 15 }, 5: { cellWidth: 16 }
+      },
+      margin: { left: 14, right: 14 }
+    });
+
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY,
+      body: [
+        [`GSTIN : ${data.gstinBill || data.gstin || ''}`, `GSTIN : ${data.gstinShip || data.gstin || ''}`]
+      ],
+      theme: 'grid',
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, fontStyle: 'bold', cellPadding: 1.5 },
+      columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
+      margin: { left: 14, right: 14 }
+    });
+  }
+
+  const head = [
+    [
+      { content: 'S.\nNo.', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: headerFill } },
+      { content: 'Description', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: headerFill } },
+      { content: (isPO || isPI) ? 'Qty\nKg' : 'Qty', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: headerFill } },
+      { content: 'Rate', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: headerFill } },
+      { content: 'Amount', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: headerFill } },
+      { content: 'SGST', colSpan: 2, styles: { halign: 'center', fillColor: headerFill } },
+      { content: 'CGST', colSpan: 2, styles: { halign: 'center', fillColor: headerFill } },
+      { content: 'IGST', colSpan: 2, styles: { halign: 'center', fillColor: headerFill } },
+      { content: 'Total', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: headerFill } }
+    ],
+    [
+      { content: 'Rate', styles: { halign: 'center', fillColor: headerFill } },
+      { content: 'Amount', styles: { halign: 'center', fillColor: headerFill } },
+      { content: 'Rate', styles: { halign: 'center', fillColor: headerFill } },
+      { content: 'Amount', styles: { halign: 'center', fillColor: headerFill } },
+      { content: 'Rate', styles: { halign: 'center', fillColor: headerFill } },
+      { content: 'Amount', styles: { halign: 'center', fillColor: headerFill } }
+    ]
+  ];
+
+  let itemsBody = [];
+  let sno = 1;
+  let totalAmt = 0, totalSgst = 0, totalCgst = 0, totalIgst = 0, totalAll = 0;
+  
+  const taxRate = parseFloat(data.taxRate) || 18;
+  const cgstRate = taxRate / 2;
+  const sgstRate = taxRate / 2;
+  const igstRate = 0;
+  let totalQty = 0;
+
+  if (isPO && data.productName) {
+      const qty = parseFloat(data.qty) || 0;
+      const rate = parseFloat(data.rate) || 0;
+      const amt = qty * rate > 0 ? (qty * rate) : (data.amount || 0);
+      const isTaxable = amt > 0;
+      
+      const sgstAmt = isTaxable ? amt * (sgstRate / 100) : 0;
+      const cgstAmt = isTaxable ? amt * (cgstRate / 100) : 0;
+      const igstAmt = isTaxable ? amt * (igstRate / 100) : 0;
+      const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
+
+      itemsBody.push([
+        sno++, data.productName, qty || '-', rate > 0 ? rate.toFixed(2) : '0.00', amt.toFixed(2),
+        sgstRate, sgstAmt.toFixed(2), cgstRate, cgstAmt.toFixed(2), igstRate, igstAmt.toFixed(2), rowTotal.toFixed(2)
+      ]);
+      totalAmt += amt;
+      totalSgst += sgstAmt;
+      totalCgst += cgstAmt;
+      totalIgst += igstAmt;
+      totalAll += rowTotal;
+      totalQty += qty;
+  }
+
+  if (data.customCharges && data.customCharges.length > 0) {
+    data.customCharges.forEach(cc => {
+       if (cc.checked) {
+          const qty = parseFloat(cc.qty) || 1;
+          const rate = parseFloat(cc.rate) || 0;
+          const amt = qty * rate;
+          const sgstAmt = amt * (sgstRate / 100);
+          const cgstAmt = amt * (cgstRate / 100);
+          const igstAmt = amt * (igstRate / 100);
+          const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
+
+          itemsBody.push([
+            sno++, cc.name, qty.toFixed(0), rate.toFixed(2), amt.toFixed(2),
+            sgstRate, sgstAmt.toFixed(2), cgstRate, cgstAmt.toFixed(2),
+            igstRate, igstAmt.toFixed(2), rowTotal.toFixed(2)
+          ]);
+          if (cc.hsn) {
+            itemsBody.push(['', `HSN CODE : ${cc.hsn}`, '', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00']);
+          }
+          totalAmt += amt;
+          totalSgst += sgstAmt;
+          totalCgst += cgstAmt;
+          totalIgst += igstAmt;
+          totalAll += rowTotal;
+          totalQty += qty;
+       }
+    });
+  }
+
+  const chargesList = [
+    { key: 'cleaning', label: 'Minimum Cleaning Charges' },
+    { key: 'processing', label: 'Processing Charges' },
+    { key: 'psdReport', label: 'Particle size report charges' },
+    { key: 'filterBag', label: 'Filter Bag' },
+    { key: 'sieving', label: 'Sieving Charges' },
+    { key: 'liner', label: 'Liner' },
+    { key: 'courier', label: 'Courier' },
+    { key: 'fiberDrum', label: 'Fiber Drum' },
+    { key: 'transportation', label: 'Transportation' },
+    { key: 'hdpeDrum', label: 'HDPE Drum' },
+    { key: 'batchChangeover', label: 'Batch Changeover' }
+  ];
+
+  chargesList.forEach(c => {
+     if (data.charges && data.charges[c.key]) {
+        const isQty = ['cleaning', 'processing', 'sieving'].includes(c.key);
+        const qty = isQty ? (parseFloat(data.qty) || 1) : 1;
+        const rate = parseFloat(data.rates?.[c.key] || 0);
+        const amt = qty * rate;
+        if (amt > 0) {
+          const sgstAmt = amt * (sgstRate / 100);
+          const cgstAmt = amt * (cgstRate / 100);
+          const igstAmt = amt * (igstRate / 100);
+          const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
+          
+          itemsBody.push([
+            sno++, c.label, isQty ? qty.toFixed(0) : '1', rate.toFixed(2), amt.toFixed(2),
+            sgstRate, sgstAmt.toFixed(2), cgstRate, cgstAmt.toFixed(2),
+            igstRate, igstAmt.toFixed(2), rowTotal.toFixed(2)
+          ]);
+          
+          totalAmt += amt;
+          totalSgst += sgstAmt;
+          totalCgst += cgstAmt;
+          totalIgst += igstAmt;
+          totalAll += rowTotal;
+          totalQty += (isQty ? qty : 1);
+        }
+     }
+  });
+
+  const discount = parseFloat(data.discount) || 0;
+  if (discount > 0) {
+      itemsBody.push([ '', 'Discount', '', '', `-${discount.toFixed(2)}`, '', '', '', '', '', '', `-${discount.toFixed(2)}` ]);
+      totalAmt -= discount;
+      totalAll -= discount;
+      totalSgst = totalAmt * (sgstRate / 100);
+      totalCgst = totalAmt * (cgstRate / 100);
+      totalIgst = totalAmt * (igstRate / 100);
+      totalAll = totalAmt + totalSgst + totalCgst + totalIgst;
+  }
+
+  for(let i = itemsBody.length; i < 11; i++) {
+      itemsBody.push(['', '', '', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00']);
+  }
+
+  itemsBody.push([
+    { content: 'Total', colSpan: 2, styles: { halign: 'center', fontStyle: 'bold', fillColor: headerFill } },
+    totalQty,
+    '',
+    totalAmt.toFixed(2),
+    '', totalSgst.toFixed(2),
+    '', totalCgst.toFixed(2),
+    '', totalIgst.toFixed(2),
+    totalAll.toFixed(2)
+  ]);
+
+  autoTable(doc, {
+    startY: doc.lastAutoTable.finalY,
+    head: head,
+    body: itemsBody,
+    theme: 'grid',
+    styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 8, cellPadding: 1.5, minCellHeight: 6, valign: 'top' },
+    columnStyles: { 
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 'auto' },
+      2: { cellWidth: 10, halign: 'center' },
+      3: { cellWidth: 15, halign: 'right' },
+      4: { cellWidth: 17, halign: 'right' },
+      5: { cellWidth: 8, halign: 'right' },
+      6: { cellWidth: 14, halign: 'right' },
+      7: { cellWidth: 8, halign: 'right' },
+      8: { cellWidth: 14, halign: 'right' },
+      9: { cellWidth: 8, halign: 'right' },
+      10: { cellWidth: 14, halign: 'right' },
+      11: { cellWidth: 20, halign: 'right', fontStyle: 'bold' }
+    },
+    margin: { left: 14, right: 14 }
+  });
+
+  const tableY = doc.lastAutoTable.finalY;
+  const leftWidth = (pageWidth - 28) * 0.58;
+  const rightWidth = (pageWidth - 28) * 0.42;
+
+  let leftBody = [];
+  if (isPI) {
+    leftBody = [
+      [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold', lineWidth: { top: 0.5, bottom: 0, left: 0.5, right: 0.5 } } }],
+      [{ content: `Bank Name     : AXIS BANK LTD\nA/c Name      : UMA MICRON\nCurrent A/c No. : 916020061629671\nIFS CODE      : UTIB0000383\nBranch        : Nizampura`, styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 25 } }],
+      [{ content: 'NOTE:\nPACKING MATERIALS AND TRANSPORTATION\nCHARGES WILL BE CHAGRE EXTRA AS ACTUAL', styles: { fontStyle: 'bold', minCellHeight: 15 } }],
+      [{ content: 'Terms & conditions\n1) Subject to vadodara Juridiction.\n2) Payment 100% ADVANCE AGAINST PI\nthis is system generated PI so no need to sign', styles: { fontStyle: 'bold', minCellHeight: 20 } }]
+    ];
+  } else if (isPO) {
+    leftBody = [
+      [{ content: 'Terms & Conditions:', styles: { fontStyle: 'bold', lineWidth: { top: 0.5, bottom: 0, left: 0.5, right: 0.5 } } }],
+      [{ content: `${data.terms || '1. Delivery 10 days from the date of Purchase Order.\n2. Transportation Extra As Actual.\n3. 10 Years Warranty'}`, styles: { lineWidth: { top: 0, bottom: 0, left: 0.5, right: 0.5 }, minCellHeight: 52, valign: 'top' } }],
+      [{ content: 'this is system generated PO so no need to sign', styles: { fontStyle: 'bold', lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 } } }]
+    ];
+  } else {
+    leftBody = [
+      [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold', lineWidth: { top: 0.5, bottom: 0, left: 0.5, right: 0.5 } } }],
+      [{ content: `Bank Name     : AXIS BANK LTD\nA/c Name      : UMA MICRON\nCurrent A/c No. : 916020061629671\nIFS CODE      : UTIB0000383\nBranch        : Nizampura`, styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 25 } }],
+      [{ content: 'Terms & conditions\n1) Subject to vadodara Juridiction.\n2) Payment Term as per our agree terms.\n3) Interest will charged @ 24% per annum if\namount remaining unpaid from due date.', styles: { minCellHeight: 35 } }]
+    ];
+  }
+
+  autoTable(doc, {
+    startY: tableY,
+    tableWidth: leftWidth,
+    margin: { left: 14, right: 0 },
+    body: leftBody,
+    theme: 'grid',
+    styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 8, cellPadding: 2 }
+  });
+
+  const summaryBody = [
+    ['Total Amount before Tax', { content: totalAmt.toFixed(2), styles: { halign: 'right', fontStyle: 'bold' } }],
+    ['CGST', { content: totalCgst.toFixed(2), styles: { halign: 'right' } }],
+    ['SGST', { content: totalSgst.toFixed(2), styles: { halign: 'right' } }],
+    ['IGST', { content: totalIgst.toFixed(2), styles: { halign: 'right' } }],
+    ['Total Tax Amount', { content: (totalCgst + totalSgst + totalIgst).toFixed(2), styles: { halign: 'right', fontStyle: 'bold' } }],
+    [{ content: 'Total Amount after Tax', styles: { fontStyle: 'bold', fontSize: 10 } }, { content: totalAll.toFixed(2), styles: { halign: 'right', fontStyle: 'bold', fontSize: 10 } }],
+    [{ content: 'Certified that the particulars given above are true and correct\n\n                       For UMA MICRON\n\n\n\n\nSeal                                 Authorised signatory', colSpan: 2, styles: { halign: 'left', minCellHeight: 38 } }]
+  ];
+
+  autoTable(doc, {
+    startY: tableY,
+    tableWidth: rightWidth,
+    margin: { left: 14 + leftWidth, right: 14 },
+    body: summaryBody,
+    theme: 'grid',
+    styles: { lineColor: [0, 0, 0], lineWidth: { top: 0.5, bottom: 0.5, left: 0, right: 0.5 }, textColor: 0, fontSize: 9, cellPadding: 2 },
+    columnStyles: { 0: { cellWidth: rightWidth * 0.65 }, 1: { cellWidth: rightWidth * 0.35 } }
+  });
+};
+
 const buildPDF = (docType, data) => {
   const doc = new jsPDF();
   let docNo = data.invoiceNo || data.bprNo || data.plNo || data.dcNo || data.psdNo || data.receiptNo || data.noteNo || 'N/A';
   
-  if (['PO', 'PI', 'TI'].includes(docType)) {
-    buildPO_PI_TI(doc, docType, data);
+  if (['PI', 'TI', 'PO'].includes(docType)) {
+    buildFormattedInvoice(doc, docType, data);
     docNo = data.poNo || data.invoiceNo || 'N/A';
   } else if (docType === 'BPR') {
     buildBPR(doc, data);
     docNo = data.bprNo || 'N/A';
   } else {
-    // Other documents (PL, DC, Quotations etc.) - simple generic for now or we can restore old logic.
-    // Restoring old logic for PL, DC, PSD, QUOTATION
     buildOldLogic(doc, docType, data);
   }
 
