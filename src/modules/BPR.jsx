@@ -190,7 +190,7 @@ const BPR = () => {
                 <div 
                   key={mr.id} 
                   className="glass-panel" 
-                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.05)', transition: 'all 0.15s ease' }} 
+                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.15s ease' }} 
                   onClick={() => handleCreate(mr)}
                 >
                   <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{mr.receiptNo}</p>
@@ -260,7 +260,7 @@ const BPR = () => {
 
       {/* Embedded Generator Modal */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
           <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>{editingBPR ? 'Modify BPR weights' : 'Create Batch Processing Record (BPR)'}</h2>
             
@@ -289,7 +289,7 @@ const BPR = () => {
               </div>
 
               {/* Checklists and Metrics Section */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.1)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem', background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                 <div>
                   <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Operational Cleaning</h4>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
@@ -343,7 +343,7 @@ const BPR = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 {/* Received weights */}
-                <div style={{ background: 'rgba(0,0,0,0.1)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ background: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                     <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Received Raw Material Weight</h4>
                     <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow('receivedBatches')}>+ Add Row</button>
@@ -351,7 +351,7 @@ const BPR = () => {
                   <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                       <thead>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
                           <th style={{ padding: '0.35rem' }}>Batch No</th>
                           <th style={{ padding: '0.35rem' }}>Drum No</th>
                           <th style={{ padding: '0.35rem' }}>Gross</th>
@@ -361,7 +361,7 @@ const BPR = () => {
                       </thead>
                       <tbody>
                         {form.receivedBatches.map((r, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                             <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
                             <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
                             <td style={{ padding: '0.25rem' }}>
@@ -383,7 +383,7 @@ const BPR = () => {
                 </div>
 
                 {/* Dispatched weights */}
-                <div style={{ background: 'rgba(0,0,0,0.1)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ background: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                     <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Dispatched (Micronised) Weight</h4>
                     <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow('dispatchedBatches')}>+ Add Row</button>
@@ -391,7 +391,7 @@ const BPR = () => {
                   <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                       <thead>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
                           <th style={{ padding: '0.35rem' }}>Batch No</th>
                           <th style={{ padding: '0.35rem' }}>Drum No</th>
                           <th style={{ padding: '0.35rem' }}>Gross</th>
@@ -401,7 +401,7 @@ const BPR = () => {
                       </thead>
                       <tbody>
                         {form.dispatchedBatches.map((r, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                             <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
                             <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
                             <td style={{ padding: '0.25rem' }}>

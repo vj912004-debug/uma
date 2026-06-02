@@ -323,7 +323,7 @@ const Attendance = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, backdropFilter: 'blur(5px)', padding: '2rem' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, backdropFilter: 'blur(5px)', padding: '2rem' }}>
           <div className="premium-card" style={{ width: '700px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.25rem' }}>{isEditing ? 'Edit Attendance' : 'Manual Attendance Entry'}</h2>
             <form onSubmit={submit}>
@@ -381,7 +381,7 @@ const Attendance = () => {
                   </>
                 )}
 
-                <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '8px' }}>
+                <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '1rem', background: 'var(--glass-bg)', padding: '0.75rem', borderRadius: '8px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, cursor: 'pointer' }}>
                     <input type="checkbox" checked={form.isHalfDay} onChange={e => setForm({...form, isHalfDay: e.target.checked})} />
                     Mark as Half Day manually

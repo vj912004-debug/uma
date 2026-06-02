@@ -23,13 +23,16 @@ import {
   FileMinus,
   FilePlus,
   ShoppingCart,
-  UserCheck
+  UserCheck,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 const Sidebar = () => {
   const { data, setData } = useAppContext();
   const userRole = data.settings?.userRole || 'Admin';
+  const theme = data.settings?.theme || 'dark';
 
   const groups = [
     {
@@ -119,6 +122,13 @@ const Sidebar = () => {
     }));
   };
 
+  const toggleTheme = () => {
+    setData(prev => ({
+      ...prev,
+      settings: { ...prev.settings, theme: theme === 'dark' ? 'light' : 'dark' }
+    }));
+  };
+
   return (
     <aside className="glass-panel" style={{ width: '290px', height: '100vh', padding: '1.5rem 1rem', position: 'sticky', top: 0, borderRight: '1px solid var(--border-color)', borderRadius: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ marginBottom: '1.5rem', padding: '0 0.5rem' }}>
@@ -152,7 +162,7 @@ const Sidebar = () => {
                       borderRadius: '8px',
                       textDecoration: 'none',
                       color: isActive 
-                        ? (isUnderProcess ? '#ef4444' : 'white') 
+                        ? (isUnderProcess ? '#ef4444' : 'var(--text-main)') 
                         : (isUnderProcess ? '#fca5a5' : 'var(--text-muted)'),
                       background: isActive 
                         ? (isUnderProcess ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)') 
@@ -174,29 +184,37 @@ const Sidebar = () => {
         })}
       </nav>
 
-      <div style={{ marginTop: 'auto', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-        <button 
-          onClick={toggleRole}
-          className="btn" 
-          style={{ 
-            fontSize: '0.7rem', 
-            background: 'rgba(255,255,255,0.02)', 
-            color: 'var(--text-main)',
-            width: '100%', 
-            justifyContent: 'center',
-            border: '1px solid rgba(255,255,255,0.08)',
-            padding: '0.5rem',
-            borderRadius: '8px'
-          }}
-        >
-          <Settings size={12} style={{ opacity: 0.6 }} /> Switch to {userRole === 'Admin' ? 'Staff' : 'Admin'}
-        </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: 'rgba(255,255,255,0.01)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)' }}>
+      <div style={{ marginTop: 'auto', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button 
+            onClick={toggleRole}
+            className="btn" 
+            style={{ 
+              flex: 1,
+              fontSize: '0.7rem', 
+              padding: '0.5rem',
+            }}
+          >
+            <Settings size={12} style={{ opacity: 0.6 }} /> {userRole}
+          </button>
+          <button 
+            onClick={toggleTheme}
+            className="btn" 
+            style={{ 
+              flex: 1,
+              fontSize: '0.7rem', 
+              padding: '0.5rem',
+            }}
+          >
+            {theme === 'dark' ? <Sun size={12} style={{ opacity: 0.6 }} /> : <Moon size={12} style={{ opacity: 0.6 }} />} {theme === 'dark' ? 'Light' : 'Dark'}
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: 'var(--glass-bg)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
           <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: 'white', fontSize: '0.8rem' }}>
             {userRole[0]}
           </div>
           <div style={{ overflow: 'hidden' }}>
-            <p style={{ fontSize: '0.775rem', fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>{userRole}</p>
+            <p style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>{userRole}</p>
             <p style={{ fontSize: '0.625rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', margin: 0 }}>{userRole === 'Admin' ? 'Super Admin' : 'Staff Access'}</p>
           </div>
         </div>

@@ -383,7 +383,7 @@ const buildBPR = (doc, data) => {
 
   const received = data.receivedBatches || [];
   const dispatched = data.dispatchedBatches || [];
-  const maxRows = Math.max(received.length, dispatched.length, 25);
+  const maxRows = Math.max(received.length, dispatched.length, 31);
   
   let packingBody = [];
   for (let i = 0; i < maxRows; i++) {
@@ -395,17 +395,14 @@ const buildBPR = (doc, data) => {
     ]);
   }
 
-  // Footer rows
+  // Footer rows (Labels span 4 columns, value spans 1 column)
   packingBody.push(
-    [{ content: 'Micronized Material Net Weight', colSpan: 3 }, { content: data.totalDispatchedNet?.toFixed(2) || '', colSpan: 2 }, { content: '', colSpan: 5, rowSpan: 4, styles: { halign: 'center', valign: 'bottom', minCellHeight: 30 } }],
-    [{ content: 'Lumps Net Weight', colSpan: 3 }, { content: '', colSpan: 2 }],
-    [{ content: 'Sample Net Weight', colSpan: 3 }, { content: '', colSpan: 2 }],
-    [{ content: 'Irrecoverable Loss', colSpan: 3 }, { content: '', colSpan: 2 }]
+    [{ content: 'Micronized Material Net Weight', colSpan: 4, styles: { halign: 'left' } }, { content: data.totalDispatchedNet?.toFixed(2) || '', colSpan: 1 }, { content: "\n\n\n\n\nPlant Supervisor's Sign", colSpan: 5, rowSpan: 4, styles: { halign: 'center', valign: 'bottom', minCellHeight: 25, cellPadding: { bottom: 5 } } }],
+    [{ content: 'Lumps Net Weight', colSpan: 4, styles: { halign: 'left' } }, { content: '', colSpan: 1 }],
+    [{ content: 'Sample Net Weight', colSpan: 4, styles: { halign: 'left' } }, { content: '', colSpan: 1 }],
+    [{ content: 'Irrecoverable Loss', colSpan: 4, styles: { halign: 'left' } }, { content: '', colSpan: 1 }]
   );
   
-  // Actually, put the supervisor sign text in the empty space
-  packingBody[packingBody.length - 4][2].content = "\n\n\n\nPlant Supervisor's Sign";
-
   autoTable(doc, {
     startY: 25,
     head: [
@@ -415,8 +412,11 @@ const buildBPR = (doc, data) => {
     ],
     body: packingBody,
     theme: 'grid',
-    styles: { lineColor: 0, lineWidth: 0.2, textColor: 0, fontSize: 8, cellPadding: 1.5, halign: 'center' },
-    columnStyles: { 0: { cellWidth: 15 }, 1: { cellWidth: 12 }, 5: { cellWidth: 15 }, 6: { cellWidth: 12 } }
+    styles: { lineColor: 0, lineWidth: 0.2, textColor: 0, fontSize: 8, cellPadding: 1.5, halign: 'center', valign: 'middle' },
+    columnStyles: { 
+      0: { cellWidth: 14 }, 1: { cellWidth: 10 }, 2: { cellWidth: 20 }, 3: { cellWidth: 20 }, 4: { cellWidth: 20 },
+      5: { cellWidth: 14 }, 6: { cellWidth: 10 }, 7: { cellWidth: 20 }, 8: { cellWidth: 20 }, 9: { cellWidth: 20 }
+    }
   });
 };
 

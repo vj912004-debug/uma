@@ -105,7 +105,7 @@ const AttendanceReports = ({ data }) => {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
         <SubTab id="Daily" name="Daily Report" />
         <SubTab id="Monthly" name="Monthly Summary" />
         <SubTab id="Late" name="Late Coming" />

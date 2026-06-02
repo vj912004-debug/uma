@@ -120,7 +120,7 @@ const EWayDC = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)' }}>
           <div className="premium-card" style={{ width: '550px', maxWidth: '90%' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>Link government E-Way Bill to DC</h2>
             <form onSubmit={handleSubmit}>

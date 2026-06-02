@@ -142,14 +142,14 @@ const Quotations = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem' }}>
           <div className="premium-card" style={{ width: '800px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>Create Quotation</h2>
             <form onSubmit={handleSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label>Quotation No</label>
-                  <input type="text" className="input-field" readOnly value={formData.quotationNo} style={{ background: 'rgba(255,255,255,0.05)' }} />
+                  <input type="text" className="input-field" readOnly value={formData.quotationNo} style={{ background: 'var(--glass-bg)' }} />
                 </div>
                 <div>
                   <label>Date</label>

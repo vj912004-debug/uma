@@ -230,7 +230,7 @@ const PartyDue = () => {
                 ))}
               </tr>
               {/* Filter Row */}
-              <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ background: 'var(--glass-bg)' }}>
                 {tableCols.map(col => (
                   <th key={`filter-${col.key}`} style={{ padding: '0.2rem' }}>
                     <input 
@@ -238,7 +238,7 @@ const PartyDue = () => {
                       placeholder={`Filter...`} 
                       value={columnFilters[col.key] || ''} 
                       onChange={e => setColumnFilters({...columnFilters, [col.key]: e.target.value})} 
-                      style={{ width: '100%', fontSize: '0.75rem', padding: '0.2rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }} 
+                      style={{ width: '100%', fontSize: '0.75rem', padding: '0.2rem', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px' }} 
                     />
                   </th>
                 ))}
@@ -252,7 +252,7 @@ const PartyDue = () => {
               ) : (
                 filteredDues.map(party => (
                   <tr key={party.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '1rem', fontWeight: 600, color: 'white' }}>{party.name}</td>
+                    <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>{party.name}</td>
                     <td style={{ padding: '0.5rem', color: party['21-22'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['21-22'] > 0 ? 600 : 400 }}>
                       {renderInput(party.id, '21-22', party['21-22'])}
                     </td>
@@ -277,7 +277,7 @@ const PartyDue = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)' }}>
           <div className="premium-card" style={{ width: '600px', maxWidth: '90%' }}>
             <h2 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <CreditCard style={{ color: 'var(--accent-primary)' }} />

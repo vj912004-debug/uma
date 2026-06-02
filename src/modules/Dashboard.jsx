@@ -76,7 +76,7 @@ const Dashboard = () => {
                 <div 
                   key={idx} 
                   onClick={() => navigate('/invoices')}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', cursor: 'pointer', transition: 'background 0.2s' }}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', borderRadius: '8px', background: 'var(--glass-bg)', cursor: 'pointer', transition: 'background 0.2s' }}
                 >
                   <div>
                     <p style={{ fontWeight: 600 }}>{inv.invoiceNo}</p>
@@ -96,7 +96,7 @@ const Dashboard = () => {
               <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>All caught up!</p>
             ) : (
               data.tasks.filter(t => !t.completed).slice(0, 4).map((task, idx) => (
-                <div key={idx} style={{ padding: '0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', borderLeft: '3px solid var(--accent-primary)' }}>
+                <div key={idx} style={{ padding: '0.75rem', borderRadius: '8px', background: 'var(--glass-bg)', borderLeft: '3px solid var(--accent-primary)' }}>
                   <p style={{ fontSize: '0.875rem', fontWeight: 500 }}>{task.title}</p>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{task.dueDate}</p>
                 </div>

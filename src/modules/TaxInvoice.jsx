@@ -304,7 +304,7 @@ const TaxInvoice = () => {
                 <div 
                   key={pl.id} 
                   className="glass-panel" 
-                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.05)', transition: 'all 0.15s ease' }} 
+                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.15s ease' }} 
                   onClick={() => handleCreate(pl)}
                 >
                   <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{pl.plNo}</p>
@@ -373,7 +373,7 @@ const TaxInvoice = () => {
 
       {/* Tax Invoice Modal Form */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
           <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>{editingDoc ? 'Modify Tax Invoice' : 'Create Tax Invoice'}</h2>
             
@@ -425,21 +425,21 @@ const TaxInvoice = () => {
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Bill-To Address</label>
-                  <textarea className="input-field" rows="2" readOnly value={form.billAddress || 'N/A'} style={{ background: 'rgba(255,255,255,0.01)', opacity: 0.8 }}></textarea>
+                  <textarea className="input-field" rows="2" readOnly value={form.billAddress || 'N/A'} style={{ background: 'var(--glass-bg)', opacity: 0.8 }}></textarea>
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Ship-To Address</label>
-                  <textarea className="input-field" rows="2" readOnly value={form.shipAddress || 'N/A'} style={{ background: 'rgba(255,255,255,0.01)', opacity: 0.8 }}></textarea>
+                  <textarea className="input-field" rows="2" readOnly value={form.shipAddress || 'N/A'} style={{ background: 'var(--glass-bg)', opacity: 0.8 }}></textarea>
                 </div>
               </div>
 
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', pb: '0.5rem' }}>Tax Invoice Charges Grid</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', pb: '0.5rem' }}>Tax Invoice Charges Grid</h3>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
                 <div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {chargesList.map(item => (
-                      <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem', background: 'var(--glass-bg)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', cursor: 'pointer', margin: 0 }}>
                           <input type="checkbox" checked={form.charges[item.key]} onChange={() => toggleCharge(item.key)} />
                           {item.label}
@@ -472,7 +472,7 @@ const TaxInvoice = () => {
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {(form.customCharges || []).map((charge, idx) => (
-                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--glass-bg)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                             <input type="checkbox" checked={charge.checked} onChange={e => {
                               const newCharges = [...form.customCharges];
                               newCharges[idx].checked = e.target.checked;
@@ -512,7 +512,7 @@ const TaxInvoice = () => {
                 </div>
 
                 {/* Calculation Summary */}
-                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--accent-primary)' }}>GST Tax Billing Calculations</h4>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <span>Subtotal:</span>
@@ -539,7 +539,7 @@ const TaxInvoice = () => {
                     <span>SGST @{(form.taxRate / 2)}%:</span>
                     <span>₹{((Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100)) / 2).toFixed(2)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'white' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
                     <span>Grand Total:</span>
                     <span>₹{(Math.max(0, getSubtotal() - form.discount) * (1 + form.taxRate / 100)).toFixed(2)}</span>
                   </div>

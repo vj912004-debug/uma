@@ -164,7 +164,7 @@ const Invoices = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(8px)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(8px)' }}>
           <div className="premium-card" style={{ width: '1000px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
               <div>
@@ -201,7 +201,7 @@ const Invoices = () => {
                 <h4 style={{ color: 'var(--text-muted)' }}>Standard Charges</h4>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   {STANDARD_CHARGES.map(charge => (
-                    <button key={charge.name} className="btn" style={{ fontSize: '0.75rem', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.03)' }} onClick={() => addStandardCharge(charge)}>
+                    <button key={charge.name} className="btn" style={{ fontSize: '0.75rem', padding: '0.5rem 0.75rem', background: 'var(--glass-bg)' }} onClick={() => addStandardCharge(charge)}>
                       + {charge.name}
                     </button>
                   ))}
@@ -243,7 +243,7 @@ const Invoices = () => {
                   ))}
                 </tbody>
               </table>
-              <button className="btn" style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--border-color)', width: '100%' }} onClick={addItem}>
+              <button className="btn" style={{ marginTop: '1rem', background: 'var(--glass-bg)', border: '1px dashed var(--border-color)', width: '100%' }} onClick={addItem}>
                 <Plus size={18} /> Add Miscellaneous Item
               </button>
             </div>

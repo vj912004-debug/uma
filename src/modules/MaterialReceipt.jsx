@@ -422,7 +422,7 @@ const MaterialReceipt = () => {
 
       {/* Main Material Receipt Modal */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', overflowY: 'auto', padding: '2rem 0' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', overflowY: 'auto', padding: '2rem 0' }}>
           <div className="premium-card" style={{ width: '950px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>{isEditing ? 'Modify Material Receipt' : 'Register Material Receipt'}</span>
@@ -490,15 +490,15 @@ const MaterialReceipt = () => {
                 {/* Addresses */}
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Bill To Address</label>
-                  <textarea className="input-field" rows="2" value={formData.billAddress} readOnly style={{ background: 'rgba(255,255,255,0.01)', opacity: 0.8 }} />
+                  <textarea className="input-field" rows="2" value={formData.billAddress} readOnly style={{ background: 'var(--glass-bg)', opacity: 0.8 }} />
                   <label style={{ marginTop: '0.5rem' }}>Bill To GSTIN</label>
-                  <input type="text" className="input-field" value={formData.gstinBill} readOnly style={{ background: 'rgba(255,255,255,0.01)', opacity: 0.8 }} />
+                  <input type="text" className="input-field" value={formData.gstinBill} readOnly style={{ background: 'var(--glass-bg)', opacity: 0.8 }} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Ship To Address</label>
-                  <textarea className="input-field" rows="2" value={formData.shipAddress} readOnly style={{ background: 'rgba(255,255,255,0.01)', opacity: 0.8 }} />
+                  <textarea className="input-field" rows="2" value={formData.shipAddress} readOnly style={{ background: 'var(--glass-bg)', opacity: 0.8 }} />
                   <label style={{ marginTop: '0.5rem' }}>Ship To GSTIN</label>
-                  <input type="text" className="input-field" value={formData.gstinShip} readOnly style={{ background: 'rgba(255,255,255,0.01)', opacity: 0.8 }} />
+                  <input type="text" className="input-field" value={formData.gstinShip} readOnly style={{ background: 'var(--glass-bg)', opacity: 0.8 }} />
                 </div>
 
                 <div>
@@ -526,7 +526,7 @@ const MaterialReceipt = () => {
                     { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },
                     { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
                   ].map(item => (
-                    <div key={item.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div key={item.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'var(--glass-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
                         <input 
                           type="checkbox" 
@@ -571,7 +571,7 @@ const MaterialReceipt = () => {
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       {(formData.customCharges || []).map((charge, idx) => (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--glass-bg)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                           <input type="checkbox" checked={charge.checked} onChange={e => {
                             const newCharges = [...formData.customCharges];
                             newCharges[idx].checked = e.target.checked;
@@ -624,7 +624,7 @@ const MaterialReceipt = () => {
                   </div>
                 </div>
 
-                <div style={{ overflowX: 'auto', background: 'rgba(0,0,0,0.15)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ overflowX: 'auto', background: 'var(--input-bg)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                   <datalist id="psdReqOptions">
                     {(data.psdRequirements || []).map((r, idx) => (
                       <option key={idx} value={r} />
@@ -632,7 +632,7 @@ const MaterialReceipt = () => {
                   </datalist>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
                         <th style={{ padding: '0.5rem', width: '60px' }}>Sr No</th>
                         <th style={{ padding: '0.5rem' }}>Batch Number *</th>
                         <th style={{ padding: '0.5rem', width: '120px' }}>No of Drums *</th>
@@ -652,7 +652,7 @@ const MaterialReceipt = () => {
                         </tr>
                       ) : (
                         formData.batches.map((batch, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: batch.isEmptyDrums ? 'rgba(239,68,68,0.02)' : 'transparent' }}>
+                          <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)', background: batch.isEmptyDrums ? 'rgba(239,68,68,0.02)' : 'transparent' }}>
                             <td style={{ padding: '0.5rem', fontWeight: 600 }}>{idx + 1}</td>
                             <td style={{ padding: '0.5rem' }}>
                               <input 
@@ -735,7 +735,7 @@ const MaterialReceipt = () => {
                     </tbody>
                     {formData.batches.length > 0 && (
                       <tfoot>
-                        <tr style={{ background: 'rgba(255,255,255,0.03)', fontWeight: 'bold' }}>
+                        <tr style={{ background: 'var(--glass-bg)', fontWeight: 'bold' }}>
                           <td style={{ padding: '0.75rem 0.5rem' }}>Total</td>
                           <td style={{ padding: '0.75rem 0.5rem', color: 'var(--accent-primary)' }}>{activeBatchCount} Active Batches</td>
                           <td style={{ padding: '0.75rem 0.5rem' }}>{formData.totalDrums} Drums</td>

@@ -182,7 +182,7 @@ const UnderProcess = () => {
                 const ti = getTI(mr.id);
 
                 return (
-                  <tr key={mr.id} style={{ borderBottom: '1px solid var(--border-color)', hover: { background: 'rgba(255,255,255,0.01)' } }}>
+                  <tr key={mr.id} style={{ borderBottom: '1px solid var(--border-color)', hover: { background: 'var(--glass-bg)' } }}>
                     <td style={{ padding: '1rem', fontWeight: 500 }}>{formatDate(mr.date)}</td>
                     <td style={{ padding: '1rem', fontWeight: 600 }}>{mr.partyName}</td>
                     <td style={{ padding: '1rem' }}>{mr.productName} {mr.nickName ? `(${mr.nickName})` : ''}</td>
@@ -344,7 +344,7 @@ const UnderProcess = () => {
             flexDirection: 'column',
             zIndex: 120
           }} onClick={e => e.stopPropagation()}>
-            <p style={{ margin: 0, padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <p style={{ margin: 0, padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border-color)' }}>
               {showDocPopover.cellType} Actions
             </p>
             <button style={popBtn} onClick={handleViewPDF}><FileText size={14} /> View / Print</button>
@@ -468,12 +468,12 @@ const popBtn = {
   color: 'var(--text-muted)',
   cursor: 'pointer',
   transition: 'all 0.15s ease',
-  hover: { background: 'rgba(255,255,255,0.03)' }
+  hover: { background: 'var(--glass-bg)' }
 };
 
 // Modal Wrapper Component
 const ModalWrapper = ({ title, children, onClose }) => (
-  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
+  <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
     <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto', position: 'relative' }}>
       <button onClick={onClose} style={{ position: 'absolute', right: '1.5rem', top: '1.5rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
         <X size={20} />
@@ -662,14 +662,14 @@ const PerformaInvoiceGenerator = ({ mr, editing, onClose }) => {
         </div>
       </div>
 
-      <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', pb: '0.5rem' }}>Auto-Charges Configuration Panel</h3>
+      <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', pb: '0.5rem' }}>Auto-Charges Configuration Panel</h3>
       
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
         <div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Toggle standard charges to add them as line items with HSN codes.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {chargesList.map(item => (
-              <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem', background: 'var(--glass-bg)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', cursor: 'pointer', margin: 0 }}>
                   <input type="checkbox" checked={form.charges[item.key]} onChange={() => toggleCharge(item.key)} />
                   {item.label}
@@ -692,7 +692,7 @@ const PerformaInvoiceGenerator = ({ mr, editing, onClose }) => {
         </div>
 
         {/* Calculation Summary */}
-        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--accent-primary)' }}>Calculation Invoice Summary</h4>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
             <span>Subtotal:</span>
@@ -715,7 +715,7 @@ const PerformaInvoiceGenerator = ({ mr, editing, onClose }) => {
             <span>GST Amount:</span>
             <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100)).toFixed(2)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'white' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
             <span>Grand Total:</span>
             <span>₹{(Math.max(0, getSubtotal() - form.discount) * (1 + form.taxRate / 100)).toFixed(2)}</span>
           </div>
@@ -1013,7 +1013,7 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
-                  <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>
                     <th style={{ padding: '0.4rem' }}>S.P.</th>
                     <th style={{ padding: '0.4rem' }}>D.P.</th>
                     <th style={{ padding: '0.4rem' }}>T.P.</th>
@@ -1023,7 +1023,7 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
                 </thead>
                 <tbody>
                   {(form.pressures || []).map((row, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                       {['sp', 'dp', 'tp', 'fp', 'fip'].map(k => (
                         <td key={k} style={{ padding: '0.3rem' }}>
                           <input
@@ -1059,7 +1059,7 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
             {/* Received weights */}
-            <div style={{ background: 'rgba(0,0,0,0.1)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ background: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Received Raw Material Weight</h4>
                 <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow('receivedBatches')}>+ Add Row</button>
@@ -1067,7 +1067,7 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
               <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
                       <th style={{ padding: '0.35rem' }}>Batch No</th>
                       <th style={{ padding: '0.35rem' }}>Drum No</th>
                       <th style={{ padding: '0.35rem' }}>Gross</th>
@@ -1077,7 +1077,7 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
                   </thead>
                   <tbody>
                     {form.receivedBatches.map((r, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                         <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
                         <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
                         <td style={{ padding: '0.25rem' }}>
@@ -1099,7 +1099,7 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
             </div>
 
             {/* Dispatched weights */}
-            <div style={{ background: 'rgba(0,0,0,0.1)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ background: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Dispatched (Micronised) Material Weight</h4>
                 <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow('dispatchedBatches')}>+ Add Row</button>
@@ -1107,7 +1107,7 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
               <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
                       <th style={{ padding: '0.35rem' }}>Batch No</th>
                       <th style={{ padding: '0.35rem' }}>Drum No</th>
                       <th style={{ padding: '0.35rem' }}>Gross</th>
@@ -1117,7 +1117,7 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
                   </thead>
                   <tbody>
                     {form.dispatchedBatches.map((r, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                         <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
                         <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
                         <td style={{ padding: '0.25rem' }}>
@@ -1374,7 +1374,7 @@ const PSDGenerator = ({ mr, editing, onClose }) => {
 
       <div style={{ marginBottom: '1.5rem' }}>
         {(form.reports || []).map((rep, idx) => (
-          <div key={idx} style={{ background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.06)', padding: '1rem', borderRadius: '10px', marginBottom: '0.75rem' }}>
+          <div key={idx} style={{ background: 'var(--input-bg)', border: '1px solid rgba(255,255,255,0.06)', padding: '1rem', borderRadius: '10px', marginBottom: '0.75rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h4 style={{ margin: 0 }}>Report {idx + 1}</h4>
               {(form.reports || []).length > 1 && (
@@ -1426,7 +1426,7 @@ const PSDGenerator = ({ mr, editing, onClose }) => {
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <label>Upload PDF</label>
-                <div style={{ background: 'rgba(0,0,0,0.2)', border: '2px dashed var(--border-color)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ background: 'var(--input-bg)', border: '2px dashed var(--border-color)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
                   <UploadCloud size={28} style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }} />
                   <input type="file" accept=".pdf" onChange={(e) => handleFileUpload(e, idx)} style={{ fontSize: '0.8rem' }} />
                   {rep.fileName && (
@@ -1567,7 +1567,7 @@ const PLGenerator = ({ mr, editing, onClose }) => {
         </div>
       </div>
 
-      <div style={{ background: 'rgba(0,0,0,0.1)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
+      <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
           <h3 style={{ fontSize: '0.95rem', margin: 0 }}>Batch-Wise Packing Weight Details</h3>
           <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={addCustomRow}>+ Add Column/Row</button>
@@ -1576,7 +1576,7 @@ const PLGenerator = ({ mr, editing, onClose }) => {
         <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: 'var(--text-muted)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
                 <th style={{ padding: '0.35rem' }}>Sr No</th>
                 <th style={{ padding: '0.35rem' }}>Batch No</th>
                 <th style={{ padding: '0.35rem' }}>Drum No</th>
@@ -1587,7 +1587,7 @@ const PLGenerator = ({ mr, editing, onClose }) => {
             </thead>
             <tbody>
               {form.batches.map((r, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                   <td style={{ padding: '0.25rem', fontWeight: 600 }}>{idx + 1}</td>
                   <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
                   <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
@@ -1981,13 +1981,13 @@ const TaxInvoiceGenerator = ({ mr, editing, onClose }) => {
         </div>
       </div>
 
-      <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', pb: '0.5rem' }}>Tax Invoice Charges Grid</h3>
+      <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', pb: '0.5rem' }}>Tax Invoice Charges Grid</h3>
       
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
         <div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {chargesList.map(item => (
-              <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem', background: 'var(--glass-bg)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', cursor: 'pointer', margin: 0 }}>
                   <input type="checkbox" checked={form.charges[item.key]} onChange={() => toggleCharge(item.key)} />
                   {item.label}
@@ -2010,7 +2010,7 @@ const TaxInvoiceGenerator = ({ mr, editing, onClose }) => {
         </div>
 
         {/* Calculation Summary */}
-        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--accent-primary)' }}>GST Tax Billing Calculations</h4>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
             <span>Subtotal:</span>
@@ -2037,7 +2037,7 @@ const TaxInvoiceGenerator = ({ mr, editing, onClose }) => {
             <span>SGST @{(form.taxRate / 2)}%:</span>
             <span>₹{((Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100)) / 2).toFixed(2)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'white' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
             <span>Grand Total:</span>
             <span>₹{(Math.max(0, getSubtotal() - form.discount) * (1 + form.taxRate / 100)).toFixed(2)}</span>
           </div>

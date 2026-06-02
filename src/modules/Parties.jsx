@@ -248,7 +248,7 @@ const Parties = () => {
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
                         {(party.products || []).map((prod, pIdx) => (
-                          <span key={pIdx} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}>
+                          <span key={pIdx} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}>
                             {prod.name}
                           </span>
                         ))}
@@ -281,7 +281,7 @@ const Parties = () => {
 
       {/* Main Party Form Modal */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', overflowY: 'auto', padding: '2rem 0' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', overflowY: 'auto', padding: '2rem 0' }}>
           <div className="premium-card" style={{ width: '850px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>{isEditing ? 'Modify Party' : 'Register New Party'}</span>
@@ -306,7 +306,7 @@ const Parties = () => {
                     className="input-field" 
                     value={formData.vendorCode}
                     onChange={e => setFormData({...formData, vendorCode: e.target.value})}
-                    style={{ background: 'rgba(255,255,255,0.02)', color: 'var(--accent-primary)', fontWeight: 600 }}
+                    style={{ background: 'var(--glass-bg)', color: 'var(--accent-primary)', fontWeight: 600 }}
                   />
                 </div>
                 <div>
@@ -455,10 +455,10 @@ const Parties = () => {
                   </button>
                 </div>
 
-                <div style={{ overflowX: 'auto', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ overflowX: 'auto', background: 'var(--input-bg)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
                         <th style={{ padding: '0.5rem' }}>Product Name</th>
                         <th style={{ padding: '0.5rem' }}>Nick Name</th>
                         <th style={{ padding: '0.5rem' }}>PSD Req</th>
@@ -476,7 +476,7 @@ const Parties = () => {
                         </tr>
                       ) : (
                         formData.products.map((prod, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                             <td style={{ padding: '0.5rem', fontWeight: 600 }}>{prod.name}</td>
                             <td style={{ padding: '0.5rem' }}>{prod.nickname || 'N/A'}</td>
                             <td style={{ padding: '0.5rem' }}>{prod.psdReq}</td>
@@ -513,7 +513,7 @@ const Parties = () => {
 
       {/* Associated Product Configuration Sub-Modal */}
       {isProductModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, backdropFilter: 'blur(5px)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, backdropFilter: 'blur(5px)' }}>
           <div className="premium-card" style={{ width: '680px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ marginBottom: '1.25rem' }}>{editingProductIdx !== null ? 'Modify Product Config' : 'Configure New Product & Charges'}</h3>
             <form onSubmit={handleSaveProduct}>
@@ -579,7 +579,12 @@ const Parties = () => {
                 </div>
               </div>
 
-              <h4 style={{ margin: '1rem 0 0.5rem 0', fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>Default Standard Charge Rates (₹)</h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '1rem 0 0.5rem 0', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>Default Standard Charge Rates (₹)</h4>
+                <button type="button" className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', background: 'var(--glass-bg)', color: 'var(--accent-primary)', border: '1px solid var(--border-color)' }} onClick={() => setProductData(prev => ({ ...prev, customCharges: [...(prev.customCharges || []), { name: '', hsn: '', rate: 0 }] }))}>
+                  + Add Custom Charge
+                </button>
+              </div>
               
               <datalist id="amountOptions">
                 <option value="0" />
@@ -703,27 +708,8 @@ const Parties = () => {
                     onChange={e => setProductData({...productData, charges: {...productData.charges, batchChangeover: parseFloat(e.target.value) || 0}})}
                   />
                 </div>
-                <div style={{ gridColumn: 'span 3' }}>
-                  <label>Additional Notes / Remarks</label>
-                  <textarea 
-                    className="input-field" 
-                    rows="2"
-                    placeholder="Any custom terms or notes for this product"
-                    value={productData.notes}
-                    onChange={e => setProductData({...productData, notes: e.target.value})}
-                  />
-                </div>
-
-                <div style={{ gridColumn: 'span 3', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem', marginTop: '0.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <label style={{ margin: 0, fontSize: '0.85rem', color: 'var(--accent-primary)' }}>Custom Charges / Overrides</label>
-                    <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setProductData(prev => ({ ...prev, customCharges: [...(prev.customCharges || []), { name: '', hsn: '', rate: 0 }] }))}>
-                      + Add Custom Charge
-                    </button>
-                  </div>
-                  {(productData.customCharges || []).length === 0 ? (
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No custom charges configured.</p>
-                  ) : (
+                <div style={{ gridColumn: 'span 3', marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+                  {(productData.customCharges || []).length > 0 && (
                     (productData.customCharges || []).map((charge, idx) => (
                       <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem' }}>
                         <input type="text" className="input-field" placeholder="Charge Name (e.g. Micronization)" value={charge.name} onChange={e => {
@@ -748,6 +734,17 @@ const Parties = () => {
                       </div>
                     ))
                   )}
+                </div>
+
+                <div style={{ gridColumn: 'span 3' }}>
+                  <label>Additional Notes / Remarks</label>
+                  <textarea 
+                    className="input-field" 
+                    rows="2"
+                    placeholder="Any custom terms or notes for this product"
+                    value={productData.notes}
+                    onChange={e => setProductData({...productData, notes: e.target.value})}
+                  />
                 </div>
               </div>
 

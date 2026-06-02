@@ -50,6 +50,7 @@ export const AppProvider = ({ children }) => {
       currentUser: { id: 1, username: 'Admin', role: 'Admin' },
       settings: {
         userRole: 'Admin',
+        theme: 'dark',
         serials: { MR: 1, BPR: 1, PL: 1, PI: 1, DC: 1, MI: 1, VC: 1, PSD: 1, TI: 1, EWDC: 1, EWTI: 1, QT: 1, DN: 1, CN: 1, PO: 1 }
       }
     };
@@ -108,6 +109,11 @@ export const AppProvider = ({ children }) => {
       console.error("Failed to persist data to localStorage", e);
     }
   }, [data]);
+
+  useEffect(() => {
+    const theme = data.settings?.theme || 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [data.settings?.theme]);
 
   // Helper for audit logging
   const logAudit = (prevData, action, module, oldValue, newValue) => {

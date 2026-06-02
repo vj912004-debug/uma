@@ -147,7 +147,7 @@ const PSD = () => {
                 <div 
                   key={mr.id} 
                   className="glass-panel" 
-                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.05)', transition: 'all 0.15s ease' }} 
+                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.15s ease' }} 
                   onClick={() => handleCreate(mr)}
                 >
                   <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{mr.receiptNo}</p>
@@ -232,7 +232,7 @@ const PSD = () => {
 
       {/* PSD Modal Form */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
           <div className="premium-card" style={{ width: '650px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>Upload PSD Lab Analysis Report</h2>
             
@@ -255,7 +255,7 @@ const PSD = () => {
                   <input type="text" className="input-field" readOnly value={activeMR?.productName} />
                 </div>
                 {form.reports.map((rep, idx) => (
-                  <div key={idx} style={{ gridColumn: 'span 2', background: 'rgba(0,0,0,0.1)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div key={idx} style={{ gridColumn: 'span 2', background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between' }}>
                       <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Report {idx + 1}</h4>
                       {form.reports.length > 1 && (

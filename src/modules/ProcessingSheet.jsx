@@ -240,7 +240,7 @@ const ProcessingSheet = () => {
                 ))}
               </tr>
               {/* Filter Row */}
-              <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ background: 'var(--glass-bg)' }}>
                 {tableCols.map(col => (
                   <th key={`filter-${col.key}`} style={{ padding: '0.2rem' }}>
                     <input 
@@ -248,7 +248,7 @@ const ProcessingSheet = () => {
                       placeholder={`Filter...`} 
                       value={columnFilters[col.key] || ''} 
                       onChange={e => setColumnFilters({...columnFilters, [col.key]: e.target.value})} 
-                      style={{ width: '100%', minWidth: '60px', fontSize: '0.75rem', padding: '0.2rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }} 
+                      style={{ width: '100%', minWidth: '60px', fontSize: '0.75rem', padding: '0.2rem', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px' }} 
                     />
                   </th>
                 ))}
@@ -266,7 +266,7 @@ const ProcessingSheet = () => {
                   <tr key={row.id} style={{ borderBottom: '1px solid var(--border-color)', background: idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent' }}>
                     <td style={{ padding: '0.25rem', fontWeight: 600 }}>{row.srNo}</td>
                     <td style={{ padding: '0.25rem' }}>{renderInput(row.id, 'date', row.date)}</td>
-                    <td style={{ padding: '0.25rem', fontWeight: 600, color: 'white' }}>{renderInput(row.id, 'partyName', row.partyName)}</td>
+                    <td style={{ padding: '0.25rem', fontWeight: 600, color: 'var(--text-main)' }}>{renderInput(row.id, 'partyName', row.partyName)}</td>
                     <td style={{ padding: '0.25rem' }}>{renderInput(row.id, 'productName', row.productName)}</td>
                     <td style={{ padding: '0.25rem', fontWeight: 500 }}>{renderInput(row.id, 'receivedQty', row.receivedQty)}</td>
                     <td style={{ padding: '0.25rem', fontSize: '0.75rem', color: row.piNo === 'Pending' ? '#f59e0b' : 'var(--accent-primary)' }}>{renderInput(row.id, 'piNo', row.piNo)}</td>

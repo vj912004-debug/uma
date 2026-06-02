@@ -109,14 +109,14 @@ const Payments = () => {
                       <td style={{ padding: '1rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                           {Object.entries(dueByFY).map(([fy, amount]) => (
-                            <span key={fy} style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                            <span key={fy} style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: 'var(--glass-bg)', borderRadius: '4px' }}>
                               FY {fy}: ₹{amount.toLocaleString()}
                             </span>
                           ))}
                         </div>
                       </td>
                       <td style={{ padding: '1rem' }}>
-                        <button className="btn" style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', background: 'var(--accent-primary)', color: 'white' }} onClick={() => {
+                        <button className="btn" style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', background: 'var(--accent-primary)', color: 'var(--text-main)' }} onClick={() => {
                           const firstUnpaid = data.invoices.find(inv => inv.partyName === party.name && inv.status === 'Unpaid');
                           if (firstUnpaid) handlePayment(firstUnpaid);
                         }}>
@@ -173,7 +173,7 @@ const Payments = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
           <div className="premium-card" style={{ width: '500px' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>Record Payment</h2>
             <form onSubmit={handleSubmit}>
