@@ -30,7 +30,11 @@ const MaterialReceipt = () => {
     value: '', // Editable value of the material
     batches: [], // Array of { batchNo, drums: 0, qty: 0, psdReq: '', psdReport: 'No', psdMethod: '', isEmptyDrums: false }
     totalDrums: 0,
-    totalQty: 0
+    totalQty: 0,
+    charges: { cleaning: false, filterBag: false, processing: false, sieving: false, psdReport: false, liner: false, courier: false, fiberDrum: false, transportation: false, hdpeDrum: false, batchChangeover: false },
+    rates: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
+    qtys: { cleaning: 1, filterBag: 1, processing: 1, sieving: 1, psdReport: 1, liner: 1, courier: 1, fiberDrum: 1, transportation: 1, hdpeDrum: 1, batchChangeover: 1 },
+    customCharges: [] // Array of { name: '', hsn: '', rate: 0, qty: 1, checked: true }
   });
 
   // Keep serial code synced on open modal or date changes
@@ -125,6 +129,9 @@ const MaterialReceipt = () => {
           hdpeDrum: (prodConfig.charges?.hdpeDrum || 0) > 0,
           batchChangeover: (prodConfig.charges?.batchChangeover || 0) > 0
         },
+        customCharges: (prodConfig.customCharges || []).map(c => ({
+          ...c, checked: true, qty: 1
+        })),
         batches: [
           { batchNo: '', drums: 1, qty: 0, psdReq: prodConfig.psdReq || '90% < 10M', psdReport: 'Yes', psdMethod: prodConfig.psdMethodDefault || 'Dry', isEmptyDrums: false }
         ]
@@ -225,7 +232,8 @@ const MaterialReceipt = () => {
     totalQty: 0,
     charges: { cleaning: false, filterBag: false, processing: false, sieving: false, psdReport: false, liner: false, courier: false, fiberDrum: false, transportation: false, hdpeDrum: false, batchChangeover: false },
     rates: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
-    qtys: { cleaning: 1, filterBag: 1, processing: 1, sieving: 1, psdReport: 1, liner: 1, courier: 1, fiberDrum: 1, transportation: 1, hdpeDrum: 1, batchChangeover: 1 }
+    qtys: { cleaning: 1, filterBag: 1, processing: 1, sieving: 1, psdReport: 1, liner: 1, courier: 1, fiberDrum: 1, transportation: 1, hdpeDrum: 1, batchChangeover: 1 },
+    customCharges: []
     });
     setIsEditing(null);
     setIsModalOpen(true);
@@ -549,6 +557,56 @@ const MaterialReceipt = () => {
                       )}
                     </div>
                   ))}
+                </div>
+
+                <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h4 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--accent-primary)', margin: 0 }}>Custom / Extra Charges</h4>
+                    <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setFormData(prev => ({ ...prev, customCharges: [...(prev.customCharges || []), { name: '', hsn: '', rate: 0, qty: 1, checked: true }] }))}>
+                      + Add Custom Charge
+                    </button>
+                  </div>
+                  {(formData.customCharges || []).length === 0 ? (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No custom charges added.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {(formData.customCharges || []).map((charge, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <input type="checkbox" checked={charge.checked} onChange={e => {
+                            const newCharges = [...formData.customCharges];
+                            newCharges[idx].checked = e.target.checked;
+                            setFormData({...formData, customCharges: newCharges});
+                          }} />
+                          <input type="text" className="input-field" style={{ flex: 2, padding: '0.2rem', fontSize: '0.8rem' }} placeholder="Charge Name" value={charge.name} onChange={e => {
+                            const newCharges = [...formData.customCharges];
+                            newCharges[idx].name = e.target.value;
+                            setFormData({...formData, customCharges: newCharges});
+                          }} />
+                          <input type="text" className="input-field" style={{ flex: 1, padding: '0.2rem', fontSize: '0.8rem' }} placeholder="HSN" value={charge.hsn} onChange={e => {
+                            const newCharges = [...formData.customCharges];
+                            newCharges[idx].hsn = e.target.value;
+                            setFormData({...formData, customCharges: newCharges});
+                          }} />
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Qty:</span>
+                          <input type="number" className="input-field" style={{ width: '60px', padding: '0.2rem', fontSize: '0.8rem' }} value={charge.qty} onChange={e => {
+                            const newCharges = [...formData.customCharges];
+                            newCharges[idx].qty = parseFloat(e.target.value) || 0;
+                            setFormData({...formData, customCharges: newCharges});
+                          }} />
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate: ₹</span>
+                          <input type="number" className="input-field" style={{ width: '80px', padding: '0.2rem', fontSize: '0.8rem' }} value={charge.rate} onChange={e => {
+                            const newCharges = [...formData.customCharges];
+                            newCharges[idx].rate = parseFloat(e.target.value) || 0;
+                            setFormData({...formData, customCharges: newCharges});
+                          }} />
+                          <button type="button" className="btn" style={{ padding: '0.3rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none' }} onClick={() => {
+                            const newCharges = formData.customCharges.filter((_, i) => i !== idx);
+                            setFormData({...formData, customCharges: newCharges});
+                          }}><Trash2 size={14} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
