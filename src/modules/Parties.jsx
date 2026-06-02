@@ -97,7 +97,8 @@ const Parties = () => {
         transportation: 0,
         hdpeDrum: 0,
         batchChangeover: 0
-      }
+      },
+      customCharges: []
     });
     setEditingProductIdx(null);
     setIsProductModalOpen(true);
@@ -711,6 +712,42 @@ const Parties = () => {
                     value={productData.notes}
                     onChange={e => setProductData({...productData, notes: e.target.value})}
                   />
+                </div>
+
+                <div style={{ gridColumn: 'span 3', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <label style={{ margin: 0, fontSize: '0.85rem', color: 'var(--accent-primary)' }}>Custom Charges / Overrides</label>
+                    <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setProductData(prev => ({ ...prev, customCharges: [...(prev.customCharges || []), { name: '', hsn: '', rate: 0 }] }))}>
+                      + Add Custom Charge
+                    </button>
+                  </div>
+                  {(productData.customCharges || []).length === 0 ? (
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No custom charges configured.</p>
+                  ) : (
+                    (productData.customCharges || []).map((charge, idx) => (
+                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <input type="text" className="input-field" placeholder="Charge Name (e.g. Micronization)" value={charge.name} onChange={e => {
+                          const newCharges = [...productData.customCharges];
+                          newCharges[idx].name = e.target.value;
+                          setProductData({...productData, customCharges: newCharges});
+                        }} />
+                        <input type="text" className="input-field" placeholder="HSN Code" value={charge.hsn} onChange={e => {
+                          const newCharges = [...productData.customCharges];
+                          newCharges[idx].hsn = e.target.value;
+                          setProductData({...productData, customCharges: newCharges});
+                        }} />
+                        <input type="number" className="input-field" placeholder="Rate (₹)" value={charge.rate} onChange={e => {
+                          const newCharges = [...productData.customCharges];
+                          newCharges[idx].rate = parseFloat(e.target.value) || 0;
+                          setProductData({...productData, customCharges: newCharges});
+                        }} />
+                        <button type="button" className="btn" style={{ padding: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none' }} onClick={() => {
+                          const newCharges = productData.customCharges.filter((_, i) => i !== idx);
+                          setProductData({...productData, customCharges: newCharges});
+                        }}><Trash2 size={14} /></button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 

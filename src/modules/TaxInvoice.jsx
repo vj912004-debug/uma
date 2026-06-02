@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { Search, Edit2, Trash2, FileDown, ClipboardList } from 'lucide-react';
+import { Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfExport';
 
 const TaxInvoice = () => {
-  const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
+  const { data, updateData, updateItem, setData, incrementSerial, deleteItemSoftly } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
@@ -117,7 +117,6 @@ const TaxInvoice = () => {
   };
 
   const getSubtotal = () => {
-    if (!activePL) return 0;
     return Object.keys(form.charges).reduce((sum, key) => {
       if (form.charges[key]) {
         const isQtyRate = ['processing', 'sieving', 'cleaning'].includes(key);
@@ -144,30 +143,48 @@ const TaxInvoice = () => {
       gstinBill: '',
       gstinShip: '',
       charges: {
-        cleaning: true,
-        filterBag: false,
-        processing: true,
-        sieving: false,
-        psdReport: false,
-        liner: false,
-        courier: false,
-        fiberDrum: false,
-        transportation: false,
-        hdpeDrum: false,
-        batchChangeover: false
+        cleaning: true, filterBag: false, processing: true, sieving: false,
+        psdReport: false, liner: false, courier: false, fiberDrum: false,
+        transportation: false, hdpeDrum: false, batchChangeover: false
       },
       rates: {
-        cleaning: 0,
-        filterBag: 0,
-        processing: 0,
-        sieving: 0,
-        psdReport: 0,
-        liner: 0,
-        courier: 0,
-        fiberDrum: 0,
-        transportation: 0,
-        hdpeDrum: 0,
-        batchChangeover: 0
+        cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
+        liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
+      },
+      discount: 0,
+      taxRate: 18,
+      terms: 'Payment against delivery.',
+      partyName: '',
+      productName: '',
+      qty: 0
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleCreateNew = () => {
+    setSelectedPL(null);
+    setEditingDoc(null);
+    const tiSerial = data.settings?.serials?.TI || 1;
+    const docNo = generateDocNumber('IN', tiSerial, new Date());
+    setForm({
+      invoiceNo: docNo,
+      date: new Date().toISOString().split('T')[0],
+      dcNo: '',
+      dcDate: '',
+      partyDocNo: '',
+      partyDocDate: '',
+      billAddress: '',
+      shipAddress: '',
+      gstinBill: '',
+      gstinShip: '',
+      charges: {
+        cleaning: true, filterBag: false, processing: true, sieving: false,
+        psdReport: false, liner: false, courier: false, fiberDrum: false,
+        transportation: false, hdpeDrum: false, batchChangeover: false
+      },
+      rates: {
+        cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
+        liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
       },
       discount: 0,
       taxRate: 18,
@@ -201,7 +218,7 @@ const TaxInvoice = () => {
 
     const finalDoc = {
       ...form,
-      receiptId: activeMR.id,
+      receiptId: activeMR?.id || activePL?.receiptId || '',
       partyName: form.partyName,
       productName: form.productName,
       qty: form.qty,
@@ -222,7 +239,6 @@ const TaxInvoice = () => {
     setIsModalOpen(false);
   };
 
-  // Find PLs that do not have a Tax Invoice generated yet
   const pendingPLs = data.packingLists.filter(pl => 
     !(data.invoices || []).some(inv => inv.receiptId === pl.receiptId && inv.invoiceNo?.includes('/IN/'))
   );
@@ -250,13 +266,17 @@ const TaxInvoice = () => {
 
   return (
     <div>
-      <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Tax Invoices</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Generate commercial GST tax invoices carrying forward processed packing values.</p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Tax Invoices</h1>
+          <p style={{ color: 'var(--text-muted)' }}>Generate and manage billing against finalized delivery challans.</p>
+        </div>
+        <button className="btn btn-primary" onClick={handleCreateNew}>
+          <Plus size={18} /> Create New Tax Invoice
+        </button>
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
-        {/* Left Side: Pending Billing scheduler */}
         <div className="premium-card">
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />

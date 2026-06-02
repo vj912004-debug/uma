@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { Search, Edit2, Trash2, FileDown, ClipboardList } from 'lucide-react';
+import { Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfExport';
 
 const PackingList = () => {
-  const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
+  const { data, updateData, updateItem, setData, incrementSerial, deleteItemSoftly } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPL, setEditingPL] = useState(null);
@@ -86,6 +86,22 @@ const PackingList = () => {
     setIsModalOpen(true);
   };
 
+  const handleCreateNew = () => {
+    setSelectedBPR(null);
+    setEditingPL(null);
+    const plSerial = data.settings?.serials?.PL || 1;
+    const docNo = generateDocNumber('PL', plSerial, new Date());
+    setForm({
+      plNo: docNo,
+      date: new Date().toISOString().split('T')[0],
+      productName: '',
+      totalWeight: 0,
+      totalDrums: 0,
+      batches: []
+    });
+    setIsModalOpen(true);
+  };
+
   const handleEdit = (pl) => {
     setEditingPL(pl);
     setForm(pl);
@@ -102,7 +118,7 @@ const PackingList = () => {
     e.preventDefault();
     const finalDoc = {
       ...form,
-      receiptId: editingPL ? editingPL.receiptId : selectedBPR.receiptId
+      receiptId: editingPL ? editingPL.receiptId : (selectedBPR?.receiptId || '')
     };
 
     if (editingPL) {
@@ -126,9 +142,14 @@ const PackingList = () => {
 
   return (
     <div>
-      <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Packing Lists (P.L.)</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Generate batch weight packlists carrying forward dispatched milling data.</p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Packing Lists (P.L.)</h1>
+          <p style={{ color: 'var(--text-muted)' }}>Generate batch weight packlists carrying forward dispatched milling data.</p>
+        </div>
+        <button className="btn btn-primary" onClick={handleCreateNew}>
+          <Plus size={18} /> Create New PL
+        </button>
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
@@ -230,7 +251,7 @@ const PackingList = () => {
                 </div>
                 <div>
                   <label>Product Name</label>
-                  <input type="text" className="input-field" readOnly value={form.productName} />
+                  <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
                 </div>
                 <div>
                   <label>Total Weight (Calculated)</label>

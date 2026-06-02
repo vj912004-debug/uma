@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { Search, Edit2, Trash2, FileDown, ClipboardList } from 'lucide-react';
+import { Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfExport';
 
 const DeliveryChallan = () => {
-  const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
+  const { data, updateData, updateItem, setData, incrementSerial, deleteItemSoftly } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
@@ -69,6 +69,32 @@ const DeliveryChallan = () => {
     setIsModalOpen(true);
   };
 
+  const handleCreateNew = () => {
+    setSelectedPL(null);
+    setEditingDoc(null);
+    const dcSerial = data.settings?.serials?.DC || 1;
+    const docNo = generateDocNumber('DC', dcSerial, new Date());
+    setForm({
+      dcNo: docNo,
+      date: new Date().toISOString().split('T')[0],
+      partyDocNo: '',
+      partyDocDate: '',
+      partyName: '',
+      billAddress: '',
+      shipAddress: '',
+      gstinBill: '',
+      gstinShip: '',
+      productName: '',
+      qty: 0,
+      totalDrums: 0,
+      value: 0,
+      vehicleNo: '',
+      driverName: '',
+      termsAndConditions: 'Material sent for Micronisation on Job Work basis. Goods to be returned after processing.'
+    });
+    setIsModalOpen(true);
+  };
+
   const handleEdit = (dc) => {
     setEditingDoc(dc);
     setForm(dc);
@@ -85,7 +111,7 @@ const DeliveryChallan = () => {
     e.preventDefault();
     const finalDoc = {
       ...form,
-      receiptId: activeMR.id
+      receiptId: activeMR?.id || activePL?.receiptId || ''
     };
 
     if (editingDoc) {
@@ -110,9 +136,14 @@ const DeliveryChallan = () => {
 
   return (
     <div>
-      <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Delivery Challans (D.C.)</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Generate transport dispatch delivery challans mapped to packing lists.</p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Delivery Challans (D.C.)</h1>
+          <p style={{ color: 'var(--text-muted)' }}>Generate transport dispatch delivery challans mapped to packing lists.</p>
+        </div>
+        <button className="btn btn-primary" onClick={handleCreateNew}>
+          <Plus size={18} /> Create New DC
+        </button>
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>

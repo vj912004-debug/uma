@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { Plus, Search, Edit2, Trash2, Calendar, ClipboardList, Columns, FileDown } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfExport';
+import ExportButton from '../components/ExportButton';
+import { Plus, Search, Edit2, Trash2, Calendar, ClipboardList, Columns, FileDown, PackageCheck } from 'lucide-react';
 
 const BPR = () => {
-  const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
+  const { data, updateData, updateItem, setData, incrementSerial, deleteItemSoftly } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBPR, setEditingBPR] = useState(null);
@@ -155,11 +156,22 @@ const BPR = () => {
     (b.productName || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const tableCols = [
+    { key: 'bprNo', label: 'BPR No' },
+    { key: 'partyName', label: 'Party Name' },
+    { key: 'productName', label: 'Product Name' },
+    { key: 'totalDispatchedNet', label: 'Total Net Weight (Kg)' },
+    { key: 'totalDispatchedGross', label: 'Total Gross Weight (Kg)' }
+  ];
+
   return (
     <div>
-      <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Batch Processing Records (BPR)</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Monitor milled batches and double-check dispatched weights.</p>
+      <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Batch Processing Records (BPR)</h1>
+          <p style={{ color: 'var(--text-muted)' }}>Monitor milled batches and double-check dispatched weights.</p>
+        </div>
+        <ExportButton data={filteredBPRs} columns={tableCols} filename="BPR_Records" title="Batch Processing Records" />
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>

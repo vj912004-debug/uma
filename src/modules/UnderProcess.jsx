@@ -96,7 +96,7 @@ const UnderProcess = () => {
         <p style={{ color: 'var(--text-muted)' }}>Interactive workflow command center. Monitor real-time progress and generate downstream documents.</p>
       </header>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+      <div className="hide-scrollbar" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', overflowX: 'auto', whiteSpace: 'nowrap' }}>
         {[
           { id: 'All', label: 'All' },
           { id: 'PI', label: 'PI Pending' },
@@ -742,6 +742,9 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
   const party = (data.parties || []).find(p => p.id === mr.partyId);
   const prodConfig = (party?.products || []).find(p => p.name === mr.productName);
 
+  const [activeFormTab, setActiveFormTab] = useState('Basic Info');
+  const formTabs = ['Basic Info', 'Pressures & Checklist', 'Batches & Weights', 'Quality & Dispatch'];
+
   const [form, setForm] = useState({
     bprNo: '',
     date: new Date().toISOString().split('T')[0],
@@ -883,317 +886,367 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div>
-          <label>BPR Number</label>
-          <input type="text" className="input-field" readOnly value={form.bprNo} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
-        </div>
-        <div>
-          <label>BPR Date *</label>
-          <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
-        </div>
-        <div>
-          <label>Customer Name</label>
-          <input type="text" className="input-field" value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} />
-        </div>
-        <div>
-          <label>Product Name</label>
-          <input type="text" className="input-field" readOnly value={form.productName} />
-        </div>
-        <div>
-          <label>Total Quantity (kg)</label>
-          <input type="text" className="input-field" readOnly value={String(form.totalInputQty)} />
-        </div>
-        <div>
-          <label>Batch No.</label>
-          <input type="text" className="input-field" value={form.batchNo} onChange={e => setForm({ ...form, batchNo: e.target.value })} />
-        </div>
-        <div>
-          <label>Total No. Batch</label>
-          <input type="number" className="input-field" value={form.totalNoBatch} onChange={e => setForm({ ...form, totalNoBatch: parseInt(e.target.value) || 0 })} />
-        </div>
-        <div>
-          <label>Total Drum</label>
-          <input type="number" className="input-field" value={form.totalDrums} onChange={e => setForm({ ...form, totalDrums: parseInt(e.target.value) || 0 })} />
-        </div>
-        <div>
-          <label>PSD Requirement *</label>
-          <input type="text" className="input-field" required value={form.psdRequirement} onChange={e => setForm({...form, psdRequirement: e.target.value})} />
-        </div>
+      {/* Tabs Header */}
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+        {formTabs.map(tab => (
+          <button 
+            key={tab}
+            type="button"
+            onClick={() => setActiveFormTab(tab)}
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              padding: '0.5rem 1rem', 
+              fontSize: '0.9rem', 
+              fontWeight: 600, 
+              color: activeFormTab === tab ? 'var(--accent-primary)' : 'var(--text-muted)',
+              borderBottom: activeFormTab === tab ? '2px solid var(--accent-primary)' : 'none',
+              cursor: 'pointer'
+            }}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
-      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Process Header</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
-          <div>
-            <label>Committed</label>
-            <input type="text" className="input-field" value={form.committedBy} onChange={e => setForm({ ...form, committedBy: e.target.value })} />
+      {activeFormTab === 'Basic Info' && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div>
+              <label>BPR Number</label>
+              <input type="text" className="input-field" readOnly value={form.bprNo} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
+            </div>
+            <div>
+              <label>BPR Date *</label>
+              <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+            </div>
+            <div>
+              <label>Customer Name</label>
+              <input type="text" className="input-field" value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} />
+            </div>
+            <div>
+              <label>Product Name</label>
+              <input type="text" className="input-field" readOnly value={form.productName} />
+            </div>
+            <div>
+              <label>Total Quantity (kg)</label>
+              <input type="text" className="input-field" readOnly value={String(form.totalInputQty)} />
+            </div>
+            <div>
+              <label>Batch No.</label>
+              <input type="text" className="input-field" value={form.batchNo} onChange={e => setForm({ ...form, batchNo: e.target.value })} />
+            </div>
+            <div>
+              <label>Total No. Batch</label>
+              <input type="number" className="input-field" value={form.totalNoBatch} onChange={e => setForm({ ...form, totalNoBatch: parseInt(e.target.value) || 0 })} />
+            </div>
+            <div>
+              <label>Total Drum</label>
+              <input type="number" className="input-field" value={form.totalDrums} onChange={e => setForm({ ...form, totalDrums: parseInt(e.target.value) || 0 })} />
+            </div>
+            <div>
+              <label>PSD Requirement *</label>
+              <input type="text" className="input-field" required value={form.psdRequirement} onChange={e => setForm({...form, psdRequirement: e.target.value})} />
+            </div>
           </div>
-          <div>
-            <label>Processing Start (Date)</label>
-            <input type="date" className="input-field" value={form.processingStartDate} onChange={e => setForm({ ...form, processingStartDate: e.target.value })} />
-          </div>
-          <div>
-            <label>Processing Start (Time)</label>
-            <input type="time" className="input-field" value={form.processingStartTime} onChange={e => setForm({ ...form, processingStartTime: e.target.value })} />
-          </div>
-          <div>
-            <label>Processing Supervisor</label>
-            <input type="text" className="input-field" value={form.processingSupervisor} onChange={e => setForm({ ...form, processingSupervisor: e.target.value })} />
-          </div>
-          <div>
-            <label>Sizing report require</label>
-            <select className="input-field" value={form.sizingReportRequired} onChange={e => setForm({ ...form, sizingReportRequired: e.target.value })}>
-              <option value="Yes">Yes</option>
-              <option value="No">No</option>
-            </select>
-          </div>
-          <div style={{ gridColumn: 'span 3' }}>
-            <label>Particle size result</label>
-            <input type="text" className="input-field" value={form.particleSizeResult} onChange={e => setForm({ ...form, particleSizeResult: e.target.value })} />
-          </div>
-        </div>
-      </div>
 
-      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Cleaning Checklist</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-          {[
-            { key: 'isMicronizerCleaned', label: 'Is the Micronizar cleaned?' },
-            { key: 'isAreaCleaned', label: 'Is the processing Area Cleaned?' },
-            { key: 'isFilterBagPackedLabeled', label: 'Is the filter Bag before process packed and labeled in LDPE Bag ?' },
-            { key: 'isBagCleanBlackSpotFree', label: 'Is the bag is clean and black spot free?' }
-          ].map(item => (
-            <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={Boolean(form[item.key])}
-                onChange={e => setForm({ ...form, [item.key]: e.target.checked })}
-              />
-              {item.label}
-            </label>
-          ))}
-        </div>
-      </div>
+          <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Process Header</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label>Committed</label>
+                <input type="text" className="input-field" value={form.committedBy} onChange={e => setForm({ ...form, committedBy: e.target.value })} />
+              </div>
+              <div>
+                <label>Processing Start (Date)</label>
+                <input type="date" className="input-field" value={form.processingStartDate} onChange={e => setForm({ ...form, processingStartDate: e.target.value })} />
+              </div>
+              <div>
+                <label>Processing Start (Time)</label>
+                <input type="time" className="input-field" value={form.processingStartTime} onChange={e => setForm({ ...form, processingStartTime: e.target.value })} />
+              </div>
+              <div>
+                <label>Processing Supervisor</label>
+                <input type="text" className="input-field" value={form.processingSupervisor} onChange={e => setForm({ ...form, processingSupervisor: e.target.value })} />
+              </div>
+              <div>
+                <label>Sizing report require</label>
+                <select className="input-field" value={form.sizingReportRequired} onChange={e => setForm({ ...form, sizingReportRequired: e.target.value })}>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+              <div style={{ gridColumn: 'span 3' }}>
+                <label>Particle size result</label>
+                <input type="text" className="input-field" value={form.particleSizeResult} onChange={e => setForm({ ...form, particleSizeResult: e.target.value })} />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
-      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Pressure Log</h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-            <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                <th style={{ padding: '0.4rem' }}>S.P.</th>
-                <th style={{ padding: '0.4rem' }}>D.P.</th>
-                <th style={{ padding: '0.4rem' }}>T.P.</th>
-                <th style={{ padding: '0.4rem' }}>F.P.</th>
-                <th style={{ padding: '0.4rem' }}>Fi.P.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(form.pressures || []).map((row, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  {['sp', 'dp', 'tp', 'fp', 'fip'].map(k => (
-                    <td key={k} style={{ padding: '0.3rem' }}>
-                      <input
-                        className="input-field"
-                        style={{ padding: '0.25rem', fontSize: '0.8rem' }}
-                        value={row[k]}
-                        onChange={e => {
-                          const next = [...(form.pressures || [])];
-                          next[idx] = { ...next[idx], [k]: e.target.value };
-                          setForm({ ...form, pressures: next });
-                        }}
-                      />
-                    </td>
-                  ))}
-                </tr>
+      {activeFormTab === 'Pressures & Checklist' && (
+        <>
+          <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Cleaning Checklist</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              {[
+                { key: 'isMicronizerCleaned', label: 'Is the Micronizar cleaned?' },
+                { key: 'isAreaCleaned', label: 'Is the processing Area Cleaned?' },
+                { key: 'isFilterBagPackedLabeled', label: 'Is the filter Bag before process packed and labeled in LDPE Bag ?' },
+                { key: 'isBagCleanBlackSpotFree', label: 'Is the bag is clean and black spot free?' }
+              ].map(item => (
+                <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form[item.key])}
+                    onChange={e => setForm({ ...form, [item.key]: e.target.checked })}
+                  />
+                  {item.label}
+                </label>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Weights Configuration Tables</h3>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer', color: 'var(--accent-primary)', fontWeight: 600 }}>
-          <input type="checkbox" checked={form.doubleDispatch} onChange={toggleDoubleDispatch} />
-          Double Dispatch Drums Count (e.g. split micronised batches)
-        </label>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-        {/* Received weights */}
-        <div style={{ background: 'rgba(0,0,0,0.1)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Received Raw Material Weight</h4>
-            <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow('receivedBatches')}>+ Add Row</button>
+            </div>
           </div>
-          <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                  <th style={{ padding: '0.35rem' }}>Batch No</th>
-                  <th style={{ padding: '0.35rem' }}>Drum No</th>
-                  <th style={{ padding: '0.35rem' }}>Gross</th>
-                  <th style={{ padding: '0.35rem' }}>Tare</th>
-                  <th style={{ padding: '0.35rem' }}>Net</th>
-                </tr>
-              </thead>
-              <tbody>
-                {form.receivedBatches.map((r, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
-                    <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
-                    <td style={{ padding: '0.25rem' }}>
-                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross} onChange={e => handleCellChange('receivedBatches', idx, 'gross', e.target.value)} />
-                    </td>
-                    <td style={{ padding: '0.25rem' }}>
-                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare} onChange={e => handleCellChange('receivedBatches', idx, 'tare', e.target.value)} />
-                    </td>
-                    <td style={{ padding: '0.25rem', fontWeight: 600 }}>{r.net.toFixed(2)}</td>
+
+          <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Pressure Log</h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                    <th style={{ padding: '0.4rem' }}>S.P.</th>
+                    <th style={{ padding: '0.4rem' }}>D.P.</th>
+                    <th style={{ padding: '0.4rem' }}>T.P.</th>
+                    <th style={{ padding: '0.4rem' }}>F.P.</th>
+                    <th style={{ padding: '0.4rem' }}>Fi.P.</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {(form.pressures || []).map((row, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      {['sp', 'dp', 'tp', 'fp', 'fip'].map(k => (
+                        <td key={k} style={{ padding: '0.3rem' }}>
+                          <input
+                            className="input-field"
+                            style={{ padding: '0.25rem', fontSize: '0.8rem' }}
+                            value={row[k]}
+                            onChange={e => {
+                              const next = [...(form.pressures || [])];
+                              next[idx] = { ...next[idx], [k]: e.target.value };
+                              setForm({ ...form, pressures: next });
+                            }}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
-            <span>Total Received:</span>
-            <span>{totalReceivedNet.toFixed(2)} Kg</span>
-          </div>
-        </div>
+        </>
+      )}
 
-        {/* Dispatched weights */}
-        <div style={{ background: 'rgba(0,0,0,0.1)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Dispatched (Micronised) Material Weight</h4>
-            <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow('dispatchedBatches')}>+ Add Row</button>
+      {activeFormTab === 'Batches & Weights' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Weights Configuration Tables</h3>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer', color: 'var(--accent-primary)', fontWeight: 600 }}>
+              <input type="checkbox" checked={form.doubleDispatch} onChange={toggleDoubleDispatch} />
+              Double Dispatch Drums Count (e.g. split micronised batches)
+            </label>
           </div>
-          <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                  <th style={{ padding: '0.35rem' }}>Batch No</th>
-                  <th style={{ padding: '0.35rem' }}>Drum No</th>
-                  <th style={{ padding: '0.35rem' }}>Gross</th>
-                  <th style={{ padding: '0.35rem' }}>Tare</th>
-                  <th style={{ padding: '0.35rem' }}>Net</th>
-                </tr>
-              </thead>
-              <tbody>
-                {form.dispatchedBatches.map((r, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
-                    <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
-                    <td style={{ padding: '0.25rem' }}>
-                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross} onChange={e => handleCellChange('dispatchedBatches', idx, 'gross', e.target.value)} />
-                    </td>
-                    <td style={{ padding: '0.25rem' }}>
-                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare} onChange={e => handleCellChange('dispatchedBatches', idx, 'tare', e.target.value)} />
-                    </td>
-                    <td style={{ padding: '0.25rem', fontWeight: 600 }}>{r.net.toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
-            <span>Total Dispatched:</span>
-            <span>{totalDispatchedNet.toFixed(2)} Kg</span>
-          </div>
-        </div>
-      </div>
 
-      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Packing Materials Used</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '0.75rem' }}>
-          <div>
-            <label>White LD Bags</label>
-            <input className="input-field" value={form.packingMaterials?.whiteLdBags || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, whiteLdBags: e.target.value } })} />
-          </div>
-          <div>
-            <label>Black LD Bags</label>
-            <input className="input-field" value={form.packingMaterials?.blackLdBags || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, blackLdBags: e.target.value } })} />
-          </div>
-          <div>
-            <label>Brow Tapes</label>
-            <input className="input-field" value={form.packingMaterials?.brownTapes || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, brownTapes: e.target.value } })} />
-          </div>
-          <div>
-            <label>Drum Used</label>
-            <input className="input-field" value={form.packingMaterials?.drumUsed || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, drumUsed: e.target.value } })} />
-          </div>
-          <div>
-            <label>Other Details</label>
-            <input className="input-field" value={form.packingMaterials?.otherDetails || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, otherDetails: e.target.value } })} />
-          </div>
-        </div>
-      </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+            {/* Received weights */}
+            <div style={{ background: 'rgba(0,0,0,0.1)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Received Raw Material Weight</h4>
+                <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow('receivedBatches')}>+ Add Row</button>
+              </div>
+              <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '0.35rem' }}>Batch No</th>
+                      <th style={{ padding: '0.35rem' }}>Drum No</th>
+                      <th style={{ padding: '0.35rem' }}>Gross</th>
+                      <th style={{ padding: '0.35rem' }}>Tare</th>
+                      <th style={{ padding: '0.35rem' }}>Net</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {form.receivedBatches.map((r, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
+                        <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
+                        <td style={{ padding: '0.25rem' }}>
+                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross} onChange={e => handleCellChange('receivedBatches', idx, 'gross', e.target.value)} />
+                        </td>
+                        <td style={{ padding: '0.25rem' }}>
+                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare} onChange={e => handleCellChange('receivedBatches', idx, 'tare', e.target.value)} />
+                        </td>
+                        <td style={{ padding: '0.25rem', fontWeight: 600 }}>{r.net.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
+                <span>Total Received:</span>
+                <span>{totalReceivedNet.toFixed(2)} Kg</span>
+              </div>
+            </div>
 
-      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Dispatch Material Quantity Details</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.75rem' }}>
-          <div>
-            <label>Micronized Material net weight</label>
-            <input className="input-field" value={form.dispatchQty?.micronizedNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, micronizedNet: e.target.value } })} />
+            {/* Dispatched weights */}
+            <div style={{ background: 'rgba(0,0,0,0.1)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Dispatched (Micronised) Material Weight</h4>
+                <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow('dispatchedBatches')}>+ Add Row</button>
+              </div>
+              <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '0.35rem' }}>Batch No</th>
+                      <th style={{ padding: '0.35rem' }}>Drum No</th>
+                      <th style={{ padding: '0.35rem' }}>Gross</th>
+                      <th style={{ padding: '0.35rem' }}>Tare</th>
+                      <th style={{ padding: '0.35rem' }}>Net</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {form.dispatchedBatches.map((r, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
+                        <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
+                        <td style={{ padding: '0.25rem' }}>
+                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross} onChange={e => handleCellChange('dispatchedBatches', idx, 'gross', e.target.value)} />
+                        </td>
+                        <td style={{ padding: '0.25rem' }}>
+                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare} onChange={e => handleCellChange('dispatchedBatches', idx, 'tare', e.target.value)} />
+                        </td>
+                        <td style={{ padding: '0.25rem', fontWeight: 600 }}>{r.net.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
+                <span>Total Dispatched:</span>
+                <span>{totalDispatchedNet.toFixed(2)} Kg</span>
+              </div>
+            </div>
           </div>
-          <div>
-            <label>Lumps Net weight</label>
-            <input className="input-field" value={form.dispatchQty?.lumpsNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, lumpsNet: e.target.value } })} />
-          </div>
-          <div>
-            <label>Floor Dust Net weight</label>
-            <input className="input-field" value={form.dispatchQty?.floorDustNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, floorDustNet: e.target.value } })} />
-          </div>
-          <div>
-            <label>Net Process Loss</label>
-            <input className="input-field" value={form.dispatchQty?.netProcessLoss || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, netProcessLoss: e.target.value } })} />
-          </div>
-          <div style={{ gridColumn: 'span 4' }}>
-            <label>Remark</label>
-            <input className="input-field" value={form.dispatchQty?.remark || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, remark: e.target.value } })} />
-          </div>
-        </div>
-      </div>
+        </>
+      )}
 
-      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Process Completion</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '0.75rem' }}>
-          <div>
-            <label>Date</label>
-            <input type="date" className="input-field" value={form.processCompletionDate} onChange={e => setForm({ ...form, processCompletionDate: e.target.value })} />
+      {activeFormTab === 'Quality & Dispatch' && (
+        <>
+          <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Packing Materials Used</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label>White LD Bags</label>
+                <input className="input-field" value={form.packingMaterials?.whiteLdBags || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, whiteLdBags: e.target.value } })} />
+              </div>
+              <div>
+                <label>Black LD Bags</label>
+                <input className="input-field" value={form.packingMaterials?.blackLdBags || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, blackLdBags: e.target.value } })} />
+              </div>
+              <div>
+                <label>Brow Tapes</label>
+                <input className="input-field" value={form.packingMaterials?.brownTapes || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, brownTapes: e.target.value } })} />
+              </div>
+              <div>
+                <label>Drum Used</label>
+                <input className="input-field" value={form.packingMaterials?.drumUsed || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, drumUsed: e.target.value } })} />
+              </div>
+              <div>
+                <label>Other Details</label>
+                <input className="input-field" value={form.packingMaterials?.otherDetails || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, otherDetails: e.target.value } })} />
+              </div>
+            </div>
           </div>
-          <div>
-            <label>Time</label>
-            <input type="time" className="input-field" value={form.processCompletionTime} onChange={e => setForm({ ...form, processCompletionTime: e.target.value })} />
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-            <input type="checkbox" checked={Boolean(form.isFilterBagPackedStoredAfter)} onChange={e => setForm({ ...form, isFilterBagPackedStoredAfter: e.target.checked })} />
-            Is Filter Bag Packed in HDPE bag and label & stored properly after processing ?
-          </label>
-          <div style={{ gridColumn: 'span 3' }}>
-            <label>Remark</label>
-            <input className="input-field" value={form.remarks} onChange={e => setForm({ ...form, remarks: e.target.value })} />
-          </div>
-        </div>
-      </div>
 
-      <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Signatures</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-          <div>
-            <label>Operator's Signature</label>
-            <input className="input-field" value={form.operatorSignature} onChange={e => setForm({ ...form, operatorSignature: e.target.value })} />
+          <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Dispatch Material Quantity Details</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label>Micronized Material net weight</label>
+                <input className="input-field" value={form.dispatchQty?.micronizedNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, micronizedNet: e.target.value } })} />
+              </div>
+              <div>
+                <label>Lumps Net weight</label>
+                <input className="input-field" value={form.dispatchQty?.lumpsNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, lumpsNet: e.target.value } })} />
+              </div>
+              <div>
+                <label>Floor Dust Net weight</label>
+                <input className="input-field" value={form.dispatchQty?.floorDustNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, floorDustNet: e.target.value } })} />
+              </div>
+              <div>
+                <label>Net Process Loss</label>
+                <input className="input-field" value={form.dispatchQty?.netProcessLoss || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, netProcessLoss: e.target.value } })} />
+              </div>
+              <div style={{ gridColumn: 'span 4' }}>
+                <label>Remark</label>
+                <input className="input-field" value={form.dispatchQty?.remark || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, remark: e.target.value } })} />
+              </div>
+            </div>
           </div>
-          <div>
-            <label>Plant Supervisor's Signature</label>
-            <input className="input-field" value={form.plantSupervisorSignature} onChange={e => setForm({ ...form, plantSupervisorSignature: e.target.value })} />
-          </div>
-        </div>
-      </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
-        <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
-        <button type="submit" className="btn btn-primary">Save BPR</button>
+          <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Process Completion</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div>
+                <label>Process Completion Date</label>
+                <input type="date" className="input-field" value={form.processCompletionDate} onChange={e => setForm({ ...form, processCompletionDate: e.target.value })} />
+              </div>
+              <div>
+                <label>Process Completion Time</label>
+                <input type="time" className="input-field" value={form.processCompletionTime} onChange={e => setForm({ ...form, processCompletionTime: e.target.value })} />
+              </div>
+              <div>
+                <label>Remarks</label>
+                <input type="text" className="input-field" value={form.remarks} onChange={e => setForm({ ...form, remarks: e.target.value })} />
+              </div>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: '1rem' }}>
+              <input type="checkbox" checked={form.isFilterBagPackedStoredAfter} onChange={e => setForm({ ...form, isFilterBagPackedStoredAfter: e.target.checked })} />
+              Is the filter bag after process packed and labeled and stored safely?
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label>Operator Signature Name</label>
+                <input type="text" className="input-field" value={form.operatorSignature} onChange={e => setForm({ ...form, operatorSignature: e.target.value })} />
+              </div>
+              <div>
+                <label>Plant Supervisor Signature Name</label>
+                <input type="text" className="input-field" value={form.plantSupervisorSignature} onChange={e => setForm({ ...form, plantSupervisorSignature: e.target.value })} />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+        <div>
+          {activeFormTab !== 'Basic Info' && (
+            <button type="button" className="btn btn-secondary" onClick={() => setActiveFormTab(formTabs[formTabs.indexOf(activeFormTab) - 1])}>
+              Previous
+            </button>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
+          {activeFormTab !== 'Quality & Dispatch' ? (
+            <button type="button" className="btn btn-primary" onClick={() => setActiveFormTab(formTabs[formTabs.indexOf(activeFormTab) + 1])}>
+              Next Step
+            </button>
+          ) : (
+            <button type="submit" className="btn btn-primary">Save BPR Document</button>
+          )}
+        </div>
       </div>
     </form>
   );

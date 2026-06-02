@@ -51,7 +51,7 @@ const PSD = () => {
   };
 
   const addReport = () => {
-    if (form.reports.length < 3) {
+    if (form.reports.length < 10) {
       setForm(prev => ({
         ...prev,
         reports: [...prev.reports, { batchNo: prev.reports[0].batchNo, method: prev.reports[0].method, requirement: prev.reports[0].requirement, result: '', fileName: '', fileSize: '' }]
@@ -88,15 +88,15 @@ const PSD = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Enforce max 3 reports per batch
+    // Enforce max 10 reports per batch
     const counts = (form.reports || []).reduce((acc, r) => {
       const k = r.batchNo || '';
       acc[k] = (acc[k] || 0) + 1;
       return acc;
     }, {});
-    const tooMany = Object.entries(counts).find(([batch, c]) => batch && c > 3);
+    const tooMany = Object.entries(counts).find(([batch, c]) => batch && c > 10);
     if (tooMany) {
-      alert(`Max 3 PSD reports allowed for batch "${tooMany[0]}".`);
+      alert(`Max 10 PSD reports allowed for batch "${tooMany[0]}".`);
       return;
     }
 
@@ -315,9 +315,9 @@ const PSD = () => {
                   </div>
                 ))}
                 
-                {form.reports.length < 3 && (
+                {form.reports.length < 10 && (
                   <div style={{ gridColumn: 'span 2' }}>
-                    <button type="button" className="btn btn-secondary" onClick={addReport}>+ Add Another Report (Max 3)</button>
+                    <button type="button" className="btn btn-secondary" onClick={addReport}>+ Add Another Report (Max 10)</button>
                   </div>
                 )}
                 

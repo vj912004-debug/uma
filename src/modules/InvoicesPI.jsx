@@ -2,7 +2,7 @@ import { formatDate } from '../utils/dateUtils';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { Search, Edit2, Trash2, FileDown, ClipboardList } from 'lucide-react';
+import { Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfExport';
 import ExportButton from '../components/ExportButton';
 
@@ -80,7 +80,6 @@ const InvoicesPI = () => {
   };
 
   const getSubtotal = () => {
-    if (!activeMR) return 0;
     return Object.keys(form.charges).reduce((sum, key) => {
       if (form.charges[key]) {
         const isQtyRate = ['processing', 'sieving', 'cleaning'].includes(key);
@@ -119,6 +118,35 @@ const InvoicesPI = () => {
     setIsModalOpen(true);
   };
 
+  const handleCreateNew = () => {
+    setSelectedMR(null);
+    setEditingDoc(null);
+    const piSerial = data.settings?.serials?.PI || 1;
+    const docNo = generateDocNumber('PI', piSerial, new Date());
+    setForm({
+      invoiceNo: docNo,
+      date: new Date().toISOString().split('T')[0],
+      partyDocNo: '',
+      partyDocDate: '',
+      charges: {
+        cleaning: true, filterBag: false, processing: true, sieving: false,
+        psdReport: false, liner: false, courier: false, fiberDrum: false,
+        transportation: false, hdpeDrum: false, batchChangeover: false
+      },
+      rates: {
+        cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
+        liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
+      },
+      discount: 0,
+      taxRate: 18,
+      terms: '100% advance against PI.',
+      partyName: '',
+      productName: '',
+      qty: 0
+    });
+    setIsModalOpen(true);
+  };
+
   const handleEdit = (pi) => {
     setEditingDoc(pi);
     setForm(pi);
@@ -135,7 +163,7 @@ const InvoicesPI = () => {
 
     const finalDoc = {
       ...form,
-      receiptId: activeMR.id,
+      receiptId: activeMR?.id || '',
       partyName: form.partyName,
       productName: form.productName,
       qty: form.qty,
@@ -194,7 +222,12 @@ const InvoicesPI = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Proforma Invoices (PI)</h1>
           <p style={{ color: 'var(--text-muted)' }}>Generate advanced billing from Material Receipts.</p>
         </div>
-        <ExportButton data={filtered} columns={exportColumns} filename="Proforma_Invoices" title="Proforma Invoices Log" />
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <ExportButton data={filtered} columns={exportColumns} filename="Proforma_Invoices" title="Proforma Invoices Log" />
+          <button className="btn btn-primary" onClick={handleCreateNew}>
+            <Plus size={18} /> Create New PI
+          </button>
+        </div>
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>

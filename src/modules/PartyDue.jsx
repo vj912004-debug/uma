@@ -1,12 +1,14 @@
 import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Search, Plus, CreditCard, DollarSign } from 'lucide-react';
+import { Search, Plus, CreditCard, DollarSign, ArrowUpDown } from 'lucide-react';
+import ExportButton from '../components/ExportButton';
 
 const PartyDue = () => {
-  const { data, updateData, setData } = useAppContext();
+  const { data, updateData, setData, updateItem } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [columnFilters, setColumnFilters] = useState({});
 
   // Payment Form State
   const [paymentForm, setPaymentForm] = useState({
@@ -44,6 +46,16 @@ const PartyDue = () => {
     } catch {
       return '24-25';
     }
+  };
+
+  const handleCellChange = (partyId, fy, value) => {
+    const party = data.parties.find(p => p.id === partyId);
+    if (!party) return;
+    const currentOverrides = party.dueOverrides || {};
+    updateItem('parties', partyId, {
+      ...party,
+      dueOverrides: { ...currentOverrides, [fy]: value }
+    });
   };
 
   const recordPayment = (e) => {
@@ -105,19 +117,79 @@ const PartyDue = () => {
       }
     });
 
-    const totalDue = Object.values(invoiceDuesByFY).reduce((s, v) => s + v, 0);
+    const o = party.dueOverrides || {};
+    
+    const final21 = o['21-22'] !== undefined ? parseFloat(o['21-22']) || 0 : invoiceDuesByFY['21-22'];
+    const final22 = o['22-23'] !== undefined ? parseFloat(o['22-23']) || 0 : invoiceDuesByFY['22-23'];
+    const final23 = o['23-24'] !== undefined ? parseFloat(o['23-24']) || 0 : invoiceDuesByFY['23-24'];
+    const final24 = o['24-25'] !== undefined ? parseFloat(o['24-25']) || 0 : invoiceDuesByFY['24-25'];
+
+    const totalDue = final21 + final22 + final23 + final24;
 
     return {
       id: party.id,
       name: party.name,
-      ...invoiceDuesByFY,
+      '21-22': final21,
+      '22-23': final22,
+      '23-24': final23,
+      '24-25': final24,
       totalDue
     };
   });
 
-  const filteredDues = partyRows.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredDues = partyRows.filter(p => {
+    const s = searchTerm.toLowerCase();
+    const matchesSearch = p.name.toLowerCase().includes(s);
+
+    let matchesColumnFilters = true;
+    for (const [key, filterVal] of Object.entries(columnFilters)) {
+      if (filterVal) {
+        const rowVal = String(p[key] || '').toLowerCase();
+        if (!rowVal.includes(filterVal.toLowerCase())) {
+          matchesColumnFilters = false;
+          break;
+        }
+      }
+    }
+
+    return matchesSearch && matchesColumnFilters;
+  });
+
+  const tableCols = [
+    { key: 'name', label: 'Party Name' },
+    { key: '21-22', label: 'Dues FY 21-22' },
+    { key: '22-23', label: 'Dues FY 22-23' },
+    { key: '23-24', label: 'Dues FY 23-24' },
+    { key: '24-25', label: 'Dues FY 24-25' },
+    { key: 'totalDue', label: 'Total Outstanding Dues' }
+  ];
+
+  const renderInput = (partyId, fy, value, isTotal = false) => {
+    if (isTotal) return `₹${parseFloat(value || 0).toFixed(2)}`;
+    return (
+      <input
+        type="number"
+        value={value === 0 ? '' : value}
+        placeholder="0.00"
+        onChange={(e) => handleCellChange(partyId, fy, e.target.value)}
+        style={{
+          background: 'transparent',
+          border: '1px solid transparent',
+          color: 'inherit',
+          width: '100%',
+          textAlign: 'right',
+          fontSize: 'inherit',
+          outline: 'none',
+          fontFamily: 'inherit',
+          fontWeight: 'inherit',
+          padding: '0.2rem',
+          transition: 'all 0.2s ease',
+        }}
+        onFocus={(e) => e.target.style.borderBottom = '1px solid var(--accent-primary)'}
+        onBlur={(e) => e.target.style.borderBottom = '1px solid transparent'}
+      />
+    );
+  };
 
   return (
     <div>
@@ -126,9 +198,12 @@ const PartyDue = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Party Wise Outstanding</h1>
           <p style={{ color: 'var(--text-muted)' }}>Financial Year-wise aging report. Track unpaid commercial invoices and outstanding balances.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-          <Plus size={18} /> Record Cheque Payment
-        </button>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <ExportButton data={filteredDues} columns={tableCols} filename="Party_Outstanding_Dues" title="Party Wise Outstanding" />
+          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+            <Plus size={18} /> Record Cheque Payment
+          </button>
+        </div>
       </header>
 
       <div className="premium-card">
@@ -148,37 +223,50 @@ const PartyDue = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
-                <th style={{ padding: '1rem' }}>Party Name</th>
-                <th style={{ padding: '1rem', textAlign: 'right' }}>Dues FY 21-22</th>
-                <th style={{ padding: '1rem', textAlign: 'right' }}>Dues FY 22-23</th>
-                <th style={{ padding: '1rem', textAlign: 'right' }}>Dues FY 23-24</th>
-                <th style={{ padding: '1rem', textAlign: 'right' }}>Dues FY 24-25</th>
-                <th style={{ padding: '1rem', textAlign: 'right', color: 'white' }}>Total Outstanding Dues</th>
+                {tableCols.map(col => (
+                  <th key={col.key} style={{ padding: '1rem', textAlign: col.key === 'name' ? 'left' : 'right' }}>
+                    {col.label}
+                  </th>
+                ))}
+              </tr>
+              {/* Filter Row */}
+              <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                {tableCols.map(col => (
+                  <th key={`filter-${col.key}`} style={{ padding: '0.2rem' }}>
+                    <input 
+                      type="text" 
+                      placeholder={`Filter...`} 
+                      value={columnFilters[col.key] || ''} 
+                      onChange={e => setColumnFilters({...columnFilters, [col.key]: e.target.value})} 
+                      style={{ width: '100%', fontSize: '0.75rem', padding: '0.2rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }} 
+                    />
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {filteredDues.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No outstanding party balances.</td>
+                  <td colSpan={tableCols.length} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No outstanding party balances.</td>
                 </tr>
               ) : (
                 filteredDues.map(party => (
                   <tr key={party.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td style={{ padding: '1rem', fontWeight: 600, color: 'white' }}>{party.name}</td>
-                    <td style={{ padding: '1rem', textAlign: 'right', color: party['21-22'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['21-22'] > 0 ? 600 : 400 }}>
-                      ₹{party['21-22'].toFixed(2)}
+                    <td style={{ padding: '0.5rem', color: party['21-22'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['21-22'] > 0 ? 600 : 400 }}>
+                      {renderInput(party.id, '21-22', party['21-22'])}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'right', color: party['22-23'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['22-23'] > 0 ? 600 : 400 }}>
-                      ₹{party['22-23'].toFixed(2)}
+                    <td style={{ padding: '0.5rem', color: party['22-23'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['22-23'] > 0 ? 600 : 400 }}>
+                      {renderInput(party.id, '22-23', party['22-23'])}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'right', color: party['23-24'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['23-24'] > 0 ? 600 : 400 }}>
-                      ₹{party['23-24'].toFixed(2)}
+                    <td style={{ padding: '0.5rem', color: party['23-24'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['23-24'] > 0 ? 600 : 400 }}>
+                      {renderInput(party.id, '23-24', party['23-24'])}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'right', color: party['24-25'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['24-25'] > 0 ? 600 : 400 }}>
-                      ₹{party['24-25'].toFixed(2)}
+                    <td style={{ padding: '0.5rem', color: party['24-25'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['24-25'] > 0 ? 600 : 400 }}>
+                      {renderInput(party.id, '24-25', party['24-25'])}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right', color: party.totalDue > 0 ? '#ef4444' : '#10b981', fontWeight: 700, fontSize: '0.95rem' }}>
-                      ₹{party.totalDue.toFixed(2)}
+                      {renderInput(party.id, 'totalDue', party.totalDue, true)}
                     </td>
                   </tr>
                 ))

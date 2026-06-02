@@ -2,6 +2,8 @@ import { formatDate } from '../utils/dateUtils';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
+import ExportButton from '../components/ExportButton';
+import { exportToPDF } from '../utils/pdfExport';
 import { Plus, Search, FileDown, Edit2, Trash2, ShieldAlert } from 'lucide-react';
 
 const MaterialReceipt = () => {
@@ -95,6 +97,34 @@ const MaterialReceipt = () => {
         ...prev,
         productName: prodName,
         nickName: prodConfig.nickname || '',
+        rates: {
+          ...prev.rates,
+          cleaning: prodConfig.charges?.cleaning || 0,
+          filterBag: prodConfig.charges?.filterBag || 0,
+          processing: prodConfig.charges?.processing || 0,
+          sieving: prodConfig.charges?.sieving || 0,
+          psdReport: prodConfig.charges?.psdReport || 0,
+          liner: prodConfig.charges?.liner || 0,
+          courier: prodConfig.charges?.courier || 0,
+          fiberDrum: prodConfig.charges?.fiberDrum || 0,
+          transportation: prodConfig.charges?.transportation || 0,
+          hdpeDrum: prodConfig.charges?.hdpeDrum || 0,
+          batchChangeover: prodConfig.charges?.batchChangeover || 0
+        },
+        charges: {
+          ...prev.charges,
+          cleaning: (prodConfig.charges?.cleaning || 0) > 0,
+          filterBag: (prodConfig.charges?.filterBag || 0) > 0,
+          processing: (prodConfig.charges?.processing || 0) > 0,
+          sieving: (prodConfig.charges?.sieving || 0) > 0,
+          psdReport: (prodConfig.charges?.psdReport || 0) > 0,
+          liner: (prodConfig.charges?.liner || 0) > 0,
+          courier: (prodConfig.charges?.courier || 0) > 0,
+          fiberDrum: (prodConfig.charges?.fiberDrum || 0) > 0,
+          transportation: (prodConfig.charges?.transportation || 0) > 0,
+          hdpeDrum: (prodConfig.charges?.hdpeDrum || 0) > 0,
+          batchChangeover: (prodConfig.charges?.batchChangeover || 0) > 0
+        },
         batches: [
           { batchNo: '', drums: 1, qty: 0, psdReq: prodConfig.psdReq || '90% < 10M', psdReport: 'Yes', psdMethod: prodConfig.psdMethodDefault || 'Dry', isEmptyDrums: false }
         ]
@@ -281,6 +311,16 @@ const MaterialReceipt = () => {
   // Active batch count (excluding Empty Drums)
   const activeBatchCount = formData.batches.filter(b => !b.isEmptyDrums).length;
 
+  const tableCols = [
+    { key: 'receiptNo', label: 'M.R. Number' },
+    { key: 'date', label: 'Received Date' },
+    { key: 'partyName', label: 'Party Name' },
+    { key: 'productName', label: 'Product Name' },
+    { key: 'totalDrums', label: 'Batches / Drums' },
+    { key: 'totalQty', label: 'Total Qty' },
+    { key: 'status', label: 'Status' }
+  ];
+
   return (
     <div>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -288,9 +328,12 @@ const MaterialReceipt = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Material Received Data (M.R.)</h1>
           <p style={{ color: 'var(--text-muted)' }}>Log incoming supplier raw materials, batches, and PSD method specifications.</p>
         </div>
-        <button className="btn btn-primary" onClick={handleOpenModal}>
-          <Plus size={18} /> Add Material Receipt
-        </button>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <ExportButton data={filteredReceipts} columns={tableCols} filename="Material_Receipts" title="Material Receipts Log" />
+          <button className="btn btn-primary" onClick={handleOpenModal}>
+            <Plus size={18} /> Add Material Receipt
+          </button>
+        </div>
       </header>
 
       <div className="premium-card">
@@ -429,6 +472,11 @@ const MaterialReceipt = () => {
                       <option key={idx} value={p.name}>{p.name} ({p.nickname})</option>
                     ))}
                   </select>
+                </div>
+
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Nickname</label>
+                  <input type="text" className="input-field" value={formData.nickName} onChange={e => setFormData({...formData, nickName: e.target.value})} />
                 </div>
 
                 {/* Addresses */}

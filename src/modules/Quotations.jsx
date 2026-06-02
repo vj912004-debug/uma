@@ -16,8 +16,10 @@ const Quotations = () => {
     partyId: '',
     partyName: '',
     partyAddress: '',
+    gstNumber: '',
     contactPerson: '',
     subject: 'Quotation for Micronization Services.',
+    description: '',
     productName: '',
     mainCharges: [{ description: '', psdRequirement: '', rate: '' }],
     optionalCharges: [{ description: '', rate: '' }],
@@ -42,7 +44,8 @@ const Quotations = () => {
         ...prev, 
         partyId: party.id, 
         partyName: party.name, 
-        partyAddress: party.billAddress 
+        partyAddress: party.billAddress || '',
+        gstNumber: party.gstinBill || ''
       }));
     }
   };
@@ -161,13 +164,25 @@ const Quotations = () => {
                     ))}
                   </select>
                 </div>
-                <div>
+                <div style={{ gridColumn: 'span 2' }}>
                   <label>Contact Person / Attn</label>
                   <input type="text" className="input-field" placeholder="e.g. Mr. Sharma" value={formData.contactPerson} onChange={e => setFormData({...formData, contactPerson: e.target.value})} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
+                  <label>Party Address</label>
+                  <textarea className="input-field" rows="2" value={formData.partyAddress} onChange={e => setFormData({...formData, partyAddress: e.target.value})}></textarea>
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>GST Number</label>
+                  <input type="text" className="input-field" value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
                   <label>Subject</label>
                   <input type="text" className="input-field" value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Description</label>
+                  <textarea className="input-field" rows="2" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Product Name</label>
