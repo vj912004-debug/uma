@@ -208,7 +208,7 @@ const DeliveryChallan = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label>Delivery Challan No</label>
-                  <input type="text" className="input-field" readOnly value={form.dcNo} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
+                  <input type="text" className="input-field" value={form.dcNo} onChange={e => setForm({...form, dcNo: e.target.value})} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
                 </div>
                 <div>
                   <label>DC Date</label>
@@ -216,18 +216,22 @@ const DeliveryChallan = () => {
                 </div>
                 <div>
                   <label>Supplier Document No</label>
-                  <input type="text" className="input-field" readOnly value={form.partyDocNo} />
+                  <input type="text" className="input-field" value={form.partyDocNo} onChange={e => setForm({...form, partyDocNo: e.target.value})} />
                 </div>
                 <div>
                   <label>Supplier Doc Date</label>
-                  <input type="text" className="input-field" readOnly value={form.partyDocDate} />
+                  <input type="date" className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
                 </div>
 
                 <div style={{ gridColumn: 'span 4', borderTop: '1px solid rgba(255,255,255,0.05)', margin: '0.5rem 0' }}></div>
 
                 <div>
+                  <label>Party Name</label>
+                  <input type="text" className="input-field" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
+                </div>
+                <div>
                   <label>Product Name</label>
-                  <input type="text" className="input-field" readOnly value={form.productName} />
+                  <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
                 </div>
                 <div>
                   <label>Micronised Qty (Kg)</label>

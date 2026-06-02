@@ -19,6 +19,9 @@ const InvoicesPI = () => {
     date: new Date().toISOString().split('T')[0],
     partyDocNo: '',
     partyDocDate: '',
+    partyName: '',
+    productName: '',
+    qty: 0,
     charges: {
       cleaning: true, filterBag: false, processing: true, sieving: false,
       psdReport: false, liner: false, courier: false, fiberDrum: false,
@@ -50,6 +53,9 @@ const InvoicesPI = () => {
         invoiceNo: docNo,
         partyDocNo: activeMR.partyDocNo,
         partyDocDate: activeMR.partyDocDate,
+        partyName: activeMR.partyName,
+        productName: activeMR.productName,
+        qty: activeMR.totalQty,
         charges: activeMR.charges || prev.charges,
         rates: {
           ...prev.rates,
@@ -78,7 +84,7 @@ const InvoicesPI = () => {
     return Object.keys(form.charges).reduce((sum, key) => {
       if (form.charges[key]) {
         const isQtyRate = ['processing', 'sieving', 'cleaning'].includes(key);
-        const qty = parseFloat(activeMR.totalQty) || 0;
+        const qty = parseFloat(form.qty) || 0;
         const rate = form.rates[key] || 0;
         return sum + (isQtyRate ? qty * rate : rate);
       }
@@ -105,7 +111,10 @@ const InvoicesPI = () => {
       },
       discount: 0,
       taxRate: 18,
-      terms: '100% advance against PI.'
+      terms: '100% advance against PI.',
+      partyName: '',
+      productName: '',
+      qty: 0
     });
     setIsModalOpen(true);
   };
@@ -127,9 +136,9 @@ const InvoicesPI = () => {
     const finalDoc = {
       ...form,
       receiptId: activeMR.id,
-      partyName: activeMR.partyName,
-      productName: activeMR.productName,
-      qty: activeMR.totalQty,
+      partyName: form.partyName,
+      productName: form.productName,
+      qty: form.qty,
       subtotal,
       taxAmount,
       total,
@@ -284,7 +293,7 @@ const InvoicesPI = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label>PI Number</label>
-                  <input type="text" className="input-field" readOnly value={form.invoiceNo} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
+                  <input type="text" className="input-field" value={form.invoiceNo} onChange={e => setForm({...form, invoiceNo: e.target.value})} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
                 </div>
                 <div>
                   <label>PI Date *</label>
@@ -292,17 +301,25 @@ const InvoicesPI = () => {
                 </div>
                 <div>
                   <label>Supplier Doc No</label>
-                  <input type="text" className="input-field" readOnly value={form.partyDocNo} />
+                  <input type="text" className="input-field" value={form.partyDocNo} onChange={e => setForm({...form, partyDocNo: e.target.value})} />
                 </div>
                 <div>
                   <label>Supplier Doc Date</label>
-                  <input type="text" className="input-field" readOnly value={form.partyDocDate} />
+                  <input type="date" className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
+                </div>
+                <div>
+                  <label>Party Name</label>
+                  <input type="text" className="input-field" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
+                </div>
+                <div>
+                  <label>Product Name</label>
+                  <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
                 </div>
                 <div>
                   <label>Material Qty (Kg)</label>
-                  <input type="text" className="input-field" readOnly value={`${activeMR?.totalQty || 0} Kg`} />
+                  <input type="number" step="any" className="input-field" value={form.qty} onChange={e => setForm({...form, qty: parseFloat(e.target.value) || 0})} />
                 </div>
-                <div style={{ gridColumn: 'span 3' }}>
+                <div style={{ gridColumn: 'span 4' }}>
                   <label>Terms</label>
                   <input type="text" className="input-field" value={form.terms} onChange={e => setForm({...form, terms: e.target.value})} />
                 </div>

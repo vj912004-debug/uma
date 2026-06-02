@@ -15,6 +15,7 @@ const BPR = () => {
   const [form, setForm] = useState({
     bprNo: '',
     date: new Date().toISOString().split('T')[0],
+    partyName: '',
     productName: '',
     totalInputQty: 0,
     psdRequirement: '90% < 10M',
@@ -57,6 +58,7 @@ const BPR = () => {
     setForm({
       bprNo: docNo,
       date: new Date().toISOString().split('T')[0],
+      partyName: mr.partyName,
       productName: mr.productName,
       totalInputQty: mr.totalQty,
       psdRequirement: '90% < 10M',
@@ -121,7 +123,7 @@ const BPR = () => {
     const finalDoc = {
       ...form,
       receiptId: editingBPR ? editingBPR.receiptId : selectedMR.id,
-      partyName: editingBPR ? editingBPR.partyName : selectedMR.partyName,
+      partyName: form.partyName,
       productName: form.productName,
       totalReceivedNet,
       totalDispatchedNet
@@ -251,18 +253,22 @@ const BPR = () => {
             <h2 style={{ marginBottom: '1.5rem' }}>{editingBPR ? 'Modify BPR weights' : 'Create Batch Processing Record (BPR)'}</h2>
             
             <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label>BPR Number</label>
-                  <input type="text" className="input-field" readOnly value={form.bprNo} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
+                  <input type="text" className="input-field" value={form.bprNo} onChange={e => setForm({...form, bprNo: e.target.value})} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
                 </div>
                 <div>
                   <label>BPR Date *</label>
                   <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                 </div>
                 <div>
+                  <label>Party Name</label>
+                  <input type="text" className="input-field" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
+                </div>
+                <div>
                   <label>Product Name</label>
-                  <input type="text" className="input-field" readOnly value={form.productName} />
+                  <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
                 </div>
                 <div>
                   <label>PSD Requirement *</label>

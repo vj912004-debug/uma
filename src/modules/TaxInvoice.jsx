@@ -23,6 +23,9 @@ const TaxInvoice = () => {
     shipAddress: '',
     gstinBill: '',
     gstinShip: '',
+    partyName: '',
+    productName: '',
+    qty: 0,
     charges: {
       cleaning: true,
       filterBag: false,
@@ -79,6 +82,9 @@ const TaxInvoice = () => {
         shipAddress: activeMR.shipAddress || '',
         gstinBill: activeMR.gstinBill || '',
         gstinShip: activeMR.gstinShip || '',
+        partyName: activeMR.partyName,
+        productName: activeMR.productName,
+        qty: activePL.totalWeight,
         rates: {
           cleaning: defaultRates.cleaning || 0,
           filterBag: defaultRates.filterBag || 0,
@@ -115,7 +121,7 @@ const TaxInvoice = () => {
     return Object.keys(form.charges).reduce((sum, key) => {
       if (form.charges[key]) {
         const isQtyRate = ['processing', 'sieving', 'cleaning'].includes(key);
-        const qty = parseFloat(activePL.totalWeight) || 0;
+        const qty = parseFloat(form.qty) || 0;
         const rate = form.rates[key] || 0;
         return sum + (isQtyRate ? qty * rate : rate);
       }
@@ -165,7 +171,10 @@ const TaxInvoice = () => {
       },
       discount: 0,
       taxRate: 18,
-      terms: 'Payment against delivery.'
+      terms: 'Payment against delivery.',
+      partyName: '',
+      productName: '',
+      qty: 0
     });
     setIsModalOpen(true);
   };
@@ -193,9 +202,9 @@ const TaxInvoice = () => {
     const finalDoc = {
       ...form,
       receiptId: activeMR.id,
-      partyName: activeMR.partyName,
-      productName: activeMR.productName,
-      qty: activePL.totalWeight,
+      partyName: form.partyName,
+      productName: form.productName,
+      qty: form.qty,
       subtotal,
       taxAmount,
       total,
@@ -339,7 +348,7 @@ const TaxInvoice = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label>Invoice Number</label>
-                  <input type="text" className="input-field" readOnly value={form.invoiceNo} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
+                  <input type="text" className="input-field" value={form.invoiceNo} onChange={e => setForm({...form, invoiceNo: e.target.value})} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
                 </div>
                 <div>
                   <label>Invoice Date *</label>
@@ -347,31 +356,39 @@ const TaxInvoice = () => {
                 </div>
                 <div>
                   <label>Delivery Challan No</label>
-                  <input type="text" className="input-field" readOnly value={form.dcNo} />
+                  <input type="text" className="input-field" value={form.dcNo} onChange={e => setForm({...form, dcNo: e.target.value})} />
                 </div>
                 <div>
                   <label>Delivery Challan Date</label>
-                  <input type="text" className="input-field" readOnly value={form.dcDate} />
+                  <input type="text" className="input-field" value={form.dcDate} onChange={e => setForm({...form, dcDate: e.target.value})} />
                 </div>
                 <div>
                   <label>Supplier Doc No</label>
-                  <input type="text" className="input-field" readOnly value={form.partyDocNo} />
+                  <input type="text" className="input-field" value={form.partyDocNo} onChange={e => setForm({...form, partyDocNo: e.target.value})} />
                 </div>
                 <div>
                   <label>Supplier Doc Date</label>
-                  <input type="text" className="input-field" readOnly value={form.partyDocDate} />
+                  <input type="date" className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
+                </div>
+                <div>
+                  <label>Party Name</label>
+                  <input type="text" className="input-field" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
+                </div>
+                <div>
+                  <label>Product Name</label>
+                  <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
                 </div>
                 <div>
                   <label>Bill-To GSTIN</label>
-                  <input type="text" className="input-field" readOnly value={form.gstinBill || 'N/A'} />
+                  <input type="text" className="input-field" value={form.gstinBill} onChange={e => setForm({...form, gstinBill: e.target.value})} />
                 </div>
                 <div>
                   <label>Ship-To GSTIN</label>
-                  <input type="text" className="input-field" readOnly value={form.gstinShip || 'N/A'} />
+                  <input type="text" className="input-field" value={form.gstinShip} onChange={e => setForm({...form, gstinShip: e.target.value})} />
                 </div>
                 <div>
-                  <label>Material Micronised Qty</label>
-                  <input type="text" className="input-field" readOnly value={`${activePL?.totalWeight || 0} Kg`} />
+                  <label>Material Micronised Qty (Kg)</label>
+                  <input type="number" step="any" className="input-field" value={form.qty} onChange={e => setForm({...form, qty: parseFloat(e.target.value) || 0})} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Bill-To Address</label>

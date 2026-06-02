@@ -222,7 +222,7 @@ const DebitNotes = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label>Note Number *</label>
-                  <input type="text" className="input-field" required readOnly value={form.noteNo} style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--accent-primary)', fontWeight: 600 }} />
+                  <input type="text" className="input-field" required value={form.noteNo} onChange={e => setForm({...form, noteNo: e.target.value})} style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--accent-primary)', fontWeight: 600 }} />
                 </div>
                 <div>
                   <label>Date *</label>
