@@ -425,11 +425,11 @@ const TaxInvoice = () => {
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Bill-To Address</label>
-                  <textarea className="input-field" rows="2" readOnly value={form.billAddress || 'N/A'} style={{ background: 'var(--glass-bg)', opacity: 0.8 }}></textarea>
+                  <textarea className="input-field" rows="2" value={form.billAddress || ''} onChange={e => setForm({...form, billAddress: e.target.value})} style={{ background: 'var(--glass-bg)', opacity: 0.8 }}></textarea>
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Ship-To Address</label>
-                  <textarea className="input-field" rows="2" readOnly value={form.shipAddress || 'N/A'} style={{ background: 'var(--glass-bg)', opacity: 0.8 }}></textarea>
+                  <textarea className="input-field" rows="2" value={form.shipAddress || ''} onChange={e => setForm({...form, shipAddress: e.target.value})} style={{ background: 'var(--glass-bg)', opacity: 0.8 }}></textarea>
                 </div>
               </div>
 

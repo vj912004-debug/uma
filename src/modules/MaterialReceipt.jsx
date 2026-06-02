@@ -490,15 +490,15 @@ const MaterialReceipt = () => {
                 {/* Addresses */}
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Bill To Address</label>
-                  <textarea className="input-field" rows="2" value={formData.billAddress} readOnly style={{ background: 'var(--glass-bg)', opacity: 0.8 }} />
+                  <textarea className="input-field" rows="2" value={formData.billAddress} onChange={e => setFormData({...formData, billAddress: e.target.value})} style={{ background: 'var(--glass-bg)', opacity: 0.8 }} />
                   <label style={{ marginTop: '0.5rem' }}>Bill To GSTIN</label>
-                  <input type="text" className="input-field" value={formData.gstinBill} readOnly style={{ background: 'var(--glass-bg)', opacity: 0.8 }} />
+                  <input type="text" className="input-field" value={formData.gstinBill} onChange={e => setFormData({...formData, gstinBill: e.target.value})} style={{ background: 'var(--glass-bg)', opacity: 0.8 }} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Ship To Address</label>
-                  <textarea className="input-field" rows="2" value={formData.shipAddress} readOnly style={{ background: 'var(--glass-bg)', opacity: 0.8 }} />
+                  <textarea className="input-field" rows="2" value={formData.shipAddress} onChange={e => setFormData({...formData, shipAddress: e.target.value})} style={{ background: 'var(--glass-bg)', opacity: 0.8 }} />
                   <label style={{ marginTop: '0.5rem' }}>Ship To GSTIN</label>
-                  <input type="text" className="input-field" value={formData.gstinShip} readOnly style={{ background: 'var(--glass-bg)', opacity: 0.8 }} />
+                  <input type="text" className="input-field" value={formData.gstinShip} onChange={e => setFormData({...formData, gstinShip: e.target.value})} style={{ background: 'var(--glass-bg)', opacity: 0.8 }} />
                 </div>
 
                 <div>

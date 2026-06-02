@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Plus, Search, Download, Trash2 } from 'lucide-react';
+import { Plus, Search, Download, Trash2, Edit2 } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF } from '../utils/pdfExport';
 import { formatDate } from '../utils/dateUtils';
@@ -52,14 +52,23 @@ const Quotations = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const newQuotation = {
-      ...formData,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-    updateData('quotations', newQuotation);
-    incrementSerial('QT');
+    if (formData.id) {
+      updateItem('quotations', formData.id, formData);
+    } else {
+      const newQuotation = {
+        ...formData,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString()
+      };
+      updateData('quotations', newQuotation);
+      incrementSerial('QT');
+    }
     setIsModalOpen(false);
+  };
+
+  const handleEdit = (q) => {
+    setFormData(q);
+    setIsModalOpen(true);
   };
 
   const addChargeRow = (type) => {
@@ -88,7 +97,27 @@ const Quotations = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Quotations</h1>
           <p style={{ color: 'var(--text-muted)' }}>Create and manage commercial proposals.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setIsModalOpen(true); }}>
+        <button className="btn btn-primary" onClick={() => { 
+          setFormData({
+            quotationNo: '',
+            date: new Date().toISOString().split('T')[0],
+            partyId: '',
+            partyName: '',
+            partyAddress: '',
+            gstNumber: '',
+            contactPerson: '',
+            subject: 'Quotation for Micronization Services.',
+            description: '',
+            productName: '',
+            mainCharges: [{ description: '', psdRequirement: '', rate: '' }],
+            optionalCharges: [{ description: '', rate: '' }],
+            validityDate: '2026-06-21',
+            terms: 'Tax: GST will charge extra.\\nLoss: Loss occurs during Processing is on your account.\\nSame Batch: Same materials requirement of micronization separately batch wise of different specification of same materials then change over charge @ Rs. 500/- batch or per specification will be applicable.\\nCharges: This is only processing charges, all other charges like Transportation, Insurance, Repacking material charges will be extra.\\nPayment: 100% Advance against PI\\nValidity: 21/06/2026\\nNote: If properties of material change then rate will be change and PSD will change then rate will be change.',
+            notes: '1) ABC\\n\\n2) ABC\\n\\n3) ABC',
+            signatoryName: 'Amit Patel'
+          });
+          setIsModalOpen(true); 
+        }}>
           <Plus size={18} /> New Quotation
         </button>
       </header>
@@ -128,6 +157,9 @@ const Quotations = () => {
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }} onClick={() => exportToPDF('QUOTATION', q)}>
                         <Download size={14} /> PDF
+                      </button>
+                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'transparent', color: 'var(--text-muted)' }} onClick={() => handleEdit(q)}>
+                        <Edit2 size={14} />
                       </button>
                       <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} onClick={() => deleteItemSoftly('quotations', q.id)}>
                         <Trash2 size={14} />
