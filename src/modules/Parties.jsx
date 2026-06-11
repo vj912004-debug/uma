@@ -76,6 +76,21 @@ const Parties = () => {
     }
   };
 
+  const STANDARD_CHARGE_DEFS = [
+    { key: 'cleaning',       label: 'Min Cleaning (998842)',      span: 1 },
+    { key: 'filterBag',     label: 'Filter Bag (591190)',         span: 1 },
+    { key: 'processing',    label: 'Processing (998842)',         span: 1 },
+    { key: 'sieving',       label: 'Sieving (998842)',            span: 1 },
+    { key: 'psdReportDry',  label: 'PSD Report Dry (998346)',     span: 1 },
+    { key: 'psdReportWet',  label: 'PSD Report Wet (998346)',     span: 1 },
+    { key: 'liner',         label: 'Liner (39233090)',            span: 1 },
+    { key: 'courier',       label: 'Courier (996812)',            span: 1 },
+    { key: 'fiberDrum',     label: 'Fiber Drum (7310)',           span: 1 },
+    { key: 'transportation',label: 'Transportation (996511)',     span: 1 },
+    { key: 'hdpeDrum',      label: 'HDPE Drum (39233090)',        span: 1 },
+    { key: 'batchChangeover',label: 'Batch Change Over (998842)', span: 2 },
+  ];
+
   const handleAddProduct = () => {
     setProductData({
       name: '',
@@ -98,6 +113,7 @@ const Parties = () => {
         hdpeDrum: 0,
         batchChangeover: 0
       },
+      disabledCharges: [],
       customCharges: []
     });
     setEditingProductIdx(null);
@@ -599,115 +615,66 @@ const Parties = () => {
                 <option value="4500" />
               </datalist>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.8rem', marginBottom: '1.5rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.75rem' }}>Min Cleaning (998842)</label>
-                  <input 
-                    type="number" list="amountOptions"
-                    className="input-field" 
-                    value={productData.charges.cleaning}
-                    onChange={e => setProductData({...productData, charges: {...productData.charges, cleaning: parseFloat(e.target.value) || 0}})}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem' }}>Filter Bag (591190)</label>
-                  <input 
-                    type="number" list="amountOptions"
-                    className="input-field" 
-                    value={productData.charges.filterBag}
-                    onChange={e => setProductData({...productData, charges: {...productData.charges, filterBag: parseFloat(e.target.value) || 0}})}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem' }}>Processing (998842)</label>
-                  <input 
-                    type="number" list="amountOptions"
-                    className="input-field" 
-                    value={productData.charges.processing}
-                    onChange={e => setProductData({...productData, charges: {...productData.charges, processing: parseFloat(e.target.value) || 0}})}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem' }}>Sieving (998842)</label>
-                  <input 
-                    type="number" list="amountOptions"
-                    className="input-field" 
-                    value={productData.charges.sieving}
-                    onChange={e => setProductData({...productData, charges: {...productData.charges, sieving: parseFloat(e.target.value) || 0}})}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem' }}>PSD Report Dry (998346)</label>
-                  <input 
-                    type="number" list="amountOptions"
-                    className="input-field" 
-                    value={productData.charges.psdReportDry}
-                    onChange={e => setProductData({...productData, charges: {...productData.charges, psdReportDry: parseFloat(e.target.value) || 0}})}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem' }}>PSD Report Wet (998346)</label>
-                  <input 
-                    type="number" list="amountOptions"
-                    className="input-field" 
-                    value={productData.charges.psdReportWet}
-                    onChange={e => setProductData({...productData, charges: {...productData.charges, psdReportWet: parseFloat(e.target.value) || 0}})}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem' }}>Liner (39233090)</label>
-                  <input 
-                    type="number" list="amountOptions"
-                    className="input-field" 
-                    value={productData.charges.liner}
-                    onChange={e => setProductData({...productData, charges: {...productData.charges, liner: parseFloat(e.target.value) || 0}})}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem' }}>Courier (996812)</label>
-                  <input 
-                    type="number" list="amountOptions"
-                    className="input-field" 
-                    value={productData.charges.courier}
-                    onChange={e => setProductData({...productData, charges: {...productData.charges, courier: parseFloat(e.target.value) || 0}})}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem' }}>Fiber Drum (7310)</label>
-                  <input 
-                    type="number" list="amountOptions"
-                    className="input-field" 
-                    value={productData.charges.fiberDrum}
-                    onChange={e => setProductData({...productData, charges: {...productData.charges, fiberDrum: parseFloat(e.target.value) || 0}})}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem' }}>Transportation (996511)</label>
-                  <input 
-                    type="number" list="amountOptions"
-                    className="input-field" 
-                    value={productData.charges.transportation}
-                    onChange={e => setProductData({...productData, charges: {...productData.charges, transportation: parseFloat(e.target.value) || 0}})}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem' }}>HDPE Drum (39233090)</label>
-                  <input 
-                    type="number" list="amountOptions"
-                    className="input-field" 
-                    value={productData.charges.hdpeDrum}
-                    onChange={e => setProductData({...productData, charges: {...productData.charges, hdpeDrum: parseFloat(e.target.value) || 0}})}
-                  />
-                </div>
-                <div style={{ gridColumn: 'span 2' }}>
-                  <label style={{ fontSize: '0.75rem' }}>Batch Change Over (998842)</label>
-                  <input 
-                    type="number" list="amountOptions"
-                    className="input-field" 
-                    value={productData.charges.batchChangeover}
-                    onChange={e => setProductData({...productData, charges: {...productData.charges, batchChangeover: parseFloat(e.target.value) || 0}})}
-                  />
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.8rem', marginBottom: '1rem' }}>
+                {STANDARD_CHARGE_DEFS.filter(def => !(productData.disabledCharges || []).includes(def.key)).map(def => (
+                  <div key={def.key} style={{ gridColumn: def.span > 1 ? `span ${def.span}` : undefined }}>
+                    <label style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                      <span style={{ textTransform: 'uppercase', letterSpacing: '0.03em' }}>{def.label}</span>
+                      <button
+                        type="button"
+                        title="Remove this charge"
+                        onClick={() => {
+                          setProductData(prev => ({
+                            ...prev,
+                            disabledCharges: [...(prev.disabledCharges || []), def.key],
+                            charges: { ...prev.charges, [def.key]: 0 }
+                          }));
+                        }}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: 'rgba(239,68,68,0.5)', padding: '0 0 0 4px',
+                          lineHeight: 1, fontSize: '1rem', display: 'flex', alignItems: 'center'
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </label>
+                    <input
+                      type="number" list="amountOptions"
+                      className="input-field"
+                      value={productData.charges[def.key] ?? 0}
+                      onChange={e => setProductData(prev => ({ ...prev, charges: { ...prev.charges, [def.key]: parseFloat(e.target.value) || 0 } }))}
+                    />
+                  </div>
+                ))}
+
+                {/* Removed / hidden charges restore strip */}
+                {(productData.disabledCharges || []).length > 0 && (
+                  <div style={{ gridColumn: 'span 3', marginTop: '0.25rem' }}>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Hidden charges (click to restore):</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                      {(productData.disabledCharges || []).map(key => {
+                        const def = STANDARD_CHARGE_DEFS.find(d => d.key === key);
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setProductData(prev => ({ ...prev, disabledCharges: (prev.disabledCharges || []).filter(k => k !== key) }))}
+                            style={{
+                              fontSize: '0.7rem', padding: '0.2rem 0.5rem',
+                              background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)',
+                              borderRadius: '4px', color: 'var(--text-muted)', cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: '0.25rem'
+                            }}
+                          >
+                            <span style={{ color: 'var(--accent-primary)', fontSize: '0.8rem' }}>+</span>
+                            {def?.label || key}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div style={{ gridColumn: 'span 3', marginTop: '0.5rem', marginBottom: '0.5rem' }}>
                   {(productData.customCharges || []).length > 0 && (
                     (productData.customCharges || []).map((charge, idx) => (
