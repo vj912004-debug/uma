@@ -16,7 +16,6 @@ import {
   DollarSign, 
   CreditCard, 
   Bell,
-  Settings,
   Archive,
   DatabaseBackup,
   PlusSquare,
@@ -25,13 +24,17 @@ import {
   ShoppingCart,
   UserCheck,
   Sun,
-  Moon
+  Moon,
+  LogOut,
+  Shield
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 
 const Sidebar = () => {
   const { data, setData } = useAppContext();
-  const userRole = data.settings?.userRole || 'Admin';
+  const { currentUser, logout } = useAuth();
+  const userRole = currentUser?.role || data.settings?.userRole || 'Staff';
   const theme = data.settings?.theme || 'dark';
 
   const groups = [
@@ -109,18 +112,12 @@ const Sidebar = () => {
     {
       title: "System",
       items: [
+        { name: 'Employees', icon: Shield, path: '/employees', roles: ['Admin'] },
         { name: 'Recycle Bin', icon: Archive, path: '/recycle-bin', roles: ['Admin'] },
         { name: 'Backups & Logs', icon: DatabaseBackup, path: '/system-logs', roles: ['Admin'] }
       ]
     }
   ];
-
-  const toggleRole = () => {
-    setData(prev => ({
-      ...prev,
-      settings: { ...prev.settings, userRole: userRole === 'Admin' ? 'Staff' : 'Admin' }
-    }));
-  };
 
   const toggleTheme = () => {
     setData(prev => ({
@@ -128,6 +125,9 @@ const Sidebar = () => {
       settings: { ...prev.settings, theme: theme === 'dark' ? 'light' : 'dark' }
     }));
   };
+
+  const displayName = currentUser?.name || currentUser?.username || 'User';
+  const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
     <aside className="glass-panel" style={{ width: '290px', height: '100vh', padding: '1.5rem 1rem', position: 'sticky', top: 0, borderRight: '1px solid var(--border-color)', borderRadius: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -187,17 +187,6 @@ const Sidebar = () => {
       <div style={{ marginTop: 'auto', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button 
-            onClick={toggleRole}
-            className="btn" 
-            style={{ 
-              flex: 1,
-              fontSize: '0.7rem', 
-              padding: '0.5rem',
-            }}
-          >
-            <Settings size={12} style={{ opacity: 0.6 }} /> {userRole}
-          </button>
-          <button 
             onClick={toggleTheme}
             className="btn" 
             style={{ 
@@ -208,14 +197,26 @@ const Sidebar = () => {
           >
             {theme === 'dark' ? <Sun size={12} style={{ opacity: 0.6 }} /> : <Moon size={12} style={{ opacity: 0.6 }} />} {theme === 'dark' ? 'Light' : 'Dark'}
           </button>
+          <button 
+            onClick={logout}
+            className="btn" 
+            style={{ 
+              flex: 1,
+              fontSize: '0.7rem', 
+              padding: '0.5rem',
+              color: '#f87171'
+            }}
+          >
+            <LogOut size={12} style={{ opacity: 0.6 }} /> Logout
+          </button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: 'var(--glass-bg)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-          <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: 'white', fontSize: '0.8rem' }}>
-            {userRole[0]}
+          <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: 'white', fontSize: '0.7rem' }}>
+            {initials}
           </div>
           <div style={{ overflow: 'hidden' }}>
-            <p style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>{userRole}</p>
-            <p style={{ fontSize: '0.625rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', margin: 0 }}>{userRole === 'Admin' ? 'Super Admin' : 'Staff Access'}</p>
+            <p style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>{displayName}</p>
+            <p style={{ fontSize: '0.625rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', margin: 0 }}>{userRole} · {currentUser?.employeeId || ''}</p>
           </div>
         </div>
       </div>

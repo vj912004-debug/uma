@@ -239,6 +239,37 @@ const MaterialReceipt = () => {
     setIsModalOpen(true);
   };
 
+  const buildPlansFromReceipt = (receipt) => {
+    const party = data.parties.find(p => p.id === receipt.partyId);
+    const prodConfig = (party?.products || []).find(p => p.name === receipt.productName);
+
+    return (receipt.batches || [])
+      .filter(b => !b.isEmptyDrums)
+      .map((batch, idx) => ({
+        id: `${receipt.id}_batch_${idx}`,
+        receiptId: receipt.id,
+        createdAt: receipt.createdAt || new Date().toISOString(),
+        customer: receipt.partyName || party?.name || '',
+        productName: receipt.productName || '',
+        productNickName: receipt.nickName || prodConfig?.nickname || '',
+        psdReq: batch.psdReq || prodConfig?.psdReq || '',
+        psdNote: prodConfig?.psdNote || '',
+        batchNo: batch.batchNo || '',
+        qty: batch.qty ?? '',
+        priorityLevel: 'Normal',
+        specialInstructions: '',
+        status: 'Pending',
+        startDate: receipt.date || new Date().toISOString().split('T')[0],
+        startTime: '09:00',
+        endDate: receipt.date || new Date().toISOString().split('T')[0],
+        endTime: '17:00',
+        hours: '8.00',
+        notes: '',
+        supervisor: '',
+        delayReason: ''
+      }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     try {
@@ -255,46 +286,27 @@ const MaterialReceipt = () => {
         return;
       }
 
-      if (isEditing) {
-        updateItem('materialReceipts', isEditing, { ...formData, id: isEditing });
-      } else {
-        const newReceipt = {
-          ...formData,
-          id: Date.now().toString(),
-          status: 'Pending'
+      const receiptPayload = isEditing
+        ? { ...formData, id: isEditing }
+        : { ...formData, id: Date.now().toString(), status: 'Pending', createdAt: new Date().toISOString() };
+
+      const linkedPlans = buildPlansFromReceipt(receiptPayload);
+
+      setData(prev => {
+        const otherPlans = (prev.productionPlans || []).filter(p => p.receiptId !== receiptPayload.id);
+        const materialReceipts = isEditing
+          ? (prev.materialReceipts || []).map(mr => mr.id === isEditing ? receiptPayload : mr)
+          : [...(prev.materialReceipts || []), receiptPayload];
+
+        return {
+          ...prev,
+          materialReceipts,
+          productionPlans: [...otherPlans, ...linkedPlans]
         };
-        updateData('materialReceipts', newReceipt);
+      });
+
+      if (!isEditing) {
         incrementSerial('MR');
-        
-        // Auto-fill Production Planning
-        formData.batches.forEach((batch, idx) => {
-          if (!batch.isEmptyDrums) {
-            const party = data.parties.find(p => p.id === formData.partyId);
-            const prodConfig = (party?.products || []).find(p => p.name === formData.productName);
-            
-            const newPlan = {
-              id: Date.now().toString() + '_' + idx,
-              createdAt: new Date().toISOString(),
-              customer: formData.partyName,
-              productName: formData.productName,
-              productNickName: formData.nickName,
-              psdReq: batch.psdReq || prodConfig?.psdReq || '',
-              psdNote: prodConfig?.psdNote || prodConfig?.notes || '',
-              batchNo: batch.batchNo,
-              qty: batch.qty,
-              priorityLevel: 'Normal',
-              specialInstructions: '',
-              status: 'Pending',
-              startDate: formData.date,
-              startTime: '09:00',
-              endDate: formData.date,
-              endTime: '17:00',
-              hours: '8.00',
-              notes: ''
-            };
-            updateData('productionPlans', newPlan);
-          }
-        });
       }
       setIsModalOpen(false);
       setIsEditing(null);

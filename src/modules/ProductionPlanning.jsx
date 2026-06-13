@@ -1,8 +1,88 @@
 import { formatDate } from '../utils/dateUtils';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Search, Edit2, Trash2, Calendar, Clock } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
+
+const buildPlansFromReceipt = (receipt, parties) => {
+  const party = parties.find(p => p.id === receipt.partyId);
+  const prodConfig = (party?.products || []).find(p => p.name === receipt.productName);
+
+  return (receipt.batches || [])
+    .filter(b => !b.isEmptyDrums)
+    .map((batch, idx) => ({
+      id: `${receipt.id}_batch_${idx}`,
+      receiptId: receipt.id,
+      createdAt: receipt.createdAt || new Date().toISOString(),
+      customer: receipt.partyName || party?.name || '',
+      productName: receipt.productName || '',
+      productNickName: receipt.nickName || prodConfig?.nickname || '',
+      psdReq: batch.psdReq || prodConfig?.psdReq || '',
+      psdNote: prodConfig?.psdNote || '',
+      batchNo: batch.batchNo || '',
+      qty: batch.qty ?? '',
+      priorityLevel: 'Normal',
+      specialInstructions: '',
+      status: 'Pending',
+      startDate: receipt.date || new Date().toISOString().split('T')[0],
+      startTime: '09:00',
+      endDate: receipt.date || new Date().toISOString().split('T')[0],
+      endTime: '17:00',
+      hours: '8.00',
+      notes: '',
+      supervisor: '',
+      delayReason: ''
+    }));
+};
+
+const resolvePlan = (plan, materialReceipts = [], parties = []) => {
+  const resolved = {
+    ...plan,
+    customer: plan.customer || plan.partyName || '',
+    productName: plan.productName || plan.product || '',
+    productNickName: plan.productNickName || plan.nickName || '',
+    batchNo: plan.batchNo || plan.batchNumber || '',
+    psdReq: plan.psdReq || plan.psdRequirement || '',
+    psdNote: plan.psdNote || ''
+  };
+
+  if (plan.receiptId) {
+    const mr = materialReceipts.find(r => r.id === plan.receiptId);
+    if (mr) {
+      resolved.customer = resolved.customer || mr.partyName || '';
+      resolved.productName = resolved.productName || mr.productName || '';
+      resolved.productNickName = resolved.productNickName || mr.nickName || '';
+
+      const batchIdx = plan.id?.includes('_batch_') ? parseInt(plan.id.split('_batch_')[1], 10) : -1;
+      const batch = !isNaN(batchIdx) && mr.batches?.[batchIdx]
+        ? mr.batches[batchIdx]
+        : (mr.batches || []).find(b => b.batchNo && b.batchNo === plan.batchNo) || mr.batches?.[0];
+
+      if (batch) {
+        resolved.batchNo = resolved.batchNo || batch.batchNo || '';
+        resolved.psdReq = resolved.psdReq || batch.psdReq || '';
+        if (!resolved.qty && batch.qty) resolved.qty = batch.qty;
+      }
+    }
+  }
+
+  if ((!resolved.customer || !resolved.productName) && resolved.productNickName) {
+    for (const party of parties) {
+      const prod = (party.products || []).find(
+        p => p.nickname === resolved.productNickName || p.name === resolved.productNickName
+      );
+      if (prod) {
+        resolved.customer = resolved.customer || party.name;
+        resolved.productName = resolved.productName || prod.name;
+        resolved.psdReq = resolved.psdReq || prod.psdReq || '';
+        resolved.psdNote = resolved.psdNote || prod.psdNote || '';
+        break;
+      }
+    }
+  }
+
+  return resolved;
+};
 
 const ProductionPlanning = () => {
   const { data, updateData, updateItem, deleteItemSoftly, setData } = useAppContext();
@@ -15,6 +95,7 @@ const ProductionPlanning = () => {
   const staffVisibleColumns = data.settings?.productionPlanningVisibleColumnsForStaff;
 
   const [formData, setFormData] = useState({
+    partyId: '',
     customer: '',
     productName: '',
     productNickName: '',
@@ -52,7 +133,7 @@ const ProductionPlanning = () => {
   }, [formData.startDate, formData.startTime, formData.endDate, formData.endTime]);
 
   const handleEdit = (plan) => {
-    setFormData(plan);
+    setFormData(resolvePlan(plan, data.materialReceipts, data.parties));
     setIsEditing(plan.id);
     setIsModalOpen(true);
   };
@@ -65,9 +146,11 @@ const ProductionPlanning = () => {
 
   const handleOpenModal = () => {
     setFormData({
+      partyId: '',
       customer: '',
       productName: '',
       productNickName: '',
+      psdReq: '',
       psdNote: '',
       batchNo: '',
       qty: '',
@@ -84,6 +167,59 @@ const ProductionPlanning = () => {
     });
     setIsEditing(null);
     setIsModalOpen(true);
+  };
+
+  const handlePartySelect = (e) => {
+    const partyId = e.target.value;
+    const party = data.parties.find(p => p.id === partyId);
+    if (party) {
+      setFormData(prev => ({
+        ...prev,
+        partyId,
+        customer: party.name,
+        productName: '',
+        productNickName: '',
+        psdReq: '',
+        psdNote: ''
+      }));
+    }
+  };
+
+  const handleProductSelect = (e) => {
+    const productName = e.target.value;
+    const party = data.parties.find(p => p.id === formData.partyId);
+    const prodConfig = (party?.products || []).find(p => p.name === productName);
+    if (prodConfig) {
+      setFormData(prev => ({
+        ...prev,
+        productName,
+        productNickName: prodConfig.nickname || prev.productNickName,
+        psdReq: prodConfig.psdReq || prev.psdReq,
+        psdNote: prodConfig.psdNote || prev.psdNote
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, productName }));
+    }
+  };
+
+  const handleNicknameChange = (nick) => {
+    setFormData(prev => {
+      const next = { ...prev, productNickName: nick };
+      for (const party of data.parties || []) {
+        const prod = (party.products || []).find(p => p.nickname === nick);
+        if (prod) {
+          return {
+            ...next,
+            partyId: party.id,
+            customer: party.name,
+            productName: prod.name,
+            psdReq: prod.psdReq || next.psdReq,
+            psdNote: prod.psdNote || next.psdNote
+          };
+        }
+      }
+      return next;
+    });
   };
 
   const handleSubmit = (e) => {
@@ -110,7 +246,11 @@ const ProductionPlanning = () => {
   const productNicknames = Array.from(new Set((data.parties || []).flatMap(p => p.products || []).map(prod => prod?.nickname).filter(Boolean)));
 
   const plansList = (data.productionPlans || []).filter(p => !p.isDeleted);
-  const filteredPlans = plansList.filter(p => 
+  const resolvedPlans = useMemo(
+    () => plansList.map(p => resolvePlan(p, data.materialReceipts, data.parties)),
+    [plansList, data.materialReceipts, data.parties]
+  );
+  const filteredPlans = resolvedPlans.filter(p =>
     (p.productNickName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.customer || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.batchNo || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -301,16 +441,38 @@ const ProductionPlanning = () => {
             <form onSubmit={handleSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
+                  <label>Select Party</label>
+                  <select className="input-field" value={formData.partyId || ''} onChange={handlePartySelect}>
+                    <option value="">-- Select Party --</option>
+                    {(data.parties || []).filter(p => p.type === 'Customer').map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label>Customer</label>
                   <input type="text" className="input-field" value={formData.customer} onChange={e => setFormData({...formData, customer: e.target.value})} />
                 </div>
                 <div>
                   <label>Product Name</label>
-                  <input type="text" className="input-field" value={formData.productName} onChange={e => setFormData({...formData, productName: e.target.value})} />
+                  {(() => {
+                    const party = data.parties.find(p => p.id === formData.partyId);
+                    const products = party?.products || [];
+                    return products.length > 0 ? (
+                      <select className="input-field" value={formData.productName} onChange={handleProductSelect}>
+                        <option value="">-- Select Product --</option>
+                        {products.map((p, idx) => (
+                          <option key={idx} value={p.name}>{p.name}{p.nickname ? ` (${p.nickname})` : ''}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input type="text" className="input-field" value={formData.productName} onChange={e => setFormData({...formData, productName: e.target.value})} />
+                    );
+                  })()}
                 </div>
                 <div>
                   <label>Product Nickname</label>
-                  <input type="text" className="input-field" value={formData.productNickName} onChange={e => setFormData({...formData, productNickName: e.target.value})} list="nicknames" />
+                  <input type="text" className="input-field" value={formData.productNickName} onChange={e => handleNicknameChange(e.target.value)} list="nicknames" />
                   <datalist id="nicknames">
                     {productNicknames.map((nick, idx) => <option key={idx} value={nick} />)}
                   </datalist>

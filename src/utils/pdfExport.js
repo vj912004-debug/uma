@@ -389,9 +389,17 @@ const buildBPR = (doc, data) => {
   for (let i = 0; i < maxRows; i++) {
     const r = received[i] || {};
     const d = dispatched[i] || {};
+    const fmtWt = (v) => (v === '' || v === undefined || v === null || v === 0) ? '' : v;
+    const fmtNet = (row) => {
+      if (row.net !== '' && row.net !== undefined && row.net !== 0) return typeof row.net === 'number' ? row.net.toFixed(2) : row.net;
+      const g = parseFloat(row.gross);
+      const t = parseFloat(row.tare);
+      if (!isNaN(g) && !isNaN(t) && row.gross !== '' && row.tare !== '') return Math.max(0, g - t).toFixed(2);
+      return '';
+    };
     packingBody.push([
-      r.batchNo || '', r.drumNo || '', r.gross !== undefined ? r.gross : '', r.tare !== undefined ? r.tare : '', r.net !== undefined ? r.net.toFixed(2) : '',
-      d.batchNo || '', d.drumNo || '', d.gross !== undefined ? d.gross : '', d.tare !== undefined ? d.tare : '', d.net !== undefined ? d.net.toFixed(2) : ''
+      r.batchNo || '', r.drumNo || '', fmtWt(r.gross), fmtWt(r.tare), fmtNet(r),
+      d.batchNo || '', d.drumNo || '', fmtWt(d.gross), fmtWt(d.tare), fmtNet(d)
     ]);
   }
 
@@ -881,7 +889,50 @@ const buildOldLogic = (doc, docType, data) => {
   yPos += 15;
 
   if (docType === 'PL' && data.batches) {
-    const plBody = data.batches.map((b, idx) => [idx + 1, b.batchNo, b.drumNo, `${b.gross} Kg`, `${b.tare} Kg`, `${b.net.toFixed(2)} Kg`]);
+    const parseWt = (v) => (v === '' || v === undefined || v === null ? 0 : parseFloat(v) || 0);
+    const groups = {};
+    const groupOrder = [];
+    data.batches.forEach((b) => {
+      const key = b.batchNo || 'Unknown';
+      if (!groups[key]) {
+        groups[key] = { gross: 0, tare: 0, net: 0, drums: 0 };
+        groupOrder.push(key);
+      }
+      const net = b.net !== '' && b.net !== undefined ? parseWt(b.net) : Math.max(0, parseWt(b.gross) - parseWt(b.tare));
+      groups[key].gross += parseWt(b.gross);
+      groups[key].tare += parseWt(b.tare);
+      groups[key].net += net;
+      groups[key].drums += 1;
+    });
+
+    const plBody = [];
+    let sr = 1;
+    let grandGross = 0, grandTare = 0, grandNet = 0;
+
+    groupOrder.forEach((key) => {
+      data.batches.filter(b => (b.batchNo || 'Unknown') === key).forEach((b) => {
+        const net = b.net !== '' && b.net !== undefined ? parseWt(b.net) : Math.max(0, parseWt(b.gross) - parseWt(b.tare));
+        plBody.push([sr++, b.batchNo, b.drumNo, b.gross !== '' && b.gross !== undefined ? `${b.gross} Kg` : '', b.tare !== '' && b.tare !== undefined ? `${b.tare} Kg` : '', net > 0 ? `${net.toFixed(2)} Kg` : '']);
+      });
+      const g = groups[key];
+      plBody.push([
+        { content: `Batch ${key} Total (${g.drums} Drums)`, colSpan: 3, styles: { fontStyle: 'bold', fillColor: [230, 245, 235] } },
+        { content: g.gross > 0 ? `${g.gross.toFixed(2)} Kg` : '', styles: { fontStyle: 'bold' } },
+        { content: g.tare > 0 ? `${g.tare.toFixed(2)} Kg` : '', styles: { fontStyle: 'bold' } },
+        { content: g.net > 0 ? `${g.net.toFixed(2)} Kg` : '', styles: { fontStyle: 'bold' } }
+      ]);
+      grandGross += g.gross;
+      grandTare += g.tare;
+      grandNet += g.net;
+    });
+
+    plBody.push([
+      { content: `ALL BATCHES GRAND TOTAL (${data.batches.length} Drums)`, colSpan: 3, styles: { fontStyle: 'bold', fillColor: [200, 220, 250] } },
+      { content: grandGross > 0 ? `${grandGross.toFixed(2)} Kg` : '', styles: { fontStyle: 'bold' } },
+      { content: grandTare > 0 ? `${grandTare.toFixed(2)} Kg` : '', styles: { fontStyle: 'bold' } },
+      { content: grandNet > 0 ? `${grandNet.toFixed(2)} Kg` : '', styles: { fontStyle: 'bold' } }
+    ]);
+
     autoTable(doc, {
       startY: yPos,
       head: [["Sr No", "Batch No", "Drum No", "Gross Weight", "Tare Weight", "Net Weight"]],

@@ -5,29 +5,78 @@ import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF } from '../utils/pdfExport';
 import { formatDate } from '../utils/dateUtils';
 
+const MATERIAL_CHARGES = [
+  { key: 'cleaning', label: 'Minimum Cleaning Charges (998842)', isQtyRate: true },
+  { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
+  { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true },
+  { key: 'sieving', label: 'Sieving Charges (998842)', isQtyRate: true },
+  { key: 'psdReport', label: 'PSD Report Charges (998346)', isQtyRate: false },
+  { key: 'liner', label: 'Liner (39233090)', isQtyRate: false },
+  { key: 'courier', label: 'Courier (996812)', isQtyRate: false },
+  { key: 'fiberDrum', label: 'Fiber Drum (7310)', isQtyRate: false },
+  { key: 'transportation', label: 'Transportation (996511)', isQtyRate: false },
+  { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },
+  { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
+];
+
+const DEFAULT_CHARGES = {
+  cleaning: true, filterBag: false, processing: true, sieving: false,
+  psdReport: false, liner: false, courier: false, fiberDrum: false,
+  transportation: false, hdpeDrum: false, batchChangeover: false
+};
+
+const DEFAULT_RATES = {
+  cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
+  liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
+};
+
+const getDefaultForm = () => ({
+  quotationNo: '',
+  date: new Date().toISOString().split('T')[0],
+  partyId: '',
+  partyName: '',
+  partyAddress: '',
+  gstNumber: '',
+  contactPerson: '',
+  subject: 'Quotation for Micronization Services.',
+  description: '',
+  productName: '',
+  qty: '',
+  psdRequirement: '',
+  charges: { ...DEFAULT_CHARGES },
+  rates: { ...DEFAULT_RATES },
+  mainCharges: [{ description: '', psdRequirement: '', rate: '' }],
+  optionalCharges: [{ description: '', rate: '' }],
+  validityDate: '2026-06-21',
+  terms: 'Tax: GST will charge extra.\nLoss: Loss occurs during Processing is on your account.\nSame Batch: Same materials requirement of micronization separately batch wise of different specification of same materials then change over charge @ Rs. 500/- batch or per specification will be applicable.\nCharges: This is only processing charges, all other charges like Transportation, Insurance, Repacking material charges will be extra.\nPayment: 100% Advance against PI\nValidity: 21/06/2026\nNote: If properties of material change then rate will be change and PSD will change then rate will be change.',
+  notes: '1) ABC\n\n2) ABC\n\n3) ABC',
+  signatoryName: 'Amit Patel'
+});
+
+const buildMainChargesFromMaterial = (charges, rates, qty, psdRequirement) => {
+  const rows = [];
+  MATERIAL_CHARGES.forEach((item) => {
+    if (!charges[item.key]) return;
+    const rate = rates[item.key] || 0;
+    if (rate <= 0) return;
+    const rateLabel = item.isQtyRate && qty
+      ? `₹ ${rate} / Kg (Qty: ${qty} Kg)`
+      : `₹ ${rate}${item.isQtyRate ? ' / Kg' : ''}`;
+    rows.push({
+      description: item.label,
+      psdRequirement: item.key === 'processing' ? (psdRequirement || '') : '',
+      rate: rateLabel
+    });
+  });
+  return rows.length ? rows : [{ description: '', psdRequirement: '', rate: '' }];
+};
+
 const Quotations = () => {
-  const { data, updateData, deleteItemSoftly, incrementSerial } = useAppContext();
+  const { data, updateData, updateItem, deleteItemSoftly, incrementSerial } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const [formData, setFormData] = useState({
-    quotationNo: '',
-    date: new Date().toISOString().split('T')[0],
-    partyId: '',
-    partyName: '',
-    partyAddress: '',
-    gstNumber: '',
-    contactPerson: '',
-    subject: 'Quotation for Micronization Services.',
-    description: '',
-    productName: '',
-    mainCharges: [{ description: '', psdRequirement: '', rate: '' }],
-    optionalCharges: [{ description: '', rate: '' }],
-    validityDate: '2026-06-21',
-    terms: 'Tax: GST will charge extra.\nLoss: Loss occurs during Processing is on your account.\nSame Batch: Same materials requirement of micronization separately batch wise of different specification of same materials then change over charge @ Rs. 500/- batch or per specification will be applicable.\nCharges: This is only processing charges, all other charges like Transportation, Insurance, Repacking material charges will be extra.\nPayment: 100% Advance against PI\nValidity: 21/06/2026\nNote: If properties of material change then rate will be change and PSD will change then rate will be change.',
-    notes: '1) ABC\n\n2) ABC\n\n3) ABC',
-    signatoryName: 'Amit Patel'
-  });
+  const [formData, setFormData] = useState(getDefaultForm());
 
   useEffect(() => {
     if (isModalOpen && !formData.id) {
@@ -40,15 +89,81 @@ const Quotations = () => {
     const partyId = e.target.value;
     const party = data.parties.find(p => p.id === partyId);
     if (party) {
-      setFormData(prev => ({ 
-        ...prev, 
-        partyId: party.id, 
-        partyName: party.name, 
+      setFormData(prev => ({
+        ...prev,
+        partyId: party.id,
+        partyName: party.name,
         partyAddress: party.billAddress || '',
-        gstNumber: party.gstinBill || ''
+        gstNumber: party.gstinBill || '',
+        productName: '',
+        psdRequirement: ''
       }));
     }
   };
+
+  const handleProductSelect = (e) => {
+    const productName = e.target.value;
+    const party = data.parties.find(p => p.id === formData.partyId);
+    const prodConfig = (party?.products || []).find(p => p.name === productName);
+    const defaultRates = prodConfig?.charges || {};
+
+    const nextCharges = { ...DEFAULT_CHARGES };
+    Object.keys(defaultRates).forEach((key) => {
+      if ((defaultRates[key] || 0) > 0) nextCharges[key] = true;
+    });
+    nextCharges.cleaning = true;
+    nextCharges.processing = true;
+
+    const nextRates = { ...DEFAULT_RATES, ...defaultRates };
+    const psdRequirement = prodConfig?.psdReq || '';
+
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        productName,
+        psdRequirement,
+        charges: nextCharges,
+        rates: nextRates
+      };
+      return {
+        ...updated,
+        mainCharges: buildMainChargesFromMaterial(nextCharges, nextRates, prev.qty, psdRequirement)
+      };
+    });
+  };
+
+  const toggleMaterialCharge = (key) => {
+    setFormData(prev => {
+      const nextCharges = { ...prev.charges, [key]: !prev.charges[key] };
+      return {
+        ...prev,
+        charges: nextCharges,
+        mainCharges: buildMainChargesFromMaterial(nextCharges, prev.rates, prev.qty, prev.psdRequirement)
+      };
+    });
+  };
+
+  const handleMaterialRateChange = (key, val) => {
+    setFormData(prev => {
+      const nextRates = { ...prev.rates, [key]: parseFloat(val) || 0 };
+      return {
+        ...prev,
+        rates: nextRates,
+        mainCharges: buildMainChargesFromMaterial(prev.charges, nextRates, prev.qty, prev.psdRequirement)
+      };
+    });
+  };
+
+  const handleQtyChange = (val) => {
+    setFormData(prev => ({
+      ...prev,
+      qty: val,
+      mainCharges: buildMainChargesFromMaterial(prev.charges, prev.rates, val, prev.psdRequirement)
+    }));
+  };
+
+  const selectedParty = data.parties.find(p => p.id === formData.partyId);
+  const partyProducts = selectedParty?.products || [];
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -67,7 +182,12 @@ const Quotations = () => {
   };
 
   const handleEdit = (q) => {
-    setFormData(q);
+    setFormData({
+      ...getDefaultForm(),
+      ...q,
+      charges: { ...DEFAULT_CHARGES, ...(q.charges || {}) },
+      rates: { ...DEFAULT_RATES, ...(q.rates || {}) }
+    });
     setIsModalOpen(true);
   };
 
@@ -97,26 +217,9 @@ const Quotations = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Quotations</h1>
           <p style={{ color: 'var(--text-muted)' }}>Create and manage commercial proposals.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { 
-          setFormData({
-            quotationNo: '',
-            date: new Date().toISOString().split('T')[0],
-            partyId: '',
-            partyName: '',
-            partyAddress: '',
-            gstNumber: '',
-            contactPerson: '',
-            subject: 'Quotation for Micronization Services.',
-            description: '',
-            productName: '',
-            mainCharges: [{ description: '', psdRequirement: '', rate: '' }],
-            optionalCharges: [{ description: '', rate: '' }],
-            validityDate: '2026-06-21',
-            terms: 'Tax: GST will charge extra.\\nLoss: Loss occurs during Processing is on your account.\\nSame Batch: Same materials requirement of micronization separately batch wise of different specification of same materials then change over charge @ Rs. 500/- batch or per specification will be applicable.\\nCharges: This is only processing charges, all other charges like Transportation, Insurance, Repacking material charges will be extra.\\nPayment: 100% Advance against PI\\nValidity: 21/06/2026\\nNote: If properties of material change then rate will be change and PSD will change then rate will be change.',
-            notes: '1) ABC\\n\\n2) ABC\\n\\n3) ABC',
-            signatoryName: 'Amit Patel'
-          });
-          setIsModalOpen(true); 
+        <button className="btn btn-primary" onClick={() => {
+          setFormData(getDefaultForm());
+          setIsModalOpen(true);
         }}>
           <Plus size={18} /> New Quotation
         </button>
@@ -216,9 +319,26 @@ const Quotations = () => {
                   <label>Description</label>
                   <textarea className="input-field" rows="2" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
                 </div>
+                <div>
+                  <label>Product / Material *</label>
+                  {partyProducts.length > 0 ? (
+                    <select className="input-field" required value={formData.productName} onChange={handleProductSelect}>
+                      <option value="">-- Select Product --</option>
+                      {partyProducts.map((p, idx) => (
+                        <option key={idx} value={p.name}>{p.name}{p.nickname ? ` (${p.nickname})` : ''}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input type="text" className="input-field" placeholder="e.g. Calcium Carbonate" value={formData.productName} onChange={e => setFormData({ ...formData, productName: e.target.value })} />
+                  )}
+                </div>
+                <div>
+                  <label>Estimated Qty (Kg)</label>
+                  <input type="number" className="input-field" placeholder="Qty for rate calculation" value={formData.qty} onChange={e => handleQtyChange(e.target.value)} />
+                </div>
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label>Product Name</label>
-                  <input type="text" className="input-field" placeholder="e.g. Calcium Carbonate" value={formData.productName} onChange={e => setFormData({...formData, productName: e.target.value})} />
+                  <label>PSD Requirement</label>
+                  <input type="text" className="input-field" placeholder="e.g. d(0.9) < 10 Micron" value={formData.psdRequirement || ''} onChange={e => setFormData({ ...formData, psdRequirement: e.target.value })} />
                 </div>
                 <div>
                   <label>Validity Date</label>
@@ -227,6 +347,34 @@ const Quotations = () => {
                 <div>
                   <label>Signatory Name</label>
                   <input type="text" className="input-field" value={formData.signatoryName} onChange={e => setFormData({...formData, signatoryName: e.target.value})} />
+                </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Material Charges (as per Party Master)</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Rates auto-fill from party product config. Minimum cleaning &amp; processing charges are enabled by default.</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  {MATERIAL_CHARGES.map((item) => (
+                    <div key={item.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                        <input type="checkbox" checked={formData.charges?.[item.key] || false} onChange={() => toggleMaterialCharge(item.key)} />
+                        {item.label}
+                      </label>
+                      {formData.charges?.[item.key] && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingLeft: '1.5rem' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate: ₹</span>
+                          <input
+                            type="number"
+                            className="input-field"
+                            style={{ padding: '0.25rem', width: '90px', fontSize: '0.8rem' }}
+                            value={formData.rates?.[item.key] || 0}
+                            onChange={e => handleMaterialRateChange(item.key, e.target.value)}
+                          />
+                          {item.isQtyRate && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ Kg</span>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
 

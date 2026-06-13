@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { DEFAULT_ADMIN_PASSWORD_HASH } from '../utils/auth';
 
 const AppContext = createContext();
 
@@ -42,12 +43,12 @@ export const AppProvider = ({ children }) => {
       purchaseOrders: [],
       auditLogs: [],
       users: [
-        { id: 1, employeeId: 'EMP001', department: 'Management', username: 'Admin', role: 'Admin', active: true },
-        { id: 2, employeeId: 'EMP002', department: 'Production', username: 'Staff1', role: 'Staff', permissions: [], active: true },
-        { id: 3, employeeId: 'EMP003', department: 'Packaging', username: 'Staff2', role: 'Staff', permissions: [], active: true },
-        { id: 4, employeeId: 'EMP004', department: 'Quality Control', username: 'Staff3', role: 'Staff', permissions: [], active: true }
+        { id: 1, employeeId: 'EMP001', department: 'Management', name: 'Administrator', username: 'admin', role: 'Admin', active: true, passwordHash: DEFAULT_ADMIN_PASSWORD_HASH },
+        { id: 2, employeeId: 'EMP002', department: 'Production', name: 'Staff One', username: 'staff1', role: 'Staff', permissions: [], active: true },
+        { id: 3, employeeId: 'EMP003', department: 'Packaging', name: 'Staff Two', username: 'staff2', role: 'Staff', permissions: [], active: true },
+        { id: 4, employeeId: 'EMP004', department: 'Quality Control', name: 'Staff Three', username: 'staff3', role: 'Staff', permissions: [], active: true }
       ],
-      currentUser: { id: 1, username: 'Admin', role: 'Admin' },
+      currentUser: null,
       settings: {
         userRole: 'Admin',
         theme: 'dark',
@@ -90,12 +91,18 @@ export const AppProvider = ({ children }) => {
         creditNotes: parsed.creditNotes || [],
         purchaseOrders: parsed.purchaseOrders || [],
         auditLogs: parsed.auditLogs || [],
-        users: (parsed.users || baseState.users).map((u, i) => ({
-          ...u,
-          employeeId: u.employeeId || `EMP00${i + 1}`,
-          department: u.department || 'General'
-        })),
-        currentUser: parsed.currentUser || baseState.currentUser
+        users: (parsed.users || baseState.users).map((u, i) => {
+          const isAdminUser = u.role === 'Admin' && (u.username?.toLowerCase() === 'admin' || u.id === 1);
+          return {
+            ...u,
+            employeeId: u.employeeId || `EMP00${i + 1}`,
+            department: u.department || 'General',
+            name: u.name || u.username,
+            username: u.username?.toLowerCase() === 'admin' ? 'admin' : u.username,
+            passwordHash: u.passwordHash || (isAdminUser ? DEFAULT_ADMIN_PASSWORD_HASH : undefined)
+          };
+        }),
+        currentUser: null
       };
     } catch (e) {
       return baseState;

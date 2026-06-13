@@ -3,7 +3,34 @@ import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF } from '../utils/pdfExport';
 import ExportButton from '../components/ExportButton';
-import { Plus, Search, Edit2, Trash2, Calendar, ClipboardList, Columns, FileDown, PackageCheck } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, ClipboardList, FileDown } from 'lucide-react';
+
+const emptyRow = (batchNo, drumNo) => ({ batchNo, drumNo, gross: '', tare: '', net: '' });
+
+const calcNet = (gross, tare) => {
+  if (gross === '' || gross === undefined || tare === '' || tare === undefined) return '';
+  const g = parseFloat(gross);
+  const t = parseFloat(tare);
+  if (isNaN(g) || isNaN(t)) return '';
+  return Math.max(0, g - t);
+};
+
+const sumNet = (rows) => rows.reduce((s, r) => {
+  const n = r.net !== '' && r.net !== undefined ? parseFloat(r.net) : calcNet(r.gross, r.tare);
+  return s + (typeof n === 'number' && !isNaN(n) ? n : 0);
+}, 0);
+
+const normalizeRow = (r) => ({
+  ...r,
+  gross: r.gross === 0 ? '' : (r.gross ?? ''),
+  tare: r.tare === 0 ? '' : (r.tare ?? ''),
+  net: r.net === 0 ? '' : (r.net ?? '')
+});
+
+const displayNet = (net, gross, tare) => {
+  const val = net !== '' && net !== undefined ? net : calcNet(gross, tare);
+  return val === '' ? '' : (typeof val === 'number' ? val.toFixed(2) : val);
+};
 
 const BPR = () => {
   const { data, updateData, updateItem, setData, incrementSerial, deleteItemSoftly } = useAppContext();
@@ -11,6 +38,7 @@ const BPR = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBPR, setEditingBPR] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
+  const [activeTab, setActiveTab] = useState('page1');
 
   // BPR Form State
   const [form, setForm] = useState({
@@ -22,37 +50,39 @@ const BPR = () => {
     psdRequirement: '90% < 10M',
     totalDrums: 0,
     doubleDispatch: false,
-    receivedBatches: [], // Array of { batchNo, drumNo, gross, tare, net }
-    dispatchedBatches: [], // Array of { batchNo, drumNo, gross, tare, net }
+    receivedBatches: [],
+    dispatchedBatches: [],
     cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false },
     pressureMetrics: { grindingPressure: '', injectionPressure: '' },
-    packingConsumables: { fiberDrumsUsed: 0, hdpeDrumsUsed: 0, linersUsed: 0 }
+    packingConsumables: { fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '' },
+    processingSupervisor: '',
+    sizingReportRequired: '',
+    particleSizeResult: '',
+    lumpsNetWeight: '',
+    floorDustNetWeight: '',
+    processLoss: '',
+    dispatchRemark: '',
+    processCompletionDate: '',
+    processCompletionTime: ''
   });
 
-  // Calculate totals in real-time
-  const totalReceivedNet = form.receivedBatches.reduce((s, r) => s + r.net, 0);
-  const totalDispatchedNet = form.dispatchedBatches.reduce((s, r) => s + r.net, 0);
+  const totalReceivedNet = sumNet(form.receivedBatches);
+  const totalDispatchedNet = sumNet(form.dispatchedBatches);
 
   const handleCreate = (mr) => {
     setSelectedMR(mr);
     setEditingBPR(null);
-    
+    setActiveTab('page1');
+
     const bprSerial = data.settings?.serials?.BPR || 1;
     const docNo = generateDocNumber('BPR', bprSerial, new Date(form.date));
 
-    // Construct drum list from MR batches
     const activeMRBatches = mr.batches.filter(b => !b.isEmptyDrums);
     const receivedRows = [];
     activeMRBatches.forEach(b => {
       const drumCount = parseInt(b.drums) || 1;
       for (let d = 1; d <= drumCount; d++) {
-        receivedRows.push({
-          batchNo: b.batchNo,
-          drumNo: d.toString(),
-          gross: 0,
-          tare: 0,
-          net: 0
-        });
+        receivedRows.push(emptyRow(b.batchNo, d.toString()));
       }
     });
 
@@ -69,7 +99,16 @@ const BPR = () => {
       dispatchedBatches: receivedRows.map(r => ({ ...r })),
       cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false },
       pressureMetrics: { grindingPressure: '', injectionPressure: '' },
-      packingConsumables: { fiberDrumsUsed: 0, hdpeDrumsUsed: 0, linersUsed: 0 }
+      packingConsumables: { fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '' },
+      processingSupervisor: '',
+      sizingReportRequired: '',
+      particleSizeResult: '',
+      lumpsNetWeight: '',
+      floorDustNetWeight: '',
+      processLoss: '',
+      dispatchRemark: '',
+      processCompletionDate: '',
+      processCompletionTime: ''
     });
 
     setIsModalOpen(true);
@@ -77,7 +116,16 @@ const BPR = () => {
 
   const handleEdit = (bpr) => {
     setEditingBPR(bpr);
-    setForm(bpr);
+    setActiveTab('page1');
+    setForm({
+      ...bpr,
+      receivedBatches: (bpr.receivedBatches || []).map(normalizeRow),
+      dispatchedBatches: (bpr.dispatchedBatches || []).map(normalizeRow),
+      packingConsumables: {
+        fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '',
+        ...(bpr.packingConsumables || {})
+      }
+    });
     setIsModalOpen(true);
   };
 
@@ -105,8 +153,10 @@ const BPR = () => {
     setForm(prev => {
       const list = [...prev[tableKey]];
       const item = { ...list[idx] };
-      item[field] = parseFloat(val) || 0;
-      item.net = Math.max(0, item.gross - item.tare);
+      item[field] = val === '' ? '' : (parseFloat(val) || '');
+      if (field === 'gross' || field === 'tare') {
+        item.net = calcNet(item.gross, item.tare);
+      }
       list[idx] = item;
       return { ...prev, [tableKey]: list };
     });
@@ -115,9 +165,50 @@ const BPR = () => {
   const addCustomRow = (tableKey) => {
     setForm(prev => ({
       ...prev,
-      [tableKey]: [...prev[tableKey], { batchNo: 'Custom', drumNo: (prev[tableKey].length + 1).toString(), gross: 0, tare: 0, net: 0 }]
+      [tableKey]: [...prev[tableKey], emptyRow('Custom', (prev[tableKey].length + 1).toString())]
     }));
   };
+
+  const renderWeightTable = (tableKey, title) => (
+    <div style={{ background: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+        <h4 style={{ margin: 0, fontSize: '0.95rem' }}>{title}</h4>
+        <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow(tableKey)}>+ Add Row</button>
+      </div>
+      <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+              <th style={{ padding: '0.35rem' }}>Batch No</th>
+              <th style={{ padding: '0.35rem' }}>Drum No</th>
+              <th style={{ padding: '0.35rem' }}>Gross</th>
+              <th style={{ padding: '0.35rem' }}>Tare</th>
+              <th style={{ padding: '0.35rem' }}>Net</th>
+            </tr>
+          </thead>
+          <tbody>
+            {form[tableKey].map((r, idx) => (
+              <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
+                <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
+                <td style={{ padding: '0.25rem' }}>
+                  <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={r.gross === 0 ? '' : r.gross} onChange={e => handleCellChange(tableKey, idx, 'gross', e.target.value)} />
+                </td>
+                <td style={{ padding: '0.25rem' }}>
+                  <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={r.tare === 0 ? '' : r.tare} onChange={e => handleCellChange(tableKey, idx, 'tare', e.target.value)} />
+                </td>
+                <td style={{ padding: '0.25rem', fontWeight: 600 }}>{displayNet(r.net, r.gross, r.tare)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
+        <span>Total:</span>
+        <span>{tableKey === 'receivedBatches' ? totalReceivedNet.toFixed(2) : totalDispatchedNet.toFixed(2)} Kg</span>
+      </div>
+    </div>
+  );
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -262,7 +353,34 @@ const BPR = () => {
       {isModalOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
           <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto' }}>
-            <h2 style={{ marginBottom: '1.5rem' }}>{editingBPR ? 'Modify BPR weights' : 'Create Batch Processing Record (BPR)'}</h2>
+            <h2 style={{ marginBottom: '1rem' }}>{editingBPR ? 'Modify BPR' : 'Create Batch Processing Record (BPR)'}</h2>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setActiveTab('page1')}
+                style={{
+                  background: activeTab === 'page1' ? 'rgba(16, 185, 129, 0.12)' : 'transparent',
+                  color: activeTab === 'page1' ? 'var(--accent-primary)' : 'var(--text-muted)',
+                  border: activeTab === 'page1' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)'
+                }}
+              >
+                Page 1 — Batch Processing Record
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setActiveTab('page2')}
+                style={{
+                  background: activeTab === 'page2' ? 'rgba(16, 185, 129, 0.12)' : 'transparent',
+                  color: activeTab === 'page2' ? 'var(--accent-primary)' : 'var(--text-muted)',
+                  border: activeTab === 'page2' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)'
+                }}
+              >
+                Page 2 — Batch Packing Record
+              </button>
+            </div>
             
             <form onSubmit={handleSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -288,140 +406,121 @@ const BPR = () => {
                 </div>
               </div>
 
-              {/* Checklists and Metrics Section */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem', background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                <div>
-                  <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Operational Cleaning</h4>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
-                    <input type="checkbox" checked={form.cleaningChecklist.equipmentCleaned} onChange={e => setForm({...form, cleaningChecklist: {...form.cleaningChecklist, equipmentCleaned: e.target.checked}})} />
-                    Equipment Cleaned
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
-                    <input type="checkbox" checked={form.cleaningChecklist.areaCleaned} onChange={e => setForm({...form, cleaningChecklist: {...form.cleaningChecklist, areaCleaned: e.target.checked}})} />
-                    Area Cleaned
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-                    <input type="checkbox" checked={form.cleaningChecklist.lineClearance} onChange={e => setForm({...form, cleaningChecklist: {...form.cleaningChecklist, lineClearance: e.target.checked}})} />
-                    Line Clearance Received
-                  </label>
-                </div>
-                <div>
-                  <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Pressure Metrics</h4>
-                  <div style={{ marginBottom: '0.5rem' }}>
-                    <label style={{ fontSize: '0.85rem' }}>Grinding Pressure (kg/cm²)</label>
-                    <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.pressureMetrics.grindingPressure} onChange={e => setForm({...form, pressureMetrics: {...form.pressureMetrics, grindingPressure: e.target.value}})} />
+              {activeTab === 'page1' && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem', background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Operational Cleaning</h4>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                        <input type="checkbox" checked={form.cleaningChecklist.equipmentCleaned} onChange={e => setForm({...form, cleaningChecklist: {...form.cleaningChecklist, equipmentCleaned: e.target.checked}})} />
+                        Equipment Cleaned
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                        <input type="checkbox" checked={form.cleaningChecklist.areaCleaned} onChange={e => setForm({...form, cleaningChecklist: {...form.cleaningChecklist, areaCleaned: e.target.checked}})} />
+                        Area Cleaned
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                        <input type="checkbox" checked={form.cleaningChecklist.lineClearance} onChange={e => setForm({...form, cleaningChecklist: {...form.cleaningChecklist, lineClearance: e.target.checked}})} />
+                        Line Clearance Received
+                      </label>
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Pressure Metrics</h4>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <label style={{ fontSize: '0.85rem' }}>Grinding Pressure (kg/cm²)</label>
+                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.pressureMetrics.grindingPressure} onChange={e => setForm({...form, pressureMetrics: {...form.pressureMetrics, grindingPressure: e.target.value}})} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.85rem' }}>Injection Pressure (kg/cm²)</label>
+                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.pressureMetrics.injectionPressure} onChange={e => setForm({...form, pressureMetrics: {...form.pressureMetrics, injectionPressure: e.target.value}})} />
+                      </div>
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <label style={{ fontSize: '0.85rem' }}>Processing Supervisor</label>
+                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.processingSupervisor || ''} onChange={e => setForm({...form, processingSupervisor: e.target.value})} />
+                      </div>
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Packing Consumables</h4>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <label style={{ fontSize: '0.85rem' }}>Fiber Drums Used</label>
+                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.packingConsumables.fiberDrumsUsed} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, fiberDrumsUsed: e.target.value}})} />
+                      </div>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <label style={{ fontSize: '0.85rem' }}>HDPE Drums Used</label>
+                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.packingConsumables.hdpeDrumsUsed} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, hdpeDrumsUsed: e.target.value}})} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.85rem' }}>Liners Used</label>
+                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.packingConsumables.linersUsed} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, linersUsed: e.target.value}})} />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label style={{ fontSize: '0.85rem' }}>Injection Pressure (kg/cm²)</label>
-                    <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.pressureMetrics.injectionPressure} onChange={e => setForm({...form, pressureMetrics: {...form.pressureMetrics, injectionPressure: e.target.value}})} />
-                  </div>
-                </div>
-                <div>
-                  <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Packing Consumables</h4>
-                  <div style={{ marginBottom: '0.5rem' }}>
-                    <label style={{ fontSize: '0.85rem' }}>Fiber Drums Used</label>
-                    <input type="number" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.packingConsumables.fiberDrumsUsed} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, fiberDrumsUsed: parseInt(e.target.value) || 0}})} />
-                  </div>
-                  <div style={{ marginBottom: '0.5rem' }}>
-                    <label style={{ fontSize: '0.85rem' }}>HDPE Drums Used</label>
-                    <input type="number" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.packingConsumables.hdpeDrumsUsed} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, hdpeDrumsUsed: parseInt(e.target.value) || 0}})} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.85rem' }}>Liners Used</label>
-                    <input type="number" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.packingConsumables.linersUsed} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, linersUsed: parseInt(e.target.value) || 0}})} />
-                  </div>
-                </div>
-              </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Received vs Dispatched Twin Weight Tables</h3>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer', color: 'var(--accent-primary)', fontWeight: 600 }}>
-                  <input type="checkbox" checked={form.doubleDispatch} onChange={toggleDoubleDispatch} />
-                  Double Dispatch Drums Count (micronised splitting)
-                </label>
-              </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div>
+                      <label>Sizing Report Required</label>
+                      <input type="text" className="input-field" placeholder="—" value={form.sizingReportRequired || ''} onChange={e => setForm({...form, sizingReportRequired: e.target.value})} />
+                    </div>
+                    <div>
+                      <label>Particle Size Result</label>
+                      <input type="text" className="input-field" placeholder="—" value={form.particleSizeResult || ''} onChange={e => setForm({...form, particleSizeResult: e.target.value})} />
+                    </div>
+                    <div>
+                      <label>Total Input Qty (Kg)</label>
+                      <input type="text" className="input-field" placeholder="—" value={form.totalInputQty || ''} onChange={e => setForm({...form, totalInputQty: e.target.value})} />
+                    </div>
+                  </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-                {/* Received weights */}
-                <div style={{ background: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Received Raw Material Weight</h4>
-                    <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow('receivedBatches')}>+ Add Row</button>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem', background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div>
+                      <label>Micronized Material Net Weight</label>
+                      <input type="text" className="input-field" placeholder="—" value={totalDispatchedNet > 0 ? totalDispatchedNet.toFixed(2) : ''} readOnly style={{ opacity: 0.7 }} />
+                    </div>
+                    <div>
+                      <label>Lumps Net Weight</label>
+                      <input type="text" className="input-field" placeholder="—" value={form.lumpsNetWeight || ''} onChange={e => setForm({...form, lumpsNetWeight: e.target.value})} />
+                    </div>
+                    <div>
+                      <label>Floor Dust Net Weight</label>
+                      <input type="text" className="input-field" placeholder="—" value={form.floorDustNetWeight || ''} onChange={e => setForm({...form, floorDustNetWeight: e.target.value})} />
+                    </div>
+                    <div>
+                      <label>Net Process Loss</label>
+                      <input type="text" className="input-field" placeholder="—" value={form.processLoss || ''} onChange={e => setForm({...form, processLoss: e.target.value})} />
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label>Remark</label>
+                      <input type="text" className="input-field" placeholder="—" value={form.dispatchRemark || ''} onChange={e => setForm({...form, dispatchRemark: e.target.value})} />
+                    </div>
+                    <div>
+                      <label>Process Completion Date</label>
+                      <input type="date" className="input-field" value={form.processCompletionDate || ''} onChange={e => setForm({...form, processCompletionDate: e.target.value})} />
+                    </div>
+                    <div>
+                      <label>Process Completion Time</label>
+                      <input type="time" className="input-field" value={form.processCompletionTime || ''} onChange={e => setForm({...form, processCompletionTime: e.target.value})} />
+                    </div>
                   </div>
-                  <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                          <th style={{ padding: '0.35rem' }}>Batch No</th>
-                          <th style={{ padding: '0.35rem' }}>Drum No</th>
-                          <th style={{ padding: '0.35rem' }}>Gross</th>
-                          <th style={{ padding: '0.35rem' }}>Tare</th>
-                          <th style={{ padding: '0.35rem' }}>Net</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {form.receivedBatches.map((r, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                            <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
-                            <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
-                            <td style={{ padding: '0.25rem' }}>
-                              <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross} onChange={e => handleCellChange('receivedBatches', idx, 'gross', e.target.value)} />
-                            </td>
-                            <td style={{ padding: '0.25rem' }}>
-                              <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare} onChange={e => handleCellChange('receivedBatches', idx, 'tare', e.target.value)} />
-                            </td>
-                            <td style={{ padding: '0.25rem', fontWeight: 600 }}>{r.net.toFixed(2)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
-                    <span>Total Received:</span>
-                    <span>{totalReceivedNet.toFixed(2)} Kg</span>
-                  </div>
-                </div>
+                </>
+              )}
 
-                {/* Dispatched weights */}
-                <div style={{ background: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Dispatched (Micronised) Weight</h4>
-                    <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow('dispatchedBatches')}>+ Add Row</button>
+              {activeTab === 'page2' && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Received vs Dispatched Weight Tables</h3>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer', color: 'var(--accent-primary)', fontWeight: 600 }}>
+                      <input type="checkbox" checked={form.doubleDispatch} onChange={toggleDoubleDispatch} />
+                      Double Dispatch Drums (A/B split)
+                    </label>
                   </div>
-                  <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                          <th style={{ padding: '0.35rem' }}>Batch No</th>
-                          <th style={{ padding: '0.35rem' }}>Drum No</th>
-                          <th style={{ padding: '0.35rem' }}>Gross</th>
-                          <th style={{ padding: '0.35rem' }}>Tare</th>
-                          <th style={{ padding: '0.35rem' }}>Net</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {form.dispatchedBatches.map((r, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                            <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
-                            <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
-                            <td style={{ padding: '0.25rem' }}>
-                              <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross} onChange={e => handleCellChange('dispatchedBatches', idx, 'gross', e.target.value)} />
-                            </td>
-                            <td style={{ padding: '0.25rem' }}>
-                              <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare} onChange={e => handleCellChange('dispatchedBatches', idx, 'tare', e.target.value)} />
-                            </td>
-                            <td style={{ padding: '0.25rem', fontWeight: 600 }}>{r.net.toFixed(2)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Weight fields are left blank for manual entry. Net weight auto-calculates when gross and tare are filled.</p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                    {renderWeightTable('receivedBatches', 'Received Raw Material Weight')}
+                    {renderWeightTable('dispatchedBatches', 'Dispatched (Micronised) Weight')}
                   </div>
-                  <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
-                    <span>Total Dispatched:</span>
-                    <span>{totalDispatchedNet.toFixed(2)} Kg</span>
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
                 <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => setIsModalOpen(false)}>Cancel</button>

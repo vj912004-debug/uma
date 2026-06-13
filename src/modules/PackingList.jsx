@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import { Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
@@ -34,9 +34,9 @@ const PackingList = () => {
       const plRows = bprDrums.map(d => ({
         batchNo: d.batchNo,
         drumNo: d.drumNo,
-        gross: 0,
-        tare: 0,
-        net: 0
+        gross: d.gross === 0 ? '' : (d.gross ?? ''),
+        tare: d.tare === 0 ? '' : (d.tare ?? ''),
+        net: d.net === 0 ? '' : (d.net ?? '')
       }));
 
       setForm(prev => ({
@@ -48,18 +48,48 @@ const PackingList = () => {
     }
   }, [form.date, editingPL, selectedBPR, data.settings?.serials?.PL]);
 
-  useEffect(() => {
-    const totalDrums = form.batches.length;
-    const totalWeight = form.batches.reduce((s, r) => s + r.net, 0);
-    setForm(prev => ({ ...prev, totalDrums, totalWeight }));
+  const parseWt = (v) => (v === '' || v === undefined || v === null ? 0 : parseFloat(v) || 0);
+
+  const batchGroups = useMemo(() => {
+    const groups = [];
+    const map = {};
+    (form.batches || []).forEach((b, idx) => {
+      const key = b.batchNo || 'Unknown';
+      if (!map[key]) {
+        map[key] = { batchNo: key, rows: [], gross: 0, tare: 0, net: 0, drums: 0 };
+        groups.push(map[key]);
+      }
+      const net = b.net !== '' && b.net !== undefined ? parseWt(b.net) : Math.max(0, parseWt(b.gross) - parseWt(b.tare));
+      map[key].rows.push({ ...b, idx, netVal: net });
+      map[key].gross += parseWt(b.gross);
+      map[key].tare += parseWt(b.tare);
+      map[key].net += net;
+      map[key].drums += 1;
+    });
+    return groups;
   }, [form.batches]);
+
+  const grandTotal = useMemo(() => batchGroups.reduce((acc, g) => ({
+    gross: acc.gross + g.gross,
+    tare: acc.tare + g.tare,
+    net: acc.net + g.net,
+    drums: acc.drums + g.drums
+  }), { gross: 0, tare: 0, net: 0, drums: 0 }), [batchGroups]);
+
+  useEffect(() => {
+    setForm(prev => ({ ...prev, totalDrums: prev.batches.length, totalWeight: grandTotal.net }));
+  }, [grandTotal.net, form.batches.length]);
 
   const handleCellChange = (idx, field, val) => {
     setForm(prev => {
       const list = [...prev.batches];
       const item = { ...list[idx] };
-      item[field] = parseFloat(val) || 0;
-      item.net = Math.max(0, item.gross - item.tare);
+      item[field] = val === '' ? '' : (parseFloat(val) || '');
+      if (field === 'gross' || field === 'tare') {
+        const g = parseWt(item.gross);
+        const t = parseWt(item.tare);
+        item.net = (item.gross === '' || item.tare === '') ? '' : Math.max(0, g - t);
+      }
       list[idx] = item;
       return { ...prev, batches: list };
     });
@@ -269,7 +299,7 @@ const PackingList = () => {
                   <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={addCustomRow}>+ Add Column/Row</button>
                 </div>
                 
-                <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
@@ -282,20 +312,44 @@ const PackingList = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {form.batches.map((r, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                          <td style={{ padding: '0.25rem', fontWeight: 600 }}>{idx + 1}</td>
-                          <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
-                          <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
-                          <td style={{ padding: '0.25rem' }}>
-                            <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} required value={r.gross} onChange={e => handleCellChange(idx, 'gross', e.target.value)} />
-                          </td>
-                          <td style={{ padding: '0.25rem' }}>
-                            <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} required value={r.tare} onChange={e => handleCellChange(idx, 'tare', e.target.value)} />
-                          </td>
-                          <td style={{ padding: '0.25rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{r.net.toFixed(2)}</td>
-                        </tr>
+                      {batchGroups.map((group) => (
+                        <React.Fragment key={group.batchNo}>
+                          {group.rows.map((r) => (
+                            <tr key={r.idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                              <td style={{ padding: '0.25rem', fontWeight: 600 }}>{r.idx + 1}</td>
+                              <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
+                              <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
+                              <td style={{ padding: '0.25rem' }}>
+                                <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={r.gross === 0 ? '' : r.gross} onChange={e => handleCellChange(r.idx, 'gross', e.target.value)} />
+                              </td>
+                              <td style={{ padding: '0.25rem' }}>
+                                <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={r.tare === 0 ? '' : r.tare} onChange={e => handleCellChange(r.idx, 'tare', e.target.value)} />
+                              </td>
+                              <td style={{ padding: '0.25rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                                {r.netVal > 0 ? r.netVal.toFixed(2) : ''}
+                              </td>
+                            </tr>
+                          ))}
+                          <tr style={{ background: 'rgba(16, 185, 129, 0.06)', borderBottom: '2px solid var(--border-color)' }}>
+                            <td colSpan={3} style={{ padding: '0.5rem', fontWeight: 700, fontSize: '0.8rem', color: 'var(--accent-primary)' }}>
+                              Batch {group.batchNo} Total ({group.drums} Drums)
+                            </td>
+                            <td style={{ padding: '0.5rem', fontWeight: 600 }}>{group.gross > 0 ? group.gross.toFixed(2) : '—'}</td>
+                            <td style={{ padding: '0.5rem', fontWeight: 600 }}>{group.tare > 0 ? group.tare.toFixed(2) : '—'}</td>
+                            <td style={{ padding: '0.5rem', fontWeight: 700, color: 'var(--accent-primary)' }}>{group.net > 0 ? group.net.toFixed(2) : '—'}</td>
+                          </tr>
+                        </React.Fragment>
                       ))}
+                      {batchGroups.length > 0 && (
+                        <tr style={{ background: 'rgba(59, 130, 246, 0.08)', borderTop: '2px solid var(--accent-secondary)' }}>
+                          <td colSpan={3} style={{ padding: '0.65rem', fontWeight: 800, fontSize: '0.85rem' }}>
+                            ALL BATCHES GRAND TOTAL ({grandTotal.drums} Drums)
+                          </td>
+                          <td style={{ padding: '0.65rem', fontWeight: 700 }}>{grandTotal.gross > 0 ? grandTotal.gross.toFixed(2) : '—'}</td>
+                          <td style={{ padding: '0.65rem', fontWeight: 700 }}>{grandTotal.tare > 0 ? grandTotal.tare.toFixed(2) : '—'}</td>
+                          <td style={{ padding: '0.65rem', fontWeight: 800, color: 'var(--accent-secondary)', fontSize: '0.9rem' }}>{grandTotal.net > 0 ? grandTotal.net.toFixed(2) : '—'}</td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
