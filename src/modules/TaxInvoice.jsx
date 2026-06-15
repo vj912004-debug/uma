@@ -25,6 +25,7 @@ const TaxInvoice = () => {
     gstinShip: '',
     partyName: '',
     productName: '',
+    hsnCode: '',
     qty: 0,
     charges: {
       cleaning: true,
@@ -85,6 +86,7 @@ const TaxInvoice = () => {
         gstinShip: activeMR.gstinShip || '',
         partyName: activeMR.partyName,
         productName: activeMR.productName,
+        hsnCode: prodConfig?.hsn || prev.hsnCode || '',
         qty: activePL.totalWeight,
         rates: {
           cleaning: defaultRates.cleaning || 0,
@@ -167,6 +169,7 @@ const TaxInvoice = () => {
       terms: 'Payment against delivery.',
       partyName: '',
       productName: '',
+      hsnCode: '',
       qty: 0,
       customCharges: []
     });
@@ -203,6 +206,7 @@ const TaxInvoice = () => {
       terms: 'Payment against delivery.',
       partyName: '',
       productName: '',
+      hsnCode: '',
       qty: 0,
       customCharges: []
     });
@@ -410,6 +414,10 @@ const TaxInvoice = () => {
                 <div>
                   <label>Product Name</label>
                   <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
+                </div>
+                <div>
+                  <label>HSN Code</label>
+                  <input type="text" className="input-field" placeholder="e.g. 29262000" value={form.hsnCode || ''} onChange={e => setForm({...form, hsnCode: e.target.value})} />
                 </div>
                 <div>
                   <label>Bill-To GSTIN</label>

@@ -55,6 +55,35 @@ export const getContactLine = (profile) => {
   return parts.join(' | ');
 };
 
+/** Two-line address for Tax Invoice boxed header (matches printed TI format). */
+export const formatTiHeaderAddressLines = (profile) => {
+  const p = mergeCompanyProfile(profile);
+  const line1 = (p.addressLine1 || '').replace(/,\s*$/, '');
+  const country = (p.country || 'India').toUpperCase();
+  const line2 = [p.city, p.pincode].filter(Boolean).join(' - ') +
+    (p.state ? `, ${p.state}` : '') +
+    (country ? ` ${country}` : '');
+  return [line1, line2].filter(Boolean);
+};
+
+/** Contact line for Tax Invoice header: "Tel: ..., Email : ..." */
+export const getTiContactLine = (profile) => {
+  const p = mergeCompanyProfile(profile);
+  const parts = [];
+  if (p.phone) parts.push(`Tel: ${p.phone}`);
+  if (p.email) parts.push(`Email : ${p.email}`);
+  return parts.join(', ');
+};
+
+/** Contact line for PO header: "Tel: ..., Email: ..." */
+export const getPoContactLine = (profile) => {
+  const p = mergeCompanyProfile(profile);
+  const parts = [];
+  if (p.phone) parts.push(`Tel: ${p.phone}`);
+  if (p.email) parts.push(`Email: ${p.email}`);
+  return parts.join(', ');
+};
+
 export const validateCompanyProfile = (profile) => {
   const errors = {};
   if (!profile.companyName?.trim()) errors.companyName = 'Company name is required.';
@@ -143,28 +172,34 @@ export const drawPdfCompanyHeader = (doc, options = {}) => {
 export const drawPdfCompanyHeaderBoxed = (doc, options = {}) => {
   const pageWidth = doc.internal.pageSize.getWidth();
   const profile = mergeCompanyProfile(options.profile || getStoredCompanyProfile());
+  const isTi = options.variant === 'ti';
+  const isPo = options.variant === 'po';
+  const boxTop = options.boxTop ?? 15;
+  const boxHeight = options.boxHeight ?? 30;
+
   doc.setLineWidth(0.5);
   doc.setDrawColor(0, 0, 0);
-  doc.rect(14, 15, pageWidth - 28, 30);
-  drawCompanyLogo(doc, 20, 18, profile);
+  doc.rect(14, boxTop, pageWidth - 28, boxHeight);
+  drawCompanyLogo(doc, 20, boxTop + 3, profile);
 
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(profile.companyName, pageWidth / 2, 21, { align: 'center' });
+  doc.text(profile.companyName, pageWidth / 2, boxTop + 6, { align: 'center' });
 
-  const addressLines = formatCompanyAddressLines(profile);
+  const addressLines = (isTi || isPo) ? formatTiHeaderAddressLines(profile) : formatCompanyAddressLines(profile);
   doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
   addressLines.slice(0, 2).forEach((line, i) => {
-    doc.text(line, pageWidth / 2, 26 + i * 5, { align: 'center' });
+    doc.text(line, pageWidth / 2, boxTop + 11 + i * 5, { align: 'center' });
   });
 
   doc.setFont('helvetica', 'normal');
-  const contact = getContactLine(profile);
-  if (contact) doc.text(contact, pageWidth / 2, 36, { align: 'center' });
+  const contact = isTi ? getTiContactLine(profile) : (isPo ? getPoContactLine(profile) : getContactLine(profile));
+  if (contact) doc.text(contact, pageWidth / 2, boxTop + 21, { align: 'center' });
   if (profile.gstNumber) {
     doc.setFont('helvetica', 'bold');
-    doc.text(`GSTIN: ${profile.gstNumber}`, pageWidth / 2, 41, { align: 'center' });
+    doc.text(`GSTIN: ${profile.gstNumber}`, pageWidth / 2, boxTop + 26, { align: 'center' });
   }
-  return 45;
+  return boxTop + boxHeight;
 };

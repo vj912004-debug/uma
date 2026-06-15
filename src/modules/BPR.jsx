@@ -52,16 +52,26 @@ const BPR = () => {
     doubleDispatch: false,
     receivedBatches: [],
     dispatchedBatches: [],
-    cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false },
-    pressureMetrics: { grindingPressure: '', injectionPressure: '' },
+    cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false, bagClean: false },
+    pressureMetrics: { grindingPressure: '', injectionPressure: '', feedingSP: '', feedingDP: '', feedingTP: '', millingFP: '', millingFiP: '' },
     packingConsumables: { fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '' },
     processingSupervisor: '',
+    materialReceivedDate: '',
+    materialReceivedTime: '',
+    committedDate: '',
+    committedTime: '',
+    processingStartDate: '',
+    processingStartTime: '',
     sizingReportRequired: '',
     particleSizeResult: '',
     lumpsNetWeight: '',
     floorDustNetWeight: '',
+    sampleNetWeight: '',
+    irrecoverableLoss: '',
     processLoss: '',
     dispatchRemark: '',
+    remark: '',
+    filterBagPacked: false,
     processCompletionDate: '',
     processCompletionTime: ''
   });
@@ -97,16 +107,26 @@ const BPR = () => {
       doubleDispatch: false,
       receivedBatches: receivedRows,
       dispatchedBatches: receivedRows.map(r => ({ ...r })),
-      cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false },
-      pressureMetrics: { grindingPressure: '', injectionPressure: '' },
+      cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false, bagClean: false },
+      pressureMetrics: { grindingPressure: '', injectionPressure: '', feedingSP: '', feedingDP: '', feedingTP: '', millingFP: '', millingFiP: '' },
       packingConsumables: { fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '' },
       processingSupervisor: '',
+      materialReceivedDate: mr.date || '',
+      materialReceivedTime: mr.time || '',
+      committedDate: '',
+      committedTime: '',
+      processingStartDate: '',
+      processingStartTime: '',
       sizingReportRequired: '',
       particleSizeResult: '',
       lumpsNetWeight: '',
       floorDustNetWeight: '',
+      sampleNetWeight: '',
+      irrecoverableLoss: '',
       processLoss: '',
       dispatchRemark: '',
+      remark: '',
+      filterBagPacked: false,
       processCompletionDate: '',
       processCompletionTime: ''
     });
@@ -121,6 +141,7 @@ const BPR = () => {
       ...bpr,
       receivedBatches: (bpr.receivedBatches || []).map(normalizeRow),
       dispatchedBatches: (bpr.dispatchedBatches || []).map(normalizeRow),
+      cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false, bagClean: false, ...(bpr.cleaningChecklist || {}) },
       packingConsumables: {
         fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '',
         ...(bpr.packingConsumables || {})
@@ -423,6 +444,39 @@ const BPR = () => {
                         <input type="checkbox" checked={form.cleaningChecklist.lineClearance} onChange={e => setForm({...form, cleaningChecklist: {...form.cleaningChecklist, lineClearance: e.target.checked}})} />
                         Line Clearance Received
                       </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                        <input type="checkbox" checked={form.cleaningChecklist.bagClean} onChange={e => setForm({...form, cleaningChecklist: {...form.cleaningChecklist, bagClean: e.target.checked}})} />
+                        Bag clean & black spot free
+                      </label>
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Processing Timeline</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.75rem' }}>Material Received Date</label>
+                          <input type="date" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.materialReceivedDate || ''} onChange={e => setForm({...form, materialReceivedDate: e.target.value})} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem' }}>Time</label>
+                          <input type="time" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.materialReceivedTime || ''} onChange={e => setForm({...form, materialReceivedTime: e.target.value})} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem' }}>Committed Date</label>
+                          <input type="date" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.committedDate || ''} onChange={e => setForm({...form, committedDate: e.target.value})} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem' }}>Time</label>
+                          <input type="time" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.committedTime || ''} onChange={e => setForm({...form, committedTime: e.target.value})} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem' }}>Processing Start Date</label>
+                          <input type="date" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.processingStartDate || ''} onChange={e => setForm({...form, processingStartDate: e.target.value})} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem' }}>Time</label>
+                          <input type="time" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.processingStartTime || ''} onChange={e => setForm({...form, processingStartTime: e.target.value})} />
+                        </div>
+                      </div>
                     </div>
                     <div>
                       <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Pressure Metrics</h4>
@@ -450,8 +504,16 @@ const BPR = () => {
                         <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.packingConsumables.hdpeDrumsUsed} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, hdpeDrumsUsed: e.target.value}})} />
                       </div>
                       <div>
-                        <label style={{ fontSize: '0.85rem' }}>Liners Used</label>
-                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.packingConsumables.linersUsed} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, linersUsed: e.target.value}})} />
+                        <label style={{ fontSize: '0.85rem' }}>Liners / White LD Bags</label>
+                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.packingConsumables.whiteLdBags || form.packingConsumables.linersUsed} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, whiteLdBags: e.target.value, linersUsed: e.target.value}})} />
+                      </div>
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <label style={{ fontSize: '0.85rem' }}>Black LD Bags</label>
+                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.packingConsumables.blackLdBags} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, blackLdBags: e.target.value}})} />
+                      </div>
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <label style={{ fontSize: '0.85rem' }}>Brown Tapes / Drum Used</label>
+                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.packingConsumables.brownTapes || form.packingConsumables.drumUsed || form.packingConsumables.fiberDrumsUsed} onChange={e => setForm({...form, packingConsumables: {...form.packingConsumables, brownTapes: e.target.value, drumUsed: e.target.value, fiberDrumsUsed: e.target.value}})} />
                       </div>
                     </div>
                   </div>
@@ -488,9 +550,23 @@ const BPR = () => {
                       <label>Net Process Loss</label>
                       <input type="text" className="input-field" placeholder="—" value={form.processLoss || ''} onChange={e => setForm({...form, processLoss: e.target.value})} />
                     </div>
+                    <div>
+                      <label>Sample Net Weight</label>
+                      <input type="text" className="input-field" placeholder="—" value={form.sampleNetWeight || ''} onChange={e => setForm({...form, sampleNetWeight: e.target.value})} />
+                    </div>
+                    <div>
+                      <label>Irrecoverable Loss</label>
+                      <input type="text" className="input-field" placeholder="—" value={form.irrecoverableLoss || form.processLoss || ''} onChange={e => setForm({...form, irrecoverableLoss: e.target.value, processLoss: e.target.value})} />
+                    </div>
                     <div style={{ gridColumn: 'span 2' }}>
                       <label>Remark</label>
-                      <input type="text" className="input-field" placeholder="—" value={form.dispatchRemark || ''} onChange={e => setForm({...form, dispatchRemark: e.target.value})} />
+                      <textarea className="input-field" rows="2" placeholder="—" value={form.remark || form.dispatchRemark || ''} onChange={e => setForm({...form, remark: e.target.value, dispatchRemark: e.target.value})} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', marginTop: '1.5rem' }}>
+                        <input type="checkbox" checked={form.filterBagPacked} onChange={e => setForm({...form, filterBagPacked: e.target.checked})} />
+                        Filter bag packed in HDPE after processing
+                      </label>
                     </div>
                     <div>
                       <label>Process Completion Date</label>

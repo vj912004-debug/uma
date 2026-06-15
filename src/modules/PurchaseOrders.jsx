@@ -21,6 +21,12 @@ const PurchaseOrders = () => {
     partyDocDate: '',
     partyName: '',
     productName: '',
+    productDescription: '',
+    address: '',
+    state: 'GUJARAT',
+    gstin: '',
+    mobile: '',
+    email: '',
     qty: 0,
     charges: {
       cleaning: true, filterBag: false, processing: true, sieving: false,
@@ -33,7 +39,7 @@ const PurchaseOrders = () => {
     },
     discount: 0,
     taxRate: 18,
-    terms: 'Standard PO Terms.'
+    terms: '1. Delivery 10 days from the date of Purchase Order.\n2. Transportation Extra As Actual.\n3. 10 Years Warranty'
   });
 
   const activeMR = editingDoc ? data.materialReceipts.find(mr => mr.id === editingDoc.receiptId) : selectedMR;
@@ -55,6 +61,11 @@ const PurchaseOrders = () => {
         partyDocDate: activeMR.partyDocDate,
         partyName: activeMR.partyName,
         productName: activeMR.productName,
+        productDescription: [prodConfig?.psdReq, prodConfig?.psdNote].filter(Boolean).join('\n'),
+        address: activeMR.billAddress || party?.billAddress || '',
+        gstin: activeMR.gstinBill || party?.gstinBill || '',
+        mobile: party?.phone1 || '',
+        email: party?.email1 || '',
         qty: activeMR.totalQty,
         charges: activeMR.charges || prev.charges,
         rates: {
@@ -110,9 +121,15 @@ const PurchaseOrders = () => {
       },
       discount: 0,
       taxRate: 18,
-      terms: 'Standard PO Terms.',
+      terms: '1. Delivery 10 days from the date of Purchase Order.\n2. Transportation Extra As Actual.\n3. 10 Years Warranty',
       partyName: '',
       productName: '',
+      productDescription: '',
+      address: '',
+      state: 'GUJARAT',
+      gstin: '',
+      mobile: '',
+      email: '',
       qty: 0
     });
     setIsModalOpen(true);
@@ -139,9 +156,15 @@ const PurchaseOrders = () => {
       },
       discount: 0,
       taxRate: 18,
-      terms: 'Standard PO Terms.',
+      terms: '1. Delivery 10 days from the date of Purchase Order.\n2. Transportation Extra As Actual.\n3. 10 Years Warranty',
       partyName: '',
       productName: '',
+      productDescription: '',
+      address: '',
+      state: 'GUJARAT',
+      gstin: '',
+      mobile: '',
+      email: '',
       qty: 0
     });
     setIsModalOpen(true);
@@ -348,13 +371,37 @@ const PurchaseOrders = () => {
                   <label>Product Name</label>
                   <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
                 </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Product Description / Specifications</label>
+                  <textarea className="input-field" rows="3" placeholder="Additional lines shown under product name on PO PDF" value={form.productDescription || ''} onChange={e => setForm({...form, productDescription: e.target.value})} />
+                </div>
+                <div>
+                  <label>Vendor Address</label>
+                  <textarea className="input-field" rows="2" value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} />
+                </div>
+                <div>
+                  <label>Vendor State</label>
+                  <input type="text" className="input-field" value={form.state || 'GUJARAT'} onChange={e => setForm({...form, state: e.target.value})} />
+                </div>
+                <div>
+                  <label>Vendor GSTIN</label>
+                  <input type="text" className="input-field" value={form.gstin || ''} onChange={e => setForm({...form, gstin: e.target.value})} />
+                </div>
+                <div>
+                  <label>Vendor Mobile</label>
+                  <input type="text" className="input-field" value={form.mobile || ''} onChange={e => setForm({...form, mobile: e.target.value})} />
+                </div>
+                <div>
+                  <label>Vendor Email</label>
+                  <input type="text" className="input-field" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} />
+                </div>
                 <div>
                   <label>Material Qty (Kg)</label>
                   <input type="number" step="any" className="input-field" value={form.qty} onChange={e => setForm({...form, qty: parseFloat(e.target.value) || 0})} />
                 </div>
                 <div style={{ gridColumn: 'span 4' }}>
-                  <label>Terms</label>
-                  <input type="text" className="input-field" value={form.terms} onChange={e => setForm({...form, terms: e.target.value})} />
+                  <label>Terms & Conditions</label>
+                  <textarea className="input-field" rows="3" value={form.terms} onChange={e => setForm({...form, terms: e.target.value})} />
                 </div>
               </div>
 

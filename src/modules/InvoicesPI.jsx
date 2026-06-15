@@ -21,6 +21,12 @@ const InvoicesPI = () => {
     partyDocDate: '',
     partyName: '',
     productName: '',
+    billAddress: '',
+    shipAddress: '',
+    gstinBill: '',
+    gstinShip: '',
+    dcNo: 'Verbal',
+    dcDate: '',
     qty: 0,
     charges: {
       cleaning: true, filterBag: false, processing: true, sieving: false,
@@ -56,6 +62,12 @@ const InvoicesPI = () => {
         partyDocDate: activeMR.partyDocDate,
         partyName: activeMR.partyName,
         productName: activeMR.productName,
+        billAddress: activeMR.billAddress || '',
+        shipAddress: activeMR.shipAddress || '',
+        gstinBill: activeMR.gstinBill || '',
+        gstinShip: activeMR.gstinShip || '',
+        dcNo: 'Verbal',
+        dcDate: form.date,
         qty: activeMR.totalQty,
         charges: activeMR.charges || prev.charges,
         rates: {
@@ -124,6 +136,12 @@ const InvoicesPI = () => {
       terms: '100% advance against PI.',
       partyName: '',
       productName: '',
+      billAddress: '',
+      shipAddress: '',
+      gstinBill: '',
+      gstinShip: '',
+      dcNo: 'Verbal',
+      dcDate: '',
       qty: 0,
       customCharges: []
     });
@@ -154,6 +172,12 @@ const InvoicesPI = () => {
       terms: '100% advance against PI.',
       partyName: '',
       productName: '',
+      billAddress: '',
+      shipAddress: '',
+      gstinBill: '',
+      gstinShip: '',
+      dcNo: 'Verbal',
+      dcDate: '',
       qty: 0,
       customCharges: []
     });
@@ -365,9 +389,29 @@ const InvoicesPI = () => {
                   <label>Material Qty (Kg)</label>
                   <input type="number" step="any" className="input-field" value={form.qty} onChange={e => setForm({...form, qty: parseFloat(e.target.value) || 0})} />
                 </div>
-                <div style={{ gridColumn: 'span 4' }}>
-                  <label>Terms</label>
-                  <input type="text" className="input-field" value={form.terms} onChange={e => setForm({...form, terms: e.target.value})} />
+                <div>
+                  <label>Delivery Challan No.</label>
+                  <input type="text" className="input-field" value={form.dcNo || 'Verbal'} onChange={e => setForm({...form, dcNo: e.target.value})} />
+                </div>
+                <div>
+                  <label>Delivery Challan Date</label>
+                  <input type="date" className="input-field" value={form.dcDate || form.date} onChange={e => setForm({...form, dcDate: e.target.value})} />
+                </div>
+                <div>
+                  <label>Bill-To GSTIN</label>
+                  <input type="text" className="input-field" value={form.gstinBill || ''} onChange={e => setForm({...form, gstinBill: e.target.value})} />
+                </div>
+                <div>
+                  <label>Ship-To GSTIN</label>
+                  <input type="text" className="input-field" value={form.gstinShip || ''} onChange={e => setForm({...form, gstinShip: e.target.value})} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Bill-To Address</label>
+                  <textarea className="input-field" rows="2" value={form.billAddress || ''} onChange={e => setForm({...form, billAddress: e.target.value})} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Ship-To Address</label>
+                  <textarea className="input-field" rows="2" value={form.shipAddress || ''} onChange={e => setForm({...form, shipAddress: e.target.value})} />
                 </div>
               </div>
 
