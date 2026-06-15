@@ -32,6 +32,7 @@ import RecycleBin from './modules/RecycleBin';
 import SystemLogs from './modules/SystemLogs';
 import Attendance from './modules/Attendance';
 import CompanyProfileSettings from './modules/CompanyProfileSettings';
+import EmployeeManagement from './modules/EmployeeManagement';
 
 const AppLayout = () => (
   <div className="app-layout">
