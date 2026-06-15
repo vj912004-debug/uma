@@ -31,7 +31,7 @@ import CreditNotes from './modules/CreditNotes';
 import RecycleBin from './modules/RecycleBin';
 import SystemLogs from './modules/SystemLogs';
 import Attendance from './modules/Attendance';
-import EmployeeManagement from './modules/EmployeeManagement';
+import CompanyProfileSettings from './modules/CompanyProfileSettings';
 
 const AppLayout = () => (
   <div className="app-layout">
@@ -62,6 +62,7 @@ const AppLayout = () => (
         <Route path="/debit-notes" element={<DebitNotes />} />
         <Route path="/credit-notes" element={<CreditNotes />} />
         <Route path="/attendance" element={<Attendance />} />
+        <Route path="/settings/company-profile" element={<ProtectedRoute adminOnly><CompanyProfileSettings /></ProtectedRoute>} />
         <Route path="/employees" element={<ProtectedRoute adminOnly><EmployeeManagement /></ProtectedRoute>} />
         <Route path="/recycle-bin" element={<ProtectedRoute adminOnly><RecycleBin /></ProtectedRoute>} />
         <Route path="/system-logs" element={<ProtectedRoute adminOnly><SystemLogs /></ProtectedRoute>} />

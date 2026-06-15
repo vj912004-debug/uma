@@ -3,8 +3,15 @@ import { Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
+import {
+  getStoredCompanyProfile,
+  formatCompanyAddressLines,
+  getContactLine,
+  drawCompanyLogo
+} from '../utils/companyProfile';
 
 const ExportButton = ({ data, columns, filename, title }) => {
+  const profile = getStoredCompanyProfile();
 
   const exportToExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -17,19 +24,23 @@ const ExportButton = ({ data, columns, filename, title }) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Header section
+    drawCompanyLogo(doc, 15, 8, profile);
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(20);
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("UMA MICRON", 15, 20);
+    doc.text(profile.companyName, 50, 18);
 
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text("PLOT NO 1116 G.I.D.C. RANOLI, N.H.NO. 8,", 15, 26);
-    doc.text("VADODARA - 391350, GUJARAT INDIA", 15, 31);
-    doc.text("Tel: +91 97120 00297, Email : umamicron@gmail.com", 15, 36);
-    doc.setFont("helvetica", "bold");
-    doc.text("GSTIN: 24AGBPP8564D1ZE", 15, 41);
+    formatCompanyAddressLines(profile).forEach((line, i) => {
+      doc.text(line, 50, 24 + i * 5);
+    });
+    const contact = getContactLine(profile);
+    if (contact) doc.text(contact, 50, 24 + formatCompanyAddressLines(profile).length * 5);
+    if (profile.gstNumber) {
+      doc.setFont("helvetica", "bold");
+      doc.text(`GSTIN: ${profile.gstNumber}`, 50, 34 + formatCompanyAddressLines(profile).length * 5);
+    }
 
     doc.setDrawColor(200, 200, 200);
     doc.line(15, 45, pageWidth - 15, 45);
@@ -52,10 +63,11 @@ const ExportButton = ({ data, columns, filename, title }) => {
   };
 
   const exportToWord = () => {
-    // Simple HTML to Word export
     const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><body>";
     const footer = "</body></html>";
-    let tableHtml = `<h2 style="text-align: center;">UMA MICRON</h2>`;
+    let tableHtml = `<h2 style="text-align: center;">${profile.companyName}</h2>`;
+    tableHtml += `<p style="text-align: center;">${formatCompanyAddressLines(profile).join('<br/>')}</p>`;
+    if (profile.gstNumber) tableHtml += `<p style="text-align: center;"><strong>GSTIN: ${profile.gstNumber}</strong></p>`;
     tableHtml += `<h3>${title || filename}</h3>`;
     tableHtml += "<table border='1' style='width:100%; border-collapse: collapse;'><tr>";
     columns.forEach(col => {

@@ -26,7 +26,8 @@ import {
   Sun,
   Moon,
   LogOut,
-  Shield
+  Shield,
+  Building2
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -112,6 +113,7 @@ const Sidebar = () => {
     {
       title: "System",
       items: [
+        { name: 'Company Profile', icon: Building2, path: '/settings/company-profile', roles: ['Admin'] },
         { name: 'Employees', icon: Shield, path: '/employees', roles: ['Admin'] },
         { name: 'Recycle Bin', icon: Archive, path: '/recycle-bin', roles: ['Admin'] },
         { name: 'Backups & Logs', icon: DatabaseBackup, path: '/system-logs', roles: ['Admin'] }

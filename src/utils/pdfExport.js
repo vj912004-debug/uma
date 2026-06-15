@@ -1,42 +1,21 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import {
+  getStoredCompanyProfile,
+  mergeCompanyProfile,
+  drawCompanyLogo,
+  drawPdfCompanyHeader,
+  drawPdfCompanyHeaderBoxed,
+  formatCompanyAddressLines,
+  getContactLine
+} from './companyProfile';
 
-// Helper to draw the logo
-const drawLogo = (doc, x, y) => {
-  doc.setDrawColor(0, 150, 0); // Green
-  doc.setLineWidth(0.8);
-  doc.ellipse(x + 10, y + 10, 8, 12);
-  doc.setDrawColor(150, 0, 0); // Red
-  doc.ellipse(x + 14, y + 10, 8, 12);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(150, 0, 0);
-  doc.text("U", x + 5, y + 15);
-  doc.setTextColor(0, 150, 0);
-  doc.text("M", x + 12, y + 15);
-  doc.setTextColor(0, 0, 0); // Reset
-};
+const getProfile = (data) => mergeCompanyProfile(data?.companyProfile || getStoredCompanyProfile());
 
-const drawCompanyHeader = (doc, docType, data) => {
+const buildPO_PI_TI = (doc, docType, data) => {
   const pageWidth = doc.internal.pageSize.getWidth();
-  
-  // Draw Logo
-  drawLogo(doc, 15, 10);
-  
-  // Header Text
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(18);
-  doc.setFont("helvetica", "bold");
-  doc.text("UMA MICRON", pageWidth / 2, 16, { align: "center" });
-  
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.text("PLOT NO 1116 G.I.D.C. RANOLI, N.H.NO. 8,", pageWidth / 2, 22, { align: "center" });
-  doc.text("VADODARA - 391350, GUJARAT INDIA", pageWidth / 2, 27, { align: "center" });
-  doc.setFont("helvetica", "normal");
-  doc.text("Tel: +91 97120 00297, Email : info@umamicron.com", pageWidth / 2, 32, { align: "center" });
-  doc.setFont("helvetica", "bold");
-  doc.text("GSTIN: 24AGBPP8564D1ZE", pageWidth / 2, 37, { align: "center" });
+  const profile = getProfile(data);
+  drawPdfCompanyHeader(doc, { profile, startY: 10 });
 
   if (docType === 'TI') {
      doc.setFontSize(8);
@@ -44,28 +23,21 @@ const drawCompanyHeader = (doc, docType, data) => {
      doc.text("Original\nDuplicate", pageWidth - 10, 15, { align: "right" });
   }
 
-  // Draw title bar
   const titleMap = {
     'TI': 'Tax Invoice',
     'PI': 'Performa Invoice',
     'PO': 'Purchase Order'
   };
-  
   const title = titleMap[docType] || docType.toUpperCase();
-  
+
   autoTable(doc, {
     startY: 40,
     body: [[{ content: title, styles: { halign: 'center', fontStyle: 'bold', fontSize: 16, fillColor: [180, 200, 240] } }]],
     theme: 'plain',
     styles: { lineColor: 0, lineWidth: 0.2, textColor: 0 }
   });
-  
-  return doc.lastAutoTable.finalY;
-};
 
-const buildPO_PI_TI = (doc, docType, data) => {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  let yPos = drawCompanyHeader(doc, docType, data);
+  let yPos = doc.lastAutoTable.finalY;
   
   const docNo = data.invoiceNo || data.poNo || data.bprNo || 'N/A';
   const docDate = data.date || 'N/A';
@@ -284,7 +256,7 @@ const buildPO_PI_TI = (doc, docType, data) => {
   if (docType === 'PI' || docType === 'TI') {
     leftBody = [
       [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold' } }],
-      [`Bank Name     : AXIS BANK LTD\nA/c Name      : UMA MICRON\nCurrent A/c No. : 916020061629671\nIFS CODE      : UTIB0000383\nBranch        : Nizampura`],
+      [`Bank Name     : AXIS BANK LTD\nA/c Name      : ${profile.companyName}\nCurrent A/c No. : 916020061629671\nIFS CODE      : UTIB0000383\nBranch        : Nizampura`],
       [{ content: 'NOTE:\nPACKING MATERIALS AND TRANSPORTATION\nCHARGES WILL BE CHAGRE EXTRA AS ACTUAL', styles: { fontStyle: 'bold' } }],
       [{ content: 'Terms & conditions\n1) Subject to vadodara Juridiction.\n2) Payment 100% ADVANCE AGAINST PI\nthis is system generated PI so no need to sign', styles: { fontStyle: 'bold' } }]
     ];
@@ -313,7 +285,7 @@ const buildPO_PI_TI = (doc, docType, data) => {
     ['IGST', { content: totalIgst.toFixed(2), styles: { halign: 'right' } }],
     [{ content: 'Total Tax Amount', styles: { fontStyle: 'bold' } }, { content: (totalCgst + totalSgst + totalIgst).toFixed(2), styles: { halign: 'right', fontStyle: 'bold' } }],
     [{ content: 'Total Amount after Tax', styles: { fontStyle: 'bold', fontSize: 10 } }, { content: totalAll.toFixed(2), styles: { halign: 'right', fontStyle: 'bold', fontSize: 10 } }],
-    [{ content: 'Certified that the particulars given above are true and correct\n\nFor UMA MICRON\n\n\n\n\nAuthorised signatory', colSpan: 2, styles: { halign: 'center', minCellHeight: 40 } }]
+    [{ content: `Certified that the particulars given above are true and correct\n\nFor ${getProfile(data).companyName}\n\n\n\n\nAuthorised signatory`, colSpan: 2, styles: { halign: 'center', minCellHeight: 40 } }]
   ];
 
   autoTable(doc, {
@@ -329,12 +301,12 @@ const buildPO_PI_TI = (doc, docType, data) => {
 
 const buildBPR = (doc, data) => {
   const pageWidth = doc.internal.pageSize.getWidth();
+  const profile = getProfile(data);
 
-  // ----- Page 1: Batch Processing Record -----
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
-  doc.text("Uma Micron", pageWidth / 2, 20, { align: "center" });
+  doc.text(profile.companyName, pageWidth / 2, 20, { align: "center" });
 
   let yPos = 25;
 
@@ -379,7 +351,7 @@ const buildBPR = (doc, data) => {
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
-  doc.text("Uma Micron", pageWidth / 2, 20, { align: "center" });
+  doc.text(profile.companyName, pageWidth / 2, 20, { align: "center" });
 
   const received = data.receivedBatches || [];
   const dispatched = data.dispatchedBatches || [];
@@ -438,6 +410,7 @@ const buildFormattedInvoice = (doc, docType, data) => {
   const pageWidth = doc.internal.pageSize.getWidth();
   const isPI = docType === 'PI';
   const isPO = docType === 'PO';
+  const profile = getProfile(data);
   
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
@@ -445,27 +418,7 @@ const buildFormattedInvoice = (doc, docType, data) => {
     doc.text("Original\nDuplicate", pageWidth - 14, 12, { align: "right" });
   }
 
-  doc.setLineWidth(0.5);
-  doc.setDrawColor(0, 0, 0);
-  doc.rect(14, 15, pageWidth - 28, 30);
-  
-  // Draw Logo
-  drawLogo(doc, 20, 18);
-  
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.text("UMA MICRON", pageWidth / 2, 21, { align: "center" });
-  
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.text("PLOT NO 1116 G.I.D.C. RANOLI, N.H.NO. 8,", pageWidth / 2, 26, { align: "center" });
-  doc.text("VADODARA - 391350, GUJARAT INDIA", pageWidth / 2, 31, { align: "center" });
-  doc.setFont("helvetica", "bold");
-  const email = (isPI || isPO) ? 'info@umamicron.com' : 'umamicron@gmail.com';
-  doc.text(`Tel: +91 97120 00297, Email : ${email}`, pageWidth / 2, 36, { align: "center" });
-  doc.setFont("helvetica", "bold");
-  doc.text("GSTIN: 24AGBPP8564D1ZE", pageWidth / 2, 41, { align: "center" });
+  drawPdfCompanyHeaderBoxed(doc, { profile });
 
   const titleText = isPO ? 'Purchase Order' : (isPI ? 'Performa Invoice' : 'Tax Invoice');
   const headerFill = (isPI || isPO) ? [180, 200, 240] : false;
@@ -811,7 +764,7 @@ const buildFormattedInvoice = (doc, docType, data) => {
   if (isPI) {
     leftBody = [
       [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold', lineWidth: { top: 0.5, bottom: 0, left: 0.5, right: 0.5 } } }],
-      [{ content: `Bank Name     : AXIS BANK LTD\nA/c Name      : UMA MICRON\nCurrent A/c No. : 916020061629671\nIFS CODE      : UTIB0000383\nBranch        : Nizampura`, styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 25 } }],
+      [{ content: `Bank Name     : AXIS BANK LTD\nA/c Name      : ${profile.companyName}\nCurrent A/c No. : 916020061629671\nIFS CODE      : UTIB0000383\nBranch        : Nizampura`, styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 25 } }],
       [{ content: 'NOTE:\nPACKING MATERIALS AND TRANSPORTATION\nCHARGES WILL BE CHAGRE EXTRA AS ACTUAL', styles: { fontStyle: 'bold', minCellHeight: 15 } }],
       [{ content: 'Terms & conditions\n1) Subject to vadodara Juridiction.\n2) Payment 100% ADVANCE AGAINST PI\nthis is system generated PI so no need to sign', styles: { fontStyle: 'bold', minCellHeight: 20 } }]
     ];
@@ -824,7 +777,7 @@ const buildFormattedInvoice = (doc, docType, data) => {
   } else {
     leftBody = [
       [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold', lineWidth: { top: 0.5, bottom: 0, left: 0.5, right: 0.5 } } }],
-      [{ content: `Bank Name     : AXIS BANK LTD\nA/c Name      : UMA MICRON\nCurrent A/c No. : 916020061629671\nIFS CODE      : UTIB0000383\nBranch        : Nizampura`, styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 25 } }],
+      [{ content: `Bank Name     : AXIS BANK LTD\nA/c Name      : ${profile.companyName}\nCurrent A/c No. : 916020061629671\nIFS CODE      : UTIB0000383\nBranch        : Nizampura`, styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 25 } }],
       [{ content: 'Terms & conditions\n1) Subject to vadodara Juridiction.\n2) Payment Term as per our agree terms.\n3) Interest will charged @ 24% per annum if\namount remaining unpaid from due date.', styles: { minCellHeight: 35 } }]
     ];
   }
@@ -845,7 +798,7 @@ const buildFormattedInvoice = (doc, docType, data) => {
     ['IGST', { content: totalIgst.toFixed(2), styles: { halign: 'right' } }],
     ['Total Tax Amount', { content: (totalCgst + totalSgst + totalIgst).toFixed(2), styles: { halign: 'right', fontStyle: 'bold' } }],
     [{ content: 'Total Amount after Tax', styles: { fontStyle: 'bold', fontSize: 10 } }, { content: totalAll.toFixed(2), styles: { halign: 'right', fontStyle: 'bold', fontSize: 10 } }],
-    [{ content: 'Certified that the particulars given above are true and correct\n\n                       For UMA MICRON\n\n\n\n\nSeal                                 Authorised signatory', colSpan: 2, styles: { halign: 'left', minCellHeight: 38 } }]
+    [{ content: `Certified that the particulars given above are true and correct\n\n                       For ${profile.companyName}\n\n\n\n\nSeal                                 Authorised signatory`, colSpan: 2, styles: { halign: 'left', minCellHeight: 38 } }]
   ];
 
   autoTable(doc, {
@@ -878,14 +831,28 @@ const buildPDF = (docType, data) => {
 
 // Paste back the old logic for remaining doc types
 const buildOldLogic = (doc, docType, data) => {
-  const pageWidth = doc.internal.pageSize.getWidth();
+  const profile = getProfile(data);
   doc.setTextColor(0, 0, 0);
-  doc.setFontSize(20);
+  drawCompanyLogo(doc, 15, 8, profile);
+  doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
-  doc.text("UMA MICRON", 15, 20);
-  
+  doc.text(profile.companyName, 50, 18);
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  formatCompanyAddressLines(profile).forEach((line, i) => {
+    doc.text(line, 50, 24 + i * 5);
+  });
+  const contact = getContactLine(profile);
+  if (contact) doc.text(contact, 50, 24 + formatCompanyAddressLines(profile).length * 5);
+  if (profile.gstNumber) {
+    doc.setFont("helvetica", "bold");
+    doc.text(`GSTIN: ${profile.gstNumber}`, 50, 34 + formatCompanyAddressLines(profile).length * 5);
+  }
+
   let yPos = 55;
-  doc.text(docType, 15, yPos);
+  doc.setFontSize(14);
+  doc.text(docType === 'DC' ? 'Delivery Challan' : docType, 15, yPos);
   yPos += 15;
 
   if (docType === 'PL' && data.batches) {
@@ -968,12 +935,14 @@ const buildOldLogic = (doc, docType, data) => {
 };
 
 export const exportToPDF = (docType, data) => {
-  const { doc, docNo } = buildPDF(docType, data);
+  const enriched = { ...data, companyProfile: data?.companyProfile || getStoredCompanyProfile() };
+  const { doc, docNo } = buildPDF(docType, enriched);
   doc.save(`${docType}_${docNo}.pdf`);
 };
 
 export const viewPDF = (docType, data) => {
-  const { doc, docNo } = buildPDF(docType, data);
+  const enriched = { ...data, companyProfile: data?.companyProfile || getStoredCompanyProfile() };
+  const { doc, docNo } = buildPDF(docType, enriched);
   const url = doc.output('bloburl');
   const win = window.open(url, '_blank');
   if (win) {

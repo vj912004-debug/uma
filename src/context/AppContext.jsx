@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { DEFAULT_ADMIN_PASSWORD_HASH } from '../utils/auth';
+import { DEFAULT_COMPANY_PROFILE, mergeCompanyProfile } from '../utils/companyProfile';
 
 const AppContext = createContext();
 
@@ -53,7 +54,8 @@ export const AppProvider = ({ children }) => {
         userRole: 'Admin',
         theme: 'dark',
         serials: { MR: 1, BPR: 1, PL: 1, PI: 1, DC: 1, MI: 1, VC: 1, PSD: 1, TI: 1, EWDC: 1, EWTI: 1, QT: 1, DN: 1, CN: 1, PO: 1 }
-      }
+      },
+      companyProfile: { ...DEFAULT_COMPANY_PROFILE }
     };
 
     if (!savedData) return baseState;
@@ -102,7 +104,8 @@ export const AppProvider = ({ children }) => {
             passwordHash: u.passwordHash || (isAdminUser ? DEFAULT_ADMIN_PASSWORD_HASH : undefined)
           };
         }),
-        currentUser: null
+        currentUser: null,
+        companyProfile: mergeCompanyProfile(parsed.companyProfile)
       };
     } catch (e) {
       return baseState;
@@ -247,9 +250,20 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
+  const upsertCompanyProfile = (profile) => {
+    setData(prev => ({
+      ...prev,
+      companyProfile: {
+        ...mergeCompanyProfile(prev.companyProfile),
+        ...profile,
+        updatedAt: new Date().toISOString()
+      }
+    }));
+  };
+
   return (
     <AppContext.Provider value={{ 
-      data, setData, updateData, updateItem, deleteItemSoftly, restoreItem, hardDeleteItem, incrementSerial 
+      data, setData, updateData, updateItem, deleteItemSoftly, restoreItem, hardDeleteItem, incrementSerial, upsertCompanyProfile
     }}>
       {children}
     </AppContext.Provider>
