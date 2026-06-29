@@ -1,4 +1,4 @@
-import { formatDate } from '../utils/dateUtils';
+﻿import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Search, Filter, ArrowUpDown } from 'lucide-react';
@@ -86,7 +86,7 @@ const ProcessingSheet = () => {
       outstanding: o.outstanding !== undefined ? o.outstanding : compOutstanding,
       dueStatus: o.dueStatus !== undefined ? o.dueStatus : (compOutstanding <= 0 ? '0' : (overdue ? 'Overdue' : 'Due')),
       paymentDates: o.paymentDates !== undefined ? o.paymentDates : paymentHistory.map(p => p.date).filter(Boolean).join(', '),
-      paymentAmounts: o.paymentAmounts !== undefined ? o.paymentAmounts : paymentHistory.map(p => `₹${(parseFloat(p.amount) || 0).toFixed(2)}${p.tds ? ` (TDS ₹${(parseFloat(p.tds) || 0).toFixed(2)})` : ''}`).join(' | '),
+      paymentAmounts: o.paymentAmounts !== undefined ? o.paymentAmounts : paymentHistory.map(p => `Γé╣${(parseFloat(p.amount) || 0).toFixed(2)}${p.tds ? ` (TDS Γé╣${(parseFloat(p.tds) || 0).toFixed(2)})` : ''}`).join(' | '),
       paymentRef: o.paymentRef !== undefined ? o.paymentRef : '',
       ewayStatus: o.ewayStatus !== undefined ? o.ewayStatus : ewayStatus
     };
@@ -278,7 +278,7 @@ const ProcessingSheet = () => {
                     <td style={{ padding: '0.25rem', fontSize: '0.75rem', color: row.tiNo === 'Pending' ? '#f59e0b' : '#10b981', fontWeight: 600 }}>{renderInput(row.id, 'tiNo', row.tiNo)}</td>
                     <td style={{ padding: '0.25rem', fontSize: '0.75rem' }}>{renderInput(row.id, 'invoiceDate', row.invoiceDate)}</td>
                     <td style={{ padding: '0.25rem', fontWeight: 600 }}>{renderInput(row.id, 'totalBill', row.totalBill)}</td>
-                    <td style={{ padding: '0.25rem', color: '#10b981', fontWeight: 600 }}>₹{parseFloat(row.paid || 0).toFixed(2)}</td>
+                    <td style={{ padding: '0.25rem', color: '#10b981', fontWeight: 600 }}>Γé╣{parseFloat(row.paid || 0).toFixed(2)}</td>
                     <td style={{ padding: '0.25rem', color: '#10b981', fontWeight: 600 }}>{renderInput(row.id, 'manualPaid', row.manualPaid, { color: '#10b981' })}</td>
                     <td style={{ padding: '0.25rem' }}>{renderInput(row.id, 'paymentRef', row.paymentRef)}</td>
                     <td style={{ padding: '0.25rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{renderInput(row.id, 'paymentDates', row.paymentDates)}</td>

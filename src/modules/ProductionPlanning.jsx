@@ -6,33 +6,36 @@ import ExportButton from '../components/ExportButton';
 
 const buildPlansFromReceipt = (receipt, parties) => {
   const party = parties.find(p => p.id === receipt.partyId);
-  const prodConfig = (party?.products || []).find(p => p.name === receipt.productName);
 
   return (receipt.batches || [])
     .filter(b => !b.isEmptyDrums)
-    .map((batch, idx) => ({
-      id: `${receipt.id}_batch_${idx}`,
-      receiptId: receipt.id,
-      createdAt: receipt.createdAt || new Date().toISOString(),
-      customer: receipt.partyName || party?.name || '',
-      productName: receipt.productName || '',
-      productNickName: receipt.nickName || prodConfig?.nickname || '',
-      psdReq: batch.psdReq || prodConfig?.psdReq || '',
-      psdNote: prodConfig?.psdNote || '',
-      batchNo: batch.batchNo || '',
-      qty: batch.qty ?? '',
-      priorityLevel: 'Normal',
-      specialInstructions: '',
-      status: 'Pending',
-      startDate: receipt.date || new Date().toISOString().split('T')[0],
-      startTime: '09:00',
-      endDate: receipt.date || new Date().toISOString().split('T')[0],
-      endTime: '17:00',
-      hours: '8.00',
-      notes: '',
-      supervisor: '',
-      delayReason: ''
-    }));
+    .map((batch, idx) => {
+      const batchProduct = batch.productName || receipt.productName || '';
+      const prodConfig = (party?.products || []).find(p => p.name === batchProduct);
+      return {
+        id: `${receipt.id}_batch_${idx}`,
+        receiptId: receipt.id,
+        createdAt: receipt.createdAt || new Date().toISOString(),
+        customer: receipt.partyName || party?.name || '',
+        productName: batchProduct,
+        productNickName: batch.nickName || prodConfig?.nickname || receipt.nickName || '',
+        psdReq: batch.psdReq || prodConfig?.psdReq || '',
+        psdNote: prodConfig?.psdNote || '',
+        batchNo: batch.batchNo || '',
+        qty: batch.qty ?? '',
+        priorityLevel: '',
+        specialInstructions: '',
+        status: '',
+        startDate: '',
+        startTime: '',
+        endDate: '',
+        endTime: '',
+        hours: '',
+        notes: '',
+        supervisor: '',
+        delayReason: ''
+      };
+    });
 };
 
 const resolvePlan = (plan, materialReceipts = [], parties = []) => {
@@ -103,20 +106,24 @@ const ProductionPlanning = () => {
     psdNote: '',
     batchNo: '',
     qty: '',
-    priorityLevel: 'Normal',
+    priorityLevel: '',
     specialInstructions: '',
-    startDate: new Date().toISOString().split('T')[0],
-    startTime: '09:00',
-    endDate: new Date().toISOString().split('T')[0],
-    endTime: '17:00',
-    status: 'Pending',
+    startDate: '',
+    startTime: '',
+    endDate: '',
+    endTime: '',
+    hours: '',
+    status: '',
     notes: '',
     supervisor: '',
     delayReason: ''
   });
 
   useEffect(() => {
-    if (!formData.startDate || !formData.startTime || !formData.endDate || !formData.endTime) return;
+    if (!formData.startDate || !formData.startTime || !formData.endDate || !formData.endTime) {
+      if (formData.hours) setFormData(prev => ({ ...prev, hours: '' }));
+      return;
+    }
     try {
       const startDateTime = new Date(`${formData.startDate}T${formData.startTime}`);
       const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
@@ -154,13 +161,14 @@ const ProductionPlanning = () => {
       psdNote: '',
       batchNo: '',
       qty: '',
-      priorityLevel: 'Normal',
+      priorityLevel: '',
       specialInstructions: '',
-      startDate: new Date().toISOString().split('T')[0],
-      startTime: '09:00',
-      endDate: new Date().toISOString().split('T')[0],
-      endTime: '17:00',
-      status: 'Pending',
+      startDate: '',
+      startTime: '',
+      endDate: '',
+      endTime: '',
+      hours: '',
+      status: '',
       notes: '',
       supervisor: '',
       delayReason: ''
@@ -353,32 +361,36 @@ const ProductionPlanning = () => {
                     {effectiveVisibleColumns.includes('psdNote') && <td><div style={{ fontSize: '0.75rem', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.psdNote || 'None'}</div></td>}
                     {effectiveVisibleColumns.includes('batchNo') && <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{plan.batchNo || 'N/A'}</td>}
                     {effectiveVisibleColumns.includes('qty') && <td>{plan.qty}</td>}
-                    {effectiveVisibleColumns.includes('startDate') && <td style={{ fontSize: '0.85rem' }}>{formatDate(plan.startDate)} {plan.startTime}</td>}
-                    {effectiveVisibleColumns.includes('endDate') && <td style={{ fontSize: '0.85rem' }}>{formatDate(plan.endDate)} {plan.endTime}</td>}
-                    {effectiveVisibleColumns.includes('hours') && <td>{plan.hours || '0.00'}</td>}
-                    {effectiveVisibleColumns.includes('delayReason') && <td><div style={{ fontSize: '0.75rem', maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'rgba(239, 68, 68, 0.8)' }}>{plan.delayReason || '-'}</div></td>}
-                    {effectiveVisibleColumns.includes('supervisor') && <td>{plan.supervisor || 'Unassigned'}</td>}
+                    {effectiveVisibleColumns.includes('startDate') && <td style={{ fontSize: '0.85rem' }}>{plan.startDate ? `${formatDate(plan.startDate)} ${plan.startTime || ''}`.trim() : '-'}</td>}
+                    {effectiveVisibleColumns.includes('endDate') && <td style={{ fontSize: '0.85rem' }}>{plan.endDate ? `${formatDate(plan.endDate)} ${plan.endTime || ''}`.trim() : '-'}</td>}
+                    {effectiveVisibleColumns.includes('hours') && <td>{plan.hours || '-'}</td>}
+                    {effectiveVisibleColumns.includes('delayReason') && <td><div style={{ fontSize: '0.75rem', maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: plan.delayReason ? 'rgba(239, 68, 68, 0.8)' : 'var(--text-muted)' }}>{plan.delayReason || '-'}</div></td>}
+                    {effectiveVisibleColumns.includes('supervisor') && <td>{plan.supervisor || '-'}</td>}
                     {effectiveVisibleColumns.includes('priorityLevel') && (
                       <td>
-                      <span style={{
-                        padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
-                        background: plan.priorityLevel === 'Super Urgent' ? 'rgba(153, 27, 27, 0.2)' : plan.priorityLevel === 'High' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                        color: plan.priorityLevel === 'Super Urgent' ? '#f87171' : plan.priorityLevel === 'High' ? '#ef4444' : '#10b981'
-                      }}>
-                        {plan.priorityLevel || 'Normal'}
-                      </span>
+                      {plan.priorityLevel ? (
+                        <span style={{
+                          padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
+                          background: plan.priorityLevel === 'Super Urgent' ? 'rgba(153, 27, 27, 0.2)' : plan.priorityLevel === 'High' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                          color: plan.priorityLevel === 'Super Urgent' ? '#f87171' : plan.priorityLevel === 'High' ? '#ef4444' : '#10b981'
+                        }}>
+                          {plan.priorityLevel}
+                        </span>
+                      ) : '-'}
                       </td>
                     )}
                     {effectiveVisibleColumns.includes('specialInstructions') && <td><div style={{ fontSize: '0.75rem', maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.specialInstructions || '-'}</div></td>}
                     {effectiveVisibleColumns.includes('status') && (
                       <td>
-                      <span style={{ 
-                        padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600,
-                        background: plan.status === 'Done' ? 'rgba(16, 185, 129, 0.1)' : plan.status === 'Cancel' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                        color: plan.status === 'Done' ? '#10b981' : plan.status === 'Cancel' ? '#ef4444' : '#f59e0b'
-                      }}>
-                        {plan.status}
-                      </span>
+                      {plan.status ? (
+                        <span style={{ 
+                          padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600,
+                          background: plan.status === 'Done' ? 'rgba(16, 185, 129, 0.1)' : plan.status === 'Cancel' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                          color: plan.status === 'Done' ? '#10b981' : plan.status === 'Cancel' ? '#ef4444' : '#f59e0b'
+                        }}>
+                          {plan.status}
+                        </span>
+                      ) : '-'}
                       </td>
                     )}
                     {userRole === 'Admin' && (
@@ -488,6 +500,7 @@ const ProductionPlanning = () => {
                 <div>
                   <label>Priority Level</label>
                   <select className="input-field" value={formData.priorityLevel} onChange={e => setFormData({...formData, priorityLevel: e.target.value})}>
+                    <option value="">-- Select --</option>
                     <option value="Normal">Normal</option>
                     <option value="High">High</option>
                     <option value="Urgent">Urgent</option>
@@ -509,7 +522,7 @@ const ProductionPlanning = () => {
                 <div>
                   <label>Supervisor</label>
                   <select className="input-field" value={formData.supervisor} onChange={e => setFormData({...formData, supervisor: e.target.value})}>
-                    <option value="">Unassigned</option>
+                    <option value="">-- Select --</option>
                     <option value="Supervisor 1">Supervisor 1</option>
                     <option value="Supervisor 2">Supervisor 2</option>
                   </select>
@@ -530,6 +543,7 @@ const ProductionPlanning = () => {
                 <div>
                   <label>Planning Status</label>
                   <select className="input-field" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                    <option value="">-- Select --</option>
                     <option value="Pending">Pending</option>
                     <option value="In Progress">In Progress</option>
                     <option value="Done">Done</option>
@@ -547,7 +561,7 @@ const ProductionPlanning = () => {
                 </div>
                 <div>
                   <label>Total Processing Hours</label>
-                  <input type="text" className="input-field" value={formData.hours} readOnly style={{ fontWeight: 600, color: 'var(--accent-primary)', background: 'var(--glass-bg)' }} />
+                  <input type="text" className="input-field" value={formData.hours || ''} readOnly placeholder="Auto-calculated" style={{ fontWeight: 600, color: 'var(--accent-primary)', background: 'var(--glass-bg)' }} />
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>

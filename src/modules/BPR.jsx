@@ -39,6 +39,7 @@ const BPR = () => {
   const [editingBPR, setEditingBPR] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
   const [activeTab, setActiveTab] = useState('page1');
+  const [listView, setListView] = useState('page1');
 
   // BPR Form State
   const [form, setForm] = useState({
@@ -79,15 +80,60 @@ const BPR = () => {
   const totalReceivedNet = sumNet(form.receivedBatches);
   const totalDispatchedNet = sumNet(form.dispatchedBatches);
 
-  const handleCreate = (mr) => {
+  const buildEmptyBPRForm = (docNo) => ({
+    bprNo: docNo,
+    date: new Date().toISOString().split('T')[0],
+    partyName: '',
+    productName: '',
+    totalInputQty: '',
+    psdRequirement: '90% < 10M',
+    totalDrums: 0,
+    doubleDispatch: false,
+    receivedBatches: [emptyRow('', '1')],
+    dispatchedBatches: [emptyRow('', '1')],
+    cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false, bagClean: false },
+    pressureMetrics: { grindingPressure: '', injectionPressure: '', feedingSP: '', feedingDP: '', feedingTP: '', millingFP: '', millingFiP: '' },
+    packingConsumables: { fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '' },
+    processingSupervisor: '',
+    materialReceivedDate: '',
+    materialReceivedTime: '',
+    committedDate: '',
+    committedTime: '',
+    processingStartDate: '',
+    processingStartTime: '',
+    sizingReportRequired: '',
+    particleSizeResult: '',
+    lumpsNetWeight: '',
+    floorDustNetWeight: '',
+    sampleNetWeight: '',
+    irrecoverableLoss: '',
+    processLoss: '',
+    dispatchRemark: '',
+    remark: '',
+    filterBagPacked: false,
+    processCompletionDate: '',
+    processCompletionTime: ''
+  });
+
+  const handleCreateNew = (openTab = 'page1') => {
+    setSelectedMR(null);
+    setEditingBPR(null);
+    setActiveTab(openTab);
+    const bprSerial = data.settings?.serials?.BPR || 1;
+    const docNo = generateDocNumber('BPR', bprSerial, new Date());
+    setForm(buildEmptyBPRForm(docNo));
+    setIsModalOpen(true);
+  };
+
+  const handleCreate = (mr, openTab = 'page1') => {
     setSelectedMR(mr);
     setEditingBPR(null);
-    setActiveTab('page1');
+    setActiveTab(openTab);
 
     const bprSerial = data.settings?.serials?.BPR || 1;
     const docNo = generateDocNumber('BPR', bprSerial, new Date(form.date));
 
-    const activeMRBatches = mr.batches.filter(b => !b.isEmptyDrums);
+    const activeMRBatches = (mr.batches || []).filter(b => !b.isEmptyDrums);
     const receivedRows = [];
     activeMRBatches.forEach(b => {
       const drumCount = parseInt(b.drums) || 1;
@@ -134,9 +180,9 @@ const BPR = () => {
     setIsModalOpen(true);
   };
 
-  const handleEdit = (bpr) => {
+  const handleEdit = (bpr, openTab = 'page1') => {
     setEditingBPR(bpr);
-    setActiveTab('page1');
+    setActiveTab(openTab);
     setForm({
       ...bpr,
       receivedBatches: (bpr.receivedBatches || []).map(normalizeRow),
@@ -235,7 +281,7 @@ const BPR = () => {
     e.preventDefault();
     const finalDoc = {
       ...form,
-      receiptId: editingBPR ? editingBPR.receiptId : selectedMR.id,
+      receiptId: editingBPR?.receiptId || selectedMR?.id || '',
       partyName: form.partyName,
       productName: form.productName,
       totalReceivedNet,
@@ -276,16 +322,47 @@ const BPR = () => {
     { key: 'totalDispatchedGross', label: 'Total Gross Weight (Kg)' }
   ];
 
+  const pageTabBtn = (id, label) => ({
+    background: (listView === id ? 'rgba(16, 185, 129, 0.12)' : 'transparent'),
+    color: (listView === id ? 'var(--accent-primary)' : 'var(--text-muted)'),
+    border: (listView === id ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)'),
+    padding: '0.45rem 1rem',
+    borderRadius: '8px',
+    fontSize: '0.9rem',
+    fontWeight: 600,
+    cursor: 'pointer'
+  });
+
   return (
     <div>
-      <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Batch Processing Records (BPR)</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Monitor milled batches and double-check dispatched weights.</p>
+      <header style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+          <div>
+            <h1 style={{ fontSize: '2rem', fontWeight: 700, margin: 0 }}>Batch Processing Records (BPR)</h1>
+            <p style={{ color: 'var(--text-muted)', margin: '0.35rem 0 0' }}>Monitor milled batches and double-check dispatched weights.</p>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+              <button type="button" className="btn" style={pageTabBtn('page1', 'Page 1')} onClick={() => setListView('page1')}>
+                Page 1 — Batch Processing Record
+              </button>
+              <button type="button" className="btn" style={pageTabBtn('page2', 'Page 2')} onClick={() => setListView('page2')}>
+                Page 2 — Batch Packing Record
+              </button>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => handleCreateNew(listView === 'page2' ? 'page2' : 'page1')}
+            >
+              <Plus size={18} /> Create New BPR
+            </button>
+            <ExportButton data={filteredBPRs} columns={tableCols} filename="BPR_Records" title="Batch Processing Records" />
+          </div>
         </div>
-        <ExportButton data={filteredBPRs} columns={tableCols} filename="BPR_Records" title="Batch Processing Records" />
       </header>
 
+      {listView === 'page1' && (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
         {/* Left Side: Pending Receipts scheduler */}
         <div className="premium-card">
@@ -369,6 +446,85 @@ const BPR = () => {
           </div>
         </div>
       </div>
+      )}
+
+      {listView === 'page2' && (
+        <div className="premium-card">
+          <h3 style={{ marginBottom: '0.5rem' }}>Batch Packing & Weight Records</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+            Received vs dispatched drum weights. Select a record to enter or edit packing weights.
+          </p>
+
+          <div style={{ position: 'relative', marginBottom: '1rem' }}>
+            <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={16} />
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Search BPR No, customer or product..."
+              style={{ paddingLeft: '2.5rem', fontSize: '0.85rem', padding: '0.5rem 2.5rem' }}
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {pendingReceipts.length > 0 && (
+            <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Pending Weight Entry</h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                {pendingReceipts.map(mr => (
+                  <button
+                    key={mr.id}
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+                    onClick={() => handleCreate(mr, 'page2')}
+                  >
+                    {mr.receiptNo} — {mr.productName} ({mr.totalDrums || 0} drums)
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>BPR No</th>
+                  <th style={{ padding: '0.75rem' }}>Party</th>
+                  <th style={{ padding: '0.75rem' }}>Product</th>
+                  <th style={{ padding: '0.75rem' }}>Received Net (Kg)</th>
+                  <th style={{ padding: '0.75rem' }}>Dispatched Net (Kg)</th>
+                  <th style={{ padding: '0.75rem' }}>Drums</th>
+                  <th style={{ padding: '0.75rem' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredBPRs.length === 0 ? (
+                  <tr><td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No BPR weight records found.</td></tr>
+                ) : (
+                  filteredBPRs.map(bpr => (
+                    <tr key={bpr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{bpr.bprNo}</td>
+                      <td style={{ padding: '0.75rem', fontWeight: 600 }}>{bpr.partyName}</td>
+                      <td style={{ padding: '0.75rem' }}>{bpr.productName}</td>
+                      <td style={{ padding: '0.75rem' }}>{(bpr.totalReceivedNet ?? sumNet(bpr.receivedBatches || [])).toFixed(2)}</td>
+                      <td style={{ padding: '0.75rem' }}>{(bpr.totalDispatchedNet ?? sumNet(bpr.dispatchedBatches || [])).toFixed(2)}</td>
+                      <td style={{ padding: '0.75rem' }}>{bpr.dispatchedBatches?.length || 0}</td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button type="button" className="btn btn-primary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleEdit(bpr, 'page2')}>Edit Weights</button>
+                          <button onClick={() => exportToPDF('BPR', bpr)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Embedded Generator Modal */}
       {isModalOpen && (

@@ -15,3 +15,21 @@ export const generateDocNumber = (docType, serial, date = new Date()) => {
   const paddedSerial = serial.toString().padStart(4, '0');
   return `UMA/${docType}/${fy}/${paddedSerial}`;
 };
+
+/** Pick the next unused document number (skips duplicates already in saved docs). */
+export const nextAvailableDocNumber = (docType, startSerial, date, existingDocs, options = {}) => {
+  const { numberKey = 'invoiceNo', excludeId = null } = options;
+  const used = new Set(
+    (existingDocs || [])
+      .filter(d => d.id !== excludeId)
+      .map(d => d[numberKey])
+      .filter(Boolean)
+  );
+  let serial = Math.max(1, parseInt(startSerial, 10) || 1);
+  let docNo = generateDocNumber(docType, serial, date);
+  while (used.has(docNo)) {
+    serial += 1;
+    docNo = generateDocNumber(docType, serial, date);
+  }
+  return { docNo, nextSerial: serial + 1 };
+};

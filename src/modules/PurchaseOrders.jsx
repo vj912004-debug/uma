@@ -5,6 +5,17 @@ import { generateDocNumber } from '../utils/numbering';
 import { Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfExport';
 import ExportButton from '../components/ExportButton';
+import DocChargeRow from '../components/DocChargeRow';
+import {
+  STANDARD_CHARGES_LIST,
+  defaultChargeFlags,
+  defaultChargeRates,
+  emptyChargeQtys,
+  buildChargeQtys,
+  calcStandardChargesSubtotal,
+  parseChargeFieldValue,
+  isMaterialQtyCharge
+} from '../utils/documentCharges';
 
 const PurchaseOrders = () => {
   const { data, updateData, updateItem, deleteItemSoftly, incrementSerial } = useAppContext();
@@ -28,15 +39,9 @@ const PurchaseOrders = () => {
     mobile: '',
     email: '',
     qty: 0,
-    charges: {
-      cleaning: true, filterBag: false, processing: true, sieving: false,
-      psdReport: false, liner: false, courier: false, fiberDrum: false,
-      transportation: false, hdpeDrum: false, batchChangeover: false
-    },
-    rates: {
-      cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
-      liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
-    },
+    charges: defaultChargeFlags(),
+    rates: defaultChargeRates(),
+    qtys: emptyChargeQtys(),
     discount: 0,
     taxRate: 18,
     terms: '1. Delivery 10 days from the date of Purchase Order.\n2. Transportation Extra As Actual.\n3. 10 Years Warranty'
@@ -48,7 +53,11 @@ const PurchaseOrders = () => {
 
   useEffect(() => {
     if (editingDoc) {
-      setForm(editingDoc);
+      const materialQty = parseFloat(editingDoc.qty) || 0;
+      setForm({
+        ...editingDoc,
+        qtys: editingDoc.qtys ? { ...emptyChargeQtys(), ...editingDoc.qtys } : buildChargeQtys({}, materialQty)
+      });
     } else if (selectedMR && activeMR) {
       const poSerial = data.settings?.serials?.PO || 1;
       const docNo = generateDocNumber('PO', poSerial, new Date(form.date));
@@ -68,6 +77,7 @@ const PurchaseOrders = () => {
         email: party?.email1 || '',
         qty: activeMR.totalQty,
         charges: activeMR.charges || prev.charges,
+        qtys: buildChargeQtys({ qtys: activeMR.qtys }, activeMR.totalQty || 0),
         rates: {
           ...prev.rates,
           ...defaultRates
@@ -77,29 +87,28 @@ const PurchaseOrders = () => {
   }, [form.date, editingDoc, selectedMR, activeMR, prodConfig, data.settings?.serials?.PO]);
 
   const toggleCharge = (key) => {
-    setForm(prev => ({
-      ...prev,
-      charges: { ...prev.charges, [key]: !prev.charges[key] }
-    }));
+    setForm(prev => {
+      const turningOn = !prev.charges[key];
+      const materialQty = parseFloat(prev.qty) || 0;
+      const qtys = { ...(prev.qtys || emptyChargeQtys()) };
+      if (turningOn && (qtys[key] == null || qtys[key] === '')) {
+        qtys[key] = isMaterialQtyCharge(key) ? materialQty : 1;
+      }
+      return { ...prev, charges: { ...prev.charges, [key]: turningOn }, qtys };
+    });
   };
 
   const handleRateChange = (key, val) => {
-    setForm(prev => ({
-      ...prev,
-      rates: { ...prev.rates, [key]: parseFloat(val) || 0 }
-    }));
+    setForm(prev => ({ ...prev, rates: { ...prev.rates, [key]: parseChargeFieldValue(val) } }));
+  };
+
+  const handleQtyChange = (key, val) => {
+    setForm(prev => ({ ...prev, qtys: { ...(prev.qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) } }));
   };
 
   const getSubtotal = () => {
-    return Object.keys(form.charges).reduce((sum, key) => {
-      if (form.charges[key]) {
-        const isQtyRate = ['processing', 'sieving', 'cleaning'].includes(key);
-        const qty = parseFloat(form.qty) || 0;
-        const rate = form.rates[key] || 0;
-        return sum + (isQtyRate ? qty * rate : rate);
-      }
-      return sum;
-    }, 0);
+    const materialQty = parseFloat(form.qty) || 0;
+    return calcStandardChargesSubtotal(form.charges, form.rates, form.qtys, materialQty);
   };
 
   const handleCreate = (mr) => {
@@ -110,15 +119,9 @@ const PurchaseOrders = () => {
       date: new Date().toISOString().split('T')[0],
       partyDocNo: '',
       partyDocDate: '',
-      charges: {
-        cleaning: true, filterBag: false, processing: true, sieving: false,
-        psdReport: false, liner: false, courier: false, fiberDrum: false,
-        transportation: false, hdpeDrum: false, batchChangeover: false
-      },
-      rates: {
-        cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
-        liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
-      },
+      charges: defaultChargeFlags(),
+      rates: defaultChargeRates(),
+      qtys: emptyChargeQtys(),
       discount: 0,
       taxRate: 18,
       terms: '1. Delivery 10 days from the date of Purchase Order.\n2. Transportation Extra As Actual.\n3. 10 Years Warranty',
@@ -145,15 +148,9 @@ const PurchaseOrders = () => {
       date: new Date().toISOString().split('T')[0],
       partyDocNo: '',
       partyDocDate: '',
-      charges: {
-        cleaning: true, filterBag: false, processing: true, sieving: false,
-        psdReport: false, liner: false, courier: false, fiberDrum: false,
-        transportation: false, hdpeDrum: false, batchChangeover: false
-      },
-      rates: {
-        cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
-        liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
-      },
+      charges: defaultChargeFlags(),
+      rates: defaultChargeRates(),
+      qtys: emptyChargeQtys(),
       discount: 0,
       taxRate: 18,
       terms: '1. Delivery 10 days from the date of Purchase Order.\n2. Transportation Extra As Actual.\n3. 10 Years Warranty',
@@ -172,7 +169,11 @@ const PurchaseOrders = () => {
 
   const handleEdit = (po) => {
     setEditingDoc(po);
-    setForm(po);
+    const materialQty = parseFloat(po.qty) || 0;
+    setForm({
+      ...po,
+      qtys: po.qtys ? { ...emptyChargeQtys(), ...po.qtys } : buildChargeQtys({}, materialQty)
+    });
     setIsModalOpen(true);
   };
 
@@ -224,19 +225,8 @@ const PurchaseOrders = () => {
     { label: 'Total (₹)', key: 'total' }
   ];
 
-  const chargesList = [
-    { key: 'cleaning', label: 'Cleaning Charges (998842)', isQtyRate: true },
-    { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
-    { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true },
-    { key: 'sieving', label: 'Sieving Charges (998842)', isQtyRate: true },
-    { key: 'psdReport', label: 'PSD Report Charges (998346)', isQtyRate: false },
-    { key: 'liner', label: 'Liner (39233090)', isQtyRate: false },
-    { key: 'courier', label: 'Courier (996812)', isQtyRate: false },
-    { key: 'fiberDrum', label: 'Fiber Drum (7310)', isQtyRate: false },
-    { key: 'transportation', label: 'Transportation (996511)', isQtyRate: false },
-    { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },
-    { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
-  ];
+  const chargesList = STANDARD_CHARGES_LIST;
+  const materialQty = parseFloat(form.qty) || 0;
 
   return (
     <div>
@@ -411,24 +401,17 @@ const PurchaseOrders = () => {
                 <div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {chargesList.map(item => (
-                      <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem', background: 'var(--glass-bg)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', cursor: 'pointer', margin: 0 }}>
-                          <input type="checkbox" checked={form.charges[item.key]} onChange={() => toggleCharge(item.key)} />
-                          {item.label}
-                        </label>
-                        {form.charges[item.key] && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{item.isQtyRate ? '/Kg' : 'flat'}:</span>
-                            <input 
-                              type="number" 
-                              className="input-field" 
-                              style={{ width: '80px', padding: '0.2rem', fontSize: '0.8rem', height: 'auto' }}
-                              value={form.rates[item.key]} 
-                              onChange={e => handleRateChange(item.key, e.target.value)} 
-                            />
-                          </div>
-                        )}
-                      </div>
+                      <DocChargeRow
+                        key={item.key}
+                        item={item}
+                        charges={form.charges}
+                        rates={form.rates}
+                        qtys={form.qtys}
+                        materialQty={materialQty}
+                        onToggle={toggleCharge}
+                        onQtyChange={handleQtyChange}
+                        onRateChange={handleRateChange}
+                      />
                     ))}
                   </div>
                 </div>

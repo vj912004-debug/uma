@@ -47,6 +47,7 @@ const getDefaultForm = () => ({
   rates: { ...DEFAULT_RATES },
   mainCharges: [{ description: '', psdRequirement: '', rate: '' }],
   optionalCharges: [{ description: '', rate: '' }],
+  productSettings: {},
   validityDate: '2026-06-21',
   terms: 'Tax: GST will charge extra.\nLoss: Loss occurs during Processing is on your account.\nSame Batch: Same materials requirement of micronization separately batch wise of different specification of same materials then change over charge @ Rs. 500/- batch or per specification will be applicable.\nCharges: This is only processing charges, all other charges like Transportation, Insurance, Repacking material charges will be extra.\nPayment: 100% Advance against PI\nValidity: 21/06/2026\nNote: If properties of material change then rate will be change and PSD will change then rate will be change.',
   notes: '1) ABC\n\n2) ABC\n\n3) ABC',
@@ -71,10 +72,78 @@ const buildMainChargesFromMaterial = (charges, rates, qty, psdRequirement) => {
   return rows.length ? rows : [{ description: '', psdRequirement: '', rate: '' }];
 };
 
+const buildChargesFromPartyProduct = (prodConfig) => {
+  const defaultRates = prodConfig?.charges || {};
+  const nextCharges = { ...DEFAULT_CHARGES };
+  Object.keys(defaultRates).forEach((key) => {
+    if ((defaultRates[key] || 0) > 0) nextCharges[key] = true;
+  });
+  nextCharges.cleaning = true;
+  nextCharges.processing = true;
+  return {
+    charges: nextCharges,
+    rates: { ...DEFAULT_RATES, ...defaultRates },
+    psdRequirement: prodConfig?.psdReq || ''
+  };
+};
+
+const snapshotCurrentProductSettings = (form) => {
+  if (!form.productName) return form.productSettings || {};
+  return {
+    ...(form.productSettings || {}),
+    [form.productName]: {
+      qty: form.qty,
+      psdRequirement: form.psdRequirement || '',
+      charges: { ...form.charges },
+      rates: { ...form.rates },
+      mainCharges: JSON.parse(JSON.stringify(form.mainCharges || [])),
+      optionalCharges: JSON.parse(JSON.stringify(form.optionalCharges || []))
+    }
+  };
+};
+
+const applyProductToQuotation = (baseForm, productName, party) => {
+  const productSettings = snapshotCurrentProductSettings(baseForm);
+  const saved = productSettings[productName];
+
+  if (saved) {
+    const charges = { ...DEFAULT_CHARGES, ...saved.charges };
+    const rates = { ...DEFAULT_RATES, ...saved.rates };
+    return {
+      ...baseForm,
+      productName,
+      productSettings,
+      qty: saved.qty ?? '',
+      psdRequirement: saved.psdRequirement || '',
+      charges,
+      rates,
+      mainCharges: saved.mainCharges?.length
+        ? saved.mainCharges
+        : buildMainChargesFromMaterial(charges, rates, saved.qty, saved.psdRequirement)
+    };
+  }
+
+  const prodConfig = (party?.products || []).find(p => p.name === productName);
+  const { charges, rates, psdRequirement } = buildChargesFromPartyProduct(prodConfig);
+  const qty = baseForm.productName === productName ? baseForm.qty : '';
+  return {
+    ...baseForm,
+    productName,
+    productSettings,
+    qty,
+    psdRequirement,
+    charges,
+    rates,
+    mainCharges: buildMainChargesFromMaterial(charges, rates, qty, psdRequirement)
+  };
+};
+
 const Quotations = () => {
   const { data, updateData, updateItem, deleteItemSoftly, incrementSerial } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const [pendingEditData, setPendingEditData] = useState(null);
   
   const [formData, setFormData] = useState(getDefaultForm());
 
@@ -96,41 +165,20 @@ const Quotations = () => {
         partyAddress: party.billAddress || '',
         gstNumber: party.gstinBill || '',
         productName: '',
-        psdRequirement: ''
+        psdRequirement: '',
+        productSettings: {}
       }));
     }
   };
 
-  const handleProductSelect = (e) => {
-    const productName = e.target.value;
-    const party = data.parties.find(p => p.id === formData.partyId);
-    const prodConfig = (party?.products || []).find(p => p.name === productName);
-    const defaultRates = prodConfig?.charges || {};
-
-    const nextCharges = { ...DEFAULT_CHARGES };
-    Object.keys(defaultRates).forEach((key) => {
-      if ((defaultRates[key] || 0) > 0) nextCharges[key] = true;
-    });
-    nextCharges.cleaning = true;
-    nextCharges.processing = true;
-
-    const nextRates = { ...DEFAULT_RATES, ...defaultRates };
-    const psdRequirement = prodConfig?.psdReq || '';
-
-    setFormData(prev => {
-      const updated = {
-        ...prev,
-        productName,
-        psdRequirement,
-        charges: nextCharges,
-        rates: nextRates
-      };
-      return {
-        ...updated,
-        mainCharges: buildMainChargesFromMaterial(nextCharges, nextRates, prev.qty, psdRequirement)
-      };
-    });
+  const loadProduct = (productName, baseForm = formData) => {
+    const party = data.parties.find(p => p.id === baseForm.partyId);
+    setFormData(applyProductToQuotation(baseForm, productName, party));
   };
+
+  const handleProductSelect = (e) => loadProduct(e.target.value);
+
+  const handleSelectProductFromTable = (productName) => loadProduct(productName);
 
   const toggleMaterialCharge = (key) => {
     setFormData(prev => {
@@ -167,27 +215,86 @@ const Quotations = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const productSettings = snapshotCurrentProductSettings(formData);
+    const configuredProducts = Object.keys(productSettings);
+    const payload = {
+      ...formData,
+      productSettings,
+      productName: configuredProducts.length > 1
+        ? configuredProducts.join(', ')
+        : (formData.productName || configuredProducts[0] || '')
+    };
+
     if (formData.id) {
-      updateItem('quotations', formData.id, formData);
+      updateItem('quotations', formData.id, payload);
     } else {
       const newQuotation = {
-        ...formData,
+        ...payload,
         id: Date.now().toString(),
         createdAt: new Date().toISOString()
       };
       updateData('quotations', newQuotation);
       incrementSerial('QT');
     }
+    closeQuotationModal();
+  };
+
+  const openQuotationForm = (data) => {
+    setFormData(data);
+    setIsModalOpen(true);
+  };
+
+  const closeQuotationModal = () => {
     setIsModalOpen(false);
+    setProductPickerOpen(false);
+    setPendingEditData(null);
   };
 
   const handleEdit = (q) => {
-    setFormData({
+    const party = data.parties.find(p => p.id === q.partyId);
+    const baseForm = {
       ...getDefaultForm(),
       ...q,
       charges: { ...DEFAULT_CHARGES, ...(q.charges || {}) },
-      rates: { ...DEFAULT_RATES, ...(q.rates || {}) }
-    });
+      rates: { ...DEFAULT_RATES, ...(q.rates || {}) },
+      productSettings: { ...(q.productSettings || {}) }
+    };
+
+    if (q.productName && !baseForm.productSettings[q.productName?.split(',')[0]?.trim()]) {
+      const firstProduct = q.productName.split(',')[0]?.trim();
+      if (firstProduct) {
+        baseForm.productSettings[firstProduct] = {
+          qty: q.qty,
+          psdRequirement: q.psdRequirement || '',
+          charges: baseForm.charges,
+          rates: baseForm.rates,
+          mainCharges: q.mainCharges || [],
+          optionalCharges: q.optionalCharges || []
+        };
+      }
+    }
+
+    const partyProducts = party?.products || [];
+    if (partyProducts.length > 1) {
+      setPendingEditData({ baseForm, party, partyProducts });
+      setProductPickerOpen(true);
+      return;
+    }
+
+    const productName = q.productName?.split(',')[0]?.trim() || partyProducts[0]?.name || '';
+    openQuotationForm(applyProductToQuotation(baseForm, productName, party));
+  };
+
+  const handleConfirmProductEdit = (productName) => {
+    if (!pendingEditData) return;
+    const { baseForm, party } = pendingEditData;
+    openQuotationForm(applyProductToQuotation(baseForm, productName, party));
+    setProductPickerOpen(false);
+    setPendingEditData(null);
+  };
+
+  const handleNewQuotation = () => {
+    setFormData(getDefaultForm());
     setIsModalOpen(true);
   };
 
@@ -217,10 +324,7 @@ const Quotations = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Quotations</h1>
           <p style={{ color: 'var(--text-muted)' }}>Create and manage commercial proposals.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => {
-          setFormData(getDefaultForm());
-          setIsModalOpen(true);
-        }}>
+        <button className="btn btn-primary" onClick={handleNewQuotation}>
           <Plus size={18} /> New Quotation
         </button>
       </header>
@@ -276,15 +380,72 @@ const Quotations = () => {
         </div>
       </div>
 
+      {/* Product picker — shown when editing a quotation with multiple party products */}
+      {productPickerOpen && pendingEditData && (
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, backdropFilter: 'blur(5px)' }}>
+          <div className="premium-card" style={{ width: '560px', maxWidth: '95%', maxHeight: '85vh', overflowY: 'auto' }}>
+            <h2 style={{ marginBottom: '0.35rem', fontSize: '1.25rem' }}>Select Product to Edit</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+              This party has multiple products. Choose which product&apos;s quotation details you want to edit.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+              {pendingEditData.partyProducts.map(prod => {
+                const settings = pendingEditData.baseForm.productSettings?.[prod.name];
+                const isCurrent = pendingEditData.baseForm.productName?.includes(prod.name);
+                const displayRates = settings?.rates || prod.charges || {};
+                return (
+                  <button
+                    key={prod.name}
+                    type="button"
+                    className="btn"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '0.85rem 1rem',
+                      background: isCurrent ? 'rgba(16,185,129,0.06)' : 'var(--input-bg)',
+                      border: isCurrent ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      textAlign: 'left',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => handleConfirmProductEdit(prod.name)}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{prod.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                        Nick: {prod.nickname || 'N/A'} · PSD: {prod.psdReq || '—'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                        Cleaning ₹{displayRates.cleaning ?? prod.charges?.cleaning ?? 0} · Processing ₹{displayRates.processing ?? prod.charges?.processing ?? 0}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', fontSize: '0.8rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
+                      {settings ? 'Configured' : 'Party default'}
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400, marginTop: '0.15rem' }}>Click to edit</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={closeQuotationModal}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isModalOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem' }}>
-          <div className="premium-card" style={{ width: '800px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h2 style={{ marginBottom: '1.5rem' }}>Create Quotation</h2>
+          <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ marginBottom: '1.5rem' }}>{formData.id ? 'Edit Quotation' : 'Create Quotation'}</h2>
             <form onSubmit={handleSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label>Quotation No</label>
-                  <input type="text" className="input-field" readOnly value={formData.quotationNo} style={{ background: 'var(--glass-bg)' }} />
+                  <input type="text" className="input-field" value={formData.quotationNo} onChange={e => setFormData({ ...formData, quotationNo: e.target.value })} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
                 </div>
                 <div>
                   <label>Date</label>
@@ -319,18 +480,98 @@ const Quotations = () => {
                   <label>Description</label>
                   <textarea className="input-field" rows="2" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
                 </div>
-                <div>
-                  <label>Product / Material *</label>
-                  {partyProducts.length > 0 ? (
-                    <select className="input-field" required value={formData.productName} onChange={handleProductSelect}>
-                      <option value="">-- Select Product --</option>
-                      {partyProducts.map((p, idx) => (
-                        <option key={idx} value={p.name}>{p.name}{p.nickname ? ` (${p.nickname})` : ''}</option>
+              </div>
+
+              {/* Associated Products table — same as Party / Material Receipt */}
+              {formData.partyId && partyProducts.length > 0 && (
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Associated Products &amp; Default Charges</h3>
+                    {formData.productName && (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
+                        Editing: {formData.productName}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ overflowX: 'auto', background: 'var(--input-bg)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                          <th style={{ padding: '0.5rem' }}>Product Name</th>
+                          <th style={{ padding: '0.5rem' }}>Nick Name</th>
+                          <th style={{ padding: '0.5rem' }}>PSD Req</th>
+                          <th style={{ padding: '0.5rem' }}>Cleaning Chg</th>
+                          <th style={{ padding: '0.5rem' }}>Filter Bag</th>
+                          <th style={{ padding: '0.5rem' }}>Processing</th>
+                          <th style={{ padding: '0.5rem' }}>Sieving</th>
+                          <th style={{ padding: '0.5rem' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {partyProducts.map((prod, idx) => {
+                          const isSelected = formData.productName === prod.name;
+                          const savedSettings = formData.productSettings?.[prod.name];
+                          const displayRates = savedSettings?.rates || prod.charges || {};
+                          const isConfigured = Boolean(savedSettings);
+                          return (
+                            <tr
+                              key={idx}
+                              style={{
+                                borderBottom: '1px solid var(--border-color)',
+                                background: isSelected ? 'rgba(16,185,129,0.06)' : isConfigured ? 'rgba(16,185,129,0.02)' : 'transparent'
+                              }}
+                            >
+                              <td style={{ padding: '0.5rem', fontWeight: 600 }}>{prod.name}</td>
+                              <td style={{ padding: '0.5rem' }}>{prod.nickname || 'N/A'}</td>
+                              <td style={{ padding: '0.5rem' }}>{prod.psdReq || '—'}</td>
+                              <td style={{ padding: '0.5rem' }}>₹{displayRates.cleaning ?? prod.charges?.cleaning ?? 0}</td>
+                              <td style={{ padding: '0.5rem' }}>₹{displayRates.filterBag ?? prod.charges?.filterBag ?? 0}</td>
+                              <td style={{ padding: '0.5rem' }}>₹{displayRates.processing ?? prod.charges?.processing ?? 0}</td>
+                              <td style={{ padding: '0.5rem' }}>₹{displayRates.sieving ?? prod.charges?.sieving ?? 0}</td>
+                              <td style={{ padding: '0.5rem' }}>
+                                <button
+                                  type="button"
+                                  className="btn"
+                                  title="Edit quotation for this product"
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: isSelected ? 'var(--accent-primary)' : 'transparent', border: '1px solid var(--border-color)', color: isSelected ? '#fff' : 'inherit' }}
+                                  onClick={() => handleSelectProductFromTable(prod.name)}
+                                >
+                                  <Edit2 size={12} /> Edit
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.5rem 0 0' }}>
+                    Click <strong>Edit</strong> on a product to load its charges and editable fields below.
+                  </p>
+                </div>
+              )}
+
+              {formData.productName ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                {partyProducts.length > 1 && (
+                  <div style={{ gridColumn: 'span 2', padding: '0.85rem 1rem', background: 'rgba(16,185,129,0.06)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                      Which product do you want to edit?
+                    </label>
+                    <select
+                      className="input-field"
+                      value={formData.productName || ''}
+                      onChange={e => handleSelectProductFromTable(e.target.value)}
+                    >
+                      {partyProducts.map(p => (
+                        <option key={p.name} value={p.name}>{p.name}</option>
                       ))}
                     </select>
-                  ) : (
-                    <input type="text" className="input-field" placeholder="e.g. Calcium Carbonate" value={formData.productName} onChange={e => setFormData({ ...formData, productName: e.target.value })} />
-                  )}
+                  </div>
+                )}
+                <div>
+                  <label>Product / Material *</label>
+                  <input type="text" className="input-field" readOnly value={formData.productName} style={{ background: 'var(--glass-bg)' }} />
                 </div>
                 <div>
                   <label>Estimated Qty (Kg)</label>
@@ -349,7 +590,37 @@ const Quotations = () => {
                   <input type="text" className="input-field" value={formData.signatoryName} onChange={e => setFormData({...formData, signatoryName: e.target.value})} />
                 </div>
               </div>
+              ) : partyProducts.length > 0 ? (
+                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--input-bg)', borderRadius: '8px', marginBottom: '1.5rem', border: '1px dashed var(--border-color)' }}>
+                  Select a product from the table above to edit quotation charges and details.
+                </div>
+              ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <label>Product / Material *</label>
+                  <input type="text" className="input-field" placeholder="e.g. Calcium Carbonate" value={formData.productName} onChange={e => setFormData({ ...formData, productName: e.target.value })} />
+                </div>
+                <div>
+                  <label>Estimated Qty (Kg)</label>
+                  <input type="number" className="input-field" placeholder="Qty for rate calculation" value={formData.qty} onChange={e => handleQtyChange(e.target.value)} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>PSD Requirement</label>
+                  <input type="text" className="input-field" placeholder="e.g. d(0.9) < 10 Micron" value={formData.psdRequirement || ''} onChange={e => setFormData({ ...formData, psdRequirement: e.target.value })} />
+                </div>
+                <div>
+                  <label>Validity Date</label>
+                  <input type="date" className="input-field" value={formData.validityDate} onChange={e => setFormData({...formData, validityDate: e.target.value})} />
+                </div>
+                <div>
+                  <label>Signatory Name</label>
+                  <input type="text" className="input-field" value={formData.signatoryName} onChange={e => setFormData({...formData, signatoryName: e.target.value})} />
+                </div>
+              </div>
+              )}
 
+              {formData.productName && (
+              <>
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
                 <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Material Charges (as per Party Master)</h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Rates auto-fill from party product config. Minimum cleaning &amp; processing charges are enabled by default.</p>
@@ -405,10 +676,12 @@ const Quotations = () => {
                 <label>Notes</label>
                 <textarea className="input-field" rows="4" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})}></textarea>
               </div>
+              </>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-                <button type="button" className="btn" onClick={() => setIsModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Quotation</button>
+                <button type="button" className="btn" onClick={closeQuotationModal}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={!formData.productName}>Save Quotation</button>
               </div>
             </form>
           </div>

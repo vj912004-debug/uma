@@ -1,9 +1,9 @@
 import React from 'react';
 import { useAppContext } from '../context/AppContext';
-import { 
-  TrendingUp, 
-  Package, 
-  Users, 
+import {
+  TrendingUp,
+  Package,
+  Users,
   AlertCircle,
   UserCheck,
   UserX,
@@ -16,12 +16,12 @@ import { useNavigate } from 'react-router-dom';
 const StatCard = ({ title, value, icon: Icon, color, path }) => {
   const navigate = useNavigate();
   return (
-    <div 
-      className="premium-card" 
+    <div
+      className="premium-card"
       onClick={() => path && navigate(path)}
-      style={{ 
-        flex: 1, 
-        minWidth: '200px', 
+      style={{
+        flex: 1,
+        minWidth: '200px',
         cursor: path ? 'pointer' : 'default',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
       }}
@@ -39,12 +39,13 @@ const StatCard = ({ title, value, icon: Icon, color, path }) => {
 
 const Dashboard = () => {
   const { data } = useAppContext();
+  const navigate = useNavigate();
 
   return (
     <div>
-      <header style={{ marginBottom: '2.5rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Overview</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Welcome back, here's what's happening today.</p>
+      <header className="page-header">
+        <h1 className="page-title">Overview</h1>
+        <p className="page-subtitle">Welcome back — here's what's happening today.</p>
       </header>
 
       <h3 style={{ marginBottom: '1rem', color: 'var(--text-muted)' }}>Today's Attendance Overview</h3>
@@ -73,8 +74,8 @@ const Dashboard = () => {
               <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>No recent transactions found.</p>
             ) : (
               data.invoices.slice(-5).map((inv, idx) => (
-                <div 
-                  key={idx} 
+                <div
+                  key={idx}
                   onClick={() => navigate('/invoices')}
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', borderRadius: '8px', background: 'var(--glass-bg)', cursor: 'pointer', transition: 'background 0.2s' }}
                 >

@@ -481,6 +481,15 @@ const TI_CHARGES_LIST = [
   { key: 'batchChangeover', label: 'Batch Changeover' }
 ];
 
+const MATERIAL_QTY_CHARGE_KEYS = ['cleaning', 'processing', 'sieving', 'other'];
+
+const getPdfChargeLineQty = (data, key, materialQty) => {
+  const saved = data.qtys?.[key];
+  if (saved != null && saved !== '') return parseFloat(saved) || 0;
+  if (MATERIAL_QTY_CHARGE_KEYS.includes(key)) return materialQty || 1;
+  return 1;
+};
+
 const drawOuterPageBorder = (doc) => {
   const w = doc.internal.pageSize.getWidth();
   const h = doc.internal.pageSize.getHeight();
@@ -674,38 +683,138 @@ const buildTaxInvoicePDF = (doc, data) => {
     if (countQty && typeof rowQty === 'number') totalQty += rowQty;
   };
 
-  if (data.productName) {
-    const prodName = data.productName.toUpperCase().includes('MICRONIZED')
-      ? data.productName.toUpperCase()
-      : `${data.productName.toUpperCase()} MICRONIZED`;
+  const TI_PROCESSING_LABEL = 'Processing Charges';
+  const materialQty = qty;
+  const productLines = getPdfProductLines(data);
+  const normName = (s) => (s || '').trim().toLowerCase();
 
-    if (data.charges?.processing) {
-      const procRate = parseFloat(data.rates?.processing || 0);
-      const procAmt = qty * procRate;
-      if (procAmt > 0 || qty > 0) {
-        addItemRow(prodName, qty, procRate, procAmt);
-        if (hsnCode) {
-          itemsBody.push(['', `HSN CODE : ${hsnCode}`, '', '', '0.00', ...emptyTaxCells]);
+  const mergePdfLineItems = (lines) => {
+    const merged = new Map();
+    lines.forEach((line) => {
+      const rate = parseFloat(line.rate) || 0;
+      const descKey = (line.desc || '').trim().toLowerCase();
+      const key = line.mergeKey
+        ? `${descKey}|${rate.toFixed(2)}|${line.mergeKey}`
+        : `${descKey}|${rate.toFixed(2)}`;
+      const lineQty = parseFloat(line.rowQty) || 0;
+      const lineAmt = parseFloat(line.amt) || 0;
+      if (merged.has(key)) {
+        const prev = merged.get(key);
+        prev.rowQty += lineQty;
+        prev.amt += lineAmt;
+      } else {
+        merged.set(key, { desc: line.desc, rowQty: lineQty, rate, amt: lineAmt, countQty: line.countQty });
+      }
+    });
+    return Array.from(merged.values());
+  };
+
+  const pendingLines = [];
+  const queueLine = (desc, rowQty, rate, amt, mergeKey = '', countQty = true) => {
+    const lineQty = parseFloat(rowQty) || 0;
+    const lineRate = parseFloat(rate) || 0;
+    const lineAmt = parseFloat(amt) || 0;
+    if (lineAmt <= 0 && lineQty <= 0) return;
+    pendingLines.push({ desc, rowQty: lineQty, rate: lineRate, amt: lineAmt, mergeKey, countQty });
+  };
+
+  const getOrderedProductChargeEntries = () => {
+    const pcMap = data.productCharges || {};
+    const chargeKeys = Object.keys(pcMap);
+    const orderedNames = [];
+    const seen = new Set();
+    const addName = (name) => {
+      if (!name) return;
+      const nk = normName(name);
+      if (seen.has(nk)) return;
+      seen.add(nk);
+      orderedNames.push(name);
+    };
+    productLines.forEach(p => addName(p.name));
+    chargeKeys.forEach(k => addName(k));
+    return orderedNames.map(name => {
+      const chargeKey = chargeKeys.find(k => normName(k) === normName(name)) || name;
+      return {
+        prodName: chargeKey,
+        pc: pcMap[chargeKey],
+        summary: productLines.find(p => normName(p.name) === normName(name))
+      };
+    }).filter(entry => entry.pc);
+  };
+
+  let hsnShown = false;
+  const showHsnOnce = () => {
+    if (hsnShown || !hsnCode) return;
+    itemsBody.push(['', `HSN CODE : ${hsnCode}`, '', '', '0.00', ...emptyTaxCells]);
+    hsnShown = true;
+  };
+
+  if (data.productCharges && Object.keys(data.productCharges).length > 0) {
+    getOrderedProductChargeEntries().forEach(({ prodName, pc, summary }) => {
+      const prodQty = summary?.qty || 0;
+      if (pc.charges?.processing) {
+        const rate = parseFloat(pc.rates?.processing || 0);
+        const lineQty = prodQty || parseFloat(pc.qtys?.processing) || 0;
+        const amt = lineQty * rate;
+        if (amt > 0 || lineQty > 0) {
+          queueLine(TI_PROCESSING_LABEL, lineQty, rate, amt, normName(prodName));
+          showHsnOnce();
         }
       }
-    } else {
-      addItemRow(prodName, qty, 0, 0, false);
-      if (hsnCode) {
-        itemsBody.push(['', `HSN CODE : ${hsnCode}`, '', '', '0.00', ...emptyTaxCells]);
+      TI_CHARGES_LIST.filter(c => c.key !== 'processing').forEach((c) => {
+        if (pc.charges?.[c.key]) {
+          const rowQty = pc.qtys?.[c.key] != null && pc.qtys?.[c.key] !== ''
+            ? (parseFloat(pc.qtys[c.key]) || 0)
+            : 1;
+          const rate = parseFloat(pc.rates?.[c.key] || 0);
+          const amt = rowQty * rate;
+          if (amt > 0) {
+            queueLine(c.label, rowQty, rate, amt, '', false);
+          }
+        }
+      });
+    });
+  } else {
+    if (data.charges?.processing && productLines.length) {
+      productLines.forEach(({ name, qty: lineQtyVal }) => {
+        const procRate = parseFloat(data.rates?.processing || 0);
+        const lineQty = lineQtyVal || materialQty;
+        const amt = lineQty * procRate;
+        if (amt > 0 || lineQty > 0) {
+          queueLine(TI_PROCESSING_LABEL, lineQty, procRate, amt, normName(name));
+          showHsnOnce();
+        }
+      });
+    } else if (data.charges?.processing) {
+      const procRate = parseFloat(data.rates?.processing || 0);
+      const procQty = getPdfChargeLineQty(data, 'processing', materialQty);
+      const procAmt = procQty * procRate;
+      if (procAmt > 0 || procQty > 0) {
+        queueLine(TI_PROCESSING_LABEL, procQty, procRate, procAmt);
+        showHsnOnce();
       }
+    } else if (data.productName) {
+      const prodName = data.productName.toUpperCase().includes('MICRONIZED')
+        ? data.productName.toUpperCase()
+        : `${data.productName.toUpperCase()} MICRONIZED`;
+      queueLine(prodName, qty, 0, 0, '', false);
+      showHsnOnce();
     }
+
+    TI_CHARGES_LIST.filter((c) => c.key !== 'processing').forEach((c) => {
+      if (data.charges?.[c.key]) {
+        const rowQty = getPdfChargeLineQty(data, c.key, materialQty);
+        const rate = parseFloat(data.rates?.[c.key] || 0);
+        const amt = rowQty * rate;
+        if (amt > 0) {
+          queueLine(c.label, rowQty, rate, amt, '', false);
+        }
+      }
+    });
   }
 
-  TI_CHARGES_LIST.filter((c) => c.key !== 'processing').forEach((c) => {
-    if (data.charges?.[c.key]) {
-      const isQty = ['cleaning', 'sieving'].includes(c.key);
-      const rowQty = isQty ? qty : 1;
-      const rate = parseFloat(data.rates?.[c.key] || 0);
-      const amt = rowQty * rate;
-      if (amt > 0) {
-        addItemRow(c.label, isQty ? rowQty : '1', rate, amt, false);
-      }
-    }
+  mergePdfLineItems(pendingLines).forEach((line) => {
+    addItemRow(line.desc, line.rowQty, line.rate, line.amt, line.countQty !== false);
   });
 
   if (data.customCharges?.length) {
@@ -846,12 +955,12 @@ const DEFAULT_PO_TERMS = '1. Delivery 10 days from the date of Purchase Order.\n
 const calcPoSubtotal = (data) => {
   const saved = parseFloat(data.subtotal);
   if (!Number.isNaN(saved) && saved >= 0 && data.subtotal != null) return saved;
-  const qty = parseFloat(data.qty) || 0;
+  const materialQty = parseFloat(data.qty) || 0;
   return Object.keys(data.charges || {}).reduce((sum, key) => {
     if (data.charges[key]) {
-      const isQtyRate = ['processing', 'sieving', 'cleaning'].includes(key);
+      const rowQty = getPdfChargeLineQty(data, key, materialQty);
       const rate = parseFloat(data.rates?.[key] || 0);
-      return sum + (isQtyRate ? qty * rate : rate);
+      return sum + rowQty * rate;
     }
     return sum;
   }, 0);
@@ -1094,6 +1203,27 @@ const buildPurchaseOrderPDF = (doc, data) => {
   drawOuterPageBorder(doc);
 };
 
+const getPdfProductLines = (data) => {
+  if (data.productSummaries?.length) {
+    return data.productSummaries.map(p => ({
+      name: p.prodName || '',
+      qty: parseFloat(p.qty) || 0
+    })).filter(p => p.name);
+  }
+  if (data.productName?.includes(',')) {
+    return data.productName.split(',').map(name => ({
+      name: name.trim(),
+      qty: 0
+    })).filter(p => p.name);
+  }
+  if (data.productName) {
+    return [{ name: data.productName, qty: parseFloat(data.qty) || 0 }];
+  }
+  return [];
+};
+
+const PI_PROCESSING_LABEL = 'Processing Charges';
+
 const PI_HEADER_FILL = [180, 200, 240];
 const PI_ITEM_ROWS = 11;
 const PI_CHARGES_LIST = TI_CHARGES_LIST;
@@ -1273,17 +1403,121 @@ const buildPerformaInvoicePDF = (doc, data) => {
     totalQty += typeof rowQty === 'number' ? rowQty : (parseFloat(rowQty) || 0);
   };
 
-  PI_CHARGES_LIST.forEach((c) => {
+  const mergePdfLineItems = (lines) => {
+    const merged = new Map();
+    lines.forEach((line) => {
+      const rate = parseFloat(line.rate) || 0;
+      const descKey = (line.desc || '').trim().toLowerCase();
+      const key = line.mergeKey
+        ? `${descKey}|${rate.toFixed(2)}|${line.mergeKey}`
+        : `${descKey}|${rate.toFixed(2)}`;
+      const qty = parseFloat(line.rowQty) || 0;
+      const amt = parseFloat(line.amt) || 0;
+      if (merged.has(key)) {
+        const prev = merged.get(key);
+        prev.rowQty += qty;
+        prev.amt += amt;
+      } else {
+        merged.set(key, { desc: line.desc, rowQty: qty, rate, amt });
+      }
+    });
+    return Array.from(merged.values());
+  };
+
+  const pendingLines = [];
+  const queueLine = (desc, rowQty, rate, amt, mergeKey = '') => {
+    const qty = parseFloat(rowQty) || 0;
+    const lineRate = parseFloat(rate) || 0;
+    const lineAmt = parseFloat(amt) || 0;
+    if (lineAmt <= 0 && qty <= 0) return;
+    pendingLines.push({ desc, rowQty: qty, rate: lineRate, amt: lineAmt, mergeKey });
+  };
+
+  const productLines = getPdfProductLines(data);
+  const normName = (s) => (s || '').trim().toLowerCase();
+
+  const getOrderedProductChargeEntries = () => {
+    const pcMap = data.productCharges || {};
+    const chargeKeys = Object.keys(pcMap);
+    const orderedNames = [];
+    const seen = new Set();
+
+    const addName = (name) => {
+      if (!name) return;
+      const nk = normName(name);
+      if (seen.has(nk)) return;
+      seen.add(nk);
+      orderedNames.push(name);
+    };
+
+    productLines.forEach(p => addName(p.name));
+    chargeKeys.forEach(k => addName(k));
+
+    return orderedNames.map(name => {
+      const chargeKey = chargeKeys.find(k => normName(k) === normName(name)) || name;
+      return {
+        prodName: chargeKey,
+        pc: pcMap[chargeKey],
+        summary: productLines.find(p => normName(p.name) === normName(name))
+      };
+    }).filter(entry => entry.pc);
+  };
+
+  if (data.productCharges && Object.keys(data.productCharges).length > 0) {
+    getOrderedProductChargeEntries().forEach(({ prodName, pc, summary }) => {
+      const prodQty = summary?.qty || 0;
+
+      if (pc.charges?.processing) {
+        const rate = parseFloat(pc.rates?.processing || 0);
+        const lineQty = prodQty || parseFloat(pc.qtys?.processing) || 0;
+        const amt = lineQty * rate;
+        if (amt > 0 || lineQty > 0) {
+          queueLine(PI_PROCESSING_LABEL, lineQty, rate, amt, normName(prodName));
+        }
+      }
+
+      PI_CHARGES_LIST.filter(c => c.key !== 'processing').forEach((c) => {
+        if (pc.charges?.[c.key]) {
+          const rowQty = pc.qtys?.[c.key] != null && pc.qtys?.[c.key] !== ''
+            ? (parseFloat(pc.qtys[c.key]) || 0)
+            : 1;
+          const rate = parseFloat(pc.rates?.[c.key] || 0);
+          const amt = rowQty * rate;
+          if (amt > 0) {
+            queueLine(c.label, rowQty, rate, amt);
+          }
+        }
+      });
+    });
+  } else {
+  const procRate = parseFloat(data.rates?.processing || 0);
+  if (data.charges?.processing && productLines.length) {
+    productLines.forEach(({ name, qty }) => {
+      const lineQty = qty || materialQty;
+      const amt = lineQty * procRate;
+      if (amt > 0 || lineQty > 0) {
+        queueLine(PI_PROCESSING_LABEL, lineQty, procRate, amt, normName(name));
+      }
+    });
+  } else if (data.charges?.processing) {
+    const rowQty = getPdfChargeLineQty(data, 'processing', materialQty);
+    const amt = rowQty * procRate;
+    if (amt > 0) {
+      queueLine(PI_PROCESSING_LABEL, rowQty, procRate, amt);
+    }
+  }
+
+  PI_CHARGES_LIST.filter(c => c.key !== 'processing').forEach((c) => {
     if (data.charges?.[c.key]) {
-      const isQty = ['cleaning', 'processing', 'sieving'].includes(c.key);
-      const rowQty = isQty ? materialQty : 1;
+      const rowQty = getPdfChargeLineQty(data, c.key, materialQty);
       const rate = parseFloat(data.rates?.[c.key] || 0);
-      const amt = isQty ? rowQty * rate : rate;
+      const amt = rowQty * rate;
       if (amt > 0) {
-        addItemRow(c.label, isQty ? rowQty : '1', rate, amt);
+        queueLine(c.label, rowQty, rate, amt);
       }
     }
   });
+  }
 
   if (data.customCharges?.length) {
     data.customCharges.forEach((cc) => {
@@ -1292,11 +1526,15 @@ const buildPerformaInvoicePDF = (doc, data) => {
         const rate = parseFloat(cc.rate) || 0;
         const amt = ccQty * rate;
         if (amt > 0) {
-          addItemRow(cc.name, ccQty, rate, amt);
+          queueLine(cc.name || 'Custom Charge', ccQty, rate, amt);
         }
       }
     });
   }
+
+  mergePdfLineItems(pendingLines).forEach((line) => {
+    addItemRow(line.desc, line.rowQty, line.rate, line.amt);
+  });
 
   const discount = parseFloat(data.discount) || 0;
   if (discount > 0) {

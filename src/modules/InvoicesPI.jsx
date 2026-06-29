@@ -1,13 +1,38 @@
 import { formatDate } from '../utils/dateUtils';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { generateDocNumber } from '../utils/numbering';
+import { generateDocNumber, nextAvailableDocNumber } from '../utils/numbering';
 import { Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfExport';
 import ExportButton from '../components/ExportButton';
+import DocChargeRow from '../components/DocChargeRow';
+import {
+  STANDARD_CHARGES_LIST,
+  defaultChargeFlags,
+  defaultChargeRates,
+  emptyChargeQtys,
+  calcStandardChargesSubtotal,
+  parseChargeFieldValue,
+  mergeSavedDocCharges,
+  getFreshMaterialReceipt,
+  findAnyProformaInvoice,
+  initProductChargesFromMR,
+  normalizeProductChargesFromDoc,
+  sanitizeProductCharges,
+  calcProductChargesSubtotal,
+  enrichPIForPrint
+} from '../utils/documentCharges';
+import {
+  getReceiptProductLabel,
+  getReceiptProductNames,
+  getReceiptProductSummaries,
+  getProductQty,
+  getProductDisplayIndex,
+  receiptProductOptions
+} from '../utils/receiptProducts';
 
 const InvoicesPI = () => {
-  const { data, updateData, updateItem, deleteItemSoftly, incrementSerial } = useAppContext();
+  const { data, updateData, updateItem, deleteItemSoftly, ensureSerialAtLeast } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
@@ -21,6 +46,7 @@ const InvoicesPI = () => {
     partyDocDate: '',
     partyName: '',
     productName: '',
+    productSummaries: [],
     billAddress: '',
     shipAddress: '',
     gstinBill: '',
@@ -28,82 +54,220 @@ const InvoicesPI = () => {
     dcNo: 'Verbal',
     dcDate: '',
     qty: 0,
-    charges: {
-      cleaning: true, filterBag: false, processing: true, sieving: false,
-      psdReport: false, liner: false, courier: false, fiberDrum: false,
-      transportation: false, hdpeDrum: false, batchChangeover: false
-    },
-    rates: {
-      cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
-      liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
-    },
+    charges: defaultChargeFlags(),
+    rates: defaultChargeRates(),
+    qtys: emptyChargeQtys(),
     discount: 0,
     taxRate: 18,
     terms: '100% advance against PI.',
-    customCharges: [] // Array of { name: '', hsn: '', rate: 0, qty: 1, checked: true }
+    customCharges: [], // Array of { name: '', hsn: '', rate: 0, qty: 1, checked: true }
+    productCharges: {}
   });
 
-  const activeMR = editingDoc ? data.materialReceipts.find(mr => mr.id === editingDoc.receiptId) : selectedMR;
+  const activeMR = editingDoc
+    ? getFreshMaterialReceipt(data.materialReceipts, editingDoc.receiptId)
+    : selectedMR
+      ? getFreshMaterialReceipt(data.materialReceipts, selectedMR)
+      : null;
   const party = data.parties.find(p => p.id === activeMR?.partyId);
-  const prodConfig = (party?.products || []).find(p => p.name === activeMR?.productName);
+
+  const buildFormFromMR = (mr, docDate) => {
+    const freshMR = getFreshMaterialReceipt(data.materialReceipts, mr);
+    if (!freshMR) return null;
+    const prodOpts = receiptProductOptions(freshMR, data);
+    const mrParty = prodOpts.party || data.parties.find(p => p.id === freshMR.partyId);
+    const productLabel = getReceiptProductLabel(freshMR, prodOpts);
+    const productSummaries = getReceiptProductSummaries(freshMR, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
+    const materialQty = productSummaries.reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0)
+      || parseFloat(freshMR.totalQty)
+      || 0;
+    const productCharges = initProductChargesFromMR(freshMR, mrParty, prodOpts);
+    const piSerial = data.settings?.serials?.PI || 1;
+    return {
+      invoiceNo: generateDocNumber('PI', piSerial, new Date(docDate)),
+      date: docDate,
+      partyDocNo: freshMR.partyDocNo,
+      partyDocDate: freshMR.partyDocDate,
+      partyName: freshMR.partyName,
+      productName: productLabel,
+      productSummaries,
+      billAddress: freshMR.billAddress || '',
+      shipAddress: freshMR.shipAddress || '',
+      gstinBill: freshMR.gstinBill || '',
+      gstinShip: freshMR.gstinShip || '',
+      dcNo: 'Verbal',
+      dcDate: docDate,
+      qty: materialQty,
+      productCharges,
+      charges: defaultChargeFlags(),
+      rates: defaultChargeRates(),
+      qtys: emptyChargeQtys(),
+      customCharges: [],
+      discount: 0,
+      taxRate: 18,
+      terms: '100% advance against PI.'
+    };
+  };
 
   useEffect(() => {
-    if (editingDoc) {
-      setForm(editingDoc);
-    } else if (selectedMR && activeMR) {
-      const piSerial = data.settings?.serials?.PI || 1;
-      const docNo = generateDocNumber('PI', piSerial, new Date(form.date));
-      const defaultRates = prodConfig?.charges || activeMR?.rates || {};
+    if (!isModalOpen) return;
 
+    if (editingDoc) {
+      const mr = getFreshMaterialReceipt(data.materialReceipts, editingDoc.receiptId);
+      const prodOpts = mr ? receiptProductOptions(mr, data) : {};
+      const productSummaries = mr
+        ? getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0)
+        : (editingDoc.productSummaries || []);
+      const merged = mergeSavedDocCharges(editingDoc, parseFloat(editingDoc.qty) || 0);
+      const productCharges = mr
+        ? normalizeProductChargesFromDoc(editingDoc.productCharges, editingDoc, mr, prodOpts, prodOpts.party)
+        : (editingDoc.productCharges || {});
+      setForm(prev => ({
+        ...editingDoc,
+        ...merged,
+        productName: mr ? getReceiptProductLabel(mr, prodOpts) : (editingDoc.productName || ''),
+        productSummaries: productSummaries.length ? productSummaries : (editingDoc.productSummaries || []),
+        productCharges,
+        invoiceNo: prev.invoiceNo || editingDoc.invoiceNo,
+        date: prev.date || editingDoc.date
+      }));
+      return;
+    }
+
+    if (selectedMR) {
+      const freshMR = getFreshMaterialReceipt(data.materialReceipts, selectedMR);
+      if (!freshMR) return;
+      const prodOpts = receiptProductOptions(freshMR, data);
+      const mrParty = prodOpts.party || data.parties.find(p => p.id === freshMR.partyId);
+      const productLabel = getReceiptProductLabel(freshMR, prodOpts);
+      const productSummaries = getReceiptProductSummaries(freshMR, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
+      const materialQty = productSummaries.reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0)
+        || parseFloat(freshMR.totalQty)
+        || 0;
+      const productCharges = initProductChargesFromMR(freshMR, mrParty, prodOpts);
       setForm(prev => ({
         ...prev,
-        invoiceNo: docNo,
-        partyDocNo: activeMR.partyDocNo,
-        partyDocDate: activeMR.partyDocDate,
-        partyName: activeMR.partyName,
-        productName: activeMR.productName,
-        billAddress: activeMR.billAddress || '',
-        shipAddress: activeMR.shipAddress || '',
-        gstinBill: activeMR.gstinBill || '',
-        gstinShip: activeMR.gstinShip || '',
-        dcNo: 'Verbal',
-        dcDate: form.date,
-        qty: activeMR.totalQty,
-        charges: activeMR.charges || prev.charges,
-        rates: {
-          ...prev.rates,
-          ...defaultRates
-        },
-        customCharges: activeMR.customCharges ? JSON.parse(JSON.stringify(activeMR.customCharges)) : []
+        productName: productLabel,
+        productSummaries,
+        qty: materialQty,
+        productCharges
       }));
     }
-  }, [form.date, editingDoc, selectedMR, activeMR, prodConfig, data.settings?.serials?.PI]);
+  }, [editingDoc?.id, selectedMR?.id, isModalOpen]);
+
+  useEffect(() => {
+    if (editingDoc || !isModalOpen) return;
+    const piSerial = data.settings?.serials?.PI || 1;
+    const docNo = generateDocNumber('PI', piSerial, new Date(form.date));
+    setForm(prev => (prev.invoiceNo === docNo ? prev : { ...prev, invoiceNo: docNo, dcDate: form.date }));
+  }, [form.date, editingDoc, isModalOpen, data.settings?.serials?.PI]);
+
+  const handleMaterialQtyChange = (val) => {
+    setForm(prev => ({ ...prev, qty: parseFloat(val) || 0 }));
+  };
+
+  const prodOpts = activeMR ? receiptProductOptions(activeMR, data) : {};
+  const chargeProductNames = activeMR
+    ? getReceiptProductNames(activeMR, prodOpts)
+    : Object.keys(form.productCharges || {});
+
+  const getProductChargeBlock = (prodName) =>
+    form.productCharges?.[prodName]
+    || form.productCharges?.[Object.keys(form.productCharges || {}).find(k =>
+      (k || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase()
+    )]
+    || { charges: defaultChargeFlags(), rates: defaultChargeRates(), qtys: emptyChargeQtys() };
+
+  const toggleProductCharge = (prodName, key) => {
+    setForm(prev => {
+      const pc = prev.productCharges?.[prodName]
+        || prev.productCharges?.[Object.keys(prev.productCharges || {}).find(k =>
+          (k || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase()
+        )]
+        || { charges: defaultChargeFlags(), rates: defaultChargeRates(), qtys: emptyChargeQtys() };
+      const turningOn = !pc.charges[key];
+      const qtys = { ...(pc.qtys || emptyChargeQtys()) };
+      if (turningOn && (qtys[key] == null || qtys[key] === '')) {
+        qtys[key] = 1;
+      }
+      return {
+        ...prev,
+        productCharges: {
+          ...(prev.productCharges || {}),
+          [prodName]: {
+            ...pc,
+            charges: { ...pc.charges, [key]: turningOn },
+            qtys
+          }
+        }
+      };
+    });
+  };
+
+  const handleProductRateChange = (prodName, key, val) => {
+    setForm(prev => {
+      const pc = prev.productCharges?.[prodName]
+        || { charges: defaultChargeFlags(), rates: defaultChargeRates(), qtys: emptyChargeQtys() };
+      return {
+        ...prev,
+        productCharges: {
+          ...(prev.productCharges || {}),
+          [prodName]: {
+            ...pc,
+            rates: { ...pc.rates, [key]: parseChargeFieldValue(val) }
+          }
+        }
+      };
+    });
+  };
+
+  const handleProductQtyChange = (prodName, key, val) => {
+    setForm(prev => {
+      const pc = prev.productCharges?.[prodName]
+        || { charges: defaultChargeFlags(), rates: defaultChargeRates(), qtys: emptyChargeQtys() };
+      return {
+        ...prev,
+        productCharges: {
+          ...(prev.productCharges || {}),
+          [prodName]: {
+            ...pc,
+            qtys: { ...(pc.qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) }
+          }
+        }
+      };
+    });
+  };
 
   const toggleCharge = (key) => {
-    setForm(prev => ({
-      ...prev,
-      charges: { ...prev.charges, [key]: !prev.charges[key] }
-    }));
+    setForm(prev => {
+      const turningOn = !prev.charges[key];
+      const qtys = { ...(prev.qtys || emptyChargeQtys()) };
+      if (turningOn && (qtys[key] == null || qtys[key] === '')) {
+        qtys[key] = 1;
+      }
+      return {
+        ...prev,
+        charges: { ...prev.charges, [key]: turningOn },
+        qtys
+      };
+    });
   };
 
   const handleRateChange = (key, val) => {
     setForm(prev => ({
       ...prev,
-      rates: { ...prev.rates, [key]: parseFloat(val) || 0 }
+      rates: { ...prev.rates, [key]: parseChargeFieldValue(val) }
+    }));
+  };
+
+  const handleQtyChange = (key, val) => {
+    setForm(prev => ({
+      ...prev,
+      qtys: { ...(prev.qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) }
     }));
   };
 
   const getSubtotal = () => {
-    const standardSum = Object.keys(form.charges).reduce((sum, key) => {
-      if (form.charges[key]) {
-        const isQtyRate = ['processing', 'sieving', 'cleaning'].includes(key);
-        const qty = parseFloat(form.qty) || 0;
-        const rate = form.rates[key] || 0;
-        return sum + (isQtyRate ? qty * rate : rate);
-      }
-      return sum;
-    }, 0);
-
     const customSum = (form.customCharges || []).reduce((sum, charge) => {
       if (charge.checked) {
         return sum + ((parseFloat(charge.qty) || 0) * (parseFloat(charge.rate) || 0));
@@ -111,37 +275,39 @@ const InvoicesPI = () => {
       return sum;
     }, 0);
 
-    return standardSum + customSum;
+    if (activeMR && Object.keys(form.productCharges || {}).length > 0) {
+      return calcProductChargesSubtotal(form.productCharges, activeMR, prodOpts) + customSum;
+    }
+
+    const materialQty = parseFloat(form.qty) || 0;
+    return calcStandardChargesSubtotal(form.charges, form.rates, form.qtys, materialQty) + customSum;
   };
 
   const handleCreate = (mr) => {
+    const docDate = new Date().toISOString().split('T')[0];
+    const fromMR = buildFormFromMR(mr, docDate);
     setSelectedMR(mr);
     setEditingDoc(null);
-    setForm({
+    setForm(fromMR || {
       invoiceNo: '',
-      date: new Date().toISOString().split('T')[0],
+      date: docDate,
       partyDocNo: '',
       partyDocDate: '',
-      charges: {
-        cleaning: true, filterBag: false, processing: true, sieving: false,
-        psdReport: false, liner: false, courier: false, fiberDrum: false,
-        transportation: false, hdpeDrum: false, batchChangeover: false
-      },
-      rates: {
-        cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
-        liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
-      },
+      charges: defaultChargeFlags(),
+      rates: defaultChargeRates(),
+      qtys: emptyChargeQtys(),
       discount: 0,
       taxRate: 18,
       terms: '100% advance against PI.',
       partyName: '',
       productName: '',
+    productSummaries: [],
       billAddress: '',
       shipAddress: '',
       gstinBill: '',
       gstinShip: '',
       dcNo: 'Verbal',
-      dcDate: '',
+      dcDate: docDate,
       qty: 0,
       customCharges: []
     });
@@ -158,20 +324,15 @@ const InvoicesPI = () => {
       date: new Date().toISOString().split('T')[0],
       partyDocNo: '',
       partyDocDate: '',
-      charges: {
-        cleaning: true, filterBag: false, processing: true, sieving: false,
-        psdReport: false, liner: false, courier: false, fiberDrum: false,
-        transportation: false, hdpeDrum: false, batchChangeover: false
-      },
-      rates: {
-        cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
-        liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
-      },
+      charges: defaultChargeFlags(),
+      rates: defaultChargeRates(),
+      qtys: emptyChargeQtys(),
       discount: 0,
       taxRate: 18,
       terms: '100% advance against PI.',
       partyName: '',
       productName: '',
+    productSummaries: [],
       billAddress: '',
       shipAddress: '',
       gstinBill: '',
@@ -179,14 +340,17 @@ const InvoicesPI = () => {
       dcNo: 'Verbal',
       dcDate: '',
       qty: 0,
-      customCharges: []
+      customCharges: [],
+      productCharges: {}
     });
     setIsModalOpen(true);
   };
 
+  const enrichPIForExport = (pi) => enrichPIForPrint(pi, data);
+
   const handleEdit = (pi) => {
     setEditingDoc(pi);
-    setForm(pi);
+    setSelectedMR(null);
     setIsModalOpen(true);
   };
 
@@ -198,11 +362,41 @@ const InvoicesPI = () => {
     const taxAmount = taxable * (form.taxRate / 100);
     const total = taxable + taxAmount;
 
+    const prodOpts = activeMR ? receiptProductOptions(activeMR, data) : {};
+    const productSummaries = activeMR
+      ? getReceiptProductSummaries(activeMR, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0)
+      : (form.productSummaries || []);
+    const productName = activeMR
+      ? getReceiptProductLabel(activeMR, prodOpts)
+      : form.productName;
+    const sanitizedProductCharges = activeMR
+      ? sanitizeProductCharges(form.productCharges)
+      : (form.productCharges || {});
+    const firstProd = chargeProductNames[0] || productName;
+    const legacyBlock = sanitizedProductCharges[firstProd] || {};
+
+    const piPool = (data.invoices || []).filter(inv =>
+      !inv.isDeleted && (inv.type === 'Proforma Invoice' || inv.invoiceNo?.includes('/PI/'))
+    );
+    const { docNo, nextSerial } = nextAvailableDocNumber(
+      'PI',
+      data.settings?.serials?.PI || 1,
+      form.date,
+      piPool,
+      { excludeId: editingDoc?.id }
+    );
+
     const finalDoc = {
       ...form,
-      receiptId: activeMR?.id || '',
+      receiptId: activeMR?.id || editingDoc?.receiptId || '',
       partyName: form.partyName,
-      productName: form.productName,
+      productName,
+      productSummaries,
+      productCharges: sanitizedProductCharges,
+      charges: legacyBlock.charges || form.charges,
+      rates: legacyBlock.rates || form.rates,
+      qtys: legacyBlock.qtys || form.qtys,
+      invoiceNo: editingDoc ? form.invoiceNo : docNo,
       qty: form.qty,
       subtotal,
       taxAmount,
@@ -213,15 +407,19 @@ const InvoicesPI = () => {
     if (editingDoc) {
       updateItem('invoices', editingDoc.id, finalDoc);
     } else {
+      if (activeMR?.id && findAnyProformaInvoice(data.invoices, activeMR.id)) {
+        alert('A Proforma Invoice already exists for this Material Receipt. Please edit the existing PI.');
+        return;
+      }
       updateData('invoices', { ...finalDoc, id: Date.now().toString() });
-      incrementSerial('PI');
+      ensureSerialAtLeast('PI', nextSerial);
     }
     setIsModalOpen(false);
+    setSelectedMR(null);
   };
 
-  // Find MRs that do not have a PI generated yet
-  const pendingMRs = data.materialReceipts.filter(mr => 
-    !(data.invoices || []).some(inv => inv.receiptId === mr.id && inv.type === 'Proforma Invoice')
+  const pendingMRs = (data.materialReceipts || []).filter(mr =>
+    !findAnyProformaInvoice(data.invoices, mr.id)
   );
 
   const piList = (data.invoices || []).filter(inv => inv.type === 'Proforma Invoice' && !inv.isDeleted);
@@ -238,19 +436,8 @@ const InvoicesPI = () => {
     { label: 'Total (₹)', key: 'total' }
   ];
 
-  const chargesList = [
-    { key: 'cleaning', label: 'Cleaning Charges (998842)', isQtyRate: true },
-    { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
-    { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true },
-    { key: 'sieving', label: 'Sieving Charges (998842)', isQtyRate: true },
-    { key: 'psdReport', label: 'PSD Report Charges (998346)', isQtyRate: false },
-    { key: 'liner', label: 'Liner (39233090)', isQtyRate: false },
-    { key: 'courier', label: 'Courier (996812)', isQtyRate: false },
-    { key: 'fiberDrum', label: 'Fiber Drum (7310)', isQtyRate: false },
-    { key: 'transportation', label: 'Transportation (996511)', isQtyRate: false },
-    { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },
-    { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
-  ];
+  const chargesList = STANDARD_CHARGES_LIST;
+  const materialQty = parseFloat(form.qty) || 0;
 
   return (
     <div>
@@ -274,12 +461,15 @@ const InvoicesPI = () => {
             <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
             Pending M.R. Queue
           </h3>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Select a Material Receipt to generate a Proforma Invoice.</p>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Select a Material Receipt to generate one combined Proforma Invoice for all products.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {pendingMRs.length === 0 ? (
               <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', fontSize: '0.85rem' }}>No pending receipts awaiting PI.</p>
             ) : (
-              pendingMRs.map(mr => (
+              pendingMRs.map(mr => {
+                const prodOpts = receiptProductOptions(mr, data);
+                const productLabel = getReceiptProductLabel(mr, prodOpts);
+                return (
                 <div 
                   key={mr.id} 
                   className="glass-panel" 
@@ -288,9 +478,11 @@ const InvoicesPI = () => {
                 >
                   <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{mr.receiptNo}</p>
                   <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.25rem 0' }}>{mr.partyName}</p>
+                  <p style={{ fontSize: '0.8rem', margin: '0 0 0.25rem 0' }}>{productLabel || mr.productName || '—'}</p>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Weight: {mr.totalQty?.toFixed(1) || 0} Kg</p>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -338,7 +530,7 @@ const InvoicesPI = () => {
                       <td style={{ fontWeight: 600 }}>₹{pi.total?.toFixed(2)}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => exportToPDF('PI', pi)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
+                          <button onClick={() => exportToPDF('PI', enrichPIForExport(pi))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
                           <button onClick={() => handleEdit(pi)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={14} /></button>
                           <button onClick={() => deleteItemSoftly('invoices', pi.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }}>
                             <Trash2 size={14} />
@@ -381,13 +573,23 @@ const InvoicesPI = () => {
                   <label>Party Name</label>
                   <input type="text" className="input-field" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
                 </div>
-                <div>
+                <div style={{ gridColumn: 'span 2' }}>
                   <label>Product Name</label>
-                  <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
+                  <input type="text" className="input-field" readOnly value={form.productName} />
+                  {(form.productSummaries || []).length > 0 && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      {(form.productSummaries || []).map((p, idx) => (
+                        <div key={p.prodName || idx} style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '0.35rem 0.5rem', background: 'var(--glass-bg)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                          <strong style={{ color: 'var(--text-main)' }}>{p.prodName}</strong>
+                          <span> · {parseFloat(p.qty || 0).toFixed(2)} Kg · {p.drums || 0} drum{(p.drums || 0) !== 1 ? 's' : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label>Material Qty (Kg)</label>
-                  <input type="number" step="any" className="input-field" value={form.qty} onChange={e => setForm({...form, qty: parseFloat(e.target.value) || 0})} />
+                  <input type="number" step="any" className="input-field" value={form.qty} onChange={e => handleMaterialQtyChange(e.target.value)} />
                 </div>
                 <div>
                   <label>Delivery Challan No.</label>
@@ -419,28 +621,51 @@ const InvoicesPI = () => {
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
                 <div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {chargesList.map(item => (
-                      <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem', background: 'var(--glass-bg)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', cursor: 'pointer', margin: 0 }}>
-                          <input type="checkbox" checked={form.charges[item.key]} onChange={() => toggleCharge(item.key)} />
-                          {item.label}
-                        </label>
-                        {form.charges[item.key] && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{item.isQtyRate ? '/Kg' : 'flat'}:</span>
-                            <input 
-                              type="number" 
-                              className="input-field" 
-                              style={{ width: '80px', padding: '0.2rem', fontSize: '0.8rem', height: 'auto' }}
-                              value={form.rates[item.key]} 
-                              onChange={e => handleRateChange(item.key, e.target.value)} 
-                            />
+                  {activeMR && chargeProductNames.length > 0 ? (
+                    chargeProductNames.map(prodName => {
+                      const pc = getProductChargeBlock(prodName);
+                      const prodQty = getProductQty(activeMR, prodName, prodOpts);
+                      const displayIdx = getProductDisplayIndex(activeMR, prodName, prodOpts);
+                      return (
+                        <div key={prodName} style={{ marginBottom: '1.25rem', padding: '1rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                          <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                            Product {displayIdx}: {prodName} ({prodQty.toFixed(2)} Kg)
+                          </h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {chargesList.map(item => (
+                              <DocChargeRow
+                                key={`${prodName}-${item.key}`}
+                                item={item}
+                                charges={pc.charges}
+                                rates={pc.rates}
+                                qtys={pc.qtys}
+                                materialQty={prodQty}
+                                onToggle={(key) => toggleProductCharge(prodName, key)}
+                                onQtyChange={(key, val) => handleProductQtyChange(prodName, key, val)}
+                                onRateChange={(key, val) => handleProductRateChange(prodName, key, val)}
+                              />
+                            ))}
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {chargesList.map(item => (
+                        <DocChargeRow
+                          key={item.key}
+                          item={item}
+                          charges={form.charges}
+                          rates={form.rates}
+                          qtys={form.qtys}
+                          materialQty={materialQty}
+                          onToggle={toggleCharge}
+                          onQtyChange={handleQtyChange}
+                          onRateChange={handleRateChange}
+                        />
+                      ))}
+                    </div>
+                  )}
 
                   <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -529,7 +754,7 @@ const InvoicesPI = () => {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
-                <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => setIsModalOpen(false)}>Cancel</button>
+                <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => { setIsModalOpen(false); setSelectedMR(null); }}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Proforma Invoice</button>
               </div>
             </form>

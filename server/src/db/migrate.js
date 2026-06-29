@@ -1,0 +1,20 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { pool } from './pool.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+async function migrate() {
+  const schemaPath = path.join(__dirname, 'schema.sql');
+  const sql = fs.readFileSync(schemaPath, 'utf8');
+  await pool.query(sql);
+  console.log('Database schema applied successfully.');
+}
+
+migrate()
+  .catch((err) => {
+    console.error('Migration failed:', err.message);
+    process.exit(1);
+  })
+  .finally(() => pool.end());

@@ -1,9 +1,24 @@
 import { formatDate } from '../utils/dateUtils';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Plus, Search, Edit2, Trash2, FileMinus, FileDown } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, FileDown } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF } from '../utils/pdfExport';
+import DocChargeRow from '../components/DocChargeRow';
+import {
+  STANDARD_CHARGES_LIST,
+  OTHER_CHARGE_ITEM,
+  CHARGE_KEYS,
+  defaultChargeFlags,
+  defaultChargeRates,
+  emptyChargeQtys,
+  buildChargeQtys,
+  calcStandardChargesSubtotal,
+  parseChargeFieldValue
+} from '../utils/documentCharges';
+
+const CN_CHARGE_KEYS = [...CHARGE_KEYS, 'other'];
+const chargesList = [...STANDARD_CHARGES_LIST, OTHER_CHARGE_ITEM];
 
 const CreditNotes = () => {
   const { data, updateData, updateItem, deleteItemSoftly, incrementSerial } = useAppContext();
@@ -18,18 +33,9 @@ const CreditNotes = () => {
     partyName: '',
     refInvoice: '',
     particulars: '',
-    charges: {
-      cleaning: false, filterBag: false, processing: false, sieving: false,
-      psdReport: false, liner: false, courier: false, fiberDrum: false,
-      transportation: false, hdpeDrum: false, batchChangeover: false,
-      other: true
-    },
-    rates: {
-      cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
-      liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0,
-      other: 0
-    },
-    qty: 1, // Default multiplier for rate
+    charges: defaultChargeFlags({ other: true }),
+    rates: defaultChargeRates(['other']),
+    qtys: emptyChargeQtys(['other']),
     discount: 0,
     taxRate: 18
   });
@@ -52,18 +58,9 @@ const CreditNotes = () => {
       partyName: '',
       refInvoice: '',
       particulars: '',
-      charges: {
-        cleaning: false, filterBag: false, processing: false, sieving: false,
-        psdReport: false, liner: false, courier: false, fiberDrum: false,
-        transportation: false, hdpeDrum: false, batchChangeover: false,
-        other: true
-      },
-      rates: {
-        cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
-        liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0,
-        other: 0
-      },
-      qty: 1,
+      charges: defaultChargeFlags({ other: true }),
+      rates: defaultChargeRates(['other']),
+      qtys: emptyChargeQtys(['other']),
       discount: 0,
       taxRate: 18
     });
@@ -72,36 +69,38 @@ const CreditNotes = () => {
   };
 
   const handleEdit = (note) => {
-    setForm(note);
+    const legacyQty = parseFloat(note.qty) || 1;
+    setForm({
+      ...note,
+      qtys: note.qtys
+        ? { ...emptyChargeQtys(['other']), ...note.qtys }
+        : buildChargeQtys({}, legacyQty, ['other'])
+    });
     setIsEditing(note.id);
     setIsModalOpen(true);
   };
 
   const toggleCharge = (key) => {
-    setForm(prev => ({
-      ...prev,
-      charges: { ...prev.charges, [key]: !prev.charges[key] }
-    }));
+    setForm(prev => {
+      const turningOn = !prev.charges[key];
+      const qtys = { ...(prev.qtys || emptyChargeQtys(['other'])) };
+      if (turningOn && (qtys[key] == null || qtys[key] === '')) {
+        qtys[key] = 1;
+      }
+      return { ...prev, charges: { ...prev.charges, [key]: turningOn }, qtys };
+    });
   };
 
   const handleRateChange = (key, val) => {
-    setForm(prev => ({
-      ...prev,
-      rates: { ...prev.rates, [key]: parseFloat(val) || 0 }
-    }));
+    setForm(prev => ({ ...prev, rates: { ...prev.rates, [key]: parseChargeFieldValue(val) } }));
   };
 
-  const getSubtotal = () => {
-    return Object.keys(form.charges).reduce((sum, key) => {
-      if (form.charges[key]) {
-        const isQtyRate = ['processing', 'sieving', 'cleaning', 'other'].includes(key);
-        const qty = parseFloat(form.qty) || 1;
-        const rate = form.rates[key] || 0;
-        return sum + (isQtyRate ? qty * rate : rate);
-      }
-      return sum;
-    }, 0);
+  const handleQtyChange = (key, val) => {
+    setForm(prev => ({ ...prev, qtys: { ...(prev.qtys || emptyChargeQtys(['other'])), [key]: parseChargeFieldValue(val) } }));
   };
+
+  const getSubtotal = () =>
+    calcStandardChargesSubtotal(form.charges, form.rates, form.qtys, 0, CN_CHARGE_KEYS);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -115,7 +114,7 @@ const CreditNotes = () => {
       ...form,
       subtotal,
       taxAmount,
-      amount: total // Use amount as final total for compatibility
+      amount: total
     };
 
     if (isEditing) {
@@ -129,25 +128,10 @@ const CreditNotes = () => {
   };
 
   const notesList = (data.creditNotes || []).filter(n => !n.isDeleted);
-  const filtered = notesList.filter(n => 
+  const filtered = notesList.filter(n =>
     (n.noteNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (n.partyName || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const chargesList = [
-    { key: 'cleaning', label: 'Cleaning Charges (998842)', isQtyRate: true },
-    { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
-    { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true },
-    { key: 'sieving', label: 'Sieving Charges (998842)', isQtyRate: true },
-    { key: 'psdReport', label: 'PSD Report Charges (998346)', isQtyRate: false },
-    { key: 'liner', label: 'Liner (39233090)', isQtyRate: false },
-    { key: 'courier', label: 'Courier (996812)', isQtyRate: false },
-    { key: 'fiberDrum', label: 'Fiber Drum (7310)', isQtyRate: false },
-    { key: 'transportation', label: 'Transportation (996511)', isQtyRate: false },
-    { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },
-    { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false },
-    { key: 'other', label: 'Other Particulars', isQtyRate: true }
-  ];
 
   return (
     <div>
@@ -164,10 +148,10 @@ const CreditNotes = () => {
       <div className="premium-card">
         <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
           <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-          <input 
-            type="text" 
-            className="input-field" 
-            placeholder="Search by Note No or Party Name..." 
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Search by Note No or Party Name..."
             style={{ paddingLeft: '3rem' }}
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
@@ -245,41 +229,29 @@ const CreditNotes = () => {
                   <label>Particulars / Reason *</label>
                   <textarea className="input-field" rows="1" required value={form.particulars} onChange={e => setForm({...form, particulars: e.target.value})} />
                 </div>
-                <div style={{ gridColumn: 'span 2' }}>
-                  <label>Quantity / Multiplier</label>
-                  <input type="number" className="input-field" required value={form.qty} onChange={e => setForm({...form, qty: parseFloat(e.target.value) || 0})} />
-                </div>
               </div>
 
               <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', pb: '0.5rem' }}>Credit Note Charges Grid</h3>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
                 <div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {chargesList.map(item => (
-                      <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem', background: 'var(--glass-bg)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', cursor: 'pointer', margin: 0 }}>
-                          <input type="checkbox" checked={form.charges[item.key] || false} onChange={() => toggleCharge(item.key)} />
-                          {item.label}
-                        </label>
-                        {form.charges[item.key] && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{item.isQtyRate ? 'per unit' : 'flat'}:</span>
-                            <input 
-                              type="number" 
-                              className="input-field" 
-                              style={{ width: '80px', padding: '0.2rem', fontSize: '0.8rem', height: 'auto' }}
-                              value={form.rates[item.key] || 0} 
-                              onChange={e => handleRateChange(item.key, e.target.value)} 
-                            />
-                          </div>
-                        )}
-                      </div>
+                      <DocChargeRow
+                        key={item.key}
+                        item={item}
+                        charges={form.charges}
+                        rates={form.rates}
+                        qtys={form.qtys}
+                        materialQty={1}
+                        onToggle={toggleCharge}
+                        onQtyChange={handleQtyChange}
+                        onRateChange={handleRateChange}
+                      />
                     ))}
                   </div>
                 </div>
 
-                {/* Calculation Summary */}
                 <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--accent-primary)' }}>GST Tax Calculations</h4>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>

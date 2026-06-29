@@ -1,12 +1,313 @@
 import { formatDate } from '../utils/dateUtils';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { generateDocNumber } from '../utils/numbering';
+import { generateDocNumber, nextAvailableDocNumber } from '../utils/numbering';
 import { 
   FileText, Activity, UploadCloud, Package, Truck, 
   FileSpreadsheet, FileCheck, CheckCircle, Clock, X, Plus, Edit2, Download, Trash2 
 } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
+import { copyChargeQtysFromSettings, enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges } from '../utils/documentCharges';
+import {
+  getReceiptProductNames,
+  getProductBatches,
+  getProductQty,
+  getProductDrums,
+  getReceiptProductLabel,
+  getReceiptProductSummaries,
+  getProductDisplayIndex,
+  resolveReceiptProductName,
+  receiptProductOptions,
+  findReceiptDoc,
+  findAnyPackingList,
+  getBPRDispatchedRowsForPL,
+  getPLDisplayProductLabel,
+  buildPLProductSummaries,
+  alignDrumRowsToProducts,
+  buildUnderProcessRows
+} from '../utils/receiptProducts';
+
+const CHARGE_KEYS = [
+  'cleaning', 'filterBag', 'processing', 'sieving', 'psdReport',
+  'liner', 'courier', 'fiberDrum', 'transportation', 'hdpeDrum', 'batchChangeover'
+];
+
+const CHARGES_LIST = [
+  { key: 'cleaning', label: 'Cleaning Charges (998842)', isQtyRate: true },
+  { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
+  { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true },
+  { key: 'sieving', label: 'Sieving Charges (998842)', isQtyRate: true },
+  { key: 'psdReport', label: 'PSD Report Charges (998346)', isQtyRate: false },
+  { key: 'liner', label: 'Liner (39233090)', isQtyRate: false },
+  { key: 'courier', label: 'Courier (996812)', isQtyRate: false },
+  { key: 'fiberDrum', label: 'Fiber Drum (7310)', isQtyRate: false },
+  { key: 'transportation', label: 'Transportation (996511)', isQtyRate: false },
+  { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },
+  { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
+];
+
+const emptyChargeFlags = () => Object.fromEntries(CHARGE_KEYS.map(k => [k, false]));
+const emptyChargeRates = () => Object.fromEntries(CHARGE_KEYS.map(k => [k, 0]));
+const emptyChargeQtys = () => Object.fromEntries(CHARGE_KEYS.map(k => [k, 1]));
+
+const isMaterialQtyCharge = (key) => ['processing', 'sieving', 'cleaning'].includes(key);
+
+const buildChargeQtys = (settings, materialQty = 0) => {
+  const qtys = { ...emptyChargeQtys(), ...(settings?.qtys || {}) };
+  CHARGE_KEYS.forEach(k => {
+    if (isMaterialQtyCharge(k)) {
+      const saved = settings?.qtys?.[k];
+      if (saved == null || saved === '') {
+        qtys[k] = materialQty || qtys[k];
+      }
+    }
+  });
+  return qtys;
+};
+
+const parseChargeNumber = (val, fallback = 0) => {
+  if (val === '' || val == null) return fallback;
+  const n = parseFloat(val);
+  return Number.isNaN(n) ? fallback : n;
+};
+
+const parseChargeFieldValue = (val) => {
+  if (val === '') return '';
+  const n = parseFloat(val);
+  return Number.isNaN(n) ? val : n;
+};
+
+const formatWeightNet = (val) => (parseFloat(val) || 0).toFixed(2);
+
+const getChargeLineQty = (pc, key, materialQty) => {
+  const q = pc.qtys?.[key];
+  if (isMaterialQtyCharge(key)) return parseChargeNumber(q, materialQty || 1);
+  return parseChargeNumber(q, 1);
+};
+
+const normalizeProductCharges = (productCharges, legacyDoc, mr, prodOpts, fallbackProductName) => {
+  if (productCharges && Object.keys(productCharges).length > 0) {
+    return Object.fromEntries(
+      Object.entries(productCharges).map(([prodName, pc]) => {
+        const materialQty = getProductQty(mr, prodName, prodOpts);
+        return [prodName, {
+          charges: { ...emptyChargeFlags(), ...(pc.charges || {}) },
+          rates: { ...emptyChargeRates(), ...(pc.rates || {}) },
+          qtys: buildChargeQtys({ qtys: { ...(legacyDoc?.qtys || {}), ...(pc.qtys || {}) } }, materialQty)
+        }];
+      })
+    );
+  }
+  const prodName = fallbackProductName || mr.productName;
+  const materialQty = getProductQty(mr, prodName, prodOpts);
+  return {
+    [prodName]: {
+      charges: { ...emptyChargeFlags(), ...(legacyDoc?.charges || {}) },
+      rates: { ...emptyChargeRates(), ...(legacyDoc?.rates || {}) },
+      qtys: buildChargeQtys({ qtys: legacyDoc?.qtys }, materialQty)
+    }
+  };
+};
+
+const buildProductSettingsFromParty = (prodConfig) => {
+  if (!prodConfig) {
+    return { nickName: '', rates: emptyChargeRates(), charges: emptyChargeFlags() };
+  }
+  const c = prodConfig.charges || {};
+  const psdRate = prodConfig.psdMethodDefault === 'Wet'
+    ? (c.psdReportWet ?? c.psdReport ?? 0)
+    : (c.psdReportDry ?? c.psdReport ?? 0);
+  return {
+    nickName: prodConfig.nickname || '',
+    rates: {
+      cleaning: c.cleaning || 0,
+      filterBag: c.filterBag || 0,
+      processing: c.processing || 0,
+      sieving: c.sieving || 0,
+      psdReport: psdRate,
+      liner: c.liner || 0,
+      courier: c.courier || 0,
+      fiberDrum: c.fiberDrum || 0,
+      transportation: c.transportation || 0,
+      hdpeDrum: c.hdpeDrum || 0,
+      batchChangeover: c.batchChangeover || 0
+    },
+    charges: emptyChargeFlags()
+  };
+};
+
+const getMRProductSettings = (mr, party, prodName) => {
+  const settings = mr.productSettings || {};
+  const direct = settings[prodName];
+  if (direct) return direct;
+  const matchedKey = Object.keys(settings).find(k => (k || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase());
+  if (matchedKey) return settings[matchedKey];
+  const prodConfig = (party?.products || []).find(
+    p => (p.name || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase()
+  );
+  return buildProductSettingsFromParty(prodConfig);
+};
+
+const initProductChargesFromMR = (mr, party, productOptions = {}) => {
+  const productNames = getReceiptProductNames(mr, { party, ...productOptions });
+  const result = {};
+  productNames.forEach(prodName => {
+    const settings = getMRProductSettings(mr, party, prodName);
+    const materialQty = getProductQty(mr, prodName, productOptions);
+    result[prodName] = {
+      charges: { ...(settings.charges || emptyChargeFlags()) },
+      rates: { ...(settings.rates || emptyChargeRates()) },
+      qtys: copyChargeQtysFromSettings(settings)
+    };
+  });
+  if (!productNames.length && mr.productName) {
+    const materialQty = mr.totalQty || mr.receivedQty || 0;
+    result[mr.productName] = {
+      charges: { ...(mr.charges || emptyChargeFlags()) },
+      rates: { ...(mr.rates || emptyChargeRates()) },
+      qtys: copyChargeQtysFromSettings({ qtys: mr.qtys })
+    };
+  }
+  return result;
+};
+
+const calcProductChargesSubtotal = (productCharges, mr, qtyResolver, productOptions = {}) => {
+  const names = Object.keys(productCharges || {});
+  return names.reduce((sum, prodName) => {
+    const pc = productCharges[prodName] || {};
+    const qty = qtyResolver
+      ? qtyResolver(prodName)
+      : getProductQty(mr, prodName, productOptions);
+    return sum + CHARGE_KEYS.reduce((s, key) => {
+      if (!pc.charges?.[key]) return s;
+      const rate = parseChargeNumber(pc.rates?.[key], 0);
+      const lineQty = getChargeLineQty(pc, key, qty);
+      return s + lineQty * rate;
+    }, 0);
+  }, 0);
+};
+
+const findPI = (data, mrId) => findAnyProformaInvoice(data.invoices, mrId);
+const findBPR = (data, mrId, productName = '') =>
+  findReceiptDoc(data.bprs, mrId, productName);
+const findPSD = (data, mrId, productName = '') =>
+  findReceiptDoc(data.psds, mrId, productName);
+const findPL = (data, mrId, productName = '') => {
+  const any = findAnyPackingList(data.packingLists, mrId);
+  if (any) return any;
+  return findReceiptDoc(data.packingLists, mrId, productName);
+};
+const findDC = (data, mrId, productName = '') =>
+  findReceiptDoc(data.deliveryChallans, mrId, productName);
+const findTI = (data, mrId, productName = '') => {
+  const any = findAnyTaxInvoice(data.invoices, mrId);
+  if (any) return any;
+  return findReceiptDoc(data.invoices, mrId, productName, inv => inv.invoiceNo?.includes('/IN/'));
+};
+
+const initProductChargesForScope = (mr, party, prodOpts, activeProductName) => {
+  if (!activeProductName) return initProductChargesFromMR(mr, party, prodOpts);
+  const canonical = resolveReceiptProductName(mr, activeProductName, { party, ...prodOpts });
+  const settings = getMRProductSettings(mr, party, canonical);
+  const materialQty = getProductQty(mr, canonical, prodOpts);
+  return {
+    [canonical]: {
+      charges: { ...(settings.charges || emptyChargeFlags()) },
+      rates: { ...(settings.rates || emptyChargeRates()) },
+      qtys: copyChargeQtysFromSettings(settings)
+    }
+  };
+};
+
+const renderChargeRow = (item, pc, prodName, materialQty, toggleCharge, handleQtyChange, handleRateChange) => (
+  <div key={item.key} className="charge-row">
+    <label>
+      <input type="checkbox" checked={pc.charges[item.key]} onChange={() => toggleCharge(prodName, item.key)} />
+      {item.label}
+    </label>
+    {pc.charges[item.key] && (
+      <div className="charge-row-fields">
+        <span>Qty:</span>
+        <input
+          type="number"
+          step={item.isQtyRate ? '0.01' : '1'}
+          className="input-field input-compact"
+          value={pc.qtys?.[item.key] ?? (item.isQtyRate ? materialQty : 1)}
+          onChange={e => handleQtyChange(prodName, item.key, e.target.value)}
+          min="0"
+        />
+        <span>Rate: ₹</span>
+        <input
+          type="number"
+          className="input-field input-compact"
+          style={{ width: '72px' }}
+          value={pc.rates[item.key] ?? 0}
+          onChange={e => handleRateChange(prodName, item.key, e.target.value)}
+          min="0"
+        />
+      </div>
+    )}
+  </div>
+);
+
+const getScopedProductNames = (mr, prodOpts, activeProductName) => {
+  if (!activeProductName) return getReceiptProductNames(mr, prodOpts);
+  return [resolveReceiptProductName(mr, activeProductName, prodOpts)];
+};
+
+const MRProductSummary = ({ mr, party, productOptions = {}, onlyProduct = '' }) => {
+  const opts = { party, ...productOptions };
+  const allProductNames = getReceiptProductNames(mr, opts);
+  let productNames = allProductNames;
+  if (onlyProduct) {
+    const resolved = resolveReceiptProductName(mr, onlyProduct, opts);
+    productNames = allProductNames.filter(p => (p || '').trim().toLowerCase() === (resolved || '').trim().toLowerCase());
+    if (!productNames.length && resolved) productNames = [resolved];
+  }
+  if (!productNames.length) {
+    return (
+      <div className="product-block">
+        <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+          Product: {onlyProduct || mr.productName || '—'}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div style={{ marginBottom: '1.25rem' }}>
+      {productNames.map((prodName) => {
+        const displayIdx = getProductDisplayIndex(mr, prodName, opts);
+        const settings = getMRProductSettings(mr, party, prodName);
+        const batches = getProductBatches(mr, prodName, opts);
+        const qty = getProductQty(mr, prodName, opts);
+        const drums = batches.reduce((s, b) => s + (parseInt(b.drums) || 0), 0);
+        const prodConfig = (party?.products || []).find(
+          p => (p.name || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase()
+        );
+        return (
+          <div key={prodName} className="product-block">
+            <h4>
+              Product {displayIdx}: {prodName}
+              {settings.nickName ? ` (${settings.nickName})` : ''}
+            </h4>
+            <p style={{ margin: '0 0 0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              PSD: {prodConfig?.psdReq || batches[0]?.psdReq || '—'} · {qty} Kg · {drums} drums · {batches.length} batch{batches.length !== 1 ? 'es' : ''}
+            </p>
+            {batches.length > 0 && (
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                {batches.map((b, i) => (
+                  <span key={i} style={{ display: 'inline-block', marginRight: '0.65rem' }}>
+                    {b.batchNo || '—'} ({b.drums} drum{b.drums !== 1 ? 's' : ''}, {b.qty || 0} Kg)
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 const UnderProcess = () => {
   const { data, updateData, updateItem, setData, incrementSerial, deleteItemSoftly } = useAppContext();
@@ -19,38 +320,62 @@ const UnderProcess = () => {
   // ----------------------------------------------------
   // Document Search & Helper Helpers
   // ----------------------------------------------------
-  const getPI = (mrId) => (data.invoices || []).find(inv => inv.receiptId === mrId && inv.invoiceNo?.includes('/PI/'));
-  const getBPR = (mrId) => (data.bprs || []).find(b => b.receiptId === mrId);
-  const getPSD = (mrId) => (data.psds || []).find(p => p.receiptId === mrId);
-  const getPL = (mrId) => (data.packingLists || []).find(pl => pl.receiptId === mrId);
-  const getDC = (mrId) => (data.deliveryChallans || []).find(dc => dc.receiptId === mrId);
-  const getTI = (mrId) => (data.invoices || []).find(inv => inv.receiptId === mrId && inv.invoiceNo?.includes('/IN/'));
+  const getPI = (mrId) => findPI(data, mrId);
+  const getBPR = (mrId, productName = '') => findBPR(data, mrId, productName);
+  const getPSD = (mrId, productName = '') => findPSD(data, mrId, productName);
+  const getPL = (mrId, productName = '') => findPL(data, mrId, productName);
+  const getDC = (mrId, productName = '') => findDC(data, mrId, productName);
+  const getTI = (mrId, productName = '') => findTI(data, mrId, productName);
 
-  // ----------------------------------------------------
-  // Modals & Popover Triggers
-  // ----------------------------------------------------
-  const handlePendingClick = (mr, type) => {
-    setModalContext(mr);
+  const handlePendingClick = (mr, type, productName = '') => {
+    if (type === 'PI') {
+      const existing = findPI(data, mr.id);
+      if (existing) {
+        setModalContext({ mr, productName });
+        setEditingDoc(existing);
+        setActiveModal(type);
+        return;
+      }
+    }
+    if (type === 'PL') {
+      const existing = findPL(data, mr.id);
+      if (existing) {
+        setModalContext({ mr, productName: '' });
+        setEditingDoc(existing);
+        setActiveModal(type);
+        return;
+      }
+    }
+    if (type === 'TI') {
+      const existing = findTI(data, mr.id);
+      if (existing) {
+        setModalContext({ mr, productName: '' });
+        setEditingDoc(existing);
+        setActiveModal(type);
+        return;
+      }
+    }
+    setModalContext({ mr, productName });
     setEditingDoc(null);
     setActiveModal(type);
   };
 
-  const handleBlueClick = (mrId, cellType, doc, e) => {
+  const handleBlueClick = (mrId, cellType, doc, productName, e) => {
     e.stopPropagation();
-    setShowDocPopover({ cellType, doc, mrId, x: e.clientX, y: e.clientY });
+    setShowDocPopover({ cellType, doc, mrId, productName, x: e.clientX, y: e.clientY });
   };
 
   const handleEditDoc = () => {
-    const { cellType, doc, mrId } = showDocPopover;
+    const { cellType, doc, mrId, productName } = showDocPopover;
     const mr = data.materialReceipts.find(r => r.id === mrId);
-    setModalContext(mr);
+    setModalContext({ mr, productName: productName || '' });
     setEditingDoc(doc);
     setShowDocPopover(null);
     setActiveModal(cellType);
   };
 
   const handleDeleteDoc = () => {
-    const { cellType, doc } = showDocPopover;
+    const { cellType, doc, mrId, productName } = showDocPopover;
     if (window.confirm(`Are you sure you want to delete this ${cellType} document?`)) {
       if (cellType === 'PI' || cellType === 'TI') {
         deleteItemSoftly('invoices', doc.id);
@@ -63,12 +388,12 @@ const UnderProcess = () => {
       } else if (cellType === 'DC') {
         deleteItemSoftly('deliveryChallans', doc.id);
       } else if (cellType === 'EWDC') {
-        const dc = getDC(showDocPopover.mrId);
+        const dc = getDC(mrId, productName);
         if (dc) {
           updateItem('deliveryChallans', dc.id, { ...dc, ewayBillNo: '', ewayBillDate: '' });
         }
       } else if (cellType === 'EWTI') {
-        const ti = getTI(showDocPopover.mrId);
+        const ti = getTI(mrId, productName);
         if (ti) {
           updateItem('invoices', ti.id, { ...ti, ewayBillNo: '', ewayBillDate: '' });
         }
@@ -79,89 +404,81 @@ const UnderProcess = () => {
 
   const handleDownloadPDF = () => {
     const { cellType, doc } = showDocPopover;
-    exportToPDF(cellType, doc);
+    const payload = cellType === 'PI' ? enrichPIForPrint(doc, data) : doc;
+    exportToPDF(cellType, payload);
     setShowDocPopover(null);
   };
 
   const handleViewPDF = () => {
     const { cellType, doc } = showDocPopover;
-    viewPDF(cellType, doc);
+    const payload = cellType === 'PI' ? enrichPIForPrint(doc, data) : doc;
+    viewPDF(cellType, payload);
     setShowDocPopover(null);
   };
 
   return (
-    <div style={{ position: 'relative' }}>
-      <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Under Process Tracker</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Interactive workflow command center. Monitor real-time progress and generate downstream documents.</p>
+    <div>
+      <header className="page-header">
+        <h1 className="page-title">Under Process</h1>
+        <p className="page-subtitle">Track material receipts and generate documents step by step.</p>
       </header>
 
-      <div className="hide-scrollbar" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+      <div className="tab-bar">
         {[
           { id: 'All', label: 'All' },
-          { id: 'PI', label: 'PI Pending' },
-          { id: 'BPR', label: 'BPR Pending' },
-          { id: 'PSD', label: 'PSD Pending' },
-          { id: 'PL', label: 'PL Pending' },
-          { id: 'DC', label: 'DC Pending' },
-          { id: 'EWDC', label: 'E-Way DC Pending' },
-          { id: 'TI', label: 'Tax Invoice Pending' },
-          { id: 'EWTI', label: 'E-Way TI Pending' },
+          { id: 'PI', label: 'PI' },
+          { id: 'BPR', label: 'BPR' },
+          { id: 'PSD', label: 'PSD' },
+          { id: 'PL', label: 'PL' },
+          { id: 'DC', label: 'DC' },
+          { id: 'EWDC', label: 'E-Way DC' },
+          { id: 'TI', label: 'Tax Inv' },
+          { id: 'EWTI', label: 'E-Way TI' },
           { id: 'Done', label: 'Done' }
         ].map(tab => (
-          <button 
-            key={tab.id} 
-            onClick={() => setActiveTab(tab.id)} 
-            style={{ 
-              background: 'transparent', 
-              border: 'none', 
-              padding: '0.5rem 1rem', 
-              fontSize: '1rem', 
-              fontWeight: 600, 
-              color: activeTab === tab.id ? 'var(--accent-primary)' : 'var(--text-muted)',
-              borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : 'none',
-              cursor: 'pointer'
-            }}
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`tab-btn${activeTab === tab.id ? ' active' : ''}`}
           >
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Process Matrix */}
-      <div className="premium-card" style={{ padding: '1rem', overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+      <div className="premium-card data-table-container" style={{ padding: '0.75rem' }}>
+        <table className="workflow-table">
           <thead>
-            <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
-              <th style={{ padding: '1rem' }}>M.R. Date</th>
-              <th style={{ padding: '1rem' }}>Customer</th>
-              <th style={{ padding: '1rem' }}>Product</th>
-              <th style={{ padding: '1rem' }}>Qty (Kg)</th>
-              <th style={{ padding: '1rem', textAlign: 'center' }}>PI</th>
-              <th style={{ padding: '1rem', textAlign: 'center' }}>BPR</th>
-              <th style={{ padding: '1rem', textAlign: 'center' }}>PSD</th>
-              <th style={{ padding: '1rem', textAlign: 'center' }}>PL</th>
-              <th style={{ padding: '1rem', textAlign: 'center' }}>DC</th>
-              <th style={{ padding: '1rem', textAlign: 'center' }}>E-Way DC</th>
-              <th style={{ padding: '1rem', textAlign: 'center' }}>Tax Invoice</th>
-              <th style={{ padding: '1rem', textAlign: 'center' }}>E-Way TI</th>
+            <tr>
+              <th>M.R. Date</th>
+              <th>Customer</th>
+              <th>Product</th>
+              <th>Qty (Kg)</th>
+              <th className="center">PI</th>
+              <th className="center">BPR</th>
+              <th className="center">PSD</th>
+              <th className="center">PL</th>
+              <th className="center">DC</th>
+              <th className="center">E-Way DC</th>
+              <th className="center">Tax Inv</th>
+              <th className="center">E-Way TI</th>
             </tr>
           </thead>
           <tbody>
             {(data.materialReceipts || []).length === 0 ? (
               <tr>
-                <td colSpan="12" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No Material Receipts found. Go to "Add Material Received Data" first!
+                <td colSpan="12" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  No material receipts yet. Add one from Material Receipt.
                 </td>
               </tr>
             ) : (
-              (data.materialReceipts || []).filter(mr => {
+              buildUnderProcessRows(data.materialReceipts, data).filter(({ mr, productName }) => {
                   const pi = getPI(mr.id);
-                  const bpr = getBPR(mr.id);
-                  const psd = getPSD(mr.id);
-                  const pl = getPL(mr.id);
-                  const dc = getDC(mr.id);
-                  const ti = getTI(mr.id);
+                  const bpr = getBPR(mr.id, productName);
+                  const psd = getPSD(mr.id, productName);
+                  const pl = getPL(mr.id, productName);
+                  const dc = getDC(mr.id, productName);
+                  const ti = getTI(mr.id, productName);
                   const isComplete = pi && bpr && psd && pl && dc && ti;
                   if (activeTab === 'Done') return isComplete;
                   if (activeTab === 'PI') return !pi;
@@ -173,136 +490,140 @@ const UnderProcess = () => {
                   if (activeTab === 'TI') return !ti;
                   if (activeTab === 'EWTI') return !(ti && ti.ewayBillNo);
                   return true;
-                }).map(mr => {
+                }).map(({ mr, productName, prodOpts }) => {
+                const party = data.parties.find(p => p.id === mr.partyId);
+                const settings = productName ? getMRProductSettings(mr, party, productName) : null;
                 const pi = getPI(mr.id);
-                const bpr = getBPR(mr.id);
-                const psd = getPSD(mr.id);
-                const pl = getPL(mr.id);
-                const dc = getDC(mr.id);
-                const ti = getTI(mr.id);
+                const bpr = getBPR(mr.id, productName);
+                const psd = getPSD(mr.id, productName);
+                const pl = getPL(mr.id, productName);
+                const dc = getDC(mr.id, productName);
+                const ti = getTI(mr.id, productName);
+                const rowQty = productName
+                  ? getProductQty(mr, productName, prodOpts)
+                  : (mr.totalQty || mr.receivedQty || 0);
 
                 return (
-                  <tr key={mr.id} style={{ borderBottom: '1px solid var(--border-color)', hover: { background: 'var(--glass-bg)' } }}>
-                    <td style={{ padding: '1rem', fontWeight: 500 }}>{formatDate(mr.date)}</td>
-                    <td style={{ padding: '1rem', fontWeight: 600 }}>{mr.partyName}</td>
-                    <td style={{ padding: '1rem' }}>{mr.productName} {mr.nickName ? `(${mr.nickName})` : ''}</td>
-                    <td style={{ padding: '1rem', fontWeight: 600 }}>{mr.totalQty || mr.receivedQty || 0}</td>
+                  <tr key={`${mr.id}_${productName || 'default'}`}>
+                    <td style={{ fontWeight: 500 }}>{formatDate(mr.date)}</td>
+                    <td style={{ fontWeight: 600 }}>{mr.partyName}</td>
+                    <td>
+                      <span>{productName || mr.productName || '—'}</span>
+                      {(settings?.nickName || (productName ? '' : mr.nickName)) && (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>
+                          ({settings?.nickName || mr.nickName})
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ fontWeight: 600 }}>{rowQty}</td>
 
-                    {/* 1. Performa Invoice (PI) */}
-                    <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                    <td className="center">
                       {pi ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
-                          <button onClick={() => viewPDF('PI', pi)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View / Print">
+                        <div className="doc-done-group">
+                          <button onClick={() => viewPDF('PI', enrichPIForPrint(pi, data))} className="doc-icon-btn" title="View / Print">
                             <FileText size={14} />
                           </button>
-                          <button onClick={(e) => handleBlueClick(mr.id, 'PI', pi, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
+                          <button onClick={(e) => handleBlueClick(mr.id, 'PI', pi, productName, e)} className="doc-done">
                             {pi.invoiceNo.split('/').slice(-1)[0]}
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'PI')} style={yellowStyle}>Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'PI', productName)} className="doc-pending">Pending</button>
                       )}
                     </td>
 
-                    {/* 2. BPR */}
-                    <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                    <td className="center">
                       {bpr ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
-                          <button onClick={() => viewPDF('BPR', bpr)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View / Print">
+                        <div className="doc-done-group">
+                          <button onClick={() => viewPDF('BPR', bpr)} className="doc-icon-btn" title="View / Print">
                             <FileText size={14} />
                           </button>
-                          <button onClick={(e) => handleBlueClick(mr.id, 'BPR', bpr, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
+                          <button onClick={(e) => handleBlueClick(mr.id, 'BPR', bpr, productName, e)} className="doc-done">
                             {bpr.bprNo.split('/').slice(-1)[0]}
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'BPR')} style={yellowStyle}>Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'BPR', productName)} className="doc-pending">Pending</button>
                       )}
                     </td>
 
-                    {/* 3. PSD Uploader */}
-                    <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                    <td className="center">
                       {psd ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
-                          <button onClick={() => viewPDF('PSD', psd)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View / Print">
+                        <div className="doc-done-group">
+                          <button onClick={() => viewPDF('PSD', psd)} className="doc-icon-btn" title="View / Print">
                             <FileText size={14} />
                           </button>
-                          <button onClick={(e) => handleBlueClick(mr.id, 'PSD', psd, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
+                          <button onClick={(e) => handleBlueClick(mr.id, 'PSD', psd, productName, e)} className="doc-done">
                             {psd.psdNo.split('/').slice(-1)[0]}
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'PSD')} style={yellowStyle}>Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'PSD', productName)} className="doc-pending">Pending</button>
                       )}
                     </td>
 
-                    {/* 4. Packing List (PL) */}
-                    <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                    <td className="center">
                       {pl ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
-                          <button onClick={() => viewPDF('PL', pl)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View / Print">
+                        <div className="doc-done-group">
+                          <button onClick={() => viewPDF('PL', pl)} className="doc-icon-btn" title="View / Print">
                             <FileText size={14} />
                           </button>
-                          <button onClick={(e) => handleBlueClick(mr.id, 'PL', pl, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
+                          <button onClick={(e) => handleBlueClick(mr.id, 'PL', pl, productName, e)} className="doc-done">
                             {pl.plNo.split('/').slice(-1)[0]}
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'PL')} style={yellowStyle} disabled={!bpr}>Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'PL', productName)} className="doc-pending" disabled={!bpr}>Pending</button>
                       )}
                     </td>
 
-                    {/* 5. Delivery Challan (DC) */}
-                    <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                    <td className="center">
                       {dc ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
-                          <button onClick={() => viewPDF('DC', dc)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View / Print">
+                        <div className="doc-done-group">
+                          <button onClick={() => viewPDF('DC', dc)} className="doc-icon-btn" title="View / Print">
                             <FileText size={14} />
                           </button>
-                          <button onClick={(e) => handleBlueClick(mr.id, 'DC', dc, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
+                          <button onClick={(e) => handleBlueClick(mr.id, 'DC', dc, productName, e)} className="doc-done">
                             {dc.dcNo.split('/').slice(-1)[0]}
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'DC')} style={yellowStyle} disabled={!pl}>Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'DC', productName)} className="doc-pending" disabled={!pl}>Pending</button>
                       )}
                     </td>
 
-                    {/* 6. E-Way Bill from DC */}
-                    <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                    <td className="center">
                       {dc && dc.ewayBillNo ? (
-                        <button onClick={(e) => handleBlueClick(mr.id, 'EWDC', dc, e)} style={blueStyle}>
+                        <button onClick={(e) => handleBlueClick(mr.id, 'EWDC', dc, productName, e)} className="doc-done">
                           {dc.ewayBillNo}
                         </button>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'EWDC')} style={yellowStyle} disabled={!dc}>Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'EWDC', productName)} className="doc-pending" disabled={!dc}>Pending</button>
                       )}
                     </td>
 
-                    {/* 7. Tax Invoice */}
-                    <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                    <td className="center">
                       {ti ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
-                          <button onClick={() => viewPDF('TI', ti)} style={{ ...blueStyle, padding: '0.25rem', width: 'auto', background: 'transparent', border: 'none' }} title="View / Print">
+                        <div className="doc-done-group">
+                          <button onClick={() => viewPDF('TI', enrichTIForPrint(ti, data))} className="doc-icon-btn" title="View / Print">
                             <FileText size={14} />
                           </button>
-                          <button onClick={(e) => handleBlueClick(mr.id, 'TI', ti, e)} style={{ ...blueStyle, flex: 1, padding: '0.25rem' }}>
+                          <button onClick={(e) => handleBlueClick(mr.id, 'TI', ti, productName, e)} className="doc-done">
                             {ti.invoiceNo.split('/').slice(-1)[0]}
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'TI')} style={yellowStyle} disabled={!pl}>Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'TI', productName)} className="doc-pending" disabled={!pl}>Pending</button>
                       )}
                     </td>
 
-                    {/* 8. E-Way Bill from TI */}
-                    <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                    <td className="center">
                       {ti && ti.ewayBillNo ? (
-                        <button onClick={(e) => handleBlueClick(mr.id, 'EWTI', ti, e)} style={blueStyle}>
+                        <button onClick={(e) => handleBlueClick(mr.id, 'EWTI', ti, productName, e)} className="doc-done">
                           {ti.ewayBillNo}
                         </button>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'EWTI')} style={yellowStyle} disabled={!ti}>Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'EWTI', productName)} className="doc-pending" disabled={!ti}>Pending</button>
                       )}
                     </td>
                   </tr>
@@ -312,45 +633,30 @@ const UnderProcess = () => {
           </tbody>
         </table>
 
-        {/* Legend */}
-        <div style={{ display: 'flex', gap: '2rem', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ width: '12px', height: '12px', borderRadius: '4px', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)' }}></span>
-            <span>Blue = Document Generated (Click to View, Edit or Delete)</span>
+        <div className="legend">
+          <div className="legend-item">
+            <span className="legend-dot done"></span>
+            <span>Done — click to view, edit, or delete</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ width: '12px', height: '12px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)' }}></span>
-            <span>Yellow = Document Pending (Click to Generate now!)</span>
+          <div className="legend-item">
+            <span className="legend-dot pending"></span>
+            <span>Pending — click to generate</span>
           </div>
         </div>
       </div>
 
-      {/* ----------------------------------------------------
-          CONTEXT MENU/POPOVER FOR GENERATED DOCUMENTS
-      ---------------------------------------------------- */}
       {showDocPopover && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 110 }} onClick={() => setShowDocPopover(null)}>
-          <div style={{ 
-            position: 'absolute', 
-            left: `${showDocPopover.x}px`, 
-            top: `${showDocPopover.y - 120}px`,
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-color)',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-            borderRadius: '12px',
-            padding: '0.5rem 0',
-            width: '180px',
-            display: 'flex',
-            flexDirection: 'column',
-            zIndex: 120
-          }} onClick={e => e.stopPropagation()}>
-            <p style={{ margin: 0, padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border-color)' }}>
-              {showDocPopover.cellType} Actions
-            </p>
-            <button style={popBtn} onClick={handleViewPDF}><FileText size={14} /> View / Print</button>
-            <button style={popBtn} onClick={handleDownloadPDF}><Download size={14} /> Download PDF</button>
-            <button style={popBtn} onClick={handleEditDoc}><Edit2 size={14} /> Edit Document</button>
-            <button style={{ ...popBtn, color: '#ef4444' }} onClick={handleDeleteDoc}><Trash2 size={14} /> Delete Entry</button>
+          <div
+            className="context-menu"
+            style={{ left: `${showDocPopover.x}px`, top: `${showDocPopover.y - 120}px` }}
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="context-menu-title">{showDocPopover.cellType} Actions</p>
+            <button className="context-menu-item" onClick={handleViewPDF}><FileText size={14} /> View / Print</button>
+            <button className="context-menu-item" onClick={handleDownloadPDF}><Download size={14} /> Download PDF</button>
+            <button className="context-menu-item" onClick={handleEditDoc}><Edit2 size={14} /> Edit</button>
+            <button className="context-menu-item danger" onClick={handleDeleteDoc}><Trash2 size={14} /> Delete</button>
           </div>
         </div>
       )}
@@ -360,61 +666,77 @@ const UnderProcess = () => {
       ---------------------------------------------------- */}
       {activeModal && (
         <ModalWrapper 
-          title={`${editingDoc ? 'Edit' : 'Create'} ${activeModal}`} 
+          title={`${editingDoc ? 'Edit' : 'Create'} ${activeModal}${(modalContext?.productName ? ` — ${modalContext.productName}` : '')}`} 
           onClose={() => setActiveModal(null)}
         >
           {activeModal === 'PI' && (
             <PerformaInvoiceGenerator 
-              mr={modalContext} 
+              key={`PI-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}`}
+              mr={modalContext?.mr ?? modalContext} 
+              activeProductName={modalContext?.productName || ''}
               editing={editingDoc}
               onClose={() => setActiveModal(null)} 
             />
           )}
           {activeModal === 'BPR' && (
             <BPRGenerator 
-              mr={modalContext} 
+              key={`BPR-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}`}
+              mr={modalContext?.mr ?? modalContext} 
+              activeProductName={modalContext?.productName || ''}
               editing={editingDoc}
               onClose={() => setActiveModal(null)} 
             />
           )}
           {activeModal === 'PSD' && (
             <PSDGenerator 
-              mr={modalContext} 
+              key={`PSD-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}`}
+              mr={modalContext?.mr ?? modalContext} 
+              activeProductName={modalContext?.productName || ''}
               editing={editingDoc}
               onClose={() => setActiveModal(null)} 
             />
           )}
           {activeModal === 'PL' && (
             <PLGenerator 
-              mr={modalContext} 
+              key={`PL-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}`}
+              mr={modalContext?.mr ?? modalContext} 
+              activeProductName={modalContext?.productName || ''}
               editing={editingDoc}
               onClose={() => setActiveModal(null)} 
             />
           )}
           {activeModal === 'DC' && (
             <DCGenerator 
-              mr={modalContext} 
+              key={`DC-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}`}
+              mr={modalContext?.mr ?? modalContext} 
+              activeProductName={modalContext?.productName || ''}
               editing={editingDoc}
               onClose={() => setActiveModal(null)} 
             />
           )}
           {activeModal === 'EWDC' && (
             <EWayDCGenerator 
-              mr={modalContext} 
+              key={`EWDC-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}`}
+              mr={modalContext?.mr ?? modalContext} 
+              activeProductName={modalContext?.productName || ''}
               editing={editingDoc}
               onClose={() => setActiveModal(null)} 
             />
           )}
           {activeModal === 'TI' && (
             <TaxInvoiceGenerator 
-              mr={modalContext} 
+              key={`TI-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}`}
+              mr={modalContext?.mr ?? modalContext} 
+              activeProductName={modalContext?.productName || ''}
               editing={editingDoc}
               onClose={() => setActiveModal(null)} 
             />
           )}
           {activeModal === 'EWTI' && (
             <EWayTIGenerator 
-              mr={modalContext} 
+              key={`EWTI-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}`}
+              mr={modalContext?.mr ?? modalContext} 
+              activeProductName={modalContext?.productName || ''}
               editing={editingDoc}
               onClose={() => setActiveModal(null)} 
             />
@@ -425,60 +747,14 @@ const UnderProcess = () => {
   );
 };
 
-// ----------------------------------------------------
-// UI Styles
-// ----------------------------------------------------
-const blueStyle = {
-  background: 'rgba(59, 130, 246, 0.12)',
-  color: '#3b82f6',
-  border: '1px solid rgba(59, 130, 246, 0.3)',
-  borderRadius: '6px',
-  padding: '0.35rem 0.75rem',
-  fontSize: '0.75rem',
-  fontWeight: 600,
-  cursor: 'pointer',
-  transition: 'all 0.15s ease',
-  width: '90px'
-};
-
-const yellowStyle = {
-  background: 'rgba(245, 158, 11, 0.12)',
-  color: '#f59e0b',
-  border: '1px solid rgba(245, 158, 11, 0.3)',
-  borderRadius: '6px',
-  padding: '0.35rem 0.75rem',
-  fontSize: '0.75rem',
-  fontWeight: 600,
-  cursor: 'pointer',
-  transition: 'all 0.15s ease',
-  width: '90px'
-};
-
-const popBtn = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.5rem',
-  width: '100%',
-  padding: '0.6rem 1rem',
-  background: 'transparent',
-  border: 'none',
-  textAlign: 'left',
-  fontSize: '0.8rem',
-  fontWeight: 500,
-  color: 'var(--text-muted)',
-  cursor: 'pointer',
-  transition: 'all 0.15s ease',
-  hover: { background: 'var(--glass-bg)' }
-};
-
 // Modal Wrapper Component
 const ModalWrapper = ({ title, children, onClose }) => (
-  <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
-    <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto', position: 'relative' }}>
-      <button onClick={onClose} style={{ position: 'absolute', right: '1.5rem', top: '1.5rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+  <div className="modal-overlay">
+    <div className="premium-card modal-panel">
+      <button onClick={onClose} className="modal-close" aria-label="Close">
         <X size={20} />
       </button>
-      <h2 style={{ marginBottom: '1.5rem', fontSize: '1.5rem', fontWeight: 700 }}>{title}</h2>
+      <h2 className="modal-title">{title}</h2>
       {children}
     </div>
   </div>
@@ -487,42 +763,19 @@ const ModalWrapper = ({ title, children, onClose }) => (
 // ----------------------------------------------------
 // 1. PERFORMA INVOICE GENERATOR FORM (Slide 7 Set A)
 // ----------------------------------------------------
-const PerformaInvoiceGenerator = ({ mr, editing, onClose }) => {
-  const { data, updateData, updateItem, incrementSerial } = useAppContext();
+const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
+  const { data, updateData, updateItem, ensureSerialAtLeast } = useAppContext();
   const party = data.parties.find(p => p.id === mr.partyId);
-  const prodConfig = (party?.products || []).find(p => p.name === mr.productName);
+  const prodOpts = useMemo(() => receiptProductOptions(mr, data), [mr, data]);
+  const productNames = getReceiptProductNames(mr, prodOpts);
+  const formInitKey = `${mr.id}-combined-${editing?.id || 'new'}`;
 
   const [form, setForm] = useState({
     invoiceNo: '',
     date: new Date().toISOString().split('T')[0],
     poNo: '',
     poDate: new Date().toISOString().split('T')[0],
-    charges: {
-      cleaning: false,
-      filterBag: false,
-      processing: false,
-      sieving: false,
-      psdReport: false,
-      liner: false,
-      courier: false,
-      fiberDrum: false,
-      transportation: false,
-      hdpeDrum: false,
-      batchChangeover: false
-    },
-    rates: {
-      cleaning: 0,
-      filterBag: 0,
-      processing: 0,
-      sieving: 0,
-      psdReport: 0,
-      liner: 0,
-      courier: 0,
-      fiberDrum: 0,
-      transportation: 0,
-      hdpeDrum: 0,
-      batchChangeover: 0
-    },
+    productCharges: initProductChargesFromMR(mr, party, prodOpts),
     discount: 0,
     taxRate: 18,
     terms: 'Payment 100% advance against PI.'
@@ -532,63 +785,86 @@ const PerformaInvoiceGenerator = ({ mr, editing, onClose }) => {
     if (editing) {
       setForm({
         ...editing,
-        charges: editing.charges || {},
-        rates: editing.rates || {}
+        productCharges: normalizeProductCharges(
+          editing.productCharges,
+          editing,
+          mr,
+          prodOpts,
+          productNames[0] || mr.productName
+        ),
+        discount: editing.discount || 0,
+        taxRate: editing.taxRate ?? 18,
+        terms: editing.terms || 'Payment 100% advance against PI.'
       });
     } else {
-      const piSerial = data.settings?.serials?.PI || 1;
-      const docNo = generateDocNumber('PI', piSerial, new Date(form.date));
-      
-      // Pull pre-configured rates from Party Product Master
-      const defaultRates = prodConfig?.charges || {};
-
       setForm(prev => ({
         ...prev,
-        invoiceNo: docNo,
-        rates: {
-          cleaning: defaultRates.cleaning || 0,
-          filterBag: defaultRates.filterBag || 0,
-          processing: defaultRates.processing || 0,
-          sieving: defaultRates.sieving || 0,
-          psdReport: (prodConfig?.psdMethodDefault === 'Wet' ? (defaultRates.psdReportWet || 0) : (defaultRates.psdReportDry || 0)) || defaultRates.psdReport || 0,
-          liner: defaultRates.liner || 0,
-          courier: defaultRates.courier || 0,
-          fiberDrum: defaultRates.fiberDrum || 0,
-          transportation: defaultRates.transportation || 0,
-          hdpeDrum: defaultRates.hdpeDrum || 0,
-          batchChangeover: defaultRates.batchChangeover || 0
-        }
+        productCharges: initProductChargesFromMR(mr, party, prodOpts)
       }));
     }
-  }, [form.date, editing, prodConfig, data.settings?.serials?.PI]);
+  }, [formInitKey]);
 
-  const toggleCharge = (key) => {
-    setForm(prev => ({
-      ...prev,
-      charges: { ...prev.charges, [key]: !prev.charges[key] }
-    }));
-  };
+  useEffect(() => {
+    if (editing) return;
+    const piSerial = data.settings?.serials?.PI || 1;
+    const docNo = generateDocNumber('PI', piSerial, new Date(form.date));
+    setForm(prev => (prev.invoiceNo === docNo ? prev : { ...prev, invoiceNo: docNo }));
+  }, [form.date, editing, data.settings?.serials?.PI]);
 
-  const handleRateChange = (key, val) => {
-    setForm(prev => ({
-      ...prev,
-      rates: { ...prev.rates, [key]: parseFloat(val) || 0 }
-    }));
-  };
-
-  // Subtotal & GST math
-  const getSubtotal = () => {
-    return Object.keys(form.charges).reduce((sum, key) => {
-      if (form.charges[key]) {
-        // If it's a processing-rate item, multiply by quantity! Otherwise it is flat.
-        const isQtyRate = ['processing', 'sieving', 'cleaning'].includes(key);
-        const qty = parseFloat(mr.totalQty || mr.receivedQty || 0);
-        const rate = form.rates[key] || 0;
-        return sum + (isQtyRate ? qty * rate : rate);
+  const toggleCharge = (prodName, key) => {
+    setForm(prev => {
+      const pc = prev.productCharges[prodName] || {
+        charges: emptyChargeFlags(),
+        rates: emptyChargeRates(),
+        qtys: emptyChargeQtys()
+      };
+      const turningOn = !pc.charges[key];
+      const materialQty = getProductQty(mr, prodName, prodOpts);
+      const qtys = { ...(pc.qtys || emptyChargeQtys()) };
+      if (turningOn && (qtys[key] == null || qtys[key] === '')) {
+        qtys[key] = isMaterialQtyCharge(key) ? materialQty : 1;
       }
-      return sum;
-    }, 0);
+      return {
+        ...prev,
+        productCharges: {
+          ...prev.productCharges,
+          [prodName]: {
+            ...pc,
+            charges: { ...pc.charges, [key]: turningOn },
+            qtys
+          }
+        }
+      };
+    });
   };
+
+  const handleRateChange = (prodName, key, val) => {
+    setForm(prev => ({
+      ...prev,
+      productCharges: {
+        ...prev.productCharges,
+        [prodName]: {
+          ...prev.productCharges[prodName],
+          rates: { ...prev.productCharges[prodName].rates, [key]: parseChargeFieldValue(val) }
+        }
+      }
+    }));
+  };
+
+  const handleQtyChange = (prodName, key, val) => {
+    setForm(prev => ({
+      ...prev,
+      productCharges: {
+        ...prev.productCharges,
+        [prodName]: {
+          ...prev.productCharges[prodName],
+          qtys: { ...(prev.productCharges[prodName].qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) }
+        }
+      }
+    }));
+  };
+
+  const getSubtotal = () => calcProductChargesSubtotal(form.productCharges, mr, null, prodOpts);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -597,13 +873,40 @@ const PerformaInvoiceGenerator = ({ mr, editing, onClose }) => {
     const taxable = Math.max(0, subtotal - discountAmount);
     const taxAmount = taxable * (form.taxRate / 100);
     const total = taxable + taxAmount;
+    const sanitizedCharges = sanitizeProductCharges(form.productCharges);
+    const productLabel = getReceiptProductLabel(mr, prodOpts);
+    const productSummaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
+    const materialQty = productSummaries.reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0)
+      || parseFloat(mr.totalQty)
+      || 0;
+    const chargeSnapshot = resolveReceiptChargesForDoc(mr, party, {
+      productName: productLabel,
+      materialQty
+    });
+    const piPool = (data.invoices || []).filter(inv =>
+      !inv.isDeleted && (inv.type === 'Proforma Invoice' || inv.invoiceNo?.includes('/PI/'))
+    );
+    const { docNo, nextSerial } = nextAvailableDocNumber(
+      'PI',
+      data.settings?.serials?.PI || 1,
+      form.date,
+      piPool,
+      { excludeId: editing?.id }
+    );
 
     const finalDoc = {
       ...form,
+      invoiceNo: editing ? form.invoiceNo : docNo,
+      productCharges: sanitizedCharges,
+      charges: chargeSnapshot.charges,
+      rates: chargeSnapshot.rates,
+      qtys: chargeSnapshot.qtys,
+      customCharges: chargeSnapshot.customCharges || [],
       receiptId: mr.id,
       partyName: mr.partyName,
-      productName: mr.productName,
-      qty: mr.totalQty || mr.receivedQty || 0,
+      productName: productLabel,
+      productSummaries,
+      qty: materialQty,
       subtotal,
       taxAmount,
       total,
@@ -613,25 +916,19 @@ const PerformaInvoiceGenerator = ({ mr, editing, onClose }) => {
     if (editing) {
       updateItem('invoices', editing.id, finalDoc);
     } else {
+      if (findAnyProformaInvoice(data.invoices, mr.id)) {
+        alert('A Proforma Invoice already exists for this Material Receipt.');
+        return;
+      }
       updateData('invoices', { ...finalDoc, id: Date.now().toString() });
-      incrementSerial('PI');
+      ensureSerialAtLeast('PI', nextSerial);
     }
     onClose();
   };
 
-  const chargesList = [
-    { key: 'cleaning', label: 'Cleaning Charges (998842)', isQtyRate: true },
-    { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
-    { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true },
-    { key: 'sieving', label: 'Sieving Charges (998842)', isQtyRate: true },
-    { key: 'psdReport', label: 'PSD Report Charges (998346)', isQtyRate: false },
-    { key: 'liner', label: 'Liner (39233090)', isQtyRate: false },
-    { key: 'courier', label: 'Courier (996812)', isQtyRate: false },
-    { key: 'fiberDrum', label: 'Fiber Drum (7310)', isQtyRate: false },
-    { key: 'transportation', label: 'Transportation (996511)', isQtyRate: false },
-    { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },
-    { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
-  ];
+  const totalMaterialQty = getReceiptProductSummaries(mr, prodOpts)
+    .filter(p => p.batchCount > 0 || p.qty > 0)
+    .reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0) || (mr.totalQty || mr.receivedQty || 0);
 
   return (
     <form onSubmit={handleSubmit}>
@@ -657,38 +954,41 @@ const PerformaInvoiceGenerator = ({ mr, editing, onClose }) => {
           <input type="date" className="input-field" value={form.poDate} onChange={e => setForm({...form, poDate: e.target.value})} />
         </div>
         <div>
-          <label>Material Quantity</label>
-          <input type="text" className="input-field" readOnly value={`${mr.totalQty || mr.receivedQty || 0} Kg`} />
+          <label>Total Material Quantity</label>
+          <input type="text" className="input-field" readOnly value={`${totalMaterialQty} Kg`} />
         </div>
       </div>
+
+      <MRProductSummary mr={mr} party={party} productOptions={prodOpts} />
 
       <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', pb: '0.5rem' }}>Auto-Charges Configuration Panel</h3>
       
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
         <div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Toggle standard charges to add them as line items with HSN codes.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {chargesList.map(item => (
-              <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem', background: 'var(--glass-bg)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', cursor: 'pointer', margin: 0 }}>
-                  <input type="checkbox" checked={form.charges[item.key]} onChange={() => toggleCharge(item.key)} />
-                  {item.label}
-                </label>
-                {form.charges[item.key] && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{item.isQtyRate ? '/Kg' : 'flat'}:</span>
-                    <input 
-                      type="number" 
-                      className="input-field" 
-                      style={{ width: '80px', padding: '0.2rem', fontSize: '0.8rem', height: 'auto' }}
-                      value={form.rates[item.key]} 
-                      onChange={e => handleRateChange(item.key, e.target.value)} 
-                    />
-                  </div>
-                )}
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Configure charges per product. Toggle standard charges to add them as line items with HSN codes.</p>
+          {productNames.map((prodName) => {
+            const displayIdx = getProductDisplayIndex(mr, prodName, prodOpts);
+            const materialQty = getProductQty(mr, prodName, prodOpts);
+            const pc = form.productCharges[prodName] || form.productCharges[Object.keys(form.productCharges || {}).find(k =>
+              (k || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase()
+            )] || {
+              charges: emptyChargeFlags(),
+              rates: emptyChargeRates(),
+              qtys: buildChargeQtys({}, materialQty)
+            };
+            return (
+              <div key={prodName} style={{ marginBottom: '1rem', padding: '1rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                  Product {displayIdx}: {prodName} ({materialQty} Kg)
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {CHARGES_LIST.map(item => renderChargeRow(
+                    item, pc, prodName, materialQty, toggleCharge, handleQtyChange, handleRateChange
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
         {/* Calculation Summary */}
@@ -737,24 +1037,33 @@ const PerformaInvoiceGenerator = ({ mr, editing, onClose }) => {
 // ----------------------------------------------------
 // 2. BPR WEIGHTStwin TABLES FORM (Slide 8 Set A)
 // ----------------------------------------------------
-const BPRGenerator = ({ mr, editing, onClose }) => {
+const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const { data, updateData, updateItem, incrementSerial } = useAppContext();
   const party = (data.parties || []).find(p => p.id === mr.partyId);
-  const prodConfig = (party?.products || []).find(p => p.name === mr.productName);
+  const prodOpts = receiptProductOptions(mr, data);
+  const productNames = getScopedProductNames(mr, prodOpts, activeProductName);
+  const firstProdConfig = (party?.products || []).find(p => p.name === (productNames[0] || mr.productName));
+  const scopedQty = activeProductName ? getProductQty(mr, activeProductName, prodOpts) : (mr.totalQty || mr.receivedQty || 0);
+  const scopedDrums = activeProductName ? getProductDrums(mr, activeProductName, prodOpts) : (mr.totalDrums || 1);
 
-  const [activeFormTab, setActiveFormTab] = useState('Basic Info');
-  const formTabs = ['Basic Info', 'Pressures & Checklist', 'Batches & Weights', 'Quality & Dispatch'];
+  const bprSectionStyle = {
+    marginBottom: '1.5rem',
+    padding: '1.25rem',
+    background: 'var(--input-bg)',
+    borderRadius: '10px',
+    border: '1px solid var(--border-color)'
+  };
 
   const [form, setForm] = useState({
     bprNo: '',
     date: new Date().toISOString().split('T')[0],
     customerName: mr.partyName,
-    productName: mr.productName,
-    totalInputQty: mr.totalQty || mr.receivedQty || 0,
+    productName: activeProductName || getReceiptProductLabel(mr, prodOpts),
+    totalInputQty: scopedQty,
     batchNo: '',
     totalNoBatch: 0,
-    psdRequirement: prodConfig?.psdReq || '90% < 10M',
-    totalDrums: mr.totalDrums || 1,
+    psdRequirement: firstProdConfig?.psdReq || '90% < 10M',
+    totalDrums: scopedDrums,
     doubleDispatch: false,
     receivedBatches: [], // Array of { batchNo, drumNo, gross, tare, net }
     dispatchedBatches: [], // Array of { batchNo, drumNo, gross, tare, net }
@@ -795,17 +1104,27 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
       const docNo = generateDocNumber('BPR', bprSerial, new Date(form.date));
 
       // Construct rows from MR batches (with legacy fallback for old single-batch structure)
-      const activeMRBatches = (mr.batches || [
-        { batchNo: mr.batchNo || 'N/A', drums: 1, qty: parseFloat(mr.receivedQty || mr.totalQty || 0), isEmptyDrums: false }
-      ]).filter(b => !b.isEmptyDrums);
+      const activeMRBatches = activeProductName
+        ? getProductBatches(mr, activeProductName, prodOpts)
+        : (() => {
+            const all = getReceiptProductNames(mr, prodOpts).flatMap(prodName =>
+              getProductBatches(mr, prodName, prodOpts).map(b => ({ ...b, productName: prodName }))
+            );
+            if (all.length) return all;
+            return (mr.batches || [
+              { batchNo: mr.batchNo || 'N/A', drums: 1, qty: parseFloat(mr.receivedQty || mr.totalQty || 0), isEmptyDrums: false }
+            ]).filter(b => !b.isEmptyDrums);
+          })();
       const receivedRows = [];
       
       activeMRBatches.forEach(b => {
         const drumCount = parseInt(b.drums) || 1;
+        const pName = b.productName || productNames[0] || mr.productName?.split(',')[0]?.trim() || '';
         for (let d = 1; d <= drumCount; d++) {
           receivedRows.push({
             batchNo: b.batchNo,
             drumNo: d.toString(),
+            productName: pName,
             gross: 0,
             tare: 0,
             net: 0
@@ -817,13 +1136,16 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
         ...prev,
         bprNo: docNo,
         customerName: mr.partyName,
+        productName: activeProductName || getReceiptProductLabel(mr, prodOpts),
+        totalInputQty: scopedQty,
+        totalDrums: scopedDrums,
         receivedBatches: receivedRows,
         dispatchedBatches: receivedRows.map(r => ({ ...r })),
-        batchNo: activeMRBatches[0]?.batchNo || '',
+        batchNo: activeMRBatches.map(b => b.batchNo).filter(Boolean).join(', '),
         totalNoBatch: activeMRBatches.length
       }));
     }
-  }, [form.date, editing, mr, data.settings?.serials?.BPR]);
+  }, [form.date, editing, mr, activeProductName, scopedQty, scopedDrums, data.settings?.serials?.BPR]);
 
   // Handle double dispatch drums expansion
   const toggleDoubleDispatch = () => {
@@ -858,11 +1180,100 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
     });
   };
 
-  const addCustomRow = (tableKey) => {
+  const addCustomRow = (tableKey, productName = '') => {
     setForm(prev => ({
       ...prev,
-      [tableKey]: [...prev[tableKey], { batchNo: 'Custom', drumNo: (prev[tableKey].length + 1).toString(), gross: 0, tare: 0, net: 0 }]
+      [tableKey]: [...prev[tableKey], { batchNo: 'Custom', drumNo: (prev[tableKey].length + 1).toString(), productName: productName || productNames[0] || '', gross: 0, tare: 0, net: 0 }]
     }));
+  };
+
+  const renderWeightTable = (tableKey, title, totalNet) => {
+    const rows = form[tableKey] || [];
+    const groupedProducts = productNames.length
+      ? productNames
+      : [...new Set(rows.map(r => r.productName).filter(Boolean))];
+
+    return (
+      <div style={{ background: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <h4 style={{ margin: 0, fontSize: '0.95rem' }}>{title}</h4>
+          <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow(tableKey)}>+ Add Row</button>
+        </div>
+        <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+          {groupedProducts.length <= 1 ? (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                  {groupedProducts.length === 0 && productNames.length > 1 && <th style={{ padding: '0.35rem' }}>Product</th>}
+                  <th style={{ padding: '0.35rem' }}>Batch No</th>
+                  <th style={{ padding: '0.35rem' }}>Drum No</th>
+                  <th style={{ padding: '0.35rem' }}>Gross</th>
+                  <th style={{ padding: '0.35rem' }}>Tare</th>
+                  <th style={{ padding: '0.35rem' }}>Net</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
+                    <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
+                    <td style={{ padding: '0.25rem' }}>
+                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross} onChange={e => handleCellChange(tableKey, idx, 'gross', e.target.value)} />
+                    </td>
+                    <td style={{ padding: '0.25rem' }}>
+                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare} onChange={e => handleCellChange(tableKey, idx, 'tare', e.target.value)} />
+                    </td>
+                    <td style={{ padding: '0.25rem', fontWeight: 600 }}>{formatNet(r.net)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            groupedProducts.map((prodName, pIdx) => {
+              const prodRows = rows.map((r, idx) => ({ r, idx })).filter(({ r }) => (r.productName || productNames[0]) === prodName);
+              if (!prodRows.length) return null;
+              return (
+                <div key={prodName} style={{ marginBottom: '1rem' }}>
+                  <h5 style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                    Product {pIdx + 1}: {prodName}
+                  </h5>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                        <th style={{ padding: '0.35rem' }}>Batch No</th>
+                        <th style={{ padding: '0.35rem' }}>Drum No</th>
+                        <th style={{ padding: '0.35rem' }}>Gross</th>
+                        <th style={{ padding: '0.35rem' }}>Tare</th>
+                        <th style={{ padding: '0.35rem' }}>Net</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {prodRows.map(({ r, idx }) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
+                          <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
+                          <td style={{ padding: '0.25rem' }}>
+                            <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross} onChange={e => handleCellChange(tableKey, idx, 'gross', e.target.value)} />
+                          </td>
+                          <td style={{ padding: '0.25rem' }}>
+                            <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare} onChange={e => handleCellChange(tableKey, idx, 'tare', e.target.value)} />
+                          </td>
+                          <td style={{ padding: '0.25rem', fontWeight: 600 }}>{formatNet(r.net)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })
+          )}
+        </div>
+        <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
+          <span>Total {tableKey === 'receivedBatches' ? 'Received' : 'Dispatched'}:</span>
+          <span>{totalNet.toFixed(2)} Kg</span>
+        </div>
+      </div>
+    );
   };
 
   const handleSubmit = (e) => {
@@ -881,372 +1292,242 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
     onClose();
   };
 
-  const totalReceivedNet = form.receivedBatches.reduce((s, r) => s + r.net, 0);
-  const totalDispatchedNet = form.dispatchedBatches.reduce((s, r) => s + r.net, 0);
+  const totalReceivedNet = (form.receivedBatches || []).reduce((s, r) => s + (parseFloat(r.net) || 0), 0);
+  const totalDispatchedNet = (form.dispatchedBatches || []).reduce((s, r) => s + (parseFloat(r.net) || 0), 0);
+  const formatNet = formatWeightNet;
 
   return (
     <form onSubmit={handleSubmit}>
-      {/* Tabs Header */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-        {formTabs.map(tab => (
-          <button 
-            key={tab}
-            type="button"
-            onClick={() => setActiveFormTab(tab)}
-            style={{ 
-              background: 'transparent', 
-              border: 'none', 
-              padding: '0.5rem 1rem', 
-              fontSize: '0.9rem', 
-              fontWeight: 600, 
-              color: activeFormTab === tab ? 'var(--accent-primary)' : 'var(--text-muted)',
-              borderBottom: activeFormTab === tab ? '2px solid var(--accent-primary)' : 'none',
-              cursor: 'pointer'
-            }}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+      <MRProductSummary mr={mr} party={party} productOptions={prodOpts} onlyProduct={activeProductName} />
 
-      {activeFormTab === 'Basic Info' && (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div>
-              <label>BPR Number</label>
-              <input type="text" className="input-field" readOnly value={form.bprNo} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
-            </div>
-            <div>
-              <label>BPR Date *</label>
-              <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
-            </div>
-            <div>
-              <label>Customer Name</label>
-              <input type="text" className="input-field" value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} />
-            </div>
-            <div>
-              <label>Product Name</label>
-              <input type="text" className="input-field" readOnly value={form.productName} />
-            </div>
-            <div>
-              <label>Total Quantity (kg)</label>
-              <input type="text" className="input-field" readOnly value={String(form.totalInputQty)} />
-            </div>
-            <div>
-              <label>Batch No.</label>
-              <input type="text" className="input-field" value={form.batchNo} onChange={e => setForm({ ...form, batchNo: e.target.value })} />
-            </div>
-            <div>
-              <label>Total No. Batch</label>
-              <input type="number" className="input-field" value={form.totalNoBatch} onChange={e => setForm({ ...form, totalNoBatch: parseInt(e.target.value) || 0 })} />
-            </div>
-            <div>
-              <label>Total Drum</label>
-              <input type="number" className="input-field" value={form.totalDrums} onChange={e => setForm({ ...form, totalDrums: parseInt(e.target.value) || 0 })} />
-            </div>
-            <div>
-              <label>PSD Requirement *</label>
-              <input type="text" className="input-field" required value={form.psdRequirement} onChange={e => setForm({...form, psdRequirement: e.target.value})} />
-            </div>
+      <section style={bprSectionStyle}>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 1rem', color: 'var(--accent-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>Basic Info</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+          <div>
+            <label>BPR Number</label>
+            <input type="text" className="input-field" readOnly value={form.bprNo} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
           </div>
-
-          <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Process Header</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
-              <div>
-                <label>Committed</label>
-                <input type="text" className="input-field" value={form.committedBy} onChange={e => setForm({ ...form, committedBy: e.target.value })} />
-              </div>
-              <div>
-                <label>Processing Start (Date)</label>
-                <input type="date" className="input-field" value={form.processingStartDate} onChange={e => setForm({ ...form, processingStartDate: e.target.value })} />
-              </div>
-              <div>
-                <label>Processing Start (Time)</label>
-                <input type="time" className="input-field" value={form.processingStartTime} onChange={e => setForm({ ...form, processingStartTime: e.target.value })} />
-              </div>
-              <div>
-                <label>Processing Supervisor</label>
-                <input type="text" className="input-field" value={form.processingSupervisor} onChange={e => setForm({ ...form, processingSupervisor: e.target.value })} />
-              </div>
-              <div>
-                <label>Sizing report require</label>
-                <select className="input-field" value={form.sizingReportRequired} onChange={e => setForm({ ...form, sizingReportRequired: e.target.value })}>
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
-                </select>
-              </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label>Particle size result</label>
-                <input type="text" className="input-field" value={form.particleSizeResult} onChange={e => setForm({ ...form, particleSizeResult: e.target.value })} />
-              </div>
-            </div>
+          <div>
+            <label>BPR Date *</label>
+            <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
           </div>
-        </>
-      )}
-
-      {activeFormTab === 'Pressures & Checklist' && (
-        <>
-          <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Cleaning Checklist</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              {[
-                { key: 'isMicronizerCleaned', label: 'Is the Micronizar cleaned?' },
-                { key: 'isAreaCleaned', label: 'Is the processing Area Cleaned?' },
-                { key: 'isFilterBagPackedLabeled', label: 'Is the filter Bag before process packed and labeled in LDPE Bag ?' },
-                { key: 'isBagCleanBlackSpotFree', label: 'Is the bag is clean and black spot free?' }
-              ].map(item => (
-                <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(form[item.key])}
-                    onChange={e => setForm({ ...form, [item.key]: e.target.checked })}
-                  />
-                  {item.label}
-                </label>
-              ))}
-            </div>
+          <div>
+            <label>Customer Name</label>
+            <input type="text" className="input-field" value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} />
           </div>
+          <div>
+            <label>Product Name</label>
+            <input type="text" className="input-field" readOnly value={form.productName} />
+          </div>
+          <div>
+            <label>Total Quantity (kg)</label>
+            <input type="text" className="input-field" readOnly value={String(form.totalInputQty)} />
+          </div>
+          <div>
+            <label>Batch No.</label>
+            <input type="text" className="input-field" value={form.batchNo} onChange={e => setForm({ ...form, batchNo: e.target.value })} />
+          </div>
+          <div>
+            <label>Total No. Batch</label>
+            <input type="number" className="input-field" value={form.totalNoBatch} onChange={e => setForm({ ...form, totalNoBatch: parseInt(e.target.value) || 0 })} />
+          </div>
+          <div>
+            <label>Total Drum</label>
+            <input type="number" className="input-field" value={form.totalDrums} onChange={e => setForm({ ...form, totalDrums: parseInt(e.target.value) || 0 })} />
+          </div>
+          <div>
+            <label>PSD Requirement *</label>
+            <input type="text" className="input-field" required value={form.psdRequirement} onChange={e => setForm({...form, psdRequirement: e.target.value})} />
+          </div>
+        </div>
 
-          <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Pressure Log</h3>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>
-                    <th style={{ padding: '0.4rem' }}>S.P.</th>
-                    <th style={{ padding: '0.4rem' }}>D.P.</th>
-                    <th style={{ padding: '0.4rem' }}>T.P.</th>
-                    <th style={{ padding: '0.4rem' }}>F.P.</th>
-                    <th style={{ padding: '0.4rem' }}>Fi.P.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(form.pressures || []).map((row, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      {['sp', 'dp', 'tp', 'fp', 'fip'].map(k => (
-                        <td key={k} style={{ padding: '0.3rem' }}>
-                          <input
-                            className="input-field"
-                            style={{ padding: '0.25rem', fontSize: '0.8rem' }}
-                            value={row[k]}
-                            onChange={e => {
-                              const next = [...(form.pressures || [])];
-                              next[idx] = { ...next[idx], [k]: e.target.value };
-                              setForm({ ...form, pressures: next });
-                            }}
-                          />
-                        </td>
-                      ))}
-                    </tr>
+        <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.75rem' }}>Process Header</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
+          <div>
+            <label>Committed</label>
+            <input type="text" className="input-field" value={form.committedBy} onChange={e => setForm({ ...form, committedBy: e.target.value })} />
+          </div>
+          <div>
+            <label>Processing Start (Date)</label>
+            <input type="date" className="input-field" value={form.processingStartDate} onChange={e => setForm({ ...form, processingStartDate: e.target.value })} />
+          </div>
+          <div>
+            <label>Processing Start (Time)</label>
+            <input type="time" className="input-field" value={form.processingStartTime} onChange={e => setForm({ ...form, processingStartTime: e.target.value })} />
+          </div>
+          <div>
+            <label>Processing Supervisor</label>
+            <input type="text" className="input-field" value={form.processingSupervisor} onChange={e => setForm({ ...form, processingSupervisor: e.target.value })} />
+          </div>
+          <div>
+            <label>Sizing report require</label>
+            <select className="input-field" value={form.sizingReportRequired} onChange={e => setForm({ ...form, sizingReportRequired: e.target.value })}>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div style={{ gridColumn: 'span 3' }}>
+            <label>Particle size result</label>
+            <input type="text" className="input-field" value={form.particleSizeResult} onChange={e => setForm({ ...form, particleSizeResult: e.target.value })} />
+          </div>
+        </div>
+      </section>
+
+      <section style={bprSectionStyle}>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 1rem', color: 'var(--accent-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>Pressures & Checklist</h3>
+        <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.75rem' }}>Cleaning Checklist</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+          {[
+            { key: 'isMicronizerCleaned', label: 'Is the Micronizar cleaned?' },
+            { key: 'isAreaCleaned', label: 'Is the processing Area Cleaned?' },
+            { key: 'isFilterBagPackedLabeled', label: 'Is the filter Bag before process packed and labeled in LDPE Bag ?' },
+            { key: 'isBagCleanBlackSpotFree', label: 'Is the bag is clean and black spot free?' }
+          ].map(item => (
+            <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={Boolean(form[item.key])}
+                onChange={e => setForm({ ...form, [item.key]: e.target.checked })}
+              />
+              {item.label}
+            </label>
+          ))}
+        </div>
+
+        <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.75rem' }}>Pressure Log</h4>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <thead>
+              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>
+                <th style={{ padding: '0.4rem' }}>S.P.</th>
+                <th style={{ padding: '0.4rem' }}>D.P.</th>
+                <th style={{ padding: '0.4rem' }}>T.P.</th>
+                <th style={{ padding: '0.4rem' }}>F.P.</th>
+                <th style={{ padding: '0.4rem' }}>Fi.P.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(form.pressures || []).map((row, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  {['sp', 'dp', 'tp', 'fp', 'fip'].map(k => (
+                    <td key={k} style={{ padding: '0.3rem' }}>
+                      <input
+                        className="input-field"
+                        style={{ padding: '0.25rem', fontSize: '0.8rem' }}
+                        value={row[k]}
+                        onChange={e => {
+                          const next = [...(form.pressures || [])];
+                          next[idx] = { ...next[idx], [k]: e.target.value };
+                          setForm({ ...form, pressures: next });
+                        }}
+                      />
+                    </td>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
-
-      {activeFormTab === 'Batches & Weights' && (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Weights Configuration Tables</h3>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer', color: 'var(--accent-primary)', fontWeight: 600 }}>
-              <input type="checkbox" checked={form.doubleDispatch} onChange={toggleDoubleDispatch} />
-              Double Dispatch Drums Count (e.g. split micronised batches)
-            </label>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-            {/* Received weights */}
-            <div style={{ background: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Received Raw Material Weight</h4>
-                <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow('receivedBatches')}>+ Add Row</button>
-              </div>
-              <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                      <th style={{ padding: '0.35rem' }}>Batch No</th>
-                      <th style={{ padding: '0.35rem' }}>Drum No</th>
-                      <th style={{ padding: '0.35rem' }}>Gross</th>
-                      <th style={{ padding: '0.35rem' }}>Tare</th>
-                      <th style={{ padding: '0.35rem' }}>Net</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {form.receivedBatches.map((r, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
-                        <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
-                        <td style={{ padding: '0.25rem' }}>
-                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross} onChange={e => handleCellChange('receivedBatches', idx, 'gross', e.target.value)} />
-                        </td>
-                        <td style={{ padding: '0.25rem' }}>
-                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare} onChange={e => handleCellChange('receivedBatches', idx, 'tare', e.target.value)} />
-                        </td>
-                        <td style={{ padding: '0.25rem', fontWeight: 600 }}>{r.net.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
-                <span>Total Received:</span>
-                <span>{totalReceivedNet.toFixed(2)} Kg</span>
-              </div>
-            </div>
-
-            {/* Dispatched weights */}
-            <div style={{ background: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Dispatched (Micronised) Material Weight</h4>
-                <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow('dispatchedBatches')}>+ Add Row</button>
-              </div>
-              <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                      <th style={{ padding: '0.35rem' }}>Batch No</th>
-                      <th style={{ padding: '0.35rem' }}>Drum No</th>
-                      <th style={{ padding: '0.35rem' }}>Gross</th>
-                      <th style={{ padding: '0.35rem' }}>Tare</th>
-                      <th style={{ padding: '0.35rem' }}>Net</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {form.dispatchedBatches.map((r, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
-                        <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
-                        <td style={{ padding: '0.25rem' }}>
-                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross} onChange={e => handleCellChange('dispatchedBatches', idx, 'gross', e.target.value)} />
-                        </td>
-                        <td style={{ padding: '0.25rem' }}>
-                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare} onChange={e => handleCellChange('dispatchedBatches', idx, 'tare', e.target.value)} />
-                        </td>
-                        <td style={{ padding: '0.25rem', fontWeight: 600 }}>{r.net.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
-                <span>Total Dispatched:</span>
-                <span>{totalDispatchedNet.toFixed(2)} Kg</span>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {activeFormTab === 'Quality & Dispatch' && (
-        <>
-          <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Packing Materials Used</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '0.75rem' }}>
-              <div>
-                <label>White LD Bags</label>
-                <input className="input-field" value={form.packingMaterials?.whiteLdBags || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, whiteLdBags: e.target.value } })} />
-              </div>
-              <div>
-                <label>Black LD Bags</label>
-                <input className="input-field" value={form.packingMaterials?.blackLdBags || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, blackLdBags: e.target.value } })} />
-              </div>
-              <div>
-                <label>Brow Tapes</label>
-                <input className="input-field" value={form.packingMaterials?.brownTapes || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, brownTapes: e.target.value } })} />
-              </div>
-              <div>
-                <label>Drum Used</label>
-                <input className="input-field" value={form.packingMaterials?.drumUsed || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, drumUsed: e.target.value } })} />
-              </div>
-              <div>
-                <label>Other Details</label>
-                <input className="input-field" value={form.packingMaterials?.otherDetails || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, otherDetails: e.target.value } })} />
-              </div>
-            </div>
-          </div>
-
-          <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Dispatch Material Quantity Details</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.75rem' }}>
-              <div>
-                <label>Micronized Material net weight</label>
-                <input className="input-field" value={form.dispatchQty?.micronizedNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, micronizedNet: e.target.value } })} />
-              </div>
-              <div>
-                <label>Lumps Net weight</label>
-                <input className="input-field" value={form.dispatchQty?.lumpsNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, lumpsNet: e.target.value } })} />
-              </div>
-              <div>
-                <label>Floor Dust Net weight</label>
-                <input className="input-field" value={form.dispatchQty?.floorDustNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, floorDustNet: e.target.value } })} />
-              </div>
-              <div>
-                <label>Net Process Loss</label>
-                <input className="input-field" value={form.dispatchQty?.netProcessLoss || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, netProcessLoss: e.target.value } })} />
-              </div>
-              <div style={{ gridColumn: 'span 4' }}>
-                <label>Remark</label>
-                <input className="input-field" value={form.dispatchQty?.remark || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, remark: e.target.value } })} />
-              </div>
-            </div>
-          </div>
-
-          <div style={{ background: 'rgba(0,0,0,0.12)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: 0 }}>Process Completion</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
-              <div>
-                <label>Process Completion Date</label>
-                <input type="date" className="input-field" value={form.processCompletionDate} onChange={e => setForm({ ...form, processCompletionDate: e.target.value })} />
-              </div>
-              <div>
-                <label>Process Completion Time</label>
-                <input type="time" className="input-field" value={form.processCompletionTime} onChange={e => setForm({ ...form, processCompletionTime: e.target.value })} />
-              </div>
-              <div>
-                <label>Remarks</label>
-                <input type="text" className="input-field" value={form.remarks} onChange={e => setForm({ ...form, remarks: e.target.value })} />
-              </div>
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: '1rem' }}>
-              <input type="checkbox" checked={form.isFilterBagPackedStoredAfter} onChange={e => setForm({ ...form, isFilterBagPackedStoredAfter: e.target.checked })} />
-              Is the filter bag after process packed and labeled and stored safely?
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div>
-                <label>Operator Signature Name</label>
-                <input type="text" className="input-field" value={form.operatorSignature} onChange={e => setForm({ ...form, operatorSignature: e.target.value })} />
-              </div>
-              <div>
-                <label>Plant Supervisor Signature Name</label>
-                <input type="text" className="input-field" value={form.plantSupervisorSignature} onChange={e => setForm({ ...form, plantSupervisorSignature: e.target.value })} />
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
-        <div>
-          {activeFormTab !== 'Basic Info' && (
-            <button type="button" className="btn btn-secondary" onClick={() => setActiveFormTab(formTabs[formTabs.indexOf(activeFormTab) - 1])}>
-              Previous
-            </button>
-          )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
-          {activeFormTab !== 'Quality & Dispatch' ? (
-            <button type="button" className="btn btn-primary" onClick={() => setActiveFormTab(formTabs[formTabs.indexOf(activeFormTab) + 1])}>
-              Next Step
-            </button>
-          ) : (
-            <button type="submit" className="btn btn-primary">Save BPR Document</button>
-          )}
+      </section>
+
+      <section style={bprSectionStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--accent-primary)' }}>Batches & Weights</h3>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer', color: 'var(--accent-primary)', fontWeight: 600 }}>
+            <input type="checkbox" checked={form.doubleDispatch} onChange={toggleDoubleDispatch} />
+            Double Dispatch Drums Count (e.g. split micronised batches)
+          </label>
         </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          {renderWeightTable('receivedBatches', 'Received Raw Material Weight', totalReceivedNet)}
+          {renderWeightTable('dispatchedBatches', 'Dispatched (Micronised) Material Weight', totalDispatchedNet)}
+        </div>
+      </section>
+
+      <section style={bprSectionStyle}>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 1rem', color: 'var(--accent-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>Quality & Dispatch</h3>
+        <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.75rem' }}>Packing Materials Used</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+          <div>
+            <label>White LD Bags</label>
+            <input className="input-field" value={form.packingMaterials?.whiteLdBags || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, whiteLdBags: e.target.value } })} />
+          </div>
+          <div>
+            <label>Black LD Bags</label>
+            <input className="input-field" value={form.packingMaterials?.blackLdBags || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, blackLdBags: e.target.value } })} />
+          </div>
+          <div>
+            <label>Brow Tapes</label>
+            <input className="input-field" value={form.packingMaterials?.brownTapes || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, brownTapes: e.target.value } })} />
+          </div>
+          <div>
+            <label>Drum Used</label>
+            <input className="input-field" value={form.packingMaterials?.drumUsed || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, drumUsed: e.target.value } })} />
+          </div>
+          <div>
+            <label>Other Details</label>
+            <input className="input-field" value={form.packingMaterials?.otherDetails || ''} onChange={e => setForm({ ...form, packingMaterials: { ...form.packingMaterials, otherDetails: e.target.value } })} />
+          </div>
+        </div>
+
+        <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.75rem' }}>Dispatch Material Quantity Details</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+          <div>
+            <label>Micronized Material net weight</label>
+            <input className="input-field" value={form.dispatchQty?.micronizedNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, micronizedNet: e.target.value } })} />
+          </div>
+          <div>
+            <label>Lumps Net weight</label>
+            <input className="input-field" value={form.dispatchQty?.lumpsNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, lumpsNet: e.target.value } })} />
+          </div>
+          <div>
+            <label>Floor Dust Net weight</label>
+            <input className="input-field" value={form.dispatchQty?.floorDustNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, floorDustNet: e.target.value } })} />
+          </div>
+          <div>
+            <label>Net Process Loss</label>
+            <input className="input-field" value={form.dispatchQty?.netProcessLoss || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, netProcessLoss: e.target.value } })} />
+          </div>
+          <div style={{ gridColumn: 'span 4' }}>
+            <label>Remark</label>
+            <input className="input-field" value={form.dispatchQty?.remark || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, remark: e.target.value } })} />
+          </div>
+        </div>
+
+        <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.75rem' }}>Process Completion</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div>
+            <label>Process Completion Date</label>
+            <input type="date" className="input-field" value={form.processCompletionDate} onChange={e => setForm({ ...form, processCompletionDate: e.target.value })} />
+          </div>
+          <div>
+            <label>Process Completion Time</label>
+            <input type="time" className="input-field" value={form.processCompletionTime} onChange={e => setForm({ ...form, processCompletionTime: e.target.value })} />
+          </div>
+          <div>
+            <label>Remarks</label>
+            <input type="text" className="input-field" value={form.remarks} onChange={e => setForm({ ...form, remarks: e.target.value })} />
+          </div>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: '1rem' }}>
+          <input type="checkbox" checked={form.isFilterBagPackedStoredAfter} onChange={e => setForm({ ...form, isFilterBagPackedStoredAfter: e.target.checked })} />
+          Is the filter bag after process packed and labeled and stored safely?
+        </label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div>
+            <label>Operator Signature Name</label>
+            <input type="text" className="input-field" value={form.operatorSignature} onChange={e => setForm({ ...form, operatorSignature: e.target.value })} />
+          </div>
+          <div>
+            <label>Plant Supervisor Signature Name</label>
+            <input type="text" className="input-field" value={form.plantSupervisorSignature} onChange={e => setForm({ ...form, plantSupervisorSignature: e.target.value })} />
+          </div>
+        </div>
+      </section>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+        <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
+        <button type="submit" className="btn btn-primary">Save BPR Document</button>
       </div>
     </form>
   );
@@ -1255,17 +1536,44 @@ const BPRGenerator = ({ mr, editing, onClose }) => {
 // ----------------------------------------------------
 // 3. PSD UPLOADER & RESULTS FORM (Slide 9 Set A)
 // ----------------------------------------------------
-const PSDGenerator = ({ mr, editing, onClose }) => {
+const PSDGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const { data, updateData, updateItem, incrementSerial } = useAppContext();
   const party = data.parties.find(p => p.id === mr.partyId);
-  const prodConfig = (party?.products || []).find(p => p.name === mr.productName);
+  const prodOpts = receiptProductOptions(mr, data);
+  const productNames = getScopedProductNames(mr, prodOpts, activeProductName);
+
+  const makeDefaultReport = (prodName, batchNo = '') => {
+    const prodConfig = (party?.products || []).find(p => p.name === prodName);
+    const batches = getProductBatches(mr, prodName, prodOpts);
+    const batch = batches.find(b => b.batchNo === batchNo) || batches[0];
+    return {
+      productName: prodName,
+      batchNo: batchNo || batch?.batchNo || '',
+      method: batch?.psdMethod || prodConfig?.psdMethodDefault || 'Dry',
+      requirement: batch?.psdReq || prodConfig?.psdReq || '90% < 10M',
+      result: '',
+      fileName: '',
+      fileSize: ''
+    };
+  };
+
+  const buildInitialReports = () => {
+    const reports = [];
+    productNames.forEach(prodName => {
+      const batches = getProductBatches(mr, prodName, prodOpts).filter(b => b.batchNo);
+      if (batches.length) {
+        batches.forEach(b => reports.push(makeDefaultReport(prodName, b.batchNo)));
+      } else {
+        reports.push(makeDefaultReport(prodName));
+      }
+    });
+    return reports.length ? reports : [makeDefaultReport(mr.productName || '')];
+  };
 
   const [form, setForm] = useState({
     psdNo: '',
     date: new Date().toISOString().split('T')[0],
-    reports: [
-      { batchNo: '', method: (prodConfig?.psdMethodDefault || 'Dry'), requirement: prodConfig?.psdReq || '90% < 10M', result: '', fileName: '', fileSize: '' }
-    ],
+    reports: buildInitialReports(),
     notes: ''
   });
 
@@ -1273,9 +1581,10 @@ const PSDGenerator = ({ mr, editing, onClose }) => {
     if (editing) {
       setForm({
         ...editing,
-        reports: editing.reports || [
-          { batchNo: '', method: (prodConfig?.psdMethodDefault || 'Dry'), requirement: prodConfig?.psdReq || '90% < 10M', result: '', fileName: '', fileSize: '' }
-        ],
+        reports: (editing.reports || []).map(r => ({
+          ...r,
+          productName: r.productName || productNames[0] || mr.productName || ''
+        })),
         notes: editing.notes || ''
       });
     } else {
@@ -1284,11 +1593,7 @@ const PSDGenerator = ({ mr, editing, onClose }) => {
       setForm(prev => ({
         ...prev,
         psdNo: docNo,
-        reports: (prev.reports || []).map(r => ({
-          ...r,
-          requirement: r.requirement || prodConfig?.psdReq || '90% < 10M',
-          method: r.method || (prodConfig?.psdMethodDefault || 'Dry')
-        }))
+        reports: buildInitialReports()
       }));
     }
   }, [form.date, editing, data.settings?.serials?.PSD]);
@@ -1307,30 +1612,36 @@ const PSDGenerator = ({ mr, editing, onClose }) => {
     }
   };
 
-  const addReport = () => {
-    setForm(prev => {
-      const next = [...(prev.reports || [])];
-      next.push({ batchNo: '', method: (prodConfig?.psdMethodDefault || 'Dry'), requirement: prodConfig?.psdReq || '90% < 10M', result: '', fileName: '', fileSize: '' });
-      return { ...prev, reports: next };
-    });
+  const addReportForProduct = (prodName) => {
+    setForm(prev => ({
+      ...prev,
+      reports: [...(prev.reports || []), makeDefaultReport(prodName)]
+    }));
   };
 
   const removeReport = (idx) => {
     setForm(prev => ({ ...prev, reports: (prev.reports || []).filter((_, i) => i !== idx) }));
   };
 
+  const updateReport = (idx, patch) => {
+    setForm(prev => {
+      const next = [...(prev.reports || [])];
+      next[idx] = { ...next[idx], ...patch };
+      return { ...prev, reports: next };
+    });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Enforce max 3 reports per batch
     const counts = (form.reports || []).reduce((acc, r) => {
-      const k = r.batchNo || '';
+      const k = `${r.productName || ''}::${r.batchNo || ''}`;
       acc[k] = (acc[k] || 0) + 1;
       return acc;
     }, {});
     const tooMany = Object.entries(counts).find(([batch, c]) => batch && c > 3);
     if (tooMany) {
-      alert(`Max 3 PSD reports allowed for batch "${tooMany[0]}".`);
+      alert(`Max 3 PSD reports allowed for batch "${tooMany[0].split('::')[1]}".`);
       return;
     }
 
@@ -1338,7 +1649,7 @@ const PSDGenerator = ({ mr, editing, onClose }) => {
       ...form,
       receiptId: mr.id,
       partyName: mr.partyName,
-      productName: mr.productName,
+      productName: activeProductName || getReceiptProductLabel(mr, prodOpts),
       uploadedAt: new Date().toLocaleString()
     };
 
@@ -1350,6 +1661,8 @@ const PSDGenerator = ({ mr, editing, onClose }) => {
     }
     onClose();
   };
+
+  const displayProducts = productNames.length ? productNames : [mr.productName].filter(Boolean);
 
   return (
     <form onSubmit={handleSubmit}>
@@ -1367,82 +1680,80 @@ const PSDGenerator = ({ mr, editing, onClose }) => {
           <input type="text" className="input-field" readOnly value={mr.partyName} />
         </div>
         <div>
-          <label>Product Name</label>
-          <input type="text" className="input-field" readOnly value={mr.productName} />
+          <label>Products</label>
+          <input type="text" className="input-field" readOnly value={getReceiptProductLabel(mr, prodOpts)} />
         </div>
       </div>
 
+      <MRProductSummary mr={mr} party={party} productOptions={prodOpts} onlyProduct={activeProductName} />
+
       <div style={{ marginBottom: '1.5rem' }}>
-        {(form.reports || []).map((rep, idx) => (
-          <div key={idx} style={{ background: 'var(--input-bg)', border: '1px solid rgba(255,255,255,0.06)', padding: '1rem', borderRadius: '10px', marginBottom: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <h4 style={{ margin: 0 }}>Report {idx + 1}</h4>
-              {(form.reports || []).length > 1 && (
-                <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none' }} onClick={() => removeReport(idx)}>
-                  Remove
-                </button>
+        {displayProducts.map((prodName, pIdx) => {
+          const prodReports = (form.reports || []).map((r, idx) => ({ r, idx })).filter(({ r }) => (r.productName || displayProducts[0]) === prodName);
+          const prodBatches = getProductBatches(mr, prodName, prodOpts).filter(b => b.batchNo);
+          return (
+            <div key={prodName} style={{ border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1rem', marginBottom: '1rem', background: 'var(--input-bg)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--accent-primary)' }}>Product {pIdx + 1}: {prodName}</h3>
+                <button type="button" className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addReportForProduct(prodName)}>+ Add Report</button>
+              </div>
+              {prodReports.length === 0 ? (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>No reports yet for this product.</p>
+              ) : (
+                prodReports.map(({ r, idx }, repIdx) => (
+                  <div key={idx} style={{ background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.06)', padding: '1rem', borderRadius: '10px', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <h4 style={{ margin: 0 }}>Report {repIdx + 1}</h4>
+                      {(form.reports || []).length > 1 && (
+                        <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none' }} onClick={() => removeReport(idx)}>
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div>
+                        <label>Batch No *</label>
+                        <select className="input-field" required value={r.batchNo} onChange={e => updateReport(idx, { batchNo: e.target.value })}>
+                          <option value="">-- Select Batch --</option>
+                          {prodBatches.map((b, bIdx) => (
+                            <option key={bIdx} value={b.batchNo}>{b.batchNo}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label>Method</label>
+                        <select className="input-field" value={r.method} onChange={e => updateReport(idx, { method: e.target.value })}>
+                          <option value="Dry">Dry</option>
+                          <option value="Wet">Wet</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label>PSD Requirement *</label>
+                        <input className="input-field" required value={r.requirement} onChange={e => updateReport(idx, { requirement: e.target.value })} />
+                      </div>
+                      <div>
+                        <label>PSD Result *</label>
+                        <input className="input-field" required value={r.result} onChange={e => updateReport(idx, { result: e.target.value })} />
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <label>Upload PDF</label>
+                        <div style={{ background: 'var(--input-bg)', border: '2px dashed var(--border-color)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                          <UploadCloud size={28} style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }} />
+                          <input type="file" accept=".pdf" onChange={(e) => handleFileUpload(e, idx)} style={{ fontSize: '0.8rem' }} />
+                          {r.fileName && (
+                            <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                              {r.fileName} ({r.fileSize})
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <div>
-                <label>Batch No *</label>
-                <select className="input-field" required value={rep.batchNo} onChange={e => {
-                  const next = [...(form.reports || [])];
-                  next[idx] = { ...next[idx], batchNo: e.target.value };
-                  setForm({ ...form, reports: next });
-                }}>
-                  <option value="">-- Select Batch --</option>
-                  {(mr.batches || []).filter(b => !b.isEmptyDrums).map((b, bIdx) => (
-                    <option key={bIdx} value={b.batchNo}>{b.batchNo}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label>Method</label>
-                <select className="input-field" value={rep.method} onChange={e => {
-                  const next = [...(form.reports || [])];
-                  next[idx] = { ...next[idx], method: e.target.value };
-                  setForm({ ...form, reports: next });
-                }}>
-                  <option value="Dry">Dry</option>
-                  <option value="Wet">Wet</option>
-                </select>
-              </div>
-              <div>
-                <label>PSD Requirement *</label>
-                <input className="input-field" required value={rep.requirement} onChange={e => {
-                  const next = [...(form.reports || [])];
-                  next[idx] = { ...next[idx], requirement: e.target.value };
-                  setForm({ ...form, reports: next });
-                }} />
-              </div>
-              <div>
-                <label>PSD Result *</label>
-                <input className="input-field" required value={rep.result} onChange={e => {
-                  const next = [...(form.reports || [])];
-                  next[idx] = { ...next[idx], result: e.target.value };
-                  setForm({ ...form, reports: next });
-                }} />
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label>Upload PDF</label>
-                <div style={{ background: 'var(--input-bg)', border: '2px dashed var(--border-color)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                  <UploadCloud size={28} style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }} />
-                  <input type="file" accept=".pdf" onChange={(e) => handleFileUpload(e, idx)} style={{ fontSize: '0.8rem' }} />
-                  {rep.fileName && (
-                    <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {rep.fileName} ({rep.fileSize})
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-
-        <button type="button" className="btn btn-secondary" onClick={addReport}>
-          + Add Another Report
-        </button>
+          );
+        })}
       </div>
 
       <div style={{ marginBottom: '1.5rem' }}>
@@ -1461,46 +1772,51 @@ const PSDGenerator = ({ mr, editing, onClose }) => {
 // ----------------------------------------------------
 // 4. PACKING LIST GENERATOR FORM (Slide 10 Set A)
 // ----------------------------------------------------
-const PLGenerator = ({ mr, editing, onClose }) => {
+const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const { data, updateData, updateItem, incrementSerial } = useAppContext();
-  const bpr = data.bprs.find(b => b.receiptId === mr.id);
+  const party = data.parties.find(p => p.id === mr.partyId);
+  const prodOpts = receiptProductOptions(mr, data);
+  const productNames = getReceiptProductNames(mr, prodOpts);
 
   const [form, setForm] = useState({
     plNo: '',
     date: new Date().toISOString().split('T')[0],
-    productName: mr.productName,
+    productName: getReceiptProductLabel(mr, prodOpts),
+    productSummaries: [],
     totalWeight: 0,
     totalDrums: 0,
-    batches: [] // Drum list copied from BPR dispatched weight, but Gross/Tare manual and Net calculated
+    batches: []
   });
 
   useEffect(() => {
     if (editing) {
+      const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
+      const fromBpr = getBPRDispatchedRowsForPL(data, mr, prodOpts);
+      const sourceRows = (editing.batches || []).length ? editing.batches : fromBpr;
+      const mergedBatches = alignDrumRowsToProducts(sourceRows, mr, prodOpts);
       setForm({
         ...editing,
-        batches: editing.batches || []
+        productName: editing.productName?.includes(',')
+          ? editing.productName
+          : getReceiptProductLabel(mr, prodOpts),
+        productSummaries: editing.productSummaries?.length ? editing.productSummaries : summaries,
+        batches: mergedBatches
       });
     } else {
       const plSerial = data.settings?.serials?.PL || 1;
       const docNo = generateDocNumber('PL', plSerial, new Date(form.date));
-
-      // Import BPR Dispatched batches! Gross & Tare start blank so user enters them manually as requested!
-      const bprDrums = bpr?.dispatchedBatches || [];
-      const plRows = bprDrums.map(d => ({
-        batchNo: d.batchNo,
-        drumNo: d.drumNo,
-        gross: 0,
-        tare: 0,
-        net: 0
-      }));
+      const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
+      const plRows = getBPRDispatchedRowsForPL(data, mr, prodOpts);
 
       setForm(prev => ({
         ...prev,
         plNo: docNo,
+        productName: getReceiptProductLabel(mr, prodOpts),
+        productSummaries: summaries,
         batches: plRows
       }));
     }
-  }, [form.date, editing, bpr, data.settings?.serials?.PL]);
+  }, [form.date, editing, mr, prodOpts, data.bprs, data.settings?.serials?.PL]);
 
   useEffect(() => {
     const totalDrums = form.batches.length;
@@ -1522,20 +1838,40 @@ const PLGenerator = ({ mr, editing, onClose }) => {
   const addCustomRow = () => {
     setForm(prev => ({
       ...prev,
-      batches: [...prev.batches, { batchNo: bpr?.receivedBatches[0]?.batchNo || 'Custom', drumNo: (prev.batches.length + 1).toString(), gross: 0, tare: 0, net: 0 }]
+      batches: [...prev.batches, {
+        batchNo: prev.batches[0]?.batchNo || 'Custom',
+        drumNo: (prev.batches.length + 1).toString(),
+        productName: productNames[0] || mr.productName || '',
+        gross: 0,
+        tare: 0,
+        net: 0
+      }]
     }));
   };
 
+  const displayProducts = (() => {
+    const fromRows = [...new Set((form.batches || []).map(r => r.productName).filter(Boolean))];
+    if (productNames.length) return productNames;
+    return fromRows.length ? fromRows : [mr.productName].filter(Boolean);
+  })();
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
     const finalDoc = {
       ...form,
-      receiptId: mr.id
+      receiptId: mr.id,
+      productName: getReceiptProductLabel(mr, prodOpts),
+      productSummaries: summaries.length ? summaries : (form.productSummaries || [])
     };
 
     if (editing) {
       updateItem('packingLists', editing.id, finalDoc);
     } else {
+      if (findAnyPackingList(data.packingLists, mr.id)) {
+        alert('A Packing List already exists for this Material Receipt. Please edit the existing PL.');
+        return;
+      }
       updateData('packingLists', { ...finalDoc, id: Date.now().toString() });
       incrementSerial('PL');
     }
@@ -1554,7 +1890,7 @@ const PLGenerator = ({ mr, editing, onClose }) => {
           <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
         </div>
         <div>
-          <label>Product Name</label>
+          <label>Product(s)</label>
           <input type="text" className="input-field" readOnly value={form.productName} />
         </div>
         <div>
@@ -1567,41 +1903,66 @@ const PLGenerator = ({ mr, editing, onClose }) => {
         </div>
       </div>
 
+      <MRProductSummary mr={mr} party={party} productOptions={prodOpts} />
+
       <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
           <h3 style={{ fontSize: '0.95rem', margin: 0 }}>Batch-Wise Packing Weight Details</h3>
-          <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={addCustomRow}>+ Add Column/Row</button>
+          <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={addCustomRow}>+ Add Row</button>
         </div>
-        
-        <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                <th style={{ padding: '0.35rem' }}>Sr No</th>
-                <th style={{ padding: '0.35rem' }}>Batch No</th>
-                <th style={{ padding: '0.35rem' }}>Drum No</th>
-                <th style={{ padding: '0.35rem' }}>Gross Wt (Manual)</th>
-                <th style={{ padding: '0.35rem' }}>Tare Wt (Manual)</th>
-                <th style={{ padding: '0.35rem' }}>Net Wt (Auto)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {form.batches.map((r, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.25rem', fontWeight: 600 }}>{idx + 1}</td>
-                  <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
-                  <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
-                  <td style={{ padding: '0.25rem' }}>
-                    <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} required value={r.gross} onChange={e => handleCellChange(idx, 'gross', e.target.value)} />
-                  </td>
-                  <td style={{ padding: '0.25rem' }}>
-                    <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} required value={r.tare} onChange={e => handleCellChange(idx, 'tare', e.target.value)} />
-                  </td>
-                  <td style={{ padding: '0.25rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{r.net.toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        {displayProducts.map((prodName, pIdx) => {
+          const prodRows = form.batches.map((r, idx) => ({ r, idx })).filter(({ r }) =>
+            (r.productName || displayProducts[0] || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase()
+          );
+          if (!prodRows.length) return null;
+          const subtotal = prodRows.reduce((s, { r }) => s + r.net, 0);
+          return (
+            <div key={prodName} style={{ marginBottom: '1rem' }}>
+              <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)' }}>Product {pIdx + 1}: {prodName}</h4>
+              <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '0.35rem' }}>Sr No</th>
+                      <th style={{ padding: '0.35rem' }}>Batch No</th>
+                      <th style={{ padding: '0.35rem' }}>Drum No</th>
+                      <th style={{ padding: '0.35rem' }}>Gross Wt (Manual)</th>
+                      <th style={{ padding: '0.35rem' }}>Tare Wt (Manual)</th>
+                      <th style={{ padding: '0.35rem' }}>Net Wt (Auto)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prodRows.map(({ r, idx }, rowIdx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.25rem', fontWeight: 600 }}>{rowIdx + 1}</td>
+                        <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
+                        <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
+                        <td style={{ padding: '0.25rem' }}>
+                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} required value={r.gross} onChange={e => handleCellChange(idx, 'gross', e.target.value)} />
+                        </td>
+                        <td style={{ padding: '0.25rem' }}>
+                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} required value={r.tare} onChange={e => handleCellChange(idx, 'tare', e.target.value)} />
+                        </td>
+                        <td style={{ padding: '0.25rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{formatWeightNet(r.net)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ fontWeight: 'bold', borderTop: '1px solid var(--border-color)' }}>
+                      <td colSpan="5" style={{ padding: '0.35rem', textAlign: 'right' }}>Product Subtotal:</td>
+                      <td style={{ padding: '0.35rem', color: 'var(--accent-primary)' }}>{subtotal.toFixed(2)} Kg</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem', marginTop: '0.5rem' }}>
+          <span>Grand Total:</span>
+          <span style={{ color: 'var(--accent-primary)' }}>{form.totalWeight.toFixed(2)} Kg · {form.totalDrums} Drums</span>
         </div>
       </div>
 
@@ -1616,10 +1977,14 @@ const PLGenerator = ({ mr, editing, onClose }) => {
 // ----------------------------------------------------
 // 5. DELIVERY CHALLAN GENERATOR FORM (Slide 11)
 // ----------------------------------------------------
-const DCGenerator = ({ mr, editing, onClose }) => {
+const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const { data, updateData, updateItem, incrementSerial } = useAppContext();
-  const pl = getPL(mr.id);
-  const pi = getPI(mr.id);
+  const party = data.parties.find(p => p.id === mr.partyId);
+  const prodOpts = receiptProductOptions(mr, data);
+  const pl = findPL(data, mr.id, activeProductName);
+  const pi = findPI(data, mr.id, activeProductName);
+  const scopedQty = activeProductName ? getProductQty(mr, activeProductName, prodOpts) : (mr.totalQty || mr.receivedQty || 0);
+  const scopedDrums = activeProductName ? getProductDrums(mr, activeProductName, prodOpts) : (mr.totalDrums || 1);
 
   const [form, setForm] = useState({
     dcNo: '',
@@ -1631,9 +1996,9 @@ const DCGenerator = ({ mr, editing, onClose }) => {
     shipAddress: mr.shipAddress || '',
     gstinBill: mr.gstinBill || '',
     gstinShip: mr.gstinShip || '',
-    productName: mr.productName || '',
-    qty: pl?.totalWeight || mr.totalQty || mr.receivedQty || 0,
-    totalDrums: pl?.totalDrums || mr.totalDrums || 1,
+    productName: activeProductName || getReceiptProductLabel(mr, prodOpts),
+    qty: pl?.totalWeight || scopedQty,
+    totalDrums: pl?.totalDrums || scopedDrums,
     value: pi?.total || mr.value || 0,
     vehicleNo: mr.vehicleNo || '',
     driverName: '',
@@ -1723,6 +2088,8 @@ const DCGenerator = ({ mr, editing, onClose }) => {
         </div>
       </div>
 
+      <MRProductSummary mr={mr} party={party} productOptions={prodOpts} onlyProduct={activeProductName} />
+
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
         <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
         <button type="submit" className="btn btn-primary">Save Delivery Challan</button>
@@ -1734,9 +2101,9 @@ const DCGenerator = ({ mr, editing, onClose }) => {
 // ----------------------------------------------------
 // 6. E-WAY BILL FROM DC GENERATOR FORM (Slide 12)
 // ----------------------------------------------------
-const EWayDCGenerator = ({ mr, editing, onClose }) => {
+const EWayDCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const { data, updateItem } = useAppContext();
-  const dc = getDC(mr.id);
+  const dc = findDC(data, mr.id, activeProductName);
 
   const [form, setForm] = useState({
     ewayBillNo: dc?.ewayBillNo || '',
@@ -1795,12 +2162,23 @@ const EWayDCGenerator = ({ mr, editing, onClose }) => {
 // ----------------------------------------------------
 // 7. TAX INVOICE GENERATOR FORM (Slide 13)
 // ----------------------------------------------------
-const TaxInvoiceGenerator = ({ mr, editing, onClose }) => {
+const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const { data, updateData, updateItem, incrementSerial } = useAppContext();
   const party = (data.parties || []).find(p => p.id === mr.partyId);
-  const prodConfig = (party?.products || []).find(p => p.name === mr.productName);
-  const dc = getDC(mr.id);
-  const pl = getPL(mr.id);
+  const prodOpts = useMemo(() => receiptProductOptions(mr, data), [mr, data]);
+  const dc = findDC(data, mr.id, activeProductName);
+  const pl = findPL(data, mr.id);
+  const productNames = getReceiptProductNames(mr, prodOpts);
+  const formInitKey = `${mr.id}-${editing?.id || 'new'}`;
+
+  const resolveProductQty = (prodName) => {
+    const prodRows = (pl?.batches || []).filter(r => {
+      const rowProd = r.productName || productNames[0];
+      return (rowProd || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase();
+    });
+    if (prodRows.length) return prodRows.reduce((s, r) => s + (parseFloat(r.net) || 0), 0);
+    return getProductQty(mr, prodName, prodOpts);
+  };
 
   const [form, setForm] = useState({
     invoiceNo: '',
@@ -1809,32 +2187,9 @@ const TaxInvoiceGenerator = ({ mr, editing, onClose }) => {
     dcDate: dc?.date || 'N/A',
     partyDocNo: mr.partyDocNo || '',
     partyDocDate: mr.partyDocDate || '',
-    charges: {
-      cleaning: true,
-      filterBag: false,
-      processing: true,
-      sieving: false,
-      psdReport: false,
-      liner: false,
-      courier: false,
-      fiberDrum: false,
-      transportation: false,
-      hdpeDrum: false,
-      batchChangeover: false
-    },
-    rates: {
-      cleaning: 0,
-      filterBag: 0,
-      processing: 0,
-      sieving: 0,
-      psdReport: 0,
-      liner: 0,
-      courier: 0,
-      fiberDrum: 0,
-      transportation: 0,
-      hdpeDrum: 0,
-      batchChangeover: 0
-    },
+    productName: getReceiptProductLabel(mr, prodOpts),
+    productSummaries: [],
+    productCharges: resolveTIProductChargesForDoc(mr, party, data.invoices, prodOpts),
     discount: 0,
     taxRate: 18,
     terms: 'Payment against delivery.'
@@ -1842,62 +2197,98 @@ const TaxInvoiceGenerator = ({ mr, editing, onClose }) => {
 
   useEffect(() => {
     if (editing) {
+      const summaries = buildPLProductSummaries(pl, mr, prodOpts);
       setForm({
         ...editing,
-        charges: editing.charges || {},
-        rates: editing.rates || {}
+        productName: editing.productName?.includes(',')
+          ? editing.productName
+          : getReceiptProductLabel(mr, prodOpts),
+        productSummaries: editing.productSummaries?.length ? editing.productSummaries : summaries,
+        productCharges: normalizeProductCharges(
+          editing.productCharges,
+          editing,
+          mr,
+          prodOpts,
+          party
+        ),
+        discount: editing.discount || 0,
+        taxRate: editing.taxRate ?? 18,
+        terms: editing.terms || 'Payment against delivery.'
       });
     } else {
-      const tiSerial = data.settings?.serials?.TI || 1;
-      // prefix is UMA/IN/ as required!
-      const docNo = generateDocNumber('IN', tiSerial, new Date(form.date));
-      const defaultRates = prodConfig?.charges || {};
-
+      const summaries = buildPLProductSummaries(pl, mr, prodOpts);
       setForm(prev => ({
         ...prev,
-        invoiceNo: docNo,
-        rates: {
-          cleaning: defaultRates.cleaning || 0,
-          filterBag: defaultRates.filterBag || 0,
-          processing: defaultRates.processing || 0,
-          sieving: defaultRates.sieving || 0,
-          psdReport: (prodConfig?.psdMethodDefault === 'Wet' ? (defaultRates.psdReportWet || 0) : (defaultRates.psdReportDry || 0)) || defaultRates.psdReport || 0,
-          liner: defaultRates.liner || 0,
-          courier: defaultRates.courier || 0,
-          fiberDrum: defaultRates.fiberDrum || 0,
-          transportation: defaultRates.transportation || 0,
-          hdpeDrum: defaultRates.hdpeDrum || 0,
-          batchChangeover: defaultRates.batchChangeover || 0
-        }
+        productName: getReceiptProductLabel(mr, prodOpts),
+        productSummaries: summaries,
+        productCharges: resolveTIProductChargesForDoc(mr, party, data.invoices, prodOpts),
+        dcNo: dc?.dcNo || 'N/A',
+        dcDate: dc?.date || 'N/A'
       }));
     }
-  }, [form.date, editing, prodConfig, data.settings?.serials?.TI]);
+  }, [formInitKey, pl?.id, data.invoices]);
 
-  const toggleCharge = (key) => {
-    setForm(prev => ({
-      ...prev,
-      charges: { ...prev.charges, [key]: !prev.charges[key] }
-    }));
-  };
+  useEffect(() => {
+    if (editing) return;
+    const tiSerial = data.settings?.serials?.TI || 1;
+    const docNo = generateDocNumber('IN', tiSerial, new Date(form.date));
+    setForm(prev => (prev.invoiceNo === docNo ? prev : { ...prev, invoiceNo: docNo }));
+  }, [form.date, editing, data.settings?.serials?.TI]);
 
-  const handleRateChange = (key, val) => {
-    setForm(prev => ({
-      ...prev,
-      rates: { ...prev.rates, [key]: parseFloat(val) || 0 }
-    }));
-  };
-
-  const getSubtotal = () => {
-    return Object.keys(form.charges).reduce((sum, key) => {
-      if (form.charges[key]) {
-        const isQtyRate = ['processing', 'sieving', 'cleaning'].includes(key);
-        const qty = parseFloat(pl?.totalWeight || mr.totalQty || mr.receivedQty || 0);
-        const rate = form.rates[key] || 0;
-        return sum + (isQtyRate ? qty * rate : rate);
+  const toggleCharge = (prodName, key) => {
+    setForm(prev => {
+      const pc = prev.productCharges[prodName] || {
+        charges: emptyChargeFlags(),
+        rates: emptyChargeRates(),
+        qtys: emptyChargeQtys()
+      };
+      const turningOn = !pc.charges[key];
+      const materialQty = resolveProductQty(prodName);
+      const qtys = { ...(pc.qtys || emptyChargeQtys()) };
+      if (turningOn && (qtys[key] == null || qtys[key] === '')) {
+        qtys[key] = isMaterialQtyCharge(key) ? materialQty : 1;
       }
-      return sum;
-    }, 0);
+      return {
+        ...prev,
+        productCharges: {
+          ...prev.productCharges,
+          [prodName]: {
+            ...pc,
+            charges: { ...pc.charges, [key]: turningOn },
+            qtys
+          }
+        }
+      };
+    });
   };
+
+  const handleRateChange = (prodName, key, val) => {
+    setForm(prev => ({
+      ...prev,
+      productCharges: {
+        ...prev.productCharges,
+        [prodName]: {
+          ...prev.productCharges[prodName],
+          rates: { ...prev.productCharges[prodName].rates, [key]: parseChargeFieldValue(val) }
+        }
+      }
+    }));
+  };
+
+  const handleQtyChange = (prodName, key, val) => {
+    setForm(prev => ({
+      ...prev,
+      productCharges: {
+        ...prev.productCharges,
+        [prodName]: {
+          ...prev.productCharges[prodName],
+          qtys: { ...(prev.productCharges[prodName].qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) }
+        }
+      }
+    }));
+  };
+
+  const getSubtotal = () => calcProductChargesSubtotal(form.productCharges, mr, resolveProductQty, prodOpts);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1906,13 +2297,28 @@ const TaxInvoiceGenerator = ({ mr, editing, onClose }) => {
     const taxable = Math.max(0, subtotal - discountAmount);
     const taxAmount = taxable * (form.taxRate / 100);
     const total = taxable + taxAmount;
+    const summaries = buildPLProductSummaries(pl, mr, prodOpts);
+    const firstProd = productNames[0] || mr.productName;
+    const sanitizedCharges = sanitizeProductCharges(form.productCharges);
+    const legacyCharges = sanitizedCharges[firstProd]?.charges || emptyChargeFlags();
+    const legacyRates = sanitizedCharges[firstProd]?.rates || emptyChargeRates();
+    const legacyQtys = sanitizedCharges[firstProd]?.qtys || emptyChargeQtys();
+    const totalQty = pl?.totalWeight
+      || productNames.reduce((sum, name) => sum + resolveProductQty(name), 0)
+      || mr.totalQty
+      || 0;
 
     const finalDoc = {
       ...form,
+      productCharges: sanitizedCharges,
+      productSummaries: summaries.length ? summaries : (form.productSummaries || []),
+      charges: legacyCharges,
+      rates: legacyRates,
+      qtys: legacyQtys,
       receiptId: mr.id,
       partyName: mr.partyName,
-      productName: mr.productName,
-      qty: pl?.totalWeight || mr.totalQty || mr.receivedQty || 0,
+      productName: getReceiptProductLabel(mr, prodOpts),
+      qty: totalQty,
       subtotal,
       taxAmount,
       total,
@@ -1924,29 +2330,25 @@ const TaxInvoiceGenerator = ({ mr, editing, onClose }) => {
     if (editing) {
       updateItem('invoices', editing.id, finalDoc);
     } else {
+      if (findAnyTaxInvoice(data.invoices, mr.id)) {
+        alert('A Tax Invoice already exists for this Material Receipt. Please edit the existing TI.');
+        return;
+      }
       updateData('invoices', { ...finalDoc, id: Date.now().toString() });
       incrementSerial('TI');
     }
     onClose();
   };
 
-  const chargesList = [
-    { key: 'cleaning', label: 'Cleaning Charges (998842)', isQtyRate: true },
-    { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
-    { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true },
-    { key: 'sieving', label: 'Sieving Charges (998842)', isQtyRate: true },
-    { key: 'psdReport', label: 'PSD Report Charges (998346)', isQtyRate: false },
-    { key: 'liner', label: 'Liner (39233090)', isQtyRate: false },
-    { key: 'courier', label: 'Courier (996812)', isQtyRate: false },
-    { key: 'fiberDrum', label: 'Fiber Drum (7310)', isQtyRate: false },
-    { key: 'transportation', label: 'Transportation (996511)', isQtyRate: false },
-    { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },
-    { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
-  ];
+  const chargeProductNames = productNames.length ? productNames : [mr.productName].filter(Boolean);
+  const scopedMicronisedQty = pl?.totalWeight
+    || productNames.reduce((sum, name) => sum + resolveProductQty(name), 0)
+    || mr.totalQty
+    || 0;
 
   return (
     <form onSubmit={handleSubmit}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className="form-grid-4">
         <div>
           <label>Invoice Number</label>
           <input type="text" className="input-field" readOnly value={form.invoiceNo} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
@@ -1977,75 +2379,81 @@ const TaxInvoiceGenerator = ({ mr, editing, onClose }) => {
         </div>
         <div>
           <label>Material Micronised Qty</label>
-          <input type="text" className="input-field" readOnly value={`${pl?.totalWeight || mr.totalQty} Kg`} />
+          <input type="text" className="input-field" readOnly value={`${scopedMicronisedQty.toFixed(2)} Kg`} />
+        </div>
+        <div style={{ gridColumn: 'span 2' }}>
+          <label>Product(s)</label>
+          <input type="text" className="input-field" readOnly value={form.productName} />
         </div>
       </div>
 
-      <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', pb: '0.5rem' }}>Tax Invoice Charges Grid</h3>
+      <MRProductSummary mr={mr} party={party} productOptions={prodOpts} />
+
+      <h3 className="form-section-title">Tax Invoice Charges</h3>
       
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+      <div className="form-grid-2">
         <div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {chargesList.map(item => (
-              <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem', background: 'var(--glass-bg)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', cursor: 'pointer', margin: 0 }}>
-                  <input type="checkbox" checked={form.charges[item.key]} onChange={() => toggleCharge(item.key)} />
-                  {item.label}
-                </label>
-                {form.charges[item.key] && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{item.isQtyRate ? '/Kg' : 'flat'}:</span>
-                    <input 
-                      type="number" 
-                      className="input-field" 
-                      style={{ width: '80px', padding: '0.2rem', fontSize: '0.8rem', height: 'auto' }}
-                      value={form.rates[item.key]} 
-                      onChange={e => handleRateChange(item.key, e.target.value)} 
-                    />
-                  </div>
-                )}
+          {chargeProductNames.map((prodName) => {
+            const displayIdx = getProductDisplayIndex(mr, prodName, prodOpts);
+            const materialQty = resolveProductQty(prodName);
+            const pc = form.productCharges[prodName] || form.productCharges[Object.keys(form.productCharges || {}).find(k =>
+              (k || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase()
+            )] || {
+              charges: emptyChargeFlags(),
+              rates: emptyChargeRates(),
+              qtys: buildChargeQtys({}, materialQty)
+            };
+            return (
+              <div key={prodName} className="product-block">
+                <h4>
+                  Product {displayIdx}: {prodName} ({materialQty} Kg)
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                  {CHARGES_LIST.map(item => renderChargeRow(
+                    item, pc, prodName, materialQty, toggleCharge, handleQtyChange, handleRateChange
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
-        {/* Calculation Summary */}
-        <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--accent-primary)' }}>GST Tax Billing Calculations</h4>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-            <span>Subtotal:</span>
+        <div className="summary-box">
+          <h4 style={{ margin: 0, fontSize: '0.88rem', color: 'var(--accent-primary)' }}>Billing Summary</h4>
+          <div className="summary-row">
+            <span>Subtotal</span>
             <span style={{ fontWeight: 600 }}>₹{getSubtotal().toFixed(2)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-            <span>Discount (₹):</span>
-            <input type="number" className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.discount} onChange={e => setForm({...form, discount: parseFloat(e.target.value) || 0})} />
+          <div className="summary-row" style={{ alignItems: 'center' }}>
+            <span>Discount (₹)</span>
+            <input type="number" className="input-field input-compact" style={{ width: '100px' }} value={form.discount} onChange={e => setForm({...form, discount: parseFloat(e.target.value) || 0})} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-            <span>GST Rate (%):</span>
-            <select className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
+          <div className="summary-row" style={{ alignItems: 'center' }}>
+            <span>GST Rate</span>
+            <select className="input-field input-compact" style={{ width: '100px' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
               <option value="18">18%</option>
               <option value="12">12%</option>
               <option value="5">5%</option>
               <option value="0">0%</option>
             </select>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-            <span>CGST @{(form.taxRate / 2)}%:</span>
+          <div className="summary-row">
+            <span>CGST @{(form.taxRate / 2)}%</span>
             <span>₹{((Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100)) / 2).toFixed(2)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-            <span>SGST @{(form.taxRate / 2)}%:</span>
+          <div className="summary-row">
+            <span>SGST @{(form.taxRate / 2)}%</span>
             <span>₹{((Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100)) / 2).toFixed(2)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
-            <span>Grand Total:</span>
+          <div className="summary-row total">
+            <span>Grand Total</span>
             <span>₹{(Math.max(0, getSubtotal() - form.discount) * (1 + form.taxRate / 100)).toFixed(2)}</span>
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
-        <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
+      <div className="form-actions">
+        <button type="button" className="btn" onClick={onClose}>Cancel</button>
         <button type="submit" className="btn btn-primary">Save Tax Invoice</button>
       </div>
     </form>
@@ -2055,9 +2463,9 @@ const TaxInvoiceGenerator = ({ mr, editing, onClose }) => {
 // ----------------------------------------------------
 // 8. E-WAY BILL FROM TAX INVOICE GENERATOR FORM (Slide 14)
 // ----------------------------------------------------
-const EWayTIGenerator = ({ mr, editing, onClose }) => {
+const EWayTIGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const { data, updateItem } = useAppContext();
-  const ti = getTI(mr.id);
+  const ti = findTI(data, mr.id, activeProductName);
 
   const [form, setForm] = useState({
     ewayBillNo: ti?.ewayBillNo || '',

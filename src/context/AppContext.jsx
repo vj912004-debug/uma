@@ -1,11 +1,16 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { DEFAULT_ADMIN_PASSWORD_HASH } from '../utils/auth';
-import { DEFAULT_COMPANY_PROFILE, mergeCompanyProfile } from '../utils/companyProfile';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import {
+  fetchAppState,
+  saveAppState,
+  isApiModeEnabled,
+  getAuthToken
+} from '../api/client';
+import { loadStateFromLocalStorage, normalizeAppState } from '../utils/appState';
+import { mergeCompanyProfile } from '../utils/companyProfile';
 
 const AppContext = createContext();
 
 const SERIAL_KEY_ALIASES = {
-  // Historical/legacy keys -> canonical keys
   QUOTATION: 'QT',
   INV: 'TI'
 };
@@ -13,119 +18,62 @@ const SERIAL_KEY_ALIASES = {
 const normalizeSerialKey = (key) => SERIAL_KEY_ALIASES[key] || key;
 
 export const AppProvider = ({ children }) => {
-  const [data, setData] = useState(() => {
-    const savedData = localStorage.getItem('uma_erp_data');
-    const baseState = {
-      parties: [],
-      items: [],
-      materials: [],
-      psdRequirements: [
-        '90% < 10M',
-        'd(0.9) < 10 Micron',
-        'd(0.9) < 20 Micron'
-      ],
-      units: ['Kg', 'MT', 'Drum', 'Ltr', 'Pcs'],
-      taxes: [{ name: 'GST 18%', rate: 18 }, { name: 'GST 12%', rate: 12 }, { name: 'GST 5%', rate: 5 }],
-      materialReceipts: [],
-      materialIssues: [],
-      bprs: [],
-      packingLists: [],
-      invoices: [],
-      deliveryChallans: [],
-      payments: [],
-      tasks: [],
-      attendance: [],
-      psds: [],
-      productionPlans: [],
-      stockAdjustments: [],
-      quotations: [],
-      debitNotes: [],
-      creditNotes: [],
-      purchaseOrders: [],
-      auditLogs: [],
-      users: [
-        { id: 1, employeeId: 'EMP001', department: 'Management', name: 'Administrator', username: 'admin', role: 'Admin', active: true, passwordHash: DEFAULT_ADMIN_PASSWORD_HASH },
-        { id: 2, employeeId: 'EMP002', department: 'Production', name: 'Staff One', username: 'staff1', role: 'Staff', permissions: [], active: true },
-        { id: 3, employeeId: 'EMP003', department: 'Packaging', name: 'Staff Two', username: 'staff2', role: 'Staff', permissions: [], active: true },
-        { id: 4, employeeId: 'EMP004', department: 'Quality Control', name: 'Staff Three', username: 'staff3', role: 'Staff', permissions: [], active: true }
-      ],
-      currentUser: null,
-      settings: {
-        userRole: 'Admin',
-        theme: 'dark',
-        serials: { MR: 1, BPR: 1, PL: 1, PI: 1, DC: 1, MI: 1, VC: 1, PSD: 1, TI: 1, EWDC: 1, EWTI: 1, QT: 1, DN: 1, CN: 1, PO: 1 }
-      },
-      companyProfile: { ...DEFAULT_COMPANY_PROFILE }
-    };
-
-    if (!savedData) return baseState;
-    
-    try {
-      const parsed = JSON.parse(savedData);
-      // Deep merge or ensure keys exist
-      return {
-        ...baseState,
-        ...parsed,
-        settings: {
-          ...baseState.settings,
-          ...parsed.settings,
-          serials: {
-            ...baseState.settings.serials,
-            ...(parsed.settings?.serials || {}),
-            // Back-compat: if old keys exist, copy into canonical key (do not overwrite canonical)
-            ...(parsed.settings?.serials?.QUOTATION && !parsed.settings?.serials?.QT ? { QT: parsed.settings.serials.QUOTATION } : {}),
-            ...(parsed.settings?.serials?.INV && !parsed.settings?.serials?.TI ? { TI: parsed.settings.serials.INV } : {})
-          }
-        },
-        // Ensure arrays exist
-        items: parsed.items || [],
-        materials: parsed.materials || [],
-        stockAdjustments: parsed.stockAdjustments || [],
-        deliveryChallans: parsed.deliveryChallans || [],
-        psds: parsed.psds || [],
-        productionPlans: parsed.productionPlans || [],
-        payments: parsed.payments || [],
-        bprs: parsed.bprs || [],
-        packingLists: parsed.packingLists || [],
-        invoices: parsed.invoices || [],
-        quotations: parsed.quotations || [],
-        debitNotes: parsed.debitNotes || [],
-        creditNotes: parsed.creditNotes || [],
-        purchaseOrders: parsed.purchaseOrders || [],
-        auditLogs: parsed.auditLogs || [],
-        users: (parsed.users || baseState.users).map((u, i) => {
-          const isAdminUser = u.role === 'Admin' && (u.username?.toLowerCase() === 'admin' || u.id === 1);
-          return {
-            ...u,
-            employeeId: u.employeeId || `EMP00${i + 1}`,
-            department: u.department || 'General',
-            name: u.name || u.username,
-            username: u.username?.toLowerCase() === 'admin' ? 'admin' : u.username,
-            passwordHash: u.passwordHash || (isAdminUser ? DEFAULT_ADMIN_PASSWORD_HASH : undefined)
-          };
-        }),
-        currentUser: null,
-        companyProfile: mergeCompanyProfile(parsed.companyProfile)
-      };
-    } catch (e) {
-      return baseState;
-    }
-  });
+  const [data, setData] = useState(() => loadStateFromLocalStorage());
+  const [isReady, setIsReady] = useState(false);
+  const [apiMode, setApiMode] = useState(() => isApiModeEnabled());
+  const saveTimerRef = useRef(null);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function hydrate() {
+      if (apiMode && getAuthToken()) {
+        try {
+          const remote = await fetchAppState();
+          if (!cancelled) setData(normalizeAppState(remote));
+        } catch (err) {
+          console.warn('Failed to load from API, using local data.', err);
+          if (!cancelled) {
+            setApiMode(false);
+            setData(loadStateFromLocalStorage());
+          }
+        }
+      }
+      if (!cancelled) setIsReady(true);
+    }
+
+    hydrate();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!isReady) return undefined;
+
+    if (apiMode && getAuthToken()) {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        saveAppState(data).catch((err) => {
+          console.error('Failed to save to API', err);
+        });
+      }, 900);
+      return () => {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      };
+    }
+
     try {
       localStorage.setItem('uma_erp_data', JSON.stringify(data));
     } catch (e) {
-      console.error("Failed to persist data to localStorage", e);
+      console.error('Failed to persist data to localStorage', e);
     }
-  }, [data]);
+    return undefined;
+  }, [data, isReady, apiMode]);
 
   useEffect(() => {
     const theme = data.settings?.theme || 'dark';
     document.documentElement.setAttribute('data-theme', theme);
   }, [data.settings?.theme]);
 
-  // Helper for audit logging
   const logAudit = (prevData, action, module, oldValue, newValue) => {
     const now = new Date();
     const user = prevData.currentUser ? prevData.currentUser.username : (prevData.settings?.userRole || 'System');
@@ -164,6 +112,12 @@ export const AppProvider = ({ children }) => {
       timestamp: now.toISOString()
     };
     return [...(prevData.auditLogs || []), newLog];
+  };
+
+  const hydrateFromServer = (remoteState) => {
+    setData(normalizeAppState(remoteState));
+    setApiMode(true);
+    setIsReady(true);
   };
 
   const updateData = (module, newItem) => {
@@ -220,7 +174,6 @@ export const AppProvider = ({ children }) => {
   };
 
   const hardDeleteItem = (module, id) => {
-    // Only Admin can hard delete
     if (data.settings?.userRole !== 'Admin') {
       alert("Only Admin can permanently delete records.");
       return;
@@ -250,6 +203,25 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
+  const ensureSerialAtLeast = (docType, minValue) => {
+    const canonicalKey = normalizeSerialKey(docType);
+    const floor = Math.max(1, parseInt(minValue, 10) || 1);
+    setData(prev => {
+      const current = prev.settings.serials[canonicalKey] || 1;
+      if (floor <= current) return prev;
+      return {
+        ...prev,
+        settings: {
+          ...prev.settings,
+          serials: {
+            ...prev.settings.serials,
+            [canonicalKey]: floor
+          }
+        }
+      };
+    });
+  };
+
   const upsertCompanyProfile = (profile) => {
     setData(prev => ({
       ...prev,
@@ -262,8 +234,20 @@ export const AppProvider = ({ children }) => {
   };
 
   return (
-    <AppContext.Provider value={{ 
-      data, setData, updateData, updateItem, deleteItemSoftly, restoreItem, hardDeleteItem, incrementSerial, upsertCompanyProfile
+    <AppContext.Provider value={{
+      data,
+      setData,
+      isReady,
+      apiMode,
+      hydrateFromServer,
+      updateData,
+      updateItem,
+      deleteItemSoftly,
+      restoreItem,
+      hardDeleteItem,
+      incrementSerial,
+      ensureSerialAtLeast,
+      upsertCompanyProfile
     }}>
       {children}
     </AppContext.Provider>

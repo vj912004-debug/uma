@@ -3,6 +3,34 @@ import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import { Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfExport';
+import DocChargeRow from '../components/DocChargeRow';
+import {
+  STANDARD_CHARGES_LIST,
+  defaultChargeFlags,
+  defaultChargeRates,
+  emptyChargeQtys,
+  calcStandardChargesSubtotal,
+  calcProductChargesSubtotalWithQty,
+  parseChargeFieldValue,
+  mergeSavedDocCharges,
+  getFreshMaterialReceipt,
+  findAnyTaxInvoice,
+  resolveTIProductChargesForDoc,
+  normalizeProductChargesFromDoc,
+  sanitizeProductCharges,
+  enrichTIForPrint
+} from '../utils/documentCharges';
+import {
+  getReceiptProductLabel,
+  getReceiptProductNames,
+  getProductQty,
+  getProductDisplayIndex,
+  getPLProductNetQty,
+  buildPLProductSummaries,
+  getDocProductLabel,
+  findAnyPackingList,
+  receiptProductOptions
+} from '../utils/receiptProducts';
 
 const TaxInvoice = () => {
   const { data, updateData, updateItem, setData, incrementSerial, deleteItemSoftly } = useAppContext();
@@ -25,112 +53,211 @@ const TaxInvoice = () => {
     gstinShip: '',
     partyName: '',
     productName: '',
+    productSummaries: [],
+    productCharges: {},
     hsnCode: '',
     qty: 0,
-    charges: {
-      cleaning: true,
-      filterBag: false,
-      processing: true,
-      sieving: false,
-      psdReport: false,
-      liner: false,
-      courier: false,
-      fiberDrum: false,
-      transportation: false,
-      hdpeDrum: false,
-      batchChangeover: false
-    },
-    rates: {
-      cleaning: 0,
-      filterBag: 0,
-      processing: 0,
-      sieving: 0,
-      psdReport: 0,
-      liner: 0,
-      courier: 0,
-      fiberDrum: 0,
-      transportation: 0,
-      hdpeDrum: 0,
-      batchChangeover: 0
-    },
+    charges: defaultChargeFlags(),
+    rates: defaultChargeRates(),
+    qtys: emptyChargeQtys(),
     discount: 0,
     taxRate: 18,
     terms: 'Payment against delivery.',
     customCharges: [] // Array of { name: '', hsn: '', rate: 0, qty: 1, checked: true }
   });
 
-  const activePL = editingDoc ? data.packingLists.find(p => p.receiptId === editingDoc.receiptId) : selectedPL;
-  const activeMR = data.materialReceipts.find(mr => mr.id === (activePL?.receiptId || editingDoc?.receiptId));
-  const dc = data.deliveryChallans.find(d => d.receiptId === activeMR?.id);
-  const party = data.parties.find(p => p.id === activeMR?.partyId);
-  const prodConfig = (party?.products || []).find(p => p.name === activeMR?.productName);
+  const activePL = editingDoc
+    ? findAnyPackingList(data.packingLists, editingDoc.receiptId)
+    : selectedPL;
+  const activeMR = getFreshMaterialReceipt(
+    data.materialReceipts,
+    activePL?.receiptId || editingDoc?.receiptId || selectedPL?.receiptId
+  );
+  const prodOpts = activeMR ? receiptProductOptions(activeMR, data) : {};
+  const chargeProductNames = activeMR
+    ? getReceiptProductNames(activeMR, prodOpts)
+    : Object.keys(form.productCharges || {});
+
+  const resolveProductQty = (prodName) => {
+    if (activePL) return getPLProductNetQty(activePL, prodName, activeMR, prodOpts);
+    return getProductQty(activeMR, prodName, prodOpts);
+  };
+
+  const getProductChargeBlock = (prodName) =>
+    form.productCharges?.[prodName]
+    || form.productCharges?.[Object.keys(form.productCharges || {}).find(k =>
+      (k || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase()
+    )]
+    || { charges: defaultChargeFlags(), rates: defaultChargeRates(), qtys: emptyChargeQtys() };
+
+  const buildFormFromPL = (pl, docDate) => {
+    const freshMR = getFreshMaterialReceipt(data.materialReceipts, pl.receiptId);
+    if (!freshMR) return null;
+    const opts = receiptProductOptions(freshMR, data);
+    const mrParty = opts.party || data.parties.find(p => p.id === freshMR.partyId);
+    const linkedDC = data.deliveryChallans.find(d => d.receiptId === freshMR.id);
+    const plWeight = pl.totalWeight || 0;
+    const productSummaries = buildPLProductSummaries(pl, freshMR, opts);
+    const productLabel = getReceiptProductLabel(freshMR, opts);
+    const productCharges = resolveTIProductChargesForDoc(freshMR, mrParty, data.invoices, opts);
+    const prod = (mrParty?.products || []).find(p => p.name === productSummaries[0]?.prodName);
+    const tiSerial = data.settings?.serials?.TI || 1;
+    return {
+      invoiceNo: generateDocNumber('IN', tiSerial, new Date(docDate)),
+      date: docDate,
+      dcNo: linkedDC?.dcNo || 'N/A',
+      dcDate: linkedDC?.date || 'N/A',
+      partyDocNo: freshMR.partyDocNo,
+      partyDocDate: freshMR.partyDocDate,
+      billAddress: freshMR.billAddress || '',
+      shipAddress: freshMR.shipAddress || '',
+      gstinBill: freshMR.gstinBill || '',
+      gstinShip: freshMR.gstinShip || '',
+      partyName: freshMR.partyName,
+      productName: productLabel,
+      productSummaries,
+      productCharges,
+      hsnCode: prod?.hsn || '',
+      qty: plWeight,
+      charges: defaultChargeFlags(),
+      rates: defaultChargeRates(),
+      qtys: emptyChargeQtys(),
+      customCharges: [],
+      discount: 0,
+      taxRate: 18,
+      terms: 'Payment against delivery.'
+    };
+  };
 
   useEffect(() => {
-    if (editingDoc) {
-      setForm(editingDoc);
-    } else if (selectedPL && activeMR) {
-      const tiSerial = data.settings?.serials?.TI || 1;
-      const docNo = generateDocNumber('IN', tiSerial, new Date(form.date));
-      const defaultRates = prodConfig?.charges || {};
+    if (!isModalOpen) return;
 
+    if (editingDoc) {
+      const mr = getFreshMaterialReceipt(data.materialReceipts, editingDoc.receiptId);
+      const opts = mr ? receiptProductOptions(mr, data) : {};
+      const pl = mr ? findAnyPackingList(data.packingLists, mr.id) : null;
+      const productSummaries = mr
+        ? buildPLProductSummaries(pl, mr, opts)
+        : (editingDoc.productSummaries || []);
+      const merged = mergeSavedDocCharges(editingDoc, parseFloat(editingDoc.qty) || 0);
+      const productCharges = mr
+        ? normalizeProductChargesFromDoc(editingDoc.productCharges, editingDoc, mr, opts, opts.party)
+        : (editingDoc.productCharges || {});
+      setForm(prev => ({
+        ...editingDoc,
+        ...merged,
+        productName: mr ? getReceiptProductLabel(mr, opts) : (editingDoc.productName || ''),
+        productSummaries: productSummaries.length ? productSummaries : (editingDoc.productSummaries || []),
+        productCharges,
+        invoiceNo: prev.invoiceNo || editingDoc.invoiceNo,
+        date: prev.date || editingDoc.date
+      }));
+      return;
+    }
+
+    if (selectedPL) {
+      const freshMR = getFreshMaterialReceipt(data.materialReceipts, selectedPL.receiptId);
+      if (!freshMR) return;
+      const opts = receiptProductOptions(freshMR, data);
+      const mrParty = opts.party || data.parties.find(p => p.id === freshMR.partyId);
+      const plWeight = selectedPL.totalWeight || 0;
       setForm(prev => ({
         ...prev,
-        invoiceNo: docNo,
-        dcNo: dc?.dcNo || 'N/A',
-        dcDate: dc?.date || 'N/A',
-        partyDocNo: activeMR.partyDocNo,
-        partyDocDate: activeMR.partyDocDate,
-        billAddress: activeMR.billAddress || '',
-        shipAddress: activeMR.shipAddress || '',
-        gstinBill: activeMR.gstinBill || '',
-        gstinShip: activeMR.gstinShip || '',
-        partyName: activeMR.partyName,
-        productName: activeMR.productName,
-        hsnCode: prodConfig?.hsn || prev.hsnCode || '',
-        qty: activePL.totalWeight,
-        rates: {
-          cleaning: defaultRates.cleaning || 0,
-          filterBag: defaultRates.filterBag || 0,
-          processing: defaultRates.processing || 0,
-          sieving: defaultRates.sieving || 0,
-          psdReport: (prodConfig?.psdMethodDefault === 'Wet' ? (defaultRates.psdReportWet || 0) : (defaultRates.psdReportDry || 0)) || defaultRates.psdReport || 0,
-          liner: defaultRates.liner || 0,
-          courier: defaultRates.courier || 0,
-          fiberDrum: defaultRates.fiberDrum || 0,
-          transportation: defaultRates.transportation || 0,
-          hdpeDrum: defaultRates.hdpeDrum || 0,
-          batchChangeover: defaultRates.batchChangeover || 0
-        },
-        customCharges: activeMR.customCharges ? JSON.parse(JSON.stringify(activeMR.customCharges)) : []
+        qty: plWeight,
+        productName: getReceiptProductLabel(freshMR, opts),
+        productSummaries: buildPLProductSummaries(selectedPL, freshMR, opts),
+        productCharges: resolveTIProductChargesForDoc(freshMR, mrParty, data.invoices, opts)
       }));
     }
-  }, [form.date, editingDoc, selectedPL, activeMR, dc, prodConfig, data.settings?.serials?.TI]);
+  }, [editingDoc?.id, selectedPL?.id, isModalOpen]);
+
+  useEffect(() => {
+    if (editingDoc || !isModalOpen) return;
+    const tiSerial = data.settings?.serials?.TI || 1;
+    const docNo = generateDocNumber('IN', tiSerial, new Date(form.date));
+    setForm(prev => (prev.invoiceNo === docNo ? prev : { ...prev, invoiceNo: docNo }));
+  }, [form.date, editingDoc, isModalOpen, data.settings?.serials?.TI]);
+
+  const handleMaterialQtyChange = (val) => {
+    setForm(prev => ({ ...prev, qty: parseFloat(val) || 0 }));
+  };
+
+  const toggleProductCharge = (prodName, key) => {
+    setForm(prev => {
+      const pc = getProductChargeBlock(prodName);
+      const turningOn = !pc.charges[key];
+      const qtys = { ...(pc.qtys || emptyChargeQtys()) };
+      if (turningOn && (qtys[key] == null || qtys[key] === '')) {
+        qtys[key] = 1;
+      }
+      return {
+        ...prev,
+        productCharges: {
+          ...(prev.productCharges || {}),
+          [prodName]: {
+            ...pc,
+            charges: { ...pc.charges, [key]: turningOn },
+            qtys
+          }
+        }
+      };
+    });
+  };
+
+  const handleProductRateChange = (prodName, key, val) => {
+    setForm(prev => {
+      const pc = prev.productCharges?.[prodName]
+        || { charges: defaultChargeFlags(), rates: defaultChargeRates(), qtys: emptyChargeQtys() };
+      return {
+        ...prev,
+        productCharges: {
+          ...(prev.productCharges || {}),
+          [prodName]: {
+            ...pc,
+            rates: { ...pc.rates, [key]: parseChargeFieldValue(val) }
+          }
+        }
+      };
+    });
+  };
+
+  const handleProductQtyChange = (prodName, key, val) => {
+    setForm(prev => {
+      const pc = prev.productCharges?.[prodName]
+        || { charges: defaultChargeFlags(), rates: defaultChargeRates(), qtys: emptyChargeQtys() };
+      return {
+        ...prev,
+        productCharges: {
+          ...(prev.productCharges || {}),
+          [prodName]: {
+            ...pc,
+            qtys: { ...(pc.qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) }
+          }
+        }
+      };
+    });
+  };
 
   const toggleCharge = (key) => {
-    setForm(prev => ({
-      ...prev,
-      charges: { ...prev.charges, [key]: !prev.charges[key] }
-    }));
+    setForm(prev => {
+      const turningOn = !prev.charges[key];
+      const qtys = { ...(prev.qtys || emptyChargeQtys()) };
+      if (turningOn && (qtys[key] == null || qtys[key] === '')) {
+        qtys[key] = 1;
+      }
+      return { ...prev, charges: { ...prev.charges, [key]: turningOn }, qtys };
+    });
   };
 
   const handleRateChange = (key, val) => {
-    setForm(prev => ({
-      ...prev,
-      rates: { ...prev.rates, [key]: parseFloat(val) || 0 }
-    }));
+    setForm(prev => ({ ...prev, rates: { ...prev.rates, [key]: parseChargeFieldValue(val) } }));
+  };
+
+  const handleQtyChange = (key, val) => {
+    setForm(prev => ({ ...prev, qtys: { ...(prev.qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) } }));
   };
 
   const getSubtotal = () => {
-    const standardSum = Object.keys(form.charges).reduce((sum, key) => {
-      if (form.charges[key]) {
-        const isQtyRate = ['processing', 'sieving', 'cleaning'].includes(key);
-        const qty = parseFloat(form.qty) || 0;
-        const rate = form.rates[key] || 0;
-        return sum + (isQtyRate ? qty * rate : rate);
-      }
-      return sum;
-    }, 0);
-
     const customSum = (form.customCharges || []).reduce((sum, charge) => {
       if (charge.checked) {
         return sum + ((parseFloat(charge.qty) || 0) * (parseFloat(charge.rate) || 0));
@@ -138,15 +265,29 @@ const TaxInvoice = () => {
       return sum;
     }, 0);
 
-    return standardSum + customSum;
+    if (activeMR && Object.keys(form.productCharges || {}).length > 0) {
+      return calcProductChargesSubtotalWithQty(form.productCharges, resolveProductQty) + customSum;
+    }
+
+    const materialQty = parseFloat(form.qty) || 0;
+    return calcStandardChargesSubtotal(form.charges, form.rates, form.qtys, materialQty) + customSum;
   };
 
   const handleCreate = (pl) => {
+    const existing = findAnyTaxInvoice(data.invoices, pl.receiptId);
+    if (existing) {
+      setEditingDoc(existing);
+      setSelectedPL(null);
+      setIsModalOpen(true);
+      return;
+    }
+    const docDate = new Date().toISOString().split('T')[0];
+    const fromPL = buildFormFromPL(pl, docDate);
     setSelectedPL(pl);
     setEditingDoc(null);
-    setForm({
+    setForm(fromPL || {
       invoiceNo: '',
-      date: new Date().toISOString().split('T')[0],
+      date: docDate,
       dcNo: '',
       dcDate: '',
       partyDocNo: '',
@@ -155,15 +296,9 @@ const TaxInvoice = () => {
       shipAddress: '',
       gstinBill: '',
       gstinShip: '',
-      charges: {
-        cleaning: true, filterBag: false, processing: true, sieving: false,
-        psdReport: false, liner: false, courier: false, fiberDrum: false,
-        transportation: false, hdpeDrum: false, batchChangeover: false
-      },
-      rates: {
-        cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
-        liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
-      },
+      charges: defaultChargeFlags(),
+      rates: defaultChargeRates(),
+      qtys: emptyChargeQtys(),
       discount: 0,
       taxRate: 18,
       terms: 'Payment against delivery.',
@@ -192,20 +327,16 @@ const TaxInvoice = () => {
       shipAddress: '',
       gstinBill: '',
       gstinShip: '',
-      charges: {
-        cleaning: true, filterBag: false, processing: true, sieving: false,
-        psdReport: false, liner: false, courier: false, fiberDrum: false,
-        transportation: false, hdpeDrum: false, batchChangeover: false
-      },
-      rates: {
-        cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
-        liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
-      },
+      charges: defaultChargeFlags(),
+      rates: defaultChargeRates(),
+      qtys: emptyChargeQtys(),
       discount: 0,
       taxRate: 18,
       terms: 'Payment against delivery.',
       partyName: '',
       productName: '',
+      productSummaries: [],
+      productCharges: {},
       hsnCode: '',
       qty: 0,
       customCharges: []
@@ -213,9 +344,11 @@ const TaxInvoice = () => {
     setIsModalOpen(true);
   };
 
+  const enrichTIForExport = (ti) => enrichTIForPrint(ti, data);
+
   const handleEdit = (ti) => {
     setEditingDoc(ti);
-    setForm(ti);
+    setSelectedPL(null);
     setIsModalOpen(true);
   };
 
@@ -233,11 +366,30 @@ const TaxInvoice = () => {
     const taxAmount = taxable * (form.taxRate / 100);
     const total = taxable + taxAmount;
 
+    const opts = activeMR ? receiptProductOptions(activeMR, data) : {};
+    const pl = activeMR ? findAnyPackingList(data.packingLists, activeMR.id) : null;
+    const productSummaries = activeMR
+      ? buildPLProductSummaries(pl, activeMR, opts)
+      : (form.productSummaries || []);
+    const productName = activeMR
+      ? getReceiptProductLabel(activeMR, opts)
+      : form.productName;
+    const sanitizedProductCharges = activeMR
+      ? sanitizeProductCharges(form.productCharges)
+      : (form.productCharges || {});
+    const firstProd = chargeProductNames[0] || productName;
+    const legacyBlock = sanitizedProductCharges[firstProd] || {};
+
     const finalDoc = {
       ...form,
-      receiptId: activeMR?.id || activePL?.receiptId || '',
+      receiptId: activeMR?.id || activePL?.receiptId || editingDoc?.receiptId || '',
       partyName: form.partyName,
-      productName: form.productName,
+      productName,
+      productSummaries,
+      productCharges: sanitizedProductCharges,
+      charges: legacyBlock.charges || form.charges,
+      rates: legacyBlock.rates || form.rates,
+      qtys: legacyBlock.qtys || form.qtys,
       qty: form.qty,
       subtotal,
       taxAmount,
@@ -250,36 +402,38 @@ const TaxInvoice = () => {
     if (editingDoc) {
       updateItem('invoices', editingDoc.id, finalDoc);
     } else {
+      if (finalDoc.receiptId && findAnyTaxInvoice(data.invoices, finalDoc.receiptId)) {
+        alert('A Tax Invoice already exists for this Material Receipt. Please edit the existing TI.');
+        return;
+      }
       updateData('invoices', { ...finalDoc, id: Date.now().toString() });
       incrementSerial('TI');
     }
     setIsModalOpen(false);
   };
 
-  const pendingPLs = data.packingLists.filter(pl => 
-    !(data.invoices || []).some(inv => inv.receiptId === pl.receiptId && inv.invoiceNo?.includes('/IN/'))
+  const pendingPLs = (data.packingLists || []).filter(pl =>
+    !findAnyTaxInvoice(data.invoices, pl.receiptId)
   );
 
-  const filteredInvoices = (data.invoices || []).filter(inv => 
-    inv.invoiceNo?.includes('/IN/') &&
-    (inv.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inv.partyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inv.productName.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const seenReceipts = new Set();
+  const uniquePendingPLs = pendingPLs.filter(pl => {
+    if (seenReceipts.has(pl.receiptId)) return false;
+    seenReceipts.add(pl.receiptId);
+    return true;
+  });
 
-  const chargesList = [
-    { key: 'cleaning', label: 'Cleaning Charges (998842)', isQtyRate: true },
-    { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
-    { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true },
-    { key: 'sieving', label: 'Sieving Charges (998842)', isQtyRate: true },
-    { key: 'psdReport', label: 'PSD Report Charges (998346)', isQtyRate: false },
-    { key: 'liner', label: 'Liner (39233090)', isQtyRate: false },
-    { key: 'courier', label: 'Courier (996812)', isQtyRate: false },
-    { key: 'fiberDrum', label: 'Fiber Drum (7310)', isQtyRate: false },
-    { key: 'transportation', label: 'Transportation (996511)', isQtyRate: false },
-    { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },
-    { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
-  ];
+  const filteredInvoices = (data.invoices || []).filter(inv => {
+    if (!inv.invoiceNo?.includes('/IN/')) return false;
+    const mr = (data.materialReceipts || []).find(m => m.id === inv.receiptId);
+    const label = getDocProductLabel(inv, mr, mr ? receiptProductOptions(mr, data) : {});
+    return (inv.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (inv.partyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      label.toLowerCase().includes(searchTerm.toLowerCase()));
+  });
+
+  const chargesList = STANDARD_CHARGES_LIST;
+  const materialQty = parseFloat(form.qty) || 0;
 
   return (
     <div>
@@ -301,10 +455,13 @@ const TaxInvoice = () => {
           </h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Select a packed dispatch to generate commercial Tax Invoices.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {pendingPLs.length === 0 ? (
+            {uniquePendingPLs.length === 0 ? (
               <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', fontSize: '0.85rem' }}>No pending dispatches awaiting invoices.</p>
             ) : (
-              pendingPLs.map(pl => (
+              uniquePendingPLs.map(pl => {
+                const mr = (data.materialReceipts || []).find(m => m.id === pl.receiptId);
+                const label = mr ? getReceiptProductLabel(mr, receiptProductOptions(mr, data)) : pl.productName;
+                return (
                 <div 
                   key={pl.id} 
                   className="glass-panel" 
@@ -312,10 +469,10 @@ const TaxInvoice = () => {
                   onClick={() => handleCreate(pl)}
                 >
                   <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{pl.plNo}</p>
-                  <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.25rem 0' }}>{pl.productName}</p>
+                  <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.25rem 0' }}>{label}</p>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Weight: {pl.totalWeight?.toFixed(1) || 0} Kg</p>
                 </div>
-              ))
+              )})
             )}
           </div>
         </div>
@@ -352,22 +509,25 @@ const TaxInvoice = () => {
                 {filteredInvoices.length === 0 ? (
                   <tr><td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No Tax Invoices found.</td></tr>
                 ) : (
-                  filteredInvoices.map(inv => (
+                  filteredInvoices.map(inv => {
+                    const mr = (data.materialReceipts || []).find(m => m.id === inv.receiptId);
+                    const productLabel = getDocProductLabel(inv, mr, mr ? receiptProductOptions(mr, data) : {});
+                    return (
                     <tr key={inv.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                       <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{inv.invoiceNo}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600 }}>{inv.partyName}</td>
-                      <td style={{ padding: '0.75rem' }}>{inv.productName}</td>
+                      <td style={{ padding: '0.75rem' }}>{productLabel}</td>
                       <td style={{ padding: '0.75rem' }}>{inv.qty} Kg</td>
                       <td style={{ padding: '0.75rem', fontWeight: 700 }}>₹{inv.total.toFixed(2)}</td>
                       <td style={{ padding: '0.75rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => exportToPDF('TI', inv)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
+                          <button onClick={() => exportToPDF('TI', enrichTIForExport(inv))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
                           <button onClick={() => handleEdit(inv)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={14} /></button>
                           <button onClick={() => deleteTI(inv.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }}><Trash2 size={14} /></button>
                         </div>
                       </td>
                     </tr>
-                  ))
+                  )})
                 )}
               </tbody>
             </table>
@@ -412,8 +572,18 @@ const TaxInvoice = () => {
                   <input type="text" className="input-field" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
                 </div>
                 <div>
-                  <label>Product Name</label>
-                  <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
+                  <label>Product(s)</label>
+                  <input type="text" className="input-field" readOnly value={form.productName} />
+                  {(form.productSummaries || []).length > 0 && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      {(form.productSummaries || []).map((p, idx) => (
+                        <div key={p.prodName || idx} style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '0.35rem 0.5rem', background: 'var(--glass-bg)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                          <strong style={{ color: 'var(--text-main)' }}>{p.prodName}</strong>
+                          <span> · {parseFloat(p.qty || 0).toFixed(2)} Kg</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label>HSN Code</label>
@@ -429,7 +599,7 @@ const TaxInvoice = () => {
                 </div>
                 <div>
                   <label>Material Micronised Qty (Kg)</label>
-                  <input type="number" step="any" className="input-field" value={form.qty} onChange={e => setForm({...form, qty: parseFloat(e.target.value) || 0})} />
+                  <input type="number" step="any" className="input-field" value={form.qty} onChange={e => handleMaterialQtyChange(e.target.value)} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Bill-To Address</label>
@@ -445,28 +615,51 @@ const TaxInvoice = () => {
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
                 <div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {chargesList.map(item => (
-                      <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem', background: 'var(--glass-bg)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', cursor: 'pointer', margin: 0 }}>
-                          <input type="checkbox" checked={form.charges[item.key]} onChange={() => toggleCharge(item.key)} />
-                          {item.label}
-                        </label>
-                        {form.charges[item.key] && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{item.isQtyRate ? '/Kg' : 'flat'}:</span>
-                            <input 
-                              type="number" 
-                              className="input-field" 
-                              style={{ width: '80px', padding: '0.2rem', fontSize: '0.8rem', height: 'auto' }}
-                              value={form.rates[item.key]} 
-                              onChange={e => handleRateChange(item.key, e.target.value)} 
-                            />
+                  {activeMR && chargeProductNames.length > 0 ? (
+                    chargeProductNames.map(prodName => {
+                      const pc = getProductChargeBlock(prodName);
+                      const prodQty = resolveProductQty(prodName);
+                      const displayIdx = getProductDisplayIndex(activeMR, prodName, prodOpts);
+                      return (
+                        <div key={prodName} style={{ marginBottom: '1.25rem', padding: '1rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                          <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                            Product {displayIdx}: {prodName} ({prodQty.toFixed(2)} Kg)
+                          </h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {chargesList.map(item => (
+                              <DocChargeRow
+                                key={`${prodName}-${item.key}`}
+                                item={item}
+                                charges={pc.charges}
+                                rates={pc.rates}
+                                qtys={pc.qtys}
+                                materialQty={prodQty}
+                                onToggle={(key) => toggleProductCharge(prodName, key)}
+                                onQtyChange={(key, val) => handleProductQtyChange(prodName, key, val)}
+                                onRateChange={(key, val) => handleProductRateChange(prodName, key, val)}
+                              />
+                            ))}
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {chargesList.map(item => (
+                        <DocChargeRow
+                          key={item.key}
+                          item={item}
+                          charges={form.charges}
+                          rates={form.rates}
+                          qtys={form.qtys}
+                          materialQty={materialQty}
+                          onToggle={toggleCharge}
+                          onQtyChange={handleQtyChange}
+                          onRateChange={handleRateChange}
+                        />
+                      ))}
+                    </div>
+                  )}
 
                   <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
