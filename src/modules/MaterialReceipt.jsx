@@ -107,8 +107,8 @@ const makeDefaultBatch = (prodName, party, productSettings = {}) => {
   const settings = productSettings[prodName] || buildProductSettingsFromParty(prodConfig);
   return {
     batchNo: '',
-    drums: 1,
-    qty: 0,
+    drums: '',
+    qty: '',
     productName: prodName,
     nickName: settings.nickName || prodConfig?.nickname || '',
     psdReq: prodConfig?.psdReq || '90% < 10M',
@@ -534,8 +534,8 @@ const MaterialReceipt = () => {
           style={{ padding: '0.3rem', fontSize: '0.825rem' }}
           required
           min="1"
-          value={batch.drums}
-          onChange={e => handleBatchCellChange(idx, 'drums', parseInt(e.target.value) || 0)}
+          value={batch.drums === 0 || batch.drums === '' ? '' : batch.drums}
+          onChange={e => handleBatchCellChange(idx, 'drums', e.target.value === '' ? '' : parseInt(e.target.value, 10) || '')}
         />
       </td>
       <td style={{ padding: '0.5rem' }}>
@@ -544,8 +544,8 @@ const MaterialReceipt = () => {
           className="input-field"
           style={{ padding: '0.3rem', fontSize: '0.825rem' }}
           required
-          value={batch.qty}
-          onChange={e => handleBatchCellChange(idx, 'qty', parseFloat(e.target.value) || 0)}
+          value={batch.qty === 0 || batch.qty === '' ? '' : batch.qty}
+          onChange={e => handleBatchCellChange(idx, 'qty', e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
         />
       </td>
       <td style={{ padding: '0.5rem' }}>

@@ -560,6 +560,8 @@ export const enrichPIForPrint = (pi, appData = {}) => {
 
   return {
     ...pi,
+    partyDocNo: pi.partyDocNo || mr.partyDocNo || '',
+    partyDocDate: pi.partyDocDate || mr.partyDocDate || '',
     productName: summaries.length ? getReceiptProductLabel(mr, prodOpts) : pi.productName,
     productSummaries: summaries.length ? summaries : (pi.productSummaries || []),
     productCharges: mergedCharges,

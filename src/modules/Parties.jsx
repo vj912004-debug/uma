@@ -3,6 +3,9 @@ import { useAppContext } from '../context/AppContext';
 import { Plus, Search, Edit2, Trash2, ShieldAlert } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
 
+const displayChargeRate = (v) => (v == null || v === '' || v === 0) ? '' : v;
+const parseChargeRateInput = (val) => (val === '' ? 0 : (parseFloat(val) || 0));
+
 const Parties = () => {
   const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -597,13 +600,12 @@ const Parties = () => {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '1rem 0 0.5rem 0', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>Default Standard Charge Rates (₹)</h4>
-                <button type="button" className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', background: 'var(--glass-bg)', color: 'var(--accent-primary)', border: '1px solid var(--border-color)' }} onClick={() => setProductData(prev => ({ ...prev, customCharges: [...(prev.customCharges || []), { name: '', hsn: '', rate: 0 }] }))}>
+                <button type="button" className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', background: 'var(--glass-bg)', color: 'var(--accent-primary)', border: '1px solid var(--border-color)' }} onClick={() => setProductData(prev => ({ ...prev, customCharges: [...(prev.customCharges || []), { name: '', hsn: '', rate: '' }] }))}>
                   + Add Custom Charge
                 </button>
               </div>
               
               <datalist id="amountOptions">
-                <option value="0" />
                 <option value="5" />
                 <option value="35" />
                 <option value="70" />
@@ -642,8 +644,8 @@ const Parties = () => {
                     <input
                       type="number" list="amountOptions"
                       className="input-field"
-                      value={productData.charges[def.key] ?? 0}
-                      onChange={e => setProductData(prev => ({ ...prev, charges: { ...prev.charges, [def.key]: parseFloat(e.target.value) || 0 } }))}
+                      value={displayChargeRate(productData.charges[def.key])}
+                      onChange={e => setProductData(prev => ({ ...prev, charges: { ...prev.charges, [def.key]: parseChargeRateInput(e.target.value) } }))}
                     />
                   </div>
                 ))}
@@ -689,9 +691,9 @@ const Parties = () => {
                           newCharges[idx].hsn = e.target.value;
                           setProductData({...productData, customCharges: newCharges});
                         }} />
-                        <input type="number" className="input-field" placeholder="Rate (₹)" value={charge.rate} onChange={e => {
+                        <input type="number" className="input-field" placeholder="Rate (₹)" value={displayChargeRate(charge.rate)} onChange={e => {
                           const newCharges = [...productData.customCharges];
-                          newCharges[idx].rate = parseFloat(e.target.value) || 0;
+                          newCharges[idx].rate = parseChargeRateInput(e.target.value);
                           setProductData({...productData, customCharges: newCharges});
                         }} />
                         <button type="button" className="btn" style={{ padding: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none' }} onClick={() => {

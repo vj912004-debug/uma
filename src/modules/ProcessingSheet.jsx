@@ -1,8 +1,24 @@
-﻿import { formatDate } from '../utils/dateUtils';
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Search, Filter, ArrowUpDown } from 'lucide-react';
+import { Search, ArrowUpDown } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
+import {
+  getReceiptPaymentTotal,
+  getReceiptTdsTotal,
+  getReceiptPayments,
+  hasSheetOverride
+} from '../utils/paymentTotals';
+
+const DATE_COLUMNS = new Set(['date', 'bprDate', 'dcDate', 'invoiceDate']);
+
+const toDateInputValue = (val) => {
+  if (!val) return '';
+  const str = String(val);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  const d = new Date(str.length === 10 ? `${str}T00:00:00` : str);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString().split('T')[0];
+};
 
 const ProcessingSheet = () => {
   const { data, updateItem } = useAppContext();
@@ -19,18 +35,9 @@ const ProcessingSheet = () => {
   const getDC = (mrId) => (data.deliveryChallans || []).find(dc => dc.receiptId === mrId);
   const getTI = (mrId) => (data.invoices || []).find(inv => inv.receiptId === mrId && inv.invoiceNo?.includes('/IN/'));
 
-  const getPaymentsReceived = (mrId) => {
-    return (data.payments || [])
-      .filter(p => p.receiptId === mrId)
-      .reduce((sum, p) => sum + (parseFloat(p.amount) || 0) + (parseFloat(p.tds) || 0), 0);
-  };
-
-  const getPaymentHistory = (mrId) => {
-    return (data.payments || [])
-      .filter(p => p.receiptId === mrId)
-      .slice()
-      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  };
+  const getPaymentsReceived = (mrId) => getReceiptPaymentTotal(data.payments, mrId);
+  const getTdsReceived = (mrId) => getReceiptTdsTotal(data.payments, mrId);
+  const getPaymentHistory = (mrId) => getReceiptPayments(data.payments, mrId);
 
   const handleCellChange = (mrId, field, value) => {
     const mr = data.materialReceipts.find(m => m.id === mrId);
@@ -50,44 +57,47 @@ const ProcessingSheet = () => {
     const ti = getTI(mr.id);
     const totalBill = ti?.total || 0;
     const paid = getPaymentsReceived(mr.id);
+    const tdsTotal = getTdsReceived(mr.id);
     const overdue = (ti?.total || 0) - paid > 0 && ti?.date && new Date(ti.date) < new Date();
     const paymentHistory = getPaymentHistory(mr.id);
-    
+
+    const o = mr.sheetOverrides || {};
+
+    const finalTotalBill = hasSheetOverride(o, 'totalBill') ? parseFloat(o.totalBill) || 0 : totalBill;
+    const finalPaid = hasSheetOverride(o, 'manualPaid') ? parseFloat(o.manualPaid) || 0 : paid;
+    const compOutstanding = Math.max(0, finalTotalBill - finalPaid);
+    const finalTds = hasSheetOverride(o, 'tdsDeduction') ? parseFloat(o.tdsDeduction) || 0 : tdsTotal;
+
     // E-Way status
     let ewayStatus = 'Pending';
     if (dc?.ewayBillNo || ti?.ewayBillNo) {
       ewayStatus = 'Done';
     }
 
-    const o = mr.sheetOverrides || {};
-    
-    const finalTotalBill = o.totalBill !== undefined ? parseFloat(o.totalBill) || 0 : totalBill;
-    const finalPaid = o.manualPaid !== undefined ? parseFloat(o.manualPaid) || 0 : paid;
-    const compOutstanding = Math.max(0, finalTotalBill - finalPaid);
-
     return {
       id: mr.id,
       srNo: idx + 1,
-      date: o.date !== undefined ? o.date : mr.date,
-      partyName: o.partyName !== undefined ? o.partyName : mr.partyName,
-      productName: o.productName !== undefined ? o.productName : mr.productName,
-      receivedQty: o.receivedQty !== undefined ? o.receivedQty : (parseFloat(mr.totalQty) || 0),
-      piNo: o.piNo !== undefined ? o.piNo : (pi?.invoiceNo || 'Pending'),
-      bprDate: o.bprDate !== undefined ? o.bprDate : (bpr?.date || ''),
-      bprNetQty: o.bprNetQty !== undefined ? o.bprNetQty : (bpr?.totalDispatchedNet || 0),
-      dcNo: o.dcNo !== undefined ? o.dcNo : (dc?.dcNo || 'Pending'),
-      dcDate: o.dcDate !== undefined ? o.dcDate : (dc?.date || ''),
-      dcNetQty: o.dcNetQty !== undefined ? o.dcNetQty : (dc?.qty || 0),
-      tiNo: o.tiNo !== undefined ? o.tiNo : (ti?.invoiceNo || 'Pending'),
-      invoiceDate: o.invoiceDate !== undefined ? o.invoiceDate : (ti?.date || ''),
+      date: hasSheetOverride(o, 'date') ? o.date : mr.date,
+      partyName: hasSheetOverride(o, 'partyName') ? o.partyName : mr.partyName,
+      productName: hasSheetOverride(o, 'productName') ? o.productName : mr.productName,
+      receivedQty: hasSheetOverride(o, 'receivedQty') ? o.receivedQty : (parseFloat(mr.totalQty) || 0),
+      piNo: hasSheetOverride(o, 'piNo') ? o.piNo : (pi?.invoiceNo || 'Pending'),
+      bprDate: hasSheetOverride(o, 'bprDate') ? o.bprDate : (bpr?.date || ''),
+      bprNetQty: hasSheetOverride(o, 'bprNetQty') ? o.bprNetQty : (bpr?.totalDispatchedNet || 0),
+      dcNo: hasSheetOverride(o, 'dcNo') ? o.dcNo : (dc?.dcNo || 'Pending'),
+      dcDate: hasSheetOverride(o, 'dcDate') ? o.dcDate : (dc?.date || ''),
+      dcNetQty: hasSheetOverride(o, 'dcNetQty') ? o.dcNetQty : (dc?.qty || 0),
+      tiNo: hasSheetOverride(o, 'tiNo') ? o.tiNo : (ti?.invoiceNo || 'Pending'),
+      invoiceDate: hasSheetOverride(o, 'invoiceDate') ? o.invoiceDate : (ti?.date || ''),
       totalBill: finalTotalBill,
-      paid: paid, // auto calculated
-      manualPaid: o.manualPaid !== undefined ? o.manualPaid : '', // manual
-      outstanding: o.outstanding !== undefined ? o.outstanding : compOutstanding,
-      dueStatus: o.dueStatus !== undefined ? o.dueStatus : (compOutstanding <= 0 ? '0' : (overdue ? 'Overdue' : 'Due')),
-      paymentDates: o.paymentDates !== undefined ? o.paymentDates : paymentHistory.map(p => p.date).filter(Boolean).join(', '),
-      paymentAmounts: o.paymentAmounts !== undefined ? o.paymentAmounts : paymentHistory.map(p => `Γé╣${(parseFloat(p.amount) || 0).toFixed(2)}${p.tds ? ` (TDS Γé╣${(parseFloat(p.tds) || 0).toFixed(2)})` : ''}`).join(' | '),
-      paymentRef: o.paymentRef !== undefined ? o.paymentRef : '',
+      paid,
+      manualPaid: hasSheetOverride(o, 'manualPaid') ? o.manualPaid : '',
+      tdsDeduction: finalTds,
+      outstanding: hasSheetOverride(o, 'outstanding') ? parseFloat(o.outstanding) || 0 : compOutstanding,
+      dueStatus: hasSheetOverride(o, 'dueStatus') ? o.dueStatus : (compOutstanding <= 0 ? '0' : (overdue ? 'Overdue' : 'Due')),
+      paymentDates: hasSheetOverride(o, 'paymentDates') ? o.paymentDates : paymentHistory.map(p => p.date).filter(Boolean).join(', '),
+      paymentAmounts: hasSheetOverride(o, 'paymentAmounts') ? o.paymentAmounts : paymentHistory.map(p => `₹${(parseFloat(p.amount) || 0).toFixed(2)}${p.tds ? ` (TDS ₹${(parseFloat(p.tds) || 0).toFixed(2)})` : ''}`).join(' | '),
+      paymentRef: hasSheetOverride(o, 'paymentRef') ? o.paymentRef : '',
       ewayStatus: o.ewayStatus !== undefined ? o.ewayStatus : ewayStatus
     };
   });
@@ -163,6 +173,7 @@ const ProcessingSheet = () => {
     { key: 'paymentRef', label: 'Cheque / Ref Details' },
     { key: 'paymentDates', label: 'Payment Dates' },
     { key: 'paymentAmounts', label: 'Amounts Received' },
+    { key: 'tdsDeduction', label: 'TDS Deduction' },
     { key: 'dueStatus', label: 'Due Status' },
     { key: 'outstanding', label: 'Outstanding' },
     { key: 'ewayStatus', label: 'E-Way' }
@@ -171,7 +182,7 @@ const ProcessingSheet = () => {
   const renderInput = (id, field, value, extraStyle = {}) => (
     <input
       type="text"
-      value={value || ''}
+      value={value ?? ''}
       onChange={(e) => handleCellChange(id, field, e.target.value)}
       style={{
         background: 'transparent',
@@ -187,10 +198,73 @@ const ProcessingSheet = () => {
         transition: 'all 0.2s ease',
         ...extraStyle
       }}
-      onFocus={(e) => e.target.style.borderBottom = '1px solid var(--accent-primary)'}
-      onBlur={(e) => e.target.style.borderBottom = '1px solid transparent'}
+      onFocus={(e) => { e.target.style.borderBottom = '1px solid var(--accent-primary)'; }}
+      onBlur={(e) => { e.target.style.borderBottom = '1px solid transparent'; }}
     />
   );
+
+  const renderDateInput = (id, field, value) => (
+    <input
+      type="date"
+      value={toDateInputValue(value)}
+      onChange={(e) => handleCellChange(id, field, e.target.value)}
+      style={{
+        background: 'var(--input-bg)',
+        border: '1px solid var(--border-color)',
+        borderRadius: '4px',
+        color: 'inherit',
+        width: '100%',
+        minWidth: '130px',
+        fontSize: 'inherit',
+        outline: 'none',
+        fontFamily: 'inherit',
+        padding: '0.2rem 0.35rem',
+        cursor: 'pointer'
+      }}
+    />
+  );
+
+  const renderCell = (row, col) => {
+    const { id } = row;
+    const value = row[col.key];
+    if (DATE_COLUMNS.has(col.key)) {
+      return renderDateInput(id, col.key, value);
+    }
+    switch (col.key) {
+      case 'srNo':
+        return <span style={{ fontWeight: 600 }}>{row.srNo}</span>;
+      case 'paid':
+        return <span style={{ color: '#10b981', fontWeight: 600 }}>₹{parseFloat(value || 0).toFixed(2)}</span>;
+      case 'tdsDeduction':
+        return renderInput(id, 'tdsDeduction', value, { color: '#8b5cf6', fontWeight: 600 });
+      case 'dueStatus':
+        return renderInput(id, 'dueStatus', value, {
+          fontWeight: 700,
+          color: value === 'Overdue' ? '#ef4444' : value === '0' ? '#10b981' : '#f59e0b'
+        });
+      case 'outstanding':
+        return renderInput(id, 'outstanding', value, {
+          color: parseFloat(value) > 0 ? '#ef4444' : 'var(--text-muted)',
+          fontWeight: 700
+        });
+      case 'piNo':
+        return renderInput(id, 'piNo', value, { fontSize: '0.75rem', color: value === 'Pending' ? '#f59e0b' : 'var(--accent-primary)' });
+      case 'tiNo':
+        return renderInput(id, 'tiNo', value, { fontSize: '0.75rem', color: value === 'Pending' ? '#f59e0b' : '#10b981', fontWeight: 600 });
+      case 'manualPaid':
+        return renderInput(id, 'manualPaid', value, { color: '#10b981', fontWeight: 600 });
+      case 'partyName':
+        return renderInput(id, 'partyName', value, { fontWeight: 600, color: 'var(--text-main)' });
+      case 'paymentAmounts':
+        return (
+          <span title={value || ''} style={{ maxWidth: '220px', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {renderInput(id, 'paymentAmounts', value, { fontSize: '0.75rem', color: 'var(--text-muted)' })}
+          </span>
+        );
+      default:
+        return renderInput(id, col.key, value);
+    }
+  };
 
   return (
     <div>
@@ -264,28 +338,11 @@ const ProcessingSheet = () => {
               ) : (
                 filteredRows.map((row, idx) => (
                   <tr key={row.id} style={{ borderBottom: '1px solid var(--border-color)', background: idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent' }}>
-                    <td style={{ padding: '0.25rem', fontWeight: 600 }}>{row.srNo}</td>
-                    <td style={{ padding: '0.25rem' }}>{renderInput(row.id, 'date', row.date)}</td>
-                    <td style={{ padding: '0.25rem', fontWeight: 600, color: 'var(--text-main)' }}>{renderInput(row.id, 'partyName', row.partyName)}</td>
-                    <td style={{ padding: '0.25rem' }}>{renderInput(row.id, 'productName', row.productName)}</td>
-                    <td style={{ padding: '0.25rem', fontWeight: 500 }}>{renderInput(row.id, 'receivedQty', row.receivedQty)}</td>
-                    <td style={{ padding: '0.25rem', fontSize: '0.75rem', color: row.piNo === 'Pending' ? '#f59e0b' : 'var(--accent-primary)' }}>{renderInput(row.id, 'piNo', row.piNo)}</td>
-                    <td style={{ padding: '0.25rem', fontSize: '0.75rem' }}>{renderInput(row.id, 'bprDate', row.bprDate)}</td>
-                    <td style={{ padding: '0.25rem', fontWeight: 500 }}>{renderInput(row.id, 'bprNetQty', row.bprNetQty)}</td>
-                    <td style={{ padding: '0.25rem', fontSize: '0.75rem' }}>{renderInput(row.id, 'dcNo', row.dcNo)}</td>
-                    <td style={{ padding: '0.25rem', fontSize: '0.75rem' }}>{renderInput(row.id, 'dcDate', row.dcDate)}</td>
-                    <td style={{ padding: '0.25rem' }}>{renderInput(row.id, 'dcNetQty', row.dcNetQty)}</td>
-                    <td style={{ padding: '0.25rem', fontSize: '0.75rem', color: row.tiNo === 'Pending' ? '#f59e0b' : '#10b981', fontWeight: 600 }}>{renderInput(row.id, 'tiNo', row.tiNo)}</td>
-                    <td style={{ padding: '0.25rem', fontSize: '0.75rem' }}>{renderInput(row.id, 'invoiceDate', row.invoiceDate)}</td>
-                    <td style={{ padding: '0.25rem', fontWeight: 600 }}>{renderInput(row.id, 'totalBill', row.totalBill)}</td>
-                    <td style={{ padding: '0.25rem', color: '#10b981', fontWeight: 600 }}>Γé╣{parseFloat(row.paid || 0).toFixed(2)}</td>
-                    <td style={{ padding: '0.25rem', color: '#10b981', fontWeight: 600 }}>{renderInput(row.id, 'manualPaid', row.manualPaid, { color: '#10b981' })}</td>
-                    <td style={{ padding: '0.25rem' }}>{renderInput(row.id, 'paymentRef', row.paymentRef)}</td>
-                    <td style={{ padding: '0.25rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{renderInput(row.id, 'paymentDates', row.paymentDates)}</td>
-                    <td style={{ padding: '0.25rem', fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '220px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.paymentAmounts || ''}>{renderInput(row.id, 'paymentAmounts', row.paymentAmounts)}</td>
-                    <td style={{ padding: '0.25rem', fontWeight: 700, color: row.dueStatus === 'Overdue' ? '#ef4444' : row.dueStatus === '0' ? '#10b981' : '#f59e0b' }}>{renderInput(row.id, 'dueStatus', row.dueStatus)}</td>
-                    <td style={{ padding: '0.25rem', color: row.outstanding > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: 700 }}>{renderInput(row.id, 'outstanding', row.outstanding)}</td>
-                    <td style={{ padding: '0.25rem' }}>{renderInput(row.id, 'ewayStatus', row.ewayStatus)}</td>
+                    {tableCols.map(col => (
+                      <td key={col.key} style={{ padding: '0.25rem', fontSize: col.key === 'piNo' || col.key === 'tiNo' ? '0.75rem' : undefined }}>
+                        {renderCell(row, col)}
+                      </td>
+                    ))}
                   </tr>
                 ))
               )}

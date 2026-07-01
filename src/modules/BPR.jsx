@@ -1,9 +1,15 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { exportToPDF } from '../utils/pdfExport';
+import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
 import ExportButton from '../components/ExportButton';
-import { Plus, Search, Edit2, Trash2, ClipboardList, FileDown } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, ClipboardList, FileDown, Printer } from 'lucide-react';
+
+const getPartyProductConfig = (mr, data, productName) => {
+  const party = (data.parties || []).find(p => p.id === mr.partyId);
+  const name = (productName || mr.productName || '').split(',')[0]?.trim() || mr.productName;
+  return (party?.products || []).find(p => p.name === name) || null;
+};
 
 const emptyRow = (batchNo, drumNo) => ({ batchNo, drumNo, gross: '', tare: '', net: '' });
 
@@ -49,6 +55,7 @@ const BPR = () => {
     productName: '',
     totalInputQty: 0,
     psdRequirement: '90% < 10M',
+    psdNote: '',
     totalDrums: 0,
     doubleDispatch: false,
     receivedBatches: [],
@@ -87,10 +94,11 @@ const BPR = () => {
     productName: '',
     totalInputQty: '',
     psdRequirement: '90% < 10M',
+    psdNote: '',
     totalDrums: 0,
     doubleDispatch: false,
-    receivedBatches: [emptyRow('', '1')],
-    dispatchedBatches: [emptyRow('', '1')],
+    receivedBatches: padBPRBatchRows([emptyRow('', '1')]),
+    dispatchedBatches: padBPRBatchRows([emptyRow('', '1')]),
     cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false, bagClean: false },
     pressureMetrics: { grindingPressure: '', injectionPressure: '', feedingSP: '', feedingDP: '', feedingTP: '', millingFP: '', millingFiP: '' },
     packingConsumables: { fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '' },
@@ -142,17 +150,25 @@ const BPR = () => {
       }
     });
 
+    const prodConfig = getPartyProductConfig(mr, data);
+    const firstBatch = activeMRBatches[0];
+    const psdRequirement = firstBatch?.psdReq || prodConfig?.psdReq || '90% < 10M';
+    const psdNote = prodConfig?.psdNote || '';
+    const paddedReceived = padBPRBatchRows(receivedRows);
+    const paddedDispatched = padBPRBatchRows(receivedRows.map(r => ({ ...r })));
+
     setForm({
       bprNo: docNo,
       date: new Date().toISOString().split('T')[0],
       partyName: mr.partyName,
       productName: mr.productName,
       totalInputQty: mr.totalQty,
-      psdRequirement: '90% < 10M',
+      psdRequirement,
+      psdNote,
       totalDrums: mr.totalDrums || 0,
       doubleDispatch: false,
-      receivedBatches: receivedRows,
-      dispatchedBatches: receivedRows.map(r => ({ ...r })),
+      receivedBatches: paddedReceived,
+      dispatchedBatches: paddedDispatched,
       cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false, bagClean: false },
       pressureMetrics: { grindingPressure: '', injectionPressure: '', feedingSP: '', feedingDP: '', feedingTP: '', millingFP: '', millingFiP: '' },
       packingConsumables: { fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '' },
@@ -199,19 +215,20 @@ const BPR = () => {
   const toggleDoubleDispatch = () => {
     const nextVal = !form.doubleDispatch;
     setForm(prev => {
+      const dataRows = prev.receivedBatches.filter(r => r.batchNo);
       let nextDispatch = [];
       if (nextVal) {
-        prev.receivedBatches.forEach(r => {
+        dataRows.forEach(r => {
           nextDispatch.push({ ...r, drumNo: `${r.drumNo}A` });
           nextDispatch.push({ ...r, drumNo: `${r.drumNo}B` });
         });
       } else {
-        nextDispatch = prev.receivedBatches.map(r => ({ ...r }));
+        nextDispatch = dataRows.map(r => ({ ...r }));
       }
       return {
         ...prev,
         doubleDispatch: nextVal,
-        dispatchedBatches: nextDispatch
+        dispatchedBatches: padBPRBatchRows(nextDispatch)
       };
     });
   };
@@ -432,10 +449,11 @@ const BPR = () => {
                         <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)' }}>Net: {bpr.totalDispatchedNet?.toFixed(1) || 0} Kg</span>
                       </td>
                       <td style={{ padding: '0.75rem' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => exportToPDF('BPR', bpr)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
-                          <button onClick={() => handleEdit(bpr)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={14} /></button>
-                          <button onClick={() => deleteBPR(bpr.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }}><Trash2 size={14} /></button>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <button type="button" onClick={() => viewPDF('BPR', bpr)} title="Print" style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer' }}><Printer size={14} /></button>
+                          <button type="button" onClick={() => exportToPDF('BPR', bpr)} title="Download PDF" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
+                          <button type="button" onClick={() => handleEdit(bpr)} title="Edit" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={14} /></button>
+                          <button type="button" onClick={() => deleteBPR(bpr.id)} title="Delete" style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }}><Trash2 size={14} /></button>
                         </div>
                       </td>
                     </tr>
@@ -512,9 +530,10 @@ const BPR = () => {
                       <td style={{ padding: '0.75rem' }}>{(bpr.totalDispatchedNet ?? sumNet(bpr.dispatchedBatches || [])).toFixed(2)}</td>
                       <td style={{ padding: '0.75rem' }}>{bpr.dispatchedBatches?.length || 0}</td>
                       <td style={{ padding: '0.75rem' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                           <button type="button" className="btn btn-primary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleEdit(bpr, 'page2')}>Edit Weights</button>
-                          <button onClick={() => exportToPDF('BPR', bpr)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
+                          <button type="button" onClick={() => viewPDF('BPR', bpr)} title="Print" style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer' }}><Printer size={14} /></button>
+                          <button type="button" onClick={() => exportToPDF('BPR', bpr)} title="Download PDF" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
                         </div>
                       </td>
                     </tr>
@@ -580,6 +599,10 @@ const BPR = () => {
                 <div>
                   <label>PSD Requirement *</label>
                   <input type="text" className="input-field" required value={form.psdRequirement} onChange={e => setForm({...form, psdRequirement: e.target.value})} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>PSD Note</label>
+                  <input type="text" className="input-field" value={form.psdNote || ''} onChange={e => setForm({...form, psdNote: e.target.value})} placeholder="From party product master" />
                 </div>
               </div>
 

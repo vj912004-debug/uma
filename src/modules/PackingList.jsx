@@ -39,7 +39,28 @@ const PackingList = () => {
   const prodOpts = activeMR ? receiptProductOptions(activeMR, data) : {};
   const productNames = activeMR ? getReceiptProductNames(activeMR, prodOpts) : [];
 
+  const parseWt = (v) => (v === '' || v === undefined || v === null ? 0 : parseFloat(v) || 0);
+  const normProd = (s) => (s || '').trim().toLowerCase();
+
+  const displayProducts = useMemo(() => {
+    const fromRows = [...new Set((form.batches || []).map(r => r.productName).filter(Boolean))];
+    if (productNames.length) {
+      const merged = [...productNames];
+      fromRows.forEach((name) => {
+        if (!merged.some(p => normProd(p) === normProd(name))) merged.push(name);
+      });
+      return merged;
+    }
+    if (fromRows.length) return fromRows;
+    if (form.productName) return [form.productName];
+    return [''];
+  }, [form.batches, form.productName, productNames]);
+
+  const formInitKey = editingPL?.id || selectedBPR?.id || (isModalOpen && !editingPL && !selectedBPR ? 'manual' : '');
+
   useEffect(() => {
+    if (!isModalOpen) return;
+
     if (editingPL) {
       const mr = (data.materialReceipts || []).find(m => m.id === editingPL.receiptId);
       const opts = mr ? receiptProductOptions(mr, data) : {};
@@ -57,31 +78,26 @@ const PackingList = () => {
         productSummaries: summaries.length ? summaries : (editingPL.productSummaries || []),
         batches: mergedBatches
       });
-    } else if (selectedBPR && activeMR) {
+      return;
+    }
+
+    if (selectedBPR && activeMR) {
       const plSerial = data.settings?.serials?.PL || 1;
-      const docNo = generateDocNumber('PL', plSerial, new Date(form.date));
+      const docNo = generateDocNumber('PL', plSerial, new Date());
       const summaries = getReceiptProductSummaries(activeMR, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
       const plRows = getBPRDispatchedRowsForPL(data, activeMR, prodOpts);
 
-      setForm(prev => ({
-        ...prev,
+      setForm({
         plNo: docNo,
+        date: new Date().toISOString().split('T')[0],
         productName: getReceiptProductLabel(activeMR, prodOpts),
         productSummaries: summaries,
+        totalWeight: 0,
+        totalDrums: 0,
         batches: plRows
-      }));
+      });
     }
-  }, [form.date, editingPL, selectedBPR, activeMR, data.settings?.serials?.PL, data.bprs]);
-
-  const parseWt = (v) => (v === '' || v === undefined || v === null ? 0 : parseFloat(v) || 0);
-
-  const normProd = (s) => (s || '').trim().toLowerCase();
-
-  const displayProducts = useMemo(() => {
-    const fromRows = [...new Set((form.batches || []).map(r => r.productName).filter(Boolean))];
-    if (productNames.length) return productNames;
-    return fromRows.length ? fromRows : [form.productName].filter(Boolean);
-  }, [form.batches, form.productName, productNames]);
+  }, [formInitKey, isModalOpen]);
 
   const grandTotal = useMemo(() => {
     return (form.batches || []).reduce((acc, b) => {
@@ -103,11 +119,15 @@ const PackingList = () => {
     setForm(prev => {
       const list = [...prev.batches];
       const item = { ...list[idx] };
-      item[field] = val === '' ? '' : (parseFloat(val) || '');
-      if (field === 'gross' || field === 'tare') {
-        const g = parseWt(item.gross);
-        const t = parseWt(item.tare);
-        item.net = (item.gross === '' || item.tare === '') ? '' : Math.max(0, g - t);
+      if (field === 'batchNo' || field === 'drumNo' || field === 'productName') {
+        item[field] = val;
+      } else {
+        item[field] = val === '' ? '' : (parseFloat(val) || '');
+        if (field === 'gross' || field === 'tare') {
+          const g = parseWt(item.gross);
+          const t = parseWt(item.tare);
+          item.net = (item.gross === '' || item.tare === '') ? '' : Math.max(0, g - t);
+        }
       }
       list[idx] = item;
       return { ...prev, batches: list };
@@ -115,17 +135,28 @@ const PackingList = () => {
   };
 
   const addCustomRow = (productName = '') => {
-    setForm(prev => ({
-      ...prev,
-      batches: [...prev.batches, {
-        batchNo: prev.batches[0]?.batchNo || 'Custom',
-        drumNo: (prev.batches.length + 1).toString(),
-        productName: productName || productNames[0] || prev.productName || '',
-        gross: '',
-        tare: '',
-        net: ''
-      }]
-    }));
+    const prod = productName || form.productName || productNames[0] || '';
+    setForm(prev => {
+      const prodRowCount = prev.batches.filter(b => normProd(b.productName || prod) === normProd(prod)).length;
+      return {
+        ...prev,
+        batches: [...prev.batches, {
+          batchNo: prev.batches.find(b => normProd(b.productName || prod) === normProd(prod))?.batchNo || '',
+          drumNo: (prodRowCount + 1).toString(),
+          productName: prod,
+          gross: '',
+          tare: '',
+          net: ''
+        }]
+      };
+    });
+  };
+
+  const rowMatchesProduct = (row, prodName) => {
+    const target = (prodName || form.productName || '').trim().toLowerCase();
+    const rowProd = (row.productName || '').trim().toLowerCase();
+    if (!target) return !rowProd;
+    return rowProd === target;
   };
 
   const handleCreate = (bpr) => {
@@ -339,7 +370,14 @@ const PackingList = () => {
                 </div>
                 <div>
                   <label>Product(s)</label>
-                  <input type="text" className="input-field" readOnly value={form.productName} />
+                  <input
+                    type="text"
+                    className="input-field"
+                    readOnly={!!activeMR}
+                    value={form.productName}
+                    onChange={e => setForm({ ...form, productName: e.target.value })}
+                    placeholder={activeMR ? '' : 'Enter product name'}
+                  />
                   {(form.productSummaries || []).length > 1 && (
                     <div style={{ marginTop: '0.35rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                       {(form.productSummaries || []).map((p, idx) => (
@@ -363,14 +401,13 @@ const PackingList = () => {
               <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                   <h3 style={{ fontSize: '0.95rem', margin: 0 }}>Batch-Wise Packing Weight Details</h3>
-                  <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow()}>+ Add Row</button>
                 </div>
 
                 {displayProducts.map((prodName, pIdx) => {
                   const prodRows = (form.batches || []).map((r, idx) => ({ r, idx })).filter(({ r }) =>
-                    normProd(r.productName || displayProducts[0]) === normProd(prodName)
+                    rowMatchesProduct(r, prodName)
                   );
-                  if (!prodRows.length) return null;
+                  const sectionLabel = prodName || form.productName || `Product ${pIdx + 1}`;
 
                   const batchGroups = [];
                   const map = {};
@@ -394,10 +431,13 @@ const PackingList = () => {
                   }, 0);
 
                   return (
-                    <div key={prodName} style={{ marginBottom: '1.25rem' }}>
-                      <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                        Product {pIdx + 1}: {prodName}
-                      </h4>
+                    <div key={`${sectionLabel}-${pIdx}`} style={{ marginBottom: '1.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                        <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                          Product {pIdx + 1}: {sectionLabel}
+                        </h4>
+                        <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow(prodName || form.productName)}>+ Add Row</button>
+                      </div>
                       <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                           <thead>
@@ -411,13 +451,23 @@ const PackingList = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            {batchGroups.map(group => (
-                              <React.Fragment key={`${prodName}-${group.batchNo}`}>
+                            {prodRows.length === 0 ? (
+                              <tr>
+                                <td colSpan={6} style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                  No rows yet — click &quot;+ Add Row&quot; to add drum weights for this product.
+                                </td>
+                              </tr>
+                            ) : batchGroups.map(group => (
+                              <React.Fragment key={`${sectionLabel}-${group.batchNo}`}>
                                 {group.rows.map((r) => (
                                   <tr key={r.idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                     <td style={{ padding: '0.25rem', fontWeight: 600 }}>{r.idx + 1}</td>
-                                    <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
-                                    <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
+                                    <td style={{ padding: '0.25rem' }}>
+                                      <input type="text" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.batchNo || ''} onChange={e => handleCellChange(r.idx, 'batchNo', e.target.value)} />
+                                    </td>
+                                    <td style={{ padding: '0.25rem' }}>
+                                      <input type="text" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem', width: '60px' }} value={r.drumNo || ''} onChange={e => handleCellChange(r.idx, 'drumNo', e.target.value)} />
+                                    </td>
                                     <td style={{ padding: '0.25rem' }}>
                                       <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={r.gross === 0 ? '' : r.gross} onChange={e => handleCellChange(r.idx, 'gross', e.target.value)} />
                                     </td>
@@ -429,6 +479,7 @@ const PackingList = () => {
                                     </td>
                                   </tr>
                                 ))}
+                                {group.rows.length > 0 && (
                                 <tr style={{ background: 'rgba(16, 185, 129, 0.06)', borderBottom: '2px solid var(--border-color)' }}>
                                   <td colSpan={3} style={{ padding: '0.5rem', fontWeight: 700, fontSize: '0.8rem', color: 'var(--accent-primary)' }}>
                                     Batch {group.batchNo} Total ({group.drums} Drums)
@@ -437,20 +488,29 @@ const PackingList = () => {
                                   <td style={{ padding: '0.5rem', fontWeight: 600 }}>{group.tare > 0 ? group.tare.toFixed(2) : '—'}</td>
                                   <td style={{ padding: '0.5rem', fontWeight: 700, color: 'var(--accent-primary)' }}>{group.net > 0 ? group.net.toFixed(2) : '—'}</td>
                                 </tr>
+                                )}
                               </React.Fragment>
                             ))}
                           </tbody>
+                          {prodRows.length > 0 && (
                           <tfoot>
                             <tr style={{ fontWeight: 'bold', borderTop: '1px solid var(--border-color)' }}>
                               <td colSpan="5" style={{ padding: '0.35rem', textAlign: 'right' }}>Product Subtotal:</td>
                               <td style={{ padding: '0.35rem', color: 'var(--accent-primary)' }}>{prodSubtotal.toFixed(2)} Kg</td>
                             </tr>
                           </tfoot>
+                          )}
                         </table>
                       </div>
                     </div>
                   );
                 })}
+
+                {!displayProducts.length && (
+                  <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '1rem' }}>
+                    Enter a product name above, then add weight rows.
+                  </p>
+                )}
 
                 {form.batches.length > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem', marginTop: '0.5rem' }}>

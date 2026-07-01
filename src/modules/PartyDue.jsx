@@ -1,8 +1,9 @@
-import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Search, Plus, CreditCard, DollarSign, ArrowUpDown } from 'lucide-react';
+import { Search, Plus, CreditCard } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
+import { formatDate } from '../utils/dateUtils';
+import { getReceiptPaymentTotal, hasSheetOverride } from '../utils/paymentTotals';
 
 const PartyDue = () => {
   const { data, updateData, setData, updateItem } = useAppContext();
@@ -65,6 +66,9 @@ const PartyDue = () => {
       return;
     }
 
+    const party = data.parties.find(p => p.id === paymentForm.partyId);
+    const mr = data.materialReceipts.find(m => m.id === paymentForm.receiptId);
+
     const newPayment = {
       ...paymentForm,
       id: Date.now().toString(),
@@ -73,6 +77,21 @@ const PartyDue = () => {
     };
 
     updateData('payments', newPayment);
+
+    // Clear stale manual overrides so balances recalculate from payments
+    if (party?.dueOverrides && Object.keys(party.dueOverrides).length > 0) {
+      updateItem('parties', party.id, { ...party, dueOverrides: {} });
+    }
+    if (mr?.sheetOverrides) {
+      const nextOverrides = { ...mr.sheetOverrides };
+      ['outstanding', 'manualPaid', 'dueStatus', 'tdsDeduction', 'paymentDates', 'paymentAmounts'].forEach((key) => {
+        delete nextOverrides[key];
+      });
+      if (Object.keys(nextOverrides).length !== Object.keys(mr.sheetOverrides).length) {
+        updateItem('materialReceipts', mr.id, { ...mr, sheetOverrides: nextOverrides });
+      }
+    }
+
     setIsModalOpen(false);
     setPaymentForm({
       partyId: '',
@@ -101,11 +120,9 @@ const PartyDue = () => {
       const ti = (data.invoices || []).find(inv => inv.receiptId === mr.id && inv.invoiceNo?.includes('/IN/'));
       if (ti) {
         const fy = getFYOfDate(ti.date);
-        const paymentsTotal = (data.payments || [])
-          .filter(p => p.receiptId === mr.id)
-          .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        const paymentsTotal = getReceiptPaymentTotal(data.payments, mr.id);
         
-        const invoiceOutstanding = Math.max(0, ti.total - paymentsTotal);
+        const invoiceOutstanding = Math.max(0, (parseFloat(ti.total) || 0) - paymentsTotal);
         
         // Add to aging bucket
         if (invoiceDuesByFY.hasOwnProperty(fy)) {
@@ -119,10 +136,10 @@ const PartyDue = () => {
 
     const o = party.dueOverrides || {};
     
-    const final21 = o['21-22'] !== undefined ? parseFloat(o['21-22']) || 0 : invoiceDuesByFY['21-22'];
-    const final22 = o['22-23'] !== undefined ? parseFloat(o['22-23']) || 0 : invoiceDuesByFY['22-23'];
-    const final23 = o['23-24'] !== undefined ? parseFloat(o['23-24']) || 0 : invoiceDuesByFY['23-24'];
-    const final24 = o['24-25'] !== undefined ? parseFloat(o['24-25']) || 0 : invoiceDuesByFY['24-25'];
+    const final21 = hasSheetOverride(o, '21-22') ? parseFloat(o['21-22']) || 0 : invoiceDuesByFY['21-22'];
+    const final22 = hasSheetOverride(o, '22-23') ? parseFloat(o['22-23']) || 0 : invoiceDuesByFY['22-23'];
+    const final23 = hasSheetOverride(o, '23-24') ? parseFloat(o['23-24']) || 0 : invoiceDuesByFY['23-24'];
+    const final24 = hasSheetOverride(o, '24-25') ? parseFloat(o['24-25']) || 0 : invoiceDuesByFY['24-25'];
 
     const totalDue = final21 + final22 + final23 + final24;
 
@@ -312,8 +329,8 @@ const PartyDue = () => {
                     <option value="">Choose Invoiced Batch</option>
                     {selectedPartyReceipts.map(mr => {
                       const ti = (data.invoices || []).find(inv => inv.receiptId === mr.id && inv.invoiceNo?.includes('/IN/'));
-                      const paidTotal = (data.payments || []).filter(p => p.receiptId === mr.id).reduce((s, p) => s + p.amount, 0);
-                      const due = Math.max(0, (ti?.total || 0) - paidTotal);
+                      const paidTotal = getReceiptPaymentTotal(data.payments, mr.id);
+                      const due = Math.max(0, (parseFloat(ti?.total) || 0) - paidTotal);
                       return (
                         <option key={mr.id} value={mr.id}>
                           {mr.receiptNo} - {mr.productName} ({formatDate(mr.date)}) - Balance Due: ₹{due.toFixed(2)}

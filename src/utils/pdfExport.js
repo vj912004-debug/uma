@@ -299,7 +299,17 @@ const buildPO_PI_TI = (doc, docType, data) => {
   });
 };
 
-const BPR_PAGE2_ROWS = 35;
+export const BPR_PAGE2_ROW_COUNT = 35;
+const BPR_PAGE2_ROWS = BPR_PAGE2_ROW_COUNT;
+
+/** Pad received/dispatched weight tables so page 2 fills the printed form. */
+export const padBPRBatchRows = (rows, minRows = BPR_PAGE2_ROW_COUNT) => {
+  const padded = [...(rows || [])];
+  while (padded.length < minRows) {
+    padded.push({ batchNo: '', drumNo: '', gross: '', tare: '', net: '' });
+  }
+  return padded;
+};
 const BPR_GRID = { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, cellPadding: 2 };
 
 const bprFmtWt = (v) => {
@@ -367,7 +377,7 @@ const buildBPR = (doc, data) => {
     margin,
     body: [
       [{ content: 'Batch Processing Record', colSpan: 6, styles: { halign: 'center', fontStyle: 'bold', fontSize: 11 } }],
-      ['Customer Name :', { content: data.partyName || '', colSpan: 5 }],
+      ['Customer Name :', { content: data.partyName || data.customerName || '', colSpan: 5 }],
       ['Product Name :', { content: data.productName || '', colSpan: 5 }],
       ['Total Quantity (kg) :', data.totalInputQty ?? '', 'Batch No. :', primaryBatchNo, `Total No. Batch : ${totalNoBatch}`, `Total Drum : ${totalDrums}`],
       [{ content: 'Material Received', colSpan: 2, styles: { halign: 'center' } }, { content: 'Committed', styles: { halign: 'center' } }, { content: 'Processing Start', colSpan: 2, styles: { halign: 'center' } }, { content: 'Processing supervisor', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }],
@@ -375,6 +385,7 @@ const buildBPR = (doc, data) => {
       ['Time', data.materialReceivedTime || '', data.committedTime || '', data.processingStartTime || '', data.processingSupervisor || ''],
       [{ content: 'Particle size require', colSpan: 2, styles: { halign: 'center' } }, { content: 'Sizing report require', colSpan: 2, styles: { halign: 'center' } }, { content: 'Particle size result', colSpan: 2, styles: { halign: 'center' } }],
       [{ content: data.psdRequirement || '', colSpan: 2 }, { content: data.sizingReportRequired || '', colSpan: 2 }, { content: data.particleSizeResult || '', colSpan: 2 }],
+      [{ content: 'PSD Note', colSpan: 2, styles: { halign: 'center', fontStyle: 'bold' } }, { content: data.psdNote || '', colSpan: 4 }],
       [{ content: 'Is the Micronizar cleaned?', colSpan: 5 }, bprCheck(data.cleaningChecklist?.equipmentCleaned)],
       [{ content: 'Is the processesing Area Cleaned?', colSpan: 5 }, bprCheck(data.cleaningChecklist?.areaCleaned)],
       [{ content: 'Is the filter Bag before process packed and labeled in LDPE Bag ?', colSpan: 5 }, bprCheck(data.cleaningChecklist?.lineClearance)],
@@ -2179,11 +2190,19 @@ const buildOldLogic = (doc, docType, data) => {
   } else if (docType === 'DC') {
     const dcBody = [
       ["Party Name", data.partyName || 'N/A'],
-      ["Ship To Address", data.shipAddress || 'N/A'],
-      ["Dispatched Material", data.productName || 'N/A'],
-      ["Quantity Sent", `${data.qty} Kg (${data.totalDrums} Drums)`],
-      ["Vehicle Number", data.vehicleNo || 'N/A']
+      ["Ship To Address", data.shipAddress || 'N/A']
     ];
+    if (data.productSummaries?.length > 1) {
+      data.productSummaries.forEach((p) => {
+        dcBody.push([`Material — ${p.prodName}`, `${parseFloat(p.qty || 0).toFixed(2)} Kg (${p.drums || 0} Drums)`]);
+      });
+      dcBody.push(["Total Quantity", `${data.qty} Kg (${data.totalDrums} Drums)`]);
+    } else {
+      dcBody.push(["Dispatched Material", data.productName || 'N/A']);
+      dcBody.push(["Quantity Sent", `${data.qty} Kg (${data.totalDrums} Drums)`]);
+    }
+    dcBody.push(["Value of Goods (₹)", parseFloat(data.value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })]);
+    dcBody.push(["Vehicle Number", data.vehicleNo || 'N/A']);
     autoTable(doc, {
       startY: yPos,
       body: dcBody,

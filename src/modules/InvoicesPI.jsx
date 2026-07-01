@@ -147,6 +147,13 @@ const InvoicesPI = () => {
       const productCharges = initProductChargesFromMR(freshMR, mrParty, prodOpts);
       setForm(prev => ({
         ...prev,
+        partyDocNo: freshMR.partyDocNo || '',
+        partyDocDate: freshMR.partyDocDate || '',
+        partyName: freshMR.partyName || '',
+        billAddress: freshMR.billAddress || '',
+        shipAddress: freshMR.shipAddress || '',
+        gstinBill: freshMR.gstinBill || '',
+        gstinShip: freshMR.gstinShip || '',
         productName: productLabel,
         productSummaries,
         qty: materialQty,

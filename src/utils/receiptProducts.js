@@ -311,6 +311,50 @@ export const getPLProductNetQty = (pl, prodName, mr, prodOpts = {}) => {
   return getProductQty(mr, prodName, prodOpts);
 };
 
+export const getPLProductDrums = (pl, prodName) => {
+  const nk = norm(prodName);
+  return (pl?.batches || []).filter(r => (r.productName || '').trim() && norm(r.productName) === nk).length;
+};
+
+/** Material value entered on the Material Receipt (₹). */
+export const getMRMaterialValue = (mr) => {
+  const v = parseFloat(mr?.value);
+  return Number.isFinite(v) ? v : 0;
+};
+
+/** Build DC qty/drums/value/labels from MR + PL for selected products. */
+export const buildDCFieldsFromProducts = (mr, pl, prodOpts, selectedProductNames = []) => {
+  if (!mr) {
+    return { productSummaries: [], productName: '', qty: 0, totalDrums: 0, value: 0 };
+  }
+  const allSummaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
+  const selectedSet = new Set((selectedProductNames || []).map(n => norm(n)));
+  const selected = selectedProductNames?.length
+    ? allSummaries.filter(p => selectedSet.has(norm(p.prodName)))
+    : allSummaries;
+
+  const productSummaries = selected.map(p => {
+    const plQty = pl ? getPLProductNetQty(pl, p.prodName, mr, prodOpts) : 0;
+    const plDrums = pl ? getPLProductDrums(pl, p.prodName) : 0;
+    return {
+      ...p,
+      qty: plQty > 0 ? plQty : p.qty,
+      drums: plDrums > 0 ? plDrums : p.drums
+    };
+  });
+
+  const qty = productSummaries.reduce((s, p) => s + (parseFloat(p.qty) || 0), 0);
+  const totalDrums = productSummaries.reduce((s, p) => s + (parseInt(p.drums, 10) || 0), 0);
+  const productName = productSummaries.map(p => p.prodName).filter(Boolean).join(', ');
+  const mrValue = getMRMaterialValue(mr);
+  const totalMrQty = allSummaries.reduce((s, p) => s + (parseFloat(p.qty) || 0), 0) || parseFloat(mr.totalQty) || 0;
+  const value = totalMrQty > 0 && qty > 0 && qty < totalMrQty
+    ? (mrValue * qty) / totalMrQty
+    : mrValue;
+
+  return { productSummaries, productName, qty, totalDrums, value };
+};
+
 export const buildPLProductSummaries = (pl, mr, prodOpts = {}) => {
   const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
   if (!summaries.length) return [];

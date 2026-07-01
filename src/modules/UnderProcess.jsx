@@ -6,7 +6,7 @@ import {
   FileText, Activity, UploadCloud, Package, Truck, 
   FileSpreadsheet, FileCheck, CheckCircle, Clock, X, Plus, Edit2, Download, Trash2 
 } from 'lucide-react';
-import { exportToPDF, viewPDF } from '../utils/pdfExport';
+import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
 import { copyChargeQtysFromSettings, enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges } from '../utils/documentCharges';
 import {
   getReceiptProductNames,
@@ -24,7 +24,8 @@ import {
   getPLDisplayProductLabel,
   buildPLProductSummaries,
   alignDrumRowsToProducts,
-  buildUnderProcessRows
+  buildUnderProcessRows,
+  buildDCFieldsFromProducts
 } from '../utils/receiptProducts';
 
 const CHARGE_KEYS = [
@@ -773,8 +774,8 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
   const [form, setForm] = useState({
     invoiceNo: '',
     date: new Date().toISOString().split('T')[0],
-    poNo: '',
-    poDate: new Date().toISOString().split('T')[0],
+    partyDocNo: mr.partyDocNo || '',
+    partyDocDate: mr.partyDocDate || '',
     productCharges: initProductChargesFromMR(mr, party, prodOpts),
     discount: 0,
     taxRate: 18,
@@ -785,6 +786,8 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
     if (editing) {
       setForm({
         ...editing,
+        partyDocNo: editing.partyDocNo || editing.poNo || mr.partyDocNo || '',
+        partyDocDate: editing.partyDocDate || editing.poDate || mr.partyDocDate || '',
         productCharges: normalizeProductCharges(
           editing.productCharges,
           editing,
@@ -799,6 +802,8 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
     } else {
       setForm(prev => ({
         ...prev,
+        partyDocNo: mr.partyDocNo || '',
+        partyDocDate: mr.partyDocDate || '',
         productCharges: initProductChargesFromMR(mr, party, prodOpts)
       }));
     }
@@ -946,12 +951,12 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
           <input type="text" className="input-field" readOnly value={mr.gstinBill} />
         </div>
         <div>
-          <label>PO Number</label>
-          <input type="text" className="input-field" value={form.poNo} onChange={e => setForm({...form, poNo: e.target.value})} />
+          <label>Supplier Doc No</label>
+          <input type="text" className="input-field" value={form.partyDocNo} onChange={e => setForm({...form, partyDocNo: e.target.value})} />
         </div>
         <div>
-          <label>PO Date</label>
-          <input type="date" className="input-field" value={form.poDate} onChange={e => setForm({...form, poDate: e.target.value})} />
+          <label>Supplier Doc Date</label>
+          <input type="date" className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
         </div>
         <div>
           <label>Total Material Quantity</label>
@@ -1063,6 +1068,7 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     batchNo: '',
     totalNoBatch: 0,
     psdRequirement: firstProdConfig?.psdReq || '90% < 10M',
+    psdNote: firstProdConfig?.psdNote || '',
     totalDrums: scopedDrums,
     doubleDispatch: false,
     receivedBatches: [], // Array of { batchNo, drumNo, gross, tare, net }
@@ -1132,6 +1138,15 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         }
       });
 
+      const scopedProdConfig = (party?.products || []).find(p =>
+        p.name === (activeProductName || productNames[0] || mr.productName?.split(',')[0]?.trim())
+      ) || firstProdConfig;
+      const firstBatch = activeMRBatches[0];
+      const psdRequirement = firstBatch?.psdReq || scopedProdConfig?.psdReq || '90% < 10M';
+      const psdNote = scopedProdConfig?.psdNote || '';
+      const paddedReceived = padBPRBatchRows(receivedRows);
+      const paddedDispatched = padBPRBatchRows(receivedRows.map(r => ({ ...r })));
+
       setForm(prev => ({
         ...prev,
         bprNo: docNo,
@@ -1139,8 +1154,10 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         productName: activeProductName || getReceiptProductLabel(mr, prodOpts),
         totalInputQty: scopedQty,
         totalDrums: scopedDrums,
-        receivedBatches: receivedRows,
-        dispatchedBatches: receivedRows.map(r => ({ ...r })),
+        psdRequirement,
+        psdNote,
+        receivedBatches: paddedReceived,
+        dispatchedBatches: paddedDispatched,
         batchNo: activeMRBatches.map(b => b.batchNo).filter(Boolean).join(', '),
         totalNoBatch: activeMRBatches.length
       }));
@@ -1151,20 +1168,20 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const toggleDoubleDispatch = () => {
     const nextVal = !form.doubleDispatch;
     setForm(prev => {
+      const dataRows = prev.receivedBatches.filter(r => r.batchNo);
       let nextDispatch = [];
       if (nextVal) {
-        // Double each drum row in dispatched weight!
-        prev.receivedBatches.forEach(r => {
+        dataRows.forEach(r => {
           nextDispatch.push({ ...r, drumNo: `${r.drumNo}A` });
           nextDispatch.push({ ...r, drumNo: `${r.drumNo}B` });
         });
       } else {
-        nextDispatch = prev.receivedBatches.map(r => ({ ...r }));
+        nextDispatch = dataRows.map(r => ({ ...r }));
       }
       return {
         ...prev,
         doubleDispatch: nextVal,
-        dispatchedBatches: nextDispatch
+        dispatchedBatches: padBPRBatchRows(nextDispatch)
       };
     });
   };
@@ -1280,6 +1297,7 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     e.preventDefault();
     const finalDoc = {
       ...form,
+      partyName: form.partyName || form.customerName || mr.partyName,
       receiptId: mr.id
     };
 
@@ -1338,6 +1356,10 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           <div>
             <label>PSD Requirement *</label>
             <input type="text" className="input-field" required value={form.psdRequirement} onChange={e => setForm({...form, psdRequirement: e.target.value})} />
+          </div>
+          <div style={{ gridColumn: 'span 2' }}>
+            <label>PSD Note</label>
+            <input type="text" className="input-field" value={form.psdNote || ''} onChange={e => setForm({...form, psdNote: e.target.value})} placeholder="From party product master" />
           </div>
         </div>
 
@@ -1777,6 +1799,7 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const party = data.parties.find(p => p.id === mr.partyId);
   const prodOpts = receiptProductOptions(mr, data);
   const productNames = getReceiptProductNames(mr, prodOpts);
+  const plFormInitKey = `${mr.id}-${editing?.id || 'new'}`;
 
   const [form, setForm] = useState({
     plNo: '',
@@ -1787,6 +1810,21 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     totalDrums: 0,
     batches: []
   });
+
+  const parseWt = (v) => (v === '' || v === undefined || v === null ? 0 : parseFloat(v) || 0);
+  const normProd = (s) => (s || '').trim().toLowerCase();
+
+  const displayProducts = useMemo(() => {
+    const fromRows = [...new Set((form.batches || []).map(r => r.productName).filter(Boolean))];
+    if (productNames.length) {
+      const merged = [...productNames];
+      fromRows.forEach((name) => {
+        if (!merged.some(p => normProd(p) === normProd(name))) merged.push(name);
+      });
+      return merged;
+    }
+    return fromRows.length ? fromRows : [mr.productName].filter(Boolean);
+  }, [form.batches, productNames, mr.productName]);
 
   useEffect(() => {
     if (editing) {
@@ -1804,23 +1842,28 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       });
     } else {
       const plSerial = data.settings?.serials?.PL || 1;
-      const docNo = generateDocNumber('PL', plSerial, new Date(form.date));
+      const docNo = generateDocNumber('PL', plSerial, new Date());
       const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
       const plRows = getBPRDispatchedRowsForPL(data, mr, prodOpts);
 
-      setForm(prev => ({
-        ...prev,
+      setForm({
         plNo: docNo,
+        date: new Date().toISOString().split('T')[0],
         productName: getReceiptProductLabel(mr, prodOpts),
         productSummaries: summaries,
+        totalWeight: 0,
+        totalDrums: 0,
         batches: plRows
-      }));
+      });
     }
-  }, [form.date, editing, mr, prodOpts, data.bprs, data.settings?.serials?.PL]);
+  }, [plFormInitKey]);
 
   useEffect(() => {
     const totalDrums = form.batches.length;
-    const totalWeight = form.batches.reduce((s, r) => s + r.net, 0);
+    const totalWeight = form.batches.reduce((s, r) => {
+      const net = r.net !== '' && r.net !== undefined ? parseWt(r.net) : Math.max(0, parseWt(r.gross) - parseWt(r.tare));
+      return s + net;
+    }, 0);
     setForm(prev => ({ ...prev, totalDrums, totalWeight }));
   }, [form.batches]);
 
@@ -1828,32 +1871,43 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     setForm(prev => {
       const list = [...prev.batches];
       const item = { ...list[idx] };
-      item[field] = parseFloat(val) || 0;
-      item.net = Math.max(0, item.gross - item.tare);
+      if (field === 'batchNo' || field === 'drumNo' || field === 'productName') {
+        item[field] = val;
+      } else {
+        item[field] = val === '' ? '' : (parseFloat(val) || '');
+        const g = parseWt(item.gross);
+        const t = parseWt(item.tare);
+        item.net = (item.gross === '' || item.tare === '') ? '' : Math.max(0, g - t);
+      }
       list[idx] = item;
       return { ...prev, batches: list };
     });
   };
 
-  const addCustomRow = () => {
-    setForm(prev => ({
-      ...prev,
-      batches: [...prev.batches, {
-        batchNo: prev.batches[0]?.batchNo || 'Custom',
-        drumNo: (prev.batches.length + 1).toString(),
-        productName: productNames[0] || mr.productName || '',
-        gross: 0,
-        tare: 0,
-        net: 0
-      }]
-    }));
+  const addCustomRow = (productName = '') => {
+    const prod = productName || productNames[0] || mr.productName || '';
+    setForm(prev => {
+      const prodRowCount = prev.batches.filter(b => normProd(b.productName || prod) === normProd(prod)).length;
+      return {
+        ...prev,
+        batches: [...prev.batches, {
+          batchNo: prev.batches.find(b => normProd(b.productName || prod) === normProd(prod))?.batchNo || '',
+          drumNo: (prodRowCount + 1).toString(),
+          productName: prod,
+          gross: '',
+          tare: '',
+          net: ''
+        }]
+      };
+    });
   };
 
-  const displayProducts = (() => {
-    const fromRows = [...new Set((form.batches || []).map(r => r.productName).filter(Boolean))];
-    if (productNames.length) return productNames;
-    return fromRows.length ? fromRows : [mr.productName].filter(Boolean);
-  })();
+  const rowMatchesProduct = (row, prodName) => {
+    const target = (prodName || '').trim().toLowerCase();
+    const rowProd = (row.productName || '').trim().toLowerCase();
+    if (!target) return !rowProd;
+    return rowProd === target;
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1906,20 +1960,22 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       <MRProductSummary mr={mr} party={party} productOptions={prodOpts} />
 
       <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <h3 style={{ fontSize: '0.95rem', margin: 0 }}>Batch-Wise Packing Weight Details</h3>
-          <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={addCustomRow}>+ Add Row</button>
-        </div>
+        <h3 style={{ fontSize: '0.95rem', margin: '0 0 0.75rem' }}>Batch-Wise Packing Weight Details</h3>
 
         {displayProducts.map((prodName, pIdx) => {
           const prodRows = form.batches.map((r, idx) => ({ r, idx })).filter(({ r }) =>
-            (r.productName || displayProducts[0] || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase()
+            rowMatchesProduct(r, prodName)
           );
-          if (!prodRows.length) return null;
-          const subtotal = prodRows.reduce((s, { r }) => s + r.net, 0);
+          const subtotal = prodRows.reduce((s, { r }) => {
+            const net = r.net !== '' && r.net !== undefined ? parseWt(r.net) : Math.max(0, parseWt(r.gross) - parseWt(r.tare));
+            return s + net;
+          }, 0);
           return (
-            <div key={prodName} style={{ marginBottom: '1rem' }}>
-              <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)' }}>Product {pIdx + 1}: {prodName}</h4>
+            <div key={`${prodName}-${pIdx}`} style={{ marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)' }}>Product {pIdx + 1}: {prodName}</h4>
+                <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow(prodName)}>+ Add Row</button>
+              </div>
               <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                   <thead>
@@ -1933,27 +1989,39 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {prodRows.map(({ r, idx }, rowIdx) => (
+                    {prodRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                          No rows yet — click &quot;+ Add Row&quot; to add drum weights for this product.
+                        </td>
+                      </tr>
+                    ) : prodRows.map(({ r, idx }, rowIdx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                         <td style={{ padding: '0.25rem', fontWeight: 600 }}>{rowIdx + 1}</td>
-                        <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
-                        <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
                         <td style={{ padding: '0.25rem' }}>
-                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} required value={r.gross} onChange={e => handleCellChange(idx, 'gross', e.target.value)} />
+                          <input type="text" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.batchNo || ''} onChange={e => handleCellChange(idx, 'batchNo', e.target.value)} />
                         </td>
                         <td style={{ padding: '0.25rem' }}>
-                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} required value={r.tare} onChange={e => handleCellChange(idx, 'tare', e.target.value)} />
+                          <input type="text" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem', width: '60px' }} value={r.drumNo || ''} onChange={e => handleCellChange(idx, 'drumNo', e.target.value)} />
+                        </td>
+                        <td style={{ padding: '0.25rem' }}>
+                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={r.gross === 0 ? '' : r.gross} onChange={e => handleCellChange(idx, 'gross', e.target.value)} />
+                        </td>
+                        <td style={{ padding: '0.25rem' }}>
+                          <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={r.tare === 0 ? '' : r.tare} onChange={e => handleCellChange(idx, 'tare', e.target.value)} />
                         </td>
                         <td style={{ padding: '0.25rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{formatWeightNet(r.net)}</td>
                       </tr>
                     ))}
                   </tbody>
+                  {prodRows.length > 0 && (
                   <tfoot>
                     <tr style={{ fontWeight: 'bold', borderTop: '1px solid var(--border-color)' }}>
                       <td colSpan="5" style={{ padding: '0.35rem', textAlign: 'right' }}>Product Subtotal:</td>
                       <td style={{ padding: '0.35rem', color: 'var(--accent-primary)' }}>{subtotal.toFixed(2)} Kg</td>
                     </tr>
                   </tfoot>
+                  )}
                 </table>
               </div>
             </div>
@@ -1982,9 +2050,13 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const party = data.parties.find(p => p.id === mr.partyId);
   const prodOpts = receiptProductOptions(mr, data);
   const pl = findPL(data, mr.id, activeProductName);
-  const pi = findPI(data, mr.id, activeProductName);
-  const scopedQty = activeProductName ? getProductQty(mr, activeProductName, prodOpts) : (mr.totalQty || mr.receivedQty || 0);
-  const scopedDrums = activeProductName ? getProductDrums(mr, activeProductName, prodOpts) : (mr.totalDrums || 1);
+  const availableProducts = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
+  const dcFormInitKey = `${mr.id}-${editing?.id || 'new'}-${activeProductName || 'all'}`;
+
+  const initialSelected = activeProductName
+    ? [resolveReceiptProductName(mr, activeProductName, prodOpts)]
+    : getReceiptProductNames(mr, prodOpts);
+  const initialComputed = buildDCFieldsFromProducts(mr, pl, prodOpts, initialSelected);
 
   const [form, setForm] = useState({
     dcNo: '',
@@ -1996,10 +2068,12 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     shipAddress: mr.shipAddress || '',
     gstinBill: mr.gstinBill || '',
     gstinShip: mr.gstinShip || '',
-    productName: activeProductName || getReceiptProductLabel(mr, prodOpts),
-    qty: pl?.totalWeight || scopedQty,
-    totalDrums: pl?.totalDrums || scopedDrums,
-    value: pi?.total || mr.value || 0,
+    selectedProducts: initialSelected,
+    productName: initialComputed.productName,
+    productSummaries: initialComputed.productSummaries,
+    qty: initialComputed.qty,
+    totalDrums: initialComputed.totalDrums,
+    value: initialComputed.value,
     vehicleNo: mr.vehicleNo || '',
     driverName: '',
     termsAndConditions: 'Material sent for Micronisation on Job Work basis. Goods to be returned after processing.'
@@ -2007,21 +2081,51 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
 
   useEffect(() => {
     if (editing) {
-      setForm(editing);
-    } else {
-      const dcSerial = data.settings?.serials?.DC || 1;
-      const docNo = generateDocNumber('DC', dcSerial, new Date(form.date));
-      setForm(prev => ({
-        ...prev,
-        dcNo: docNo
-      }));
+      setForm({
+        ...editing,
+        selectedProducts: editing.selectedProducts?.length
+          ? editing.selectedProducts
+          : (editing.productSummaries || []).map(p => p.prodName).filter(Boolean)
+      });
+      return;
     }
-  }, [form.date, editing, data.settings?.serials?.DC]);
+    const dcSerial = data.settings?.serials?.DC || 1;
+    const docNo = generateDocNumber('DC', dcSerial, new Date());
+    const selected = activeProductName
+      ? [resolveReceiptProductName(mr, activeProductName, prodOpts)]
+      : getReceiptProductNames(mr, prodOpts);
+    const computed = buildDCFieldsFromProducts(mr, pl, prodOpts, selected);
+    setForm(prev => ({
+      ...prev,
+      dcNo: docNo,
+      partyDocNo: mr.partyDocNo || '',
+      partyDocDate: mr.partyDocDate || '',
+      partyName: mr.partyName || '',
+      selectedProducts: selected,
+      ...computed,
+      vehicleNo: mr.vehicleNo || prev.vehicleNo
+    }));
+  }, [dcFormInitKey]);
+
+  const toggleProductSelection = (prodName) => {
+    setForm(prev => {
+      const current = prev.selectedProducts || [];
+      const isSelected = current.some(p => p.trim().toLowerCase() === prodName.trim().toLowerCase());
+      const next = isSelected
+        ? current.filter(p => p.trim().toLowerCase() !== prodName.trim().toLowerCase())
+        : [...current, prodName];
+      if (next.length === 0) return prev;
+      const computed = buildDCFieldsFromProducts(mr, pl, prodOpts, next);
+      return { ...prev, selectedProducts: next, ...computed };
+    });
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const computed = buildDCFieldsFromProducts(mr, pl, prodOpts, form.selectedProducts);
     const finalDoc = {
       ...form,
+      ...computed,
       receiptId: mr.id
     };
 
@@ -2056,6 +2160,35 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
 
         <div style={{ gridColumn: 'span 4', borderTop: '1px solid rgba(255,255,255,0.05)', margin: '0.5rem 0' }}></div>
 
+        {availableProducts.length > 1 && (
+          <div style={{ gridColumn: 'span 4', marginBottom: '0.5rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Select Product(s) for Dispatch</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {availableProducts.map((p, idx) => {
+                const checked = (form.selectedProducts || []).some(n => n.trim().toLowerCase() === p.prodName.trim().toLowerCase());
+                return (
+                  <label
+                    key={p.prodName}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.85rem',
+                      background: checked ? 'rgba(16, 185, 129, 0.08)' : 'var(--input-bg)',
+                      border: `1px solid ${checked ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+                      borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem'
+                    }}
+                  >
+                    <input type="checkbox" checked={checked} onChange={() => toggleProductSelection(p.prodName)} />
+                    <span style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>Product {idx + 1}:</span>
+                    <span style={{ fontWeight: 600 }}>{p.prodName}</span>
+                    <span style={{ color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                      {parseFloat(p.qty || 0).toFixed(2)} Kg · {p.drums || 0} drum{(p.drums || 0) !== 1 ? 's' : ''}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div>
           <label>Product Name</label>
           <input type="text" className="input-field" readOnly value={form.productName} />
@@ -2066,10 +2199,10 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         </div>
         <div>
           <label>Total Drums *</label>
-          <input type="number" className="input-field" required value={form.totalDrums} onChange={e => setForm({...form, totalDrums: parseInt(e.target.value) || 0})} />
+          <input type="number" className="input-field" required value={form.totalDrums} onChange={e => setForm({...form, totalDrums: parseInt(e.target.value, 10) || 0})} />
         </div>
         <div>
-          <label>Value of Goods (₹)</label>
+          <label>Value of Goods (₹) <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400 }}>from MR</span></label>
           <input type="number" className="input-field" required value={form.value} onChange={e => setForm({...form, value: parseFloat(e.target.value) || 0})} />
         </div>
 
@@ -2088,7 +2221,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         </div>
       </div>
 
-      <MRProductSummary mr={mr} party={party} productOptions={prodOpts} onlyProduct={activeProductName} />
+      <MRProductSummary mr={mr} party={party} productOptions={prodOpts} />
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
         <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
