@@ -25,7 +25,9 @@ import {
   buildPLProductSummaries,
   alignDrumRowsToProducts,
   buildUnderProcessRows,
-  buildDCFieldsFromProducts
+  buildDCFieldsFromProducts,
+  getPartyProductForMR,
+  enrichBPRForPrint
 } from '../utils/receiptProducts';
 
 const CHARGE_KEYS = [
@@ -536,7 +538,7 @@ const UnderProcess = () => {
                     <td className="center">
                       {bpr ? (
                         <div className="doc-done-group">
-                          <button onClick={() => viewPDF('BPR', bpr)} className="doc-icon-btn" title="View / Print">
+                          <button onClick={() => viewPDF('BPR', enrichBPRForPrint(bpr, data))} className="doc-icon-btn" title="View / Print">
                             <FileText size={14} />
                           </button>
                           <button onClick={(e) => handleBlueClick(mr.id, 'BPR', bpr, productName, e)} className="doc-done">
@@ -1047,7 +1049,8 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const party = (data.parties || []).find(p => p.id === mr.partyId);
   const prodOpts = receiptProductOptions(mr, data);
   const productNames = getScopedProductNames(mr, prodOpts, activeProductName);
-  const firstProdConfig = (party?.products || []).find(p => p.name === (productNames[0] || mr.productName));
+  const primaryProduct = resolveReceiptProductName(mr, activeProductName || productNames[0] || '', prodOpts);
+  const firstProdConfig = getPartyProductForMR(mr, data, primaryProduct);
   const scopedQty = activeProductName ? getProductQty(mr, activeProductName, prodOpts) : (mr.totalQty || mr.receivedQty || 0);
   const scopedDrums = activeProductName ? getProductDrums(mr, activeProductName, prodOpts) : (mr.totalDrums || 1);
 
@@ -1100,8 +1103,11 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
 
   useEffect(() => {
     if (editing) {
+      const prodConfig = getPartyProductForMR(mr, data, activeProductName || editing.productName);
       setForm({
         ...editing,
+        psdNote: editing.psdNote || prodConfig?.psdNote || '',
+        psdRequirement: editing.psdRequirement || prodConfig?.psdReq || '90% < 10M',
         receivedBatches: editing.receivedBatches || [],
         dispatchedBatches: editing.dispatchedBatches || []
       });
@@ -1138,12 +1144,16 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         }
       });
 
-      const scopedProdConfig = (party?.products || []).find(p =>
-        p.name === (activeProductName || productNames[0] || mr.productName?.split(',')[0]?.trim())
-      ) || firstProdConfig;
+      const scopedProdConfig = getPartyProductForMR(mr, data, primaryProduct) || firstProdConfig;
       const firstBatch = activeMRBatches[0];
       const psdRequirement = firstBatch?.psdReq || scopedProdConfig?.psdReq || '90% < 10M';
-      const psdNote = scopedProdConfig?.psdNote || '';
+      const scopedNames = activeProductName ? [primaryProduct] : productNames;
+      const psdNotes = scopedNames
+        .map((name) => getPartyProductForMR(mr, data, name)?.psdNote)
+        .filter(Boolean);
+      const psdNote = psdNotes.length
+        ? [...new Set(psdNotes)].join(' | ')
+        : (scopedProdConfig?.psdNote || '');
       const paddedReceived = padBPRBatchRows(receivedRows);
       const paddedDispatched = padBPRBatchRows(receivedRows.map(r => ({ ...r })));
 

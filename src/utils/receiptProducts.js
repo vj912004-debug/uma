@@ -412,6 +412,16 @@ export const receiptProductOptions = (mr, data) => {
 
 export const normProduct = (s) => norm(s);
 
+/** Find party product config by name or nickname (case-insensitive). */
+export const findPartyProduct = (party, productName) => {
+  if (!party || !productName) return null;
+  const n = norm(productName);
+  const products = party.products || [];
+  return products.find(p => norm(p.name) === n)
+    || products.find(p => p.nickname && norm(p.nickname) === n)
+    || null;
+};
+
 /** Match a product name to the canonical name from the receipt's product list. */
 export const resolveReceiptProductName = (mr, name, options = {}) => {
   if (!name) return '';
@@ -421,6 +431,53 @@ export const resolveReceiptProductName = (mr, name, options = {}) => {
   const party = options.party || null;
   const partyMatch = (party?.products || []).find(p => norm(p.name) === norm(name));
   return partyMatch?.name || name.trim();
+};
+
+/** Resolve party product from MR using receipt product names, batches, and settings. */
+export const getPartyProductForMR = (mr, data, productNameHint = '') => {
+  if (!mr) return null;
+  const prodOpts = receiptProductOptions(mr, data);
+  const { party } = prodOpts;
+  if (!party) return null;
+
+  const names = getReceiptProductNames(mr, prodOpts);
+  const candidates = [];
+
+  if (productNameHint) {
+    const hints = String(productNameHint).includes(',')
+      ? String(productNameHint).split(',').map((s) => s.trim()).filter(Boolean)
+      : [productNameHint];
+    hints.forEach((hint) => candidates.push(resolveReceiptProductName(mr, hint, prodOpts)));
+  }
+  names.forEach((n) => candidates.push(n));
+  (mr.productName || '').split(',').forEach((s) => {
+    const t = s.trim();
+    if (t) candidates.push(t);
+  });
+  Object.keys(mr.productSettings || {}).forEach((k) => candidates.push(k));
+
+  const seen = new Set();
+  for (const cand of candidates) {
+    const key = norm(cand);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const prod = findPartyProduct(party, cand);
+    if (prod) return prod;
+  }
+  return null;
+};
+
+/** Fill missing BPR PSD fields from party master before PDF export. */
+export const enrichBPRForPrint = (bpr, appData = {}) => {
+  if (!bpr) return bpr;
+  const mr = (appData.materialReceipts || []).find(r => r.id === bpr.receiptId);
+  if (!mr) return bpr;
+  const prod = getPartyProductForMR(mr, appData, bpr.productName);
+  return {
+    ...bpr,
+    psdNote: bpr.psdNote || prod?.psdNote || '',
+    psdRequirement: bpr.psdRequirement || prod?.psdReq || ''
+  };
 };
 
 /** 1-based index for display (Product 1, Product 2, …) in party/MR order. */

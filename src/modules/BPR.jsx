@@ -4,12 +4,12 @@ import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
 import ExportButton from '../components/ExportButton';
 import { Plus, Search, Edit2, Trash2, ClipboardList, FileDown, Printer } from 'lucide-react';
-
-const getPartyProductConfig = (mr, data, productName) => {
-  const party = (data.parties || []).find(p => p.id === mr.partyId);
-  const name = (productName || mr.productName || '').split(',')[0]?.trim() || mr.productName;
-  return (party?.products || []).find(p => p.name === name) || null;
-};
+import {
+  getPartyProductForMR,
+  getReceiptProductNames,
+  receiptProductOptions,
+  enrichBPRForPrint
+} from '../utils/receiptProducts';
 
 const emptyRow = (batchNo, drumNo) => ({ batchNo, drumNo, gross: '', tare: '', net: '' });
 
@@ -150,10 +150,17 @@ const BPR = () => {
       }
     });
 
-    const prodConfig = getPartyProductConfig(mr, data);
+    const prodConfig = getPartyProductForMR(mr, data);
+    const prodOpts = receiptProductOptions(mr, data);
+    const productNames = getReceiptProductNames(mr, prodOpts);
     const firstBatch = activeMRBatches[0];
     const psdRequirement = firstBatch?.psdReq || prodConfig?.psdReq || '90% < 10M';
-    const psdNote = prodConfig?.psdNote || '';
+    const psdNotes = productNames
+      .map((name) => getPartyProductForMR(mr, data, name)?.psdNote)
+      .filter(Boolean);
+    const psdNote = psdNotes.length
+      ? [...new Set(psdNotes)].join(' | ')
+      : (prodConfig?.psdNote || '');
     const paddedReceived = padBPRBatchRows(receivedRows);
     const paddedDispatched = padBPRBatchRows(receivedRows.map(r => ({ ...r })));
 
@@ -199,8 +206,12 @@ const BPR = () => {
   const handleEdit = (bpr, openTab = 'page1') => {
     setEditingBPR(bpr);
     setActiveTab(openTab);
+    const mr = data.materialReceipts.find(m => m.id === bpr.receiptId);
+    const prodConfig = mr ? getPartyProductForMR(mr, data, bpr.productName) : null;
     setForm({
       ...bpr,
+      psdNote: bpr.psdNote || prodConfig?.psdNote || '',
+      psdRequirement: bpr.psdRequirement || prodConfig?.psdReq || '90% < 10M',
       receivedBatches: (bpr.receivedBatches || []).map(normalizeRow),
       dispatchedBatches: (bpr.dispatchedBatches || []).map(normalizeRow),
       cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false, bagClean: false, ...(bpr.cleaningChecklist || {}) },
@@ -450,8 +461,8 @@ const BPR = () => {
                       </td>
                       <td style={{ padding: '0.75rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                          <button type="button" onClick={() => viewPDF('BPR', bpr)} title="Print" style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer' }}><Printer size={14} /></button>
-                          <button type="button" onClick={() => exportToPDF('BPR', bpr)} title="Download PDF" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
+                          <button type="button" onClick={() => viewPDF('BPR', enrichBPRForPrint(bpr, data))} title="Print" style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer' }}><Printer size={14} /></button>
+                          <button type="button" onClick={() => exportToPDF('BPR', enrichBPRForPrint(bpr, data))} title="Download PDF" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
                           <button type="button" onClick={() => handleEdit(bpr)} title="Edit" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={14} /></button>
                           <button type="button" onClick={() => deleteBPR(bpr.id)} title="Delete" style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }}><Trash2 size={14} /></button>
                         </div>
@@ -532,8 +543,8 @@ const BPR = () => {
                       <td style={{ padding: '0.75rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                           <button type="button" className="btn btn-primary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleEdit(bpr, 'page2')}>Edit Weights</button>
-                          <button type="button" onClick={() => viewPDF('BPR', bpr)} title="Print" style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer' }}><Printer size={14} /></button>
-                          <button type="button" onClick={() => exportToPDF('BPR', bpr)} title="Download PDF" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
+                          <button type="button" onClick={() => viewPDF('BPR', enrichBPRForPrint(bpr, data))} title="Print" style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer' }}><Printer size={14} /></button>
+                          <button type="button" onClick={() => exportToPDF('BPR', enrichBPRForPrint(bpr, data))} title="Download PDF" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
                         </div>
                       </td>
                     </tr>
