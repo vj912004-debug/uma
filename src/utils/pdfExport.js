@@ -462,7 +462,21 @@ const buildGeneric = (doc, docType, data) => {
 };
 
 const PDF_MARGIN = 14;
-const TI_CHARGE_ROWS = 11;
+const TI_EMPTY_ROWS = 2;
+
+const formatPdfDateSlash = (d) => {
+  if (!d || d === 'N/A') return d === 'N/A' ? 'N/A' : '';
+  try {
+    const str = String(d);
+    const date = str.length === 10 && str[4] === '-'
+      ? new Date(`${str}T00:00:00`)
+      : new Date(d);
+    if (Number.isNaN(date.getTime())) return str;
+    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+  } catch {
+    return String(d);
+  }
+};
 
 const formatPdfDateDmy = (d) => {
   if (!d || d === 'N/A') return d === 'N/A' ? 'N/A' : '';
@@ -479,17 +493,16 @@ const formatPdfDateDmy = (d) => {
 };
 
 const TI_CHARGES_LIST = [
-  { key: 'cleaning', label: 'Minimum Cleaning Charges' },
-  { key: 'processing', label: 'Processing Charges' },
-  { key: 'psdReport', label: 'Particle size report charges' },
-  { key: 'filterBag', label: 'Filter Bag' },
-  { key: 'sieving', label: 'Sieving Charges' },
-  { key: 'liner', label: 'Liner' },
-  { key: 'courier', label: 'Courier' },
-  { key: 'fiberDrum', label: 'Fiber Drum' },
-  { key: 'transportation', label: 'Transportation' },
-  { key: 'hdpeDrum', label: 'HDPE Drum' },
-  { key: 'batchChangeover', label: 'Batch Changeover' }
+  { key: 'cleaning', label: 'Minimum Cleaning Charges(998842)', sgst: 6, cgst: 6 },
+  { key: 'processing', label: 'Processing Charges(998842)', sgst: 6, cgst: 6 },
+  { key: 'psdReport', label: 'PSD Report Charges(998346)', sgst: 9, cgst: 9 },
+  { key: 'filterBag', label: 'Filter Bag Charges(591190)', sgst: 6, cgst: 6 },
+  { key: 'sieving', label: 'Sieving Charges(998842)', sgst: 6, cgst: 6 },
+  { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', sgst: 9, cgst: 9 },
+  { key: 'liner', label: 'Liner (39233090)', sgst: 9, cgst: 9 },
+  { key: 'courier', label: 'Courier Charges(996812)', sgst: 9, cgst: 9 },
+  { key: 'transportation', label: 'Transportation (996511)', sgst: 9, cgst: 9 },
+  { key: 'batchChangeover', label: 'Batch change over charges(998842)', sgst: 6, cgst: 6 }
 ];
 
 const MATERIAL_QTY_CHARGE_KEYS = ['cleaning', 'processing', 'sieving', 'other'];
@@ -499,6 +512,86 @@ const getPdfChargeLineQty = (data, key, materialQty) => {
   if (saved != null && saved !== '') return parseFloat(saved) || 0;
   if (MATERIAL_QTY_CHARGE_KEYS.includes(key)) return materialQty || 1;
   return 1;
+};
+
+const buildTiChargeAmounts = (data) => {
+  const amounts = {};
+  const materialQty = parseFloat(data.qty) || 0;
+  const productLines = getPdfProductLines(data);
+  const normName = (s) => (s || '').trim().toLowerCase();
+
+  const addLine = (key, qty, rate, amt) => {
+    if (!amounts[key]) amounts[key] = { qty: 0, rate: 0, amt: 0 };
+    const lineQty = parseFloat(qty) || 0;
+    const lineRate = parseFloat(rate) || 0;
+    const lineAmt = parseFloat(amt) || 0;
+    amounts[key].qty += lineQty;
+    amounts[key].amt += lineAmt;
+    if (lineRate) amounts[key].rate = lineRate;
+  };
+
+  if (data.productCharges && Object.keys(data.productCharges).length > 0) {
+    const pcMap = data.productCharges;
+    const chargeKeys = Object.keys(pcMap);
+    const orderedNames = [];
+    const seen = new Set();
+    const addName = (name) => {
+      if (!name) return;
+      const nk = normName(name);
+      if (seen.has(nk)) return;
+      seen.add(nk);
+      orderedNames.push(name);
+    };
+    productLines.forEach(p => addName(p.name));
+    chargeKeys.forEach(k => addName(k));
+
+    orderedNames.forEach((name) => {
+      const chargeKey = chargeKeys.find(k => normName(k) === normName(name)) || name;
+      const pc = pcMap[chargeKey];
+      if (!pc) return;
+      const summary = productLines.find(p => normName(p.name) === normName(name));
+      const prodQty = summary?.qty || 0;
+      if (pc.charges?.processing) {
+        const rate = parseFloat(pc.rates?.processing || 0);
+        const lineQty = prodQty || parseFloat(pc.qtys?.processing) || 0;
+        addLine('processing', lineQty, rate, lineQty * rate);
+      }
+      TI_CHARGES_LIST.forEach((c) => {
+        if (c.key === 'processing') return;
+        if (pc.charges?.[c.key]) {
+          const rowQty = pc.qtys?.[c.key] != null && pc.qtys?.[c.key] !== ''
+            ? (parseFloat(pc.qtys[c.key]) || 0)
+            : 1;
+          const rate = parseFloat(pc.rates?.[c.key] || 0);
+          addLine(c.key, rowQty, rate, rowQty * rate);
+        }
+      });
+    });
+  } else {
+    if (data.charges?.processing) {
+      if (productLines.length) {
+        productLines.forEach(({ qty: lineQtyVal }) => {
+          const procRate = parseFloat(data.rates?.processing || 0);
+          const lineQty = lineQtyVal || materialQty;
+          addLine('processing', lineQty, procRate, lineQty * procRate);
+        });
+      } else {
+        const procQty = getPdfChargeLineQty(data, 'processing', materialQty);
+        const procRate = parseFloat(data.rates?.processing || 0);
+        addLine('processing', procQty, procRate, procQty * procRate);
+      }
+    }
+    TI_CHARGES_LIST.forEach((c) => {
+      if (c.key === 'processing') return;
+      if (data.charges?.[c.key]) {
+        const rowQty = getPdfChargeLineQty(data, c.key, materialQty);
+        const rate = parseFloat(data.rates?.[c.key] || 0);
+        addLine(c.key, rowQty, rate, rowQty * rate);
+      }
+    });
+  }
+
+  return amounts;
 };
 
 const drawOuterPageBorder = (doc) => {
@@ -530,18 +623,18 @@ const buildTaxInvoicePDF = (doc, data) => {
 
   autoTable(doc, {
     startY: headerEndY,
-    body: [[{ content: 'Tax Invoice', styles: { halign: 'center', fontStyle: 'bold', fontSize: 16 } }]],
+    body: [[{ content: 'Tax Invoice', styles: { halign: 'center', fontStyle: 'bold', fontSize: 20 } }]],
     theme: 'grid',
-    styles: { ...gridStyles, fontStyle: 'bold', cellPadding: 2 },
+    styles: { ...gridStyles, fontStyle: 'bold', cellPadding: 3 },
     margin: gridMargin
   });
 
   const docNo = data.invoiceNo || 'N/A';
-  const docDate = formatPdfDateDmy(data.date) || 'N/A';
+  const docDate = formatPdfDateSlash(data.date) || 'N/A';
   const refNo = data.partyDocNo || data.challanNo || '';
-  const refDate = formatPdfDateDmy(data.partyDocDate) || '';
+  const refDate = formatPdfDateSlash(data.partyDocDate) || '';
   const dcNo = data.dcNo || '';
-  const dcDate = formatPdfDateDmy(data.dcDate) || data.dcDate || '';
+  const dcDate = formatPdfDateSlash(data.dcDate) || data.dcDate || '';
 
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY,
@@ -578,58 +671,25 @@ const buildTaxInvoicePDF = (doc, data) => {
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY,
     body: [
-      [{ content: 'Bill to Party', styles: { halign: 'center' } }, { content: 'Ship to Party', styles: { halign: 'center' } }]
+      [
+        { content: 'Bill to Party', colSpan: 2, styles: { halign: 'center' } },
+        { content: 'Ship to Party', colSpan: 2, styles: { halign: 'center' } }
+      ],
+      ['Name :', data.partyName || '', 'Name :', data.shipName || data.partyName || ''],
+      ['Address :', data.billAddress || data.address || '', 'Address :', data.shipAddress || data.address || ''],
+      ['', '', '', ''],
+      ['', '', '', ''],
+      [`State : ${billState}`, billCode, `State : ${shipState}`, shipCode],
+      [`GSTIN : ${data.gstinBill || data.gstin || ''}`, '', `GSTIN : ${data.gstinShip || data.gstin || ''}`, '']
     ],
     theme: 'grid',
-    styles: gridStyles,
-    columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
-    margin: gridMargin
-  });
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY,
-    body: [
-      [`Name :          ${data.partyName || ''}`, `Name :          ${data.shipName || data.partyName || ''}`]
-    ],
-    theme: 'grid',
-    styles: gridStyles,
-    columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
-    margin: gridMargin
-  });
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY,
-    body: [
-      [`Address :\n${data.billAddress || data.address || ''}`, `Address :\n${data.shipAddress || data.address || ''}`]
-    ],
-    theme: 'grid',
-    styles: { ...gridStyles, fontStyle: 'normal' },
-    columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
-    margin: gridMargin
-  });
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY,
-    body: [
-      [`State : ${billState}`, 'Code', billCode, `State : ${shipState}`, 'Code', shipCode]
-    ],
-    theme: 'grid',
-    styles: gridStyles,
+    styles: { ...gridStyles, fontStyle: 'normal', minCellHeight: 8 },
     columnStyles: {
-      0: { cellWidth: 60 }, 1: { cellWidth: 15 }, 2: { cellWidth: 16 },
-      3: { cellWidth: 60 }, 4: { cellWidth: 15 }, 5: { cellWidth: 16 }
+      0: { cellWidth: 22, fontStyle: 'bold' },
+      1: { cellWidth: 69 },
+      2: { cellWidth: 22, fontStyle: 'bold' },
+      3: { cellWidth: 69 }
     },
-    margin: gridMargin
-  });
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY,
-    body: [
-      [`GSTIN : ${data.gstinBill || data.gstin || ''}`, `GSTIN : ${data.gstinShip || data.gstin || ''}`]
-    ],
-    theme: 'grid',
-    styles: gridStyles,
-    columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
     margin: gridMargin
   });
 
@@ -655,14 +715,8 @@ const buildTaxInvoicePDF = (doc, data) => {
     ]
   ];
 
-  const taxRate = parseFloat(data.taxRate) || 18;
-  const cgstRate = taxRate / 2;
-  const sgstRate = taxRate / 2;
-  const igstRate = 0;
-  const qty = parseFloat(data.qty) || 0;
-  const hsnCode = data.hsnCode || data.hsn || '';
+  const chargeAmounts = buildTiChargeAmounts(data);
   let itemsBody = [];
-  let sno = 1;
   let totalAmt = 0;
   let totalSgst = 0;
   let totalCgst = 0;
@@ -670,198 +724,104 @@ const buildTaxInvoicePDF = (doc, data) => {
   let totalAll = 0;
   let totalQty = 0;
 
-  const emptyTaxCells = ['', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00'];
-
-  const addItemRow = (desc, rowQty, rate, amt, countQty = true) => {
+  TI_CHARGES_LIST.forEach((charge) => {
+    const line = chargeAmounts[charge.key] || { qty: 0, rate: 0, amt: 0 };
+    const amt = line.amt || 0;
+    const sgstRate = charge.sgst;
+    const cgstRate = charge.cgst;
+    const igstRate = 0;
     const sgstAmt = amt * (sgstRate / 100);
     const cgstAmt = amt * (cgstRate / 100);
-    const igstAmt = amt * (igstRate / 100);
+    const igstAmt = 0;
     const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
-    const qtyDisplay = typeof rowQty === 'number'
-      ? (Number.isInteger(rowQty) ? rowQty : rowQty.toFixed(2))
-      : rowQty;
+    const qtyDisplay = line.qty
+      ? (Number.isInteger(line.qty) ? line.qty : line.qty.toFixed(2))
+      : '';
+    const rateDisplay = line.rate ? line.rate.toFixed(2) : '';
+
     itemsBody.push([
-      sno++, desc, qtyDisplay,
-      typeof rate === 'number' ? rate.toFixed(2) : rate,
+      '',
+      charge.label,
+      qtyDisplay,
+      rateDisplay,
       amt.toFixed(2),
-      sgstRate, sgstAmt.toFixed(2), cgstRate, cgstAmt.toFixed(2), igstRate, igstAmt.toFixed(2), rowTotal.toFixed(2)
+      sgstRate,
+      sgstAmt.toFixed(2),
+      cgstRate,
+      cgstAmt.toFixed(2),
+      igstRate,
+      igstAmt.toFixed(2),
+      rowTotal.toFixed(2)
     ]);
     totalAmt += amt;
     totalSgst += sgstAmt;
     totalCgst += cgstAmt;
     totalIgst += igstAmt;
     totalAll += rowTotal;
-    if (countQty && typeof rowQty === 'number') totalQty += rowQty;
-  };
-
-  const TI_PROCESSING_LABEL = 'Processing Charges';
-  const materialQty = qty;
-  const productLines = getPdfProductLines(data);
-  const normName = (s) => (s || '').trim().toLowerCase();
-
-  const mergePdfLineItems = (lines) => {
-    const merged = new Map();
-    lines.forEach((line) => {
-      const rate = parseFloat(line.rate) || 0;
-      const descKey = (line.desc || '').trim().toLowerCase();
-      const key = line.mergeKey
-        ? `${descKey}|${rate.toFixed(2)}|${line.mergeKey}`
-        : `${descKey}|${rate.toFixed(2)}`;
-      const lineQty = parseFloat(line.rowQty) || 0;
-      const lineAmt = parseFloat(line.amt) || 0;
-      if (merged.has(key)) {
-        const prev = merged.get(key);
-        prev.rowQty += lineQty;
-        prev.amt += lineAmt;
-      } else {
-        merged.set(key, { desc: line.desc, rowQty: lineQty, rate, amt: lineAmt, countQty: line.countQty });
-      }
-    });
-    return Array.from(merged.values());
-  };
-
-  const pendingLines = [];
-  const queueLine = (desc, rowQty, rate, amt, mergeKey = '', countQty = true) => {
-    const lineQty = parseFloat(rowQty) || 0;
-    const lineRate = parseFloat(rate) || 0;
-    const lineAmt = parseFloat(amt) || 0;
-    if (lineAmt <= 0 && lineQty <= 0) return;
-    pendingLines.push({ desc, rowQty: lineQty, rate: lineRate, amt: lineAmt, mergeKey, countQty });
-  };
-
-  const getOrderedProductChargeEntries = () => {
-    const pcMap = data.productCharges || {};
-    const chargeKeys = Object.keys(pcMap);
-    const orderedNames = [];
-    const seen = new Set();
-    const addName = (name) => {
-      if (!name) return;
-      const nk = normName(name);
-      if (seen.has(nk)) return;
-      seen.add(nk);
-      orderedNames.push(name);
-    };
-    productLines.forEach(p => addName(p.name));
-    chargeKeys.forEach(k => addName(k));
-    return orderedNames.map(name => {
-      const chargeKey = chargeKeys.find(k => normName(k) === normName(name)) || name;
-      return {
-        prodName: chargeKey,
-        pc: pcMap[chargeKey],
-        summary: productLines.find(p => normName(p.name) === normName(name))
-      };
-    }).filter(entry => entry.pc);
-  };
-
-  let hsnShown = false;
-  const showHsnOnce = () => {
-    if (hsnShown || !hsnCode) return;
-    itemsBody.push(['', `HSN CODE : ${hsnCode}`, '', '', '0.00', ...emptyTaxCells]);
-    hsnShown = true;
-  };
-
-  if (data.productCharges && Object.keys(data.productCharges).length > 0) {
-    getOrderedProductChargeEntries().forEach(({ prodName, pc, summary }) => {
-      const prodQty = summary?.qty || 0;
-      if (pc.charges?.processing) {
-        const rate = parseFloat(pc.rates?.processing || 0);
-        const lineQty = prodQty || parseFloat(pc.qtys?.processing) || 0;
-        const amt = lineQty * rate;
-        if (amt > 0 || lineQty > 0) {
-          queueLine(TI_PROCESSING_LABEL, lineQty, rate, amt, normName(prodName));
-          showHsnOnce();
-        }
-      }
-      TI_CHARGES_LIST.filter(c => c.key !== 'processing').forEach((c) => {
-        if (pc.charges?.[c.key]) {
-          const rowQty = pc.qtys?.[c.key] != null && pc.qtys?.[c.key] !== ''
-            ? (parseFloat(pc.qtys[c.key]) || 0)
-            : 1;
-          const rate = parseFloat(pc.rates?.[c.key] || 0);
-          const amt = rowQty * rate;
-          if (amt > 0) {
-            queueLine(c.label, rowQty, rate, amt, '', false);
-          }
-        }
-      });
-    });
-  } else {
-    if (data.charges?.processing && productLines.length) {
-      productLines.forEach(({ name, qty: lineQtyVal }) => {
-        const procRate = parseFloat(data.rates?.processing || 0);
-        const lineQty = lineQtyVal || materialQty;
-        const amt = lineQty * procRate;
-        if (amt > 0 || lineQty > 0) {
-          queueLine(TI_PROCESSING_LABEL, lineQty, procRate, amt, normName(name));
-          showHsnOnce();
-        }
-      });
-    } else if (data.charges?.processing) {
-      const procRate = parseFloat(data.rates?.processing || 0);
-      const procQty = getPdfChargeLineQty(data, 'processing', materialQty);
-      const procAmt = procQty * procRate;
-      if (procAmt > 0 || procQty > 0) {
-        queueLine(TI_PROCESSING_LABEL, procQty, procRate, procAmt);
-        showHsnOnce();
-      }
-    } else if (data.productName) {
-      const prodName = data.productName.toUpperCase().includes('MICRONIZED')
-        ? data.productName.toUpperCase()
-        : `${data.productName.toUpperCase()} MICRONIZED`;
-      queueLine(prodName, qty, 0, 0, '', false);
-      showHsnOnce();
-    }
-
-    TI_CHARGES_LIST.filter((c) => c.key !== 'processing').forEach((c) => {
-      if (data.charges?.[c.key]) {
-        const rowQty = getPdfChargeLineQty(data, c.key, materialQty);
-        const rate = parseFloat(data.rates?.[c.key] || 0);
-        const amt = rowQty * rate;
-        if (amt > 0) {
-          queueLine(c.label, rowQty, rate, amt, '', false);
-        }
-      }
-    });
-  }
-
-  mergePdfLineItems(pendingLines).forEach((line) => {
-    addItemRow(line.desc, line.rowQty, line.rate, line.amt, line.countQty !== false);
+    if (line.qty) totalQty += line.qty;
   });
 
+  const extraRows = [];
+  const hsnCode = data.hsnCode || data.hsn || '';
+  if (hsnCode) {
+    extraRows.push(['', `HSN CODE : ${hsnCode}`, '', '', '0.00', '', '0.00', '', '0.00', '', '0.00', '0.00']);
+  }
   if (data.customCharges?.length) {
     data.customCharges.forEach((cc) => {
-      if (cc.checked) {
-        const ccQty = parseFloat(cc.qty) || 1;
-        const rate = parseFloat(cc.rate) || 0;
-        const amt = ccQty * rate;
-        if (amt > 0) {
-          addItemRow(cc.name, ccQty, rate, amt, false);
-          if (cc.hsn) {
-            itemsBody.push(['', `HSN CODE : ${cc.hsn}`, '', '', '0.00', ...emptyTaxCells]);
-          }
-        }
-      }
+      if (!cc.checked) return;
+      const ccQty = parseFloat(cc.qty) || 1;
+      const rate = parseFloat(cc.rate) || 0;
+      const amt = ccQty * rate;
+      if (amt <= 0) return;
+      const sgstRate = 9;
+      const cgstRate = 9;
+      const sgstAmt = amt * 0.09;
+      const cgstAmt = amt * 0.09;
+      const rowTotal = amt + sgstAmt + cgstAmt;
+      extraRows.push([
+        '',
+        cc.name || '',
+        ccQty,
+        rate.toFixed(2),
+        amt.toFixed(2),
+        sgstRate,
+        sgstAmt.toFixed(2),
+        cgstRate,
+        cgstAmt.toFixed(2),
+        0,
+        '0.00',
+        rowTotal.toFixed(2)
+      ]);
+      totalAmt += amt;
+      totalSgst += sgstAmt;
+      totalCgst += cgstAmt;
+      totalAll += rowTotal;
     });
   }
+
+  for (let i = 0; i < TI_EMPTY_ROWS; i++) {
+    if (extraRows[i]) {
+      itemsBody.push(extraRows[i]);
+    } else {
+      itemsBody.push(['', '', '', '', '0.00', '', '0.00', '', '0.00', '', '0.00', '0.00']);
+    }
+  }
+  extraRows.slice(TI_EMPTY_ROWS).forEach((row) => itemsBody.push(row));
 
   const discount = parseFloat(data.discount) || 0;
   if (discount > 0) {
-    itemsBody.push(['', 'Discount', '', '', `-${discount.toFixed(2)}`, '', '', '', '', '', '', `-${discount.toFixed(2)}`]);
-    totalAmt -= discount;
-    totalAll -= discount;
-    totalSgst = totalAmt * (sgstRate / 100);
-    totalCgst = totalAmt * (cgstRate / 100);
-    totalIgst = totalAmt * (igstRate / 100);
+    const grossAmt = totalAmt;
+    totalAmt = Math.max(0, grossAmt - discount);
+    const ratio = grossAmt > 0 ? totalAmt / grossAmt : 0;
+    totalSgst *= ratio;
+    totalCgst *= ratio;
+    totalIgst *= ratio;
     totalAll = totalAmt + totalSgst + totalCgst + totalIgst;
-  }
-
-  for (let i = itemsBody.length; i < TI_CHARGE_ROWS; i++) {
-    itemsBody.push(['', '', '', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00']);
   }
 
   itemsBody.push([
     { content: 'Total', colSpan: 2, styles: { halign: 'center', fontStyle: 'bold' } },
-    totalQty || '',
+    totalQty || 0,
     '',
     totalAmt.toFixed(2),
     '', totalSgst.toFixed(2),
@@ -886,7 +846,7 @@ const buildTaxInvoicePDF = (doc, data) => {
     },
     columnStyles: {
       0: { cellWidth: 8, halign: 'center' },
-      1: { cellWidth: 'auto' },
+      1: { cellWidth: 'auto', halign: 'left' },
       2: { cellWidth: 10, halign: 'center' },
       3: { cellWidth: 15, halign: 'right' },
       4: { cellWidth: 17, halign: 'right' },
@@ -903,28 +863,25 @@ const buildTaxInvoicePDF = (doc, data) => {
 
   const tableY = doc.lastAutoTable.finalY;
   const contentWidth = pageWidth - PDF_MARGIN * 2;
-  const leftWidth = contentWidth * 0.58;
-  const rightWidth = contentWidth * 0.42;
+  const leftWidth = contentWidth * 0.55;
+  const rightWidth = contentWidth * 0.45;
+  const bankGrid = { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 8, cellPadding: 2 };
 
   autoTable(doc, {
     startY: tableY,
     tableWidth: leftWidth,
     margin: { left: PDF_MARGIN, right: 0 },
     body: [
-      [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold', lineWidth: { top: 0.5, bottom: 0, left: 0.5, right: 0.5 } } }],
+      [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold', textDecoration: 'underline', lineWidth: { top: 0.5, bottom: 0, left: 0.5, right: 0.5 } } }],
       [{
-        content: `Bank Name     : AXIS BANK LTD\nA/c Name      : ${profile.companyName}\nCurrent A/c No. : 916020061629671\nIFS CODE      : UTIB0000383\nBranch        : Nizampura`,
-        styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 25, fontStyle: 'normal' }
-      }],
-      [{
-        content: 'Terms & conditions\n1) Subject to vadodara Juridiction.\n2) Payment Term as per our agree terms.\n3) Interest will charged @ 24% per annum if\namount remaining unpaid from due date.',
-        styles: { minCellHeight: 35, fontStyle: 'bold', lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 } }
+        content: `Bank Name : AXIS BANK LTD\nA/c Name : ${profile.companyName}\nCurrent A/c No. : 916020061629671\nIFS CODE : UTIB0000383\nBranch : Nizampura`,
+        styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 28, fontStyle: 'normal' }
       }]
     ],
     theme: 'grid',
-    styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 8, cellPadding: 2 }
+    styles: bankGrid
   });
-  const leftFooterY = doc.lastAutoTable.finalY;
+  const bankY = doc.lastAutoTable.finalY;
 
   autoTable(doc, {
     startY: tableY,
@@ -936,25 +893,51 @@ const buildTaxInvoicePDF = (doc, data) => {
       ['CGST', { content: totalCgst.toFixed(2), styles: { halign: 'right' } }],
       ['IGST', { content: totalIgst.toFixed(2), styles: { halign: 'right' } }],
       ['Total Tax Amount', { content: (totalCgst + totalSgst + totalIgst).toFixed(2), styles: { halign: 'right', fontStyle: 'bold' } }],
-      [{ content: 'Total Amount after Tax', styles: { fontStyle: 'bold', fontSize: 10 } }, { content: totalAll.toFixed(2), styles: { halign: 'right', fontStyle: 'bold', fontSize: 10 } }],
-      [{
-        content: `Certified that the particulars given above are true and correct\n\nFor ${profile.companyName}\n\n\nAuthorised signatory`,
-        colSpan: 2,
-        styles: { halign: 'left', minCellHeight: 38, valign: 'top', fontStyle: 'normal' }
-      }]
+      [{ content: 'Total Amount after Tax', styles: { fontStyle: 'bold', fontSize: 10 } }, { content: totalAll.toFixed(2), styles: { halign: 'right', fontStyle: 'bold', fontSize: 10 } }]
     ],
     theme: 'grid',
-    styles: { lineColor: [0, 0, 0], lineWidth: { top: 0.5, bottom: 0.5, left: 0, right: 0.5 }, textColor: 0, fontSize: 9, cellPadding: 2 },
-    columnStyles: { 0: { cellWidth: rightWidth * 0.65 }, 1: { cellWidth: rightWidth * 0.35 } }
+    styles: { ...bankGrid, lineWidth: { top: 0.5, bottom: 0.5, left: 0, right: 0.5 }, fontSize: 9 },
+    columnStyles: { 0: { cellWidth: rightWidth * 0.68 }, 1: { cellWidth: rightWidth * 0.32 } }
   });
-  const rightFooterY = doc.lastAutoTable.finalY;
+  const totalsY = doc.lastAutoTable.finalY;
+  const footerRow2Y = Math.max(bankY, totalsY);
 
-  const sealY = Math.max(leftFooterY, rightFooterY) - 14;
-  doc.setLineWidth(0.5);
-  doc.rect(PDF_MARGIN + leftWidth * 0.3, sealY, 28, 14);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Seal', PDF_MARGIN + leftWidth * 0.3 + 14, sealY + 9, { align: 'center' });
+  autoTable(doc, {
+    startY: footerRow2Y,
+    tableWidth: leftWidth,
+    margin: { left: PDF_MARGIN, right: 0 },
+    body: [[{
+      content: 'Terms & conditions\n1. Subject to vadodara Juridiction.\n2. Payment Term as per our agree terms.\n3. Interest will charged @ 24% per annum if amount remaining unpaid from due date.',
+      styles: { minCellHeight: 38, fontStyle: 'normal', lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, valign: 'top' }
+    }]],
+    theme: 'grid',
+    styles: bankGrid
+  });
+
+  autoTable(doc, {
+    startY: footerRow2Y,
+    tableWidth: rightWidth,
+    margin: { left: PDF_MARGIN + leftWidth, right: PDF_MARGIN },
+    body: [
+      [{
+        content: 'Ceritified that the particulars given above are true and correct',
+        colSpan: 2,
+        styles: { halign: 'center', fontSize: 8, minCellHeight: 10, lineWidth: { top: 0, bottom: 0.5, left: 0, right: 0.5 } }
+      }],
+      [{
+        content: `For ${profile.companyName}`,
+        colSpan: 2,
+        styles: { halign: 'center', fontStyle: 'bold', minCellHeight: 18, lineWidth: { top: 0, bottom: 0.5, left: 0, right: 0.5 } }
+      }],
+      [
+        { content: 'Seal', styles: { halign: 'center', minCellHeight: 16, lineWidth: { top: 0, bottom: 0.5, left: 0, right: 0.5 } } },
+        { content: 'Authorised signatory', styles: { halign: 'center', minCellHeight: 16, lineWidth: { top: 0, bottom: 0.5, left: 0, right: 0.5 } } }
+      ]
+    ],
+    theme: 'grid',
+    styles: bankGrid,
+    columnStyles: { 0: { cellWidth: rightWidth * 0.4 }, 1: { cellWidth: rightWidth * 0.6 } }
+  });
 
   drawOuterPageBorder(doc);
 };
@@ -1233,10 +1216,8 @@ const getPdfProductLines = (data) => {
   return [];
 };
 
-const PI_PROCESSING_LABEL = 'Processing Charges';
-
-const PI_HEADER_FILL = [180, 200, 240];
-const PI_ITEM_ROWS = 11;
+const PI_HEADER_FILL = [189, 215, 238];
+const PI_EMPTY_ROWS = 3;
 const PI_CHARGES_LIST = TI_CHARGES_LIST;
 
 const buildPerformaInvoicePDF = (doc, data) => {
@@ -1251,44 +1232,34 @@ const buildPerformaInvoicePDF = (doc, data) => {
     fontStyle: 'bold',
     cellPadding: 1.5
   };
+  const fillStyle = { fillColor: PI_HEADER_FILL };
 
   const headerEndY = drawPdfCompanyHeaderBoxed(doc, { profile, variant: 'po' });
 
   autoTable(doc, {
     startY: headerEndY,
-    body: [[{ content: 'Performa Invoice', styles: { halign: 'center', fontStyle: 'bold', fontSize: 16, fillColor: PI_HEADER_FILL } }]],
+    body: [[{ content: 'Performa Invoice', styles: { halign: 'center', fontStyle: 'bold', fontSize: 20, ...fillStyle } }]],
     theme: 'grid',
-    styles: { ...gridStyles, cellPadding: 2 },
+    styles: { ...gridStyles, cellPadding: 3 },
     margin: gridMargin
   });
 
   const docNo = data.invoiceNo || 'N/A';
-  const docDate = formatPdfDateDmy(data.date) || 'N/A';
-  const dcNo = data.dcNo || 'Verbal';
-  const dcDate = formatPdfDateDmy(data.dcDate || data.date) || docDate;
+  const docDate = formatPdfDateSlash(data.date) || 'N/A';
+  const dcNo = data.dcNo || '';
+  const dcDate = formatPdfDateSlash(data.dcDate || data.date) || docDate;
 
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY,
     body: [
       ['PI No:', { content: docNo, styles: { fontStyle: 'bold' } }, 'Delivery Challan No.', { content: dcNo, styles: { fontStyle: 'normal' } }],
-      ['PI Date:', { content: docDate, styles: { fontStyle: 'bold' } }, 'Date :', { content: dcDate, styles: { fontStyle: 'normal' } }]
-    ],
-    theme: 'grid',
-    styles: gridStyles,
-    columnStyles: { 0: { cellWidth: 35 }, 1: { cellWidth: 56 }, 2: { cellWidth: 35 }, 3: { cellWidth: 56 } },
-    margin: gridMargin
-  });
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY,
-    body: [
-      ['State : GUJARAT', 'Code', '24', { content: '', styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 } } }, { content: '', colSpan: 2, styles: { lineWidth: { top: 0, bottom: 0.5, left: 0, right: 0.5 } } }]
+      ['PI Date:', { content: docDate, styles: { fontStyle: 'bold' } }, 'Date :', { content: dcDate, styles: { fontStyle: 'normal' } }],
+      ['State : GUJARAT', 'Code', '24', '']
     ],
     theme: 'grid',
     styles: gridStyles,
     columnStyles: {
-      0: { cellWidth: 60 }, 1: { cellWidth: 15 }, 2: { cellWidth: 16 },
-      3: { cellWidth: 35 }, 4: { cellWidth: 28 }, 5: { cellWidth: 28 }
+      0: { cellWidth: 35 }, 1: { cellWidth: 56 }, 2: { cellWidth: 35 }, 3: { cellWidth: 56 }
     },
     margin: gridMargin
   });
@@ -1301,90 +1272,52 @@ const buildPerformaInvoicePDF = (doc, data) => {
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY,
     body: [
-      [{ content: 'Bill to Party', styles: { halign: 'center', fillColor: PI_HEADER_FILL } }, { content: 'Ship to Party', styles: { halign: 'center', fillColor: PI_HEADER_FILL } }]
+      [
+        { content: 'Bill to Party', colSpan: 2, styles: { halign: 'center', ...fillStyle } },
+        { content: 'Ship to Party', colSpan: 2, styles: { halign: 'center', ...fillStyle } }
+      ],
+      ['Name :', data.partyName || '', 'Name :', data.shipName || data.partyName || ''],
+      ['Address :', data.billAddress || data.address || '', 'Address :', data.shipAddress || data.address || ''],
+      ['', '', '', ''],
+      ['', '', '', ''],
+      [`State : ${billState}`, billCode, `State : ${shipState}`, shipCode],
+      [`GSTIN : ${data.gstinBill || data.gstin || ''}`, '', `GSTIN : ${data.gstinShip || data.gstin || ''}`, '']
     ],
     theme: 'grid',
-    styles: gridStyles,
-    columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
-    margin: gridMargin
-  });
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY,
-    body: [
-      [`Name :          ${data.partyName || ''}`, `Name :          ${data.shipName || data.partyName || ''}`]
-    ],
-    theme: 'grid',
-    styles: gridStyles,
-    columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
-    margin: gridMargin
-  });
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY,
-    body: [
-      [`Address :\n${data.billAddress || data.address || ''}`, `Address :\n${data.shipAddress || data.address || ''}`]
-    ],
-    theme: 'grid',
-    styles: { ...gridStyles, fontStyle: 'normal' },
-    columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
-    margin: gridMargin
-  });
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY,
-    body: [
-      [`State : ${billState}`, 'Code', billCode, `State : ${shipState}`, 'Code', shipCode]
-    ],
-    theme: 'grid',
-    styles: gridStyles,
+    styles: { ...gridStyles, fontStyle: 'normal', minCellHeight: 8 },
     columnStyles: {
-      0: { cellWidth: 60 }, 1: { cellWidth: 15 }, 2: { cellWidth: 16 },
-      3: { cellWidth: 60 }, 4: { cellWidth: 15 }, 5: { cellWidth: 16 }
+      0: { cellWidth: 22, fontStyle: 'bold' },
+      1: { cellWidth: 69 },
+      2: { cellWidth: 22, fontStyle: 'bold' },
+      3: { cellWidth: 69 }
     },
-    margin: gridMargin
-  });
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY,
-    body: [
-      [`GSTIN : ${data.gstinBill || data.gstin || ''}`, `GSTIN : ${data.gstinShip || data.gstin || ''}`]
-    ],
-    theme: 'grid',
-    styles: gridStyles,
-    columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
     margin: gridMargin
   });
 
   const head = [
     [
-      { content: 'S.\nNo.', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: PI_HEADER_FILL } },
-      { content: 'Description', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: PI_HEADER_FILL } },
-      { content: 'Qty', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: PI_HEADER_FILL } },
-      { content: 'Rate', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: PI_HEADER_FILL } },
-      { content: 'Amount', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: PI_HEADER_FILL } },
-      { content: 'SGST', colSpan: 2, styles: { halign: 'center', fillColor: PI_HEADER_FILL } },
-      { content: 'CGST', colSpan: 2, styles: { halign: 'center', fillColor: PI_HEADER_FILL } },
-      { content: 'IGST', colSpan: 2, styles: { halign: 'center', fillColor: PI_HEADER_FILL } },
-      { content: 'Total', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: PI_HEADER_FILL } }
+      { content: 'S.\nNo.', rowSpan: 2, styles: { halign: 'center', valign: 'middle', ...fillStyle } },
+      { content: 'Description', rowSpan: 2, styles: { halign: 'center', valign: 'middle', ...fillStyle } },
+      { content: 'Qty', rowSpan: 2, styles: { halign: 'center', valign: 'middle', ...fillStyle } },
+      { content: 'Rate', rowSpan: 2, styles: { halign: 'center', valign: 'middle', ...fillStyle } },
+      { content: 'Amount', rowSpan: 2, styles: { halign: 'center', valign: 'middle', ...fillStyle } },
+      { content: 'SGST', colSpan: 2, styles: { halign: 'center', ...fillStyle } },
+      { content: 'CGST', colSpan: 2, styles: { halign: 'center', ...fillStyle } },
+      { content: 'IGST', colSpan: 2, styles: { halign: 'center', ...fillStyle } },
+      { content: 'Total', rowSpan: 2, styles: { halign: 'center', valign: 'middle', ...fillStyle } }
     ],
     [
-      { content: 'Rate', styles: { halign: 'center', fillColor: PI_HEADER_FILL } },
-      { content: 'Amount', styles: { halign: 'center', fillColor: PI_HEADER_FILL } },
-      { content: 'Rate', styles: { halign: 'center', fillColor: PI_HEADER_FILL } },
-      { content: 'Amount', styles: { halign: 'center', fillColor: PI_HEADER_FILL } },
-      { content: 'Rate', styles: { halign: 'center', fillColor: PI_HEADER_FILL } },
-      { content: 'Amount', styles: { halign: 'center', fillColor: PI_HEADER_FILL } }
+      { content: 'Rate', styles: { halign: 'center', ...fillStyle } },
+      { content: 'Amount', styles: { halign: 'center', ...fillStyle } },
+      { content: 'Rate', styles: { halign: 'center', ...fillStyle } },
+      { content: 'Amount', styles: { halign: 'center', ...fillStyle } },
+      { content: 'Rate', styles: { halign: 'center', ...fillStyle } },
+      { content: 'Amount', styles: { halign: 'center', ...fillStyle } }
     ]
   ];
 
-  const taxRate = parseFloat(data.taxRate) || 18;
-  const cgstRate = taxRate / 2;
-  const sgstRate = taxRate / 2;
-  const igstRate = 0;
-  const materialQty = parseFloat(data.qty) || 0;
+  const chargeAmounts = buildTiChargeAmounts(data);
   let itemsBody = [];
-  let sno = 1;
   let totalAmt = 0;
   let totalSgst = 0;
   let totalCgst = 0;
@@ -1392,185 +1325,107 @@ const buildPerformaInvoicePDF = (doc, data) => {
   let totalAll = 0;
   let totalQty = 0;
 
-  const addItemRow = (desc, rowQty, rate, amt) => {
+  PI_CHARGES_LIST.forEach((charge, idx) => {
+    const line = chargeAmounts[charge.key] || { qty: 0, rate: 0, amt: 0 };
+    const amt = line.amt || 0;
+    const sgstRate = charge.sgst;
+    const cgstRate = charge.cgst;
+    const igstRate = 0;
     const sgstAmt = amt * (sgstRate / 100);
     const cgstAmt = amt * (cgstRate / 100);
-    const igstAmt = amt * (igstRate / 100);
+    const igstAmt = 0;
     const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
-    const qtyDisplay = typeof rowQty === 'number'
-      ? (Number.isInteger(rowQty) ? rowQty : rowQty.toFixed(2))
-      : rowQty;
+    const qtyDisplay = line.qty
+      ? (Number.isInteger(line.qty) ? line.qty : line.qty.toFixed(2))
+      : '';
+    const rateDisplay = line.rate ? line.rate.toFixed(2) : '';
+
     itemsBody.push([
-      sno++, desc, qtyDisplay,
-      typeof rate === 'number' ? rate.toFixed(2) : rate,
+      idx + 1,
+      charge.label,
+      qtyDisplay,
+      rateDisplay,
       amt.toFixed(2),
-      sgstRate, sgstAmt.toFixed(2), cgstRate, cgstAmt.toFixed(2), igstRate, igstAmt.toFixed(2), rowTotal.toFixed(2)
+      sgstRate || '',
+      sgstAmt.toFixed(2),
+      cgstRate || '',
+      cgstAmt.toFixed(2),
+      igstRate || '',
+      igstAmt.toFixed(2),
+      rowTotal.toFixed(2)
     ]);
     totalAmt += amt;
     totalSgst += sgstAmt;
     totalCgst += cgstAmt;
     totalIgst += igstAmt;
     totalAll += rowTotal;
-    totalQty += typeof rowQty === 'number' ? rowQty : (parseFloat(rowQty) || 0);
-  };
-
-  const mergePdfLineItems = (lines) => {
-    const merged = new Map();
-    lines.forEach((line) => {
-      const rate = parseFloat(line.rate) || 0;
-      const descKey = (line.desc || '').trim().toLowerCase();
-      const key = line.mergeKey
-        ? `${descKey}|${rate.toFixed(2)}|${line.mergeKey}`
-        : `${descKey}|${rate.toFixed(2)}`;
-      const qty = parseFloat(line.rowQty) || 0;
-      const amt = parseFloat(line.amt) || 0;
-      if (merged.has(key)) {
-        const prev = merged.get(key);
-        prev.rowQty += qty;
-        prev.amt += amt;
-      } else {
-        merged.set(key, { desc: line.desc, rowQty: qty, rate, amt });
-      }
-    });
-    return Array.from(merged.values());
-  };
-
-  const pendingLines = [];
-  const queueLine = (desc, rowQty, rate, amt, mergeKey = '') => {
-    const qty = parseFloat(rowQty) || 0;
-    const lineRate = parseFloat(rate) || 0;
-    const lineAmt = parseFloat(amt) || 0;
-    if (lineAmt <= 0 && qty <= 0) return;
-    pendingLines.push({ desc, rowQty: qty, rate: lineRate, amt: lineAmt, mergeKey });
-  };
-
-  const productLines = getPdfProductLines(data);
-  const normName = (s) => (s || '').trim().toLowerCase();
-
-  const getOrderedProductChargeEntries = () => {
-    const pcMap = data.productCharges || {};
-    const chargeKeys = Object.keys(pcMap);
-    const orderedNames = [];
-    const seen = new Set();
-
-    const addName = (name) => {
-      if (!name) return;
-      const nk = normName(name);
-      if (seen.has(nk)) return;
-      seen.add(nk);
-      orderedNames.push(name);
-    };
-
-    productLines.forEach(p => addName(p.name));
-    chargeKeys.forEach(k => addName(k));
-
-    return orderedNames.map(name => {
-      const chargeKey = chargeKeys.find(k => normName(k) === normName(name)) || name;
-      return {
-        prodName: chargeKey,
-        pc: pcMap[chargeKey],
-        summary: productLines.find(p => normName(p.name) === normName(name))
-      };
-    }).filter(entry => entry.pc);
-  };
-
-  if (data.productCharges && Object.keys(data.productCharges).length > 0) {
-    getOrderedProductChargeEntries().forEach(({ prodName, pc, summary }) => {
-      const prodQty = summary?.qty || 0;
-
-      if (pc.charges?.processing) {
-        const rate = parseFloat(pc.rates?.processing || 0);
-        const lineQty = prodQty || parseFloat(pc.qtys?.processing) || 0;
-        const amt = lineQty * rate;
-        if (amt > 0 || lineQty > 0) {
-          queueLine(PI_PROCESSING_LABEL, lineQty, rate, amt, normName(prodName));
-        }
-      }
-
-      PI_CHARGES_LIST.filter(c => c.key !== 'processing').forEach((c) => {
-        if (pc.charges?.[c.key]) {
-          const rowQty = pc.qtys?.[c.key] != null && pc.qtys?.[c.key] !== ''
-            ? (parseFloat(pc.qtys[c.key]) || 0)
-            : 1;
-          const rate = parseFloat(pc.rates?.[c.key] || 0);
-          const amt = rowQty * rate;
-          if (amt > 0) {
-            queueLine(c.label, rowQty, rate, amt);
-          }
-        }
-      });
-    });
-  } else {
-  const procRate = parseFloat(data.rates?.processing || 0);
-  if (data.charges?.processing && productLines.length) {
-    productLines.forEach(({ name, qty }) => {
-      const lineQty = qty || materialQty;
-      const amt = lineQty * procRate;
-      if (amt > 0 || lineQty > 0) {
-        queueLine(PI_PROCESSING_LABEL, lineQty, procRate, amt, normName(name));
-      }
-    });
-  } else if (data.charges?.processing) {
-    const rowQty = getPdfChargeLineQty(data, 'processing', materialQty);
-    const amt = rowQty * procRate;
-    if (amt > 0) {
-      queueLine(PI_PROCESSING_LABEL, rowQty, procRate, amt);
-    }
-  }
-
-  PI_CHARGES_LIST.filter(c => c.key !== 'processing').forEach((c) => {
-    if (data.charges?.[c.key]) {
-      const rowQty = getPdfChargeLineQty(data, c.key, materialQty);
-      const rate = parseFloat(data.rates?.[c.key] || 0);
-      const amt = rowQty * rate;
-      if (amt > 0) {
-        queueLine(c.label, rowQty, rate, amt);
-      }
-    }
+    if (line.qty) totalQty += line.qty;
   });
-  }
 
+  const extraRows = [];
   if (data.customCharges?.length) {
     data.customCharges.forEach((cc) => {
-      if (cc.checked) {
-        const ccQty = parseFloat(cc.qty) || 1;
-        const rate = parseFloat(cc.rate) || 0;
-        const amt = ccQty * rate;
-        if (amt > 0) {
-          queueLine(cc.name || 'Custom Charge', ccQty, rate, amt);
-        }
-      }
+      if (!cc.checked) return;
+      const ccQty = parseFloat(cc.qty) || 1;
+      const rate = parseFloat(cc.rate) || 0;
+      const amt = ccQty * rate;
+      if (amt <= 0) return;
+      const sgstAmt = amt * 0.09;
+      const cgstAmt = amt * 0.09;
+      const rowTotal = amt + sgstAmt + cgstAmt;
+      extraRows.push([
+        extraRows.length + PI_CHARGES_LIST.length + 1,
+        cc.name || '',
+        ccQty,
+        rate.toFixed(2),
+        amt.toFixed(2),
+        9,
+        sgstAmt.toFixed(2),
+        9,
+        cgstAmt.toFixed(2),
+        '',
+        '0.00',
+        rowTotal.toFixed(2)
+      ]);
+      totalAmt += amt;
+      totalSgst += sgstAmt;
+      totalCgst += cgstAmt;
+      totalAll += rowTotal;
     });
   }
 
-  mergePdfLineItems(pendingLines).forEach((line) => {
-    addItemRow(line.desc, line.rowQty, line.rate, line.amt);
-  });
+  for (let i = 0; i < PI_EMPTY_ROWS; i++) {
+    if (extraRows[i]) {
+      itemsBody.push(extraRows[i]);
+    } else {
+      itemsBody.push(['', '', '', '', '0.00', '', '0.00', '', '0.00', '', '0.00', '0.00']);
+    }
+  }
+  extraRows.slice(PI_EMPTY_ROWS).forEach((row) => itemsBody.push(row));
 
   const discount = parseFloat(data.discount) || 0;
   if (discount > 0) {
-    itemsBody.push(['', 'Discount', '', '', `-${discount.toFixed(2)}`, '', '', '', '', '', '', `-${discount.toFixed(2)}`]);
-    totalAmt -= discount;
-    totalAll -= discount;
-    totalSgst = totalAmt * (sgstRate / 100);
-    totalCgst = totalAmt * (cgstRate / 100);
-    totalIgst = totalAmt * (igstRate / 100);
+    const grossAmt = totalAmt;
+    totalAmt = Math.max(0, grossAmt - discount);
+    const ratio = grossAmt > 0 ? totalAmt / grossAmt : 0;
+    totalSgst *= ratio;
+    totalCgst *= ratio;
+    totalIgst *= ratio;
     totalAll = totalAmt + totalSgst + totalCgst + totalIgst;
   }
 
-  for (let i = itemsBody.length; i < PI_ITEM_ROWS; i++) {
-    itemsBody.push(['', '', '', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00']);
-  }
-
   itemsBody.push([
-    { content: 'Total', colSpan: 2, styles: { halign: 'center', fontStyle: 'bold', fillColor: PI_HEADER_FILL } },
-    totalQty || '',
-    '',
-    totalAmt.toFixed(2),
-    '', totalSgst.toFixed(2),
-    '', totalCgst.toFixed(2),
-    '', totalIgst.toFixed(2),
-    totalAll.toFixed(2)
+    { content: 'Total', colSpan: 2, styles: { halign: 'center', fontStyle: 'bold', ...fillStyle } },
+    { content: totalQty || 0, styles: { halign: 'center', ...fillStyle } },
+    { content: '', styles: fillStyle },
+    { content: totalAmt.toFixed(2), styles: { halign: 'right', fontStyle: 'bold', ...fillStyle } },
+    { content: '', styles: fillStyle },
+    { content: totalSgst.toFixed(2), styles: { halign: 'right', ...fillStyle } },
+    { content: '', styles: fillStyle },
+    { content: totalCgst.toFixed(2), styles: { halign: 'right', ...fillStyle } },
+    { content: '', styles: fillStyle },
+    { content: totalIgst.toFixed(2), styles: { halign: 'right', ...fillStyle } },
+    { content: totalAll.toFixed(2), styles: { halign: 'right', fontStyle: 'bold', ...fillStyle } }
   ]);
 
   autoTable(doc, {
@@ -1589,15 +1444,15 @@ const buildPerformaInvoicePDF = (doc, data) => {
     },
     columnStyles: {
       0: { cellWidth: 8, halign: 'center' },
-      1: { cellWidth: 'auto' },
+      1: { cellWidth: 'auto', halign: 'left' },
       2: { cellWidth: 10, halign: 'center' },
-      3: { cellWidth: 15, halign: 'right' },
+      3: { cellWidth: 15, halign: 'center' },
       4: { cellWidth: 17, halign: 'right' },
-      5: { cellWidth: 8, halign: 'right' },
+      5: { cellWidth: 8, halign: 'center' },
       6: { cellWidth: 14, halign: 'right' },
-      7: { cellWidth: 8, halign: 'right' },
+      7: { cellWidth: 8, halign: 'center' },
       8: { cellWidth: 14, halign: 'right' },
-      9: { cellWidth: 8, halign: 'right' },
+      9: { cellWidth: 8, halign: 'center' },
       10: { cellWidth: 14, halign: 'right' },
       11: { cellWidth: 20, halign: 'right', fontStyle: 'bold' }
     },
@@ -1606,36 +1461,24 @@ const buildPerformaInvoicePDF = (doc, data) => {
 
   const tableY = doc.lastAutoTable.finalY;
   const contentWidth = pageWidth - PDF_MARGIN * 2;
-  const leftWidth = contentWidth * 0.58;
-  const rightWidth = contentWidth * 0.42;
+  const leftWidth = contentWidth * 0.5;
+  const rightWidth = contentWidth * 0.5;
+  const bankGrid = { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 8, cellPadding: 2 };
 
   autoTable(doc, {
     startY: tableY,
     tableWidth: leftWidth,
     margin: { left: PDF_MARGIN, right: 0 },
     body: [
-      [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold', lineWidth: { top: 0.5, bottom: 0, left: 0.5, right: 0.5 } } }],
       [{
-        content: `Bank Name     : AXIS BANK LTD\nA/c Name      : ${profile.companyName}\nCurrent A/c No. : 916020061629671\nIFS CODE      : UTIB0000383\nBranch        : Nizampura`,
-        styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 25, fontStyle: 'normal' }
-      }],
-      [{
-        content: 'NOTE:\nPACKING MATERIALS AND TRANSPORTATION\nCHARGES WILL BE CHAGRE EXTRA AS ACTUAL',
-        styles: { fontStyle: 'bold', minCellHeight: 15, lineWidth: { top: 0, bottom: 0, left: 0.5, right: 0.5 } }
-      }],
-      [{
-        content: 'Terms & conditions\n1) Subject to vadodara Juridiction.\n2) Payment 100% ADVANCE AGAINST PI',
-        styles: { fontStyle: 'bold', minCellHeight: 20, lineWidth: { top: 0, bottom: 0, left: 0.5, right: 0.5 } }
-      }],
-      [{
-        content: 'this is system generated PI so no need to sign',
-        styles: { fontStyle: 'bold', lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 } }
+        content: 'OUR BANK DETAILS\n\nBank Name : AXIS BANK LTD\nA/c Name : ' + profile.companyName + '\nCurrent A/c No. : 916020061629671\nIFS CODE : UTIB0000383\nBranch : Nizampura',
+        styles: { minCellHeight: 52, fontStyle: 'normal', valign: 'top', lineWidth: { top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 } }
       }]
     ],
     theme: 'grid',
-    styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 8, cellPadding: 2 }
+    styles: bankGrid
   });
-  const leftFooterY = doc.lastAutoTable.finalY;
+  const bankY = doc.lastAutoTable.finalY;
 
   autoTable(doc, {
     startY: tableY,
@@ -1647,25 +1490,69 @@ const buildPerformaInvoicePDF = (doc, data) => {
       ['SGST', { content: totalSgst.toFixed(2), styles: { halign: 'right' } }],
       ['IGST', { content: totalIgst.toFixed(2), styles: { halign: 'right' } }],
       ['Total Tax Amount', { content: (totalCgst + totalSgst + totalIgst).toFixed(2), styles: { halign: 'right', fontStyle: 'bold' } }],
-      [{ content: 'Total Amount after Tax', styles: { fontStyle: 'bold', fontSize: 10 } }, { content: totalAll.toFixed(2), styles: { halign: 'right', fontStyle: 'bold', fontSize: 10 } }],
+      [
+        { content: 'Total Amount after Tax', styles: { fontStyle: 'bold', fontSize: 10, ...fillStyle } },
+        { content: totalAll.toFixed(2), styles: { halign: 'right', fontStyle: 'bold', fontSize: 10, ...fillStyle } }
+      ]
+    ],
+    theme: 'grid',
+    styles: { ...bankGrid, lineWidth: { top: 0.5, bottom: 0.5, left: 0, right: 0.5 }, fontSize: 9 },
+    columnStyles: { 0: { cellWidth: rightWidth * 0.68 }, 1: { cellWidth: rightWidth * 0.32 } }
+  });
+  const totalsY = doc.lastAutoTable.finalY;
+  const footerRow2Y = Math.max(bankY, totalsY);
+
+  autoTable(doc, {
+    startY: footerRow2Y,
+    tableWidth: leftWidth,
+    margin: { left: PDF_MARGIN, right: 0 },
+    body: [[{
+      content: 'NOTE:\n\nPACKING MATERIALS AND TRANSPORTATION\nCHARGES WILL BE CHAGRE EXTRA AS ACTUAL\n\nTerms & conditions\n1) Subject to vadodara Juridiction.\n2) Payment 100% ADVANCE AGAINST PI',
+      styles: { minCellHeight: 48, fontStyle: 'bold', valign: 'top', lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, fontSize: 8 }
+    }]],
+    theme: 'grid',
+    styles: bankGrid
+  });
+
+  autoTable(doc, {
+    startY: footerRow2Y,
+    tableWidth: rightWidth,
+    margin: { left: PDF_MARGIN + leftWidth, right: PDF_MARGIN },
+    body: [
       [{
-        content: `Certified that the particulars given above are true and correct\n\nFor ${profile.companyName}\n\n\nAuthorised signatory`,
+        content: 'Ceritified that the particulars given above are true and correct',
         colSpan: 2,
-        styles: { halign: 'left', minCellHeight: 38, valign: 'top', fontStyle: 'normal' }
+        styles: { halign: 'left', fontSize: 8, minCellHeight: 12, lineWidth: { top: 0, bottom: 0.5, left: 0, right: 0.5 } }
+      }],
+      [{
+        content: `For ${profile.companyName}`,
+        colSpan: 2,
+        styles: { halign: 'center', fontStyle: 'bold', minCellHeight: 36, lineWidth: { top: 0, bottom: 0.5, left: 0, right: 0.5 } }
       }]
     ],
     theme: 'grid',
-    styles: { lineColor: [0, 0, 0], lineWidth: { top: 0.5, bottom: 0.5, left: 0, right: 0.5 }, textColor: 0, fontSize: 9, cellPadding: 2 },
-    columnStyles: { 0: { cellWidth: rightWidth * 0.65 }, 1: { cellWidth: rightWidth * 0.35 } }
+    styles: bankGrid,
+    columnStyles: { 0: { cellWidth: rightWidth * 0.5 }, 1: { cellWidth: rightWidth * 0.5 } }
   });
-  const rightFooterY = doc.lastAutoTable.finalY;
+  const signBlockY = doc.lastAutoTable.finalY;
 
-  const sealY = Math.max(leftFooterY, rightFooterY) - 14;
-  doc.setLineWidth(0.5);
-  doc.rect(PDF_MARGIN + leftWidth * 0.3, sealY, 28, 14);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Seal', PDF_MARGIN + leftWidth * 0.3 + 14, sealY + 9, { align: 'center' });
+  autoTable(doc, {
+    startY: signBlockY,
+    tableWidth: contentWidth,
+    margin: gridMargin,
+    body: [[
+      { content: 'this is system generated PI so no need to sign', styles: { fontStyle: 'bold', fontSize: 8, cellWidth: leftWidth } },
+      { content: 'Seal', styles: { halign: 'center', fontStyle: 'bold', minCellHeight: 14 } },
+      { content: 'Authorised signatory', styles: { halign: 'center', fontStyle: 'bold', minCellHeight: 14 } }
+    ]],
+    theme: 'grid',
+    styles: bankGrid,
+    columnStyles: {
+      0: { cellWidth: leftWidth },
+      1: { cellWidth: contentWidth * 0.22 },
+      2: { cellWidth: contentWidth - leftWidth - contentWidth * 0.22 }
+    }
+  });
 
   drawOuterPageBorder(doc);
 };
