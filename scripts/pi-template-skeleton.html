@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Performa Invoice - UMA MICRON</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #e9e9e9;
+    margin: 0;
+    padding: 20px;
+    color: #000;
+  }
+  .invoice {
+    max-width: 950px;
+    margin: 0 auto;
+    background: #fff;
+  }
+  table.grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  table.grid td, table.grid th {
+    border: 1px solid #000;
+    padding: 4px 6px;
+    vertical-align: middle;
+    font-size: 12.5px;
+  }
+  .noborder { border: none !important; }
+  .center { text-align: center; }
+  .left { text-align: left; }
+  .right { text-align: right; }
+  .bold { font-weight: bold; }
+  .fill { background: #bdd7ee; }
+
+  /* header */
+  .logo-img {
+    display: inline-block;
+    width: 140px;
+    height: auto;
+  }
+  .company-name { font-family: 'Times New Roman', Times, serif; font-size: 22px; font-weight: bold; margin: 0 0 3px 0; letter-spacing: 0.3px; }
+  .company-sub { font-family: 'Times New Roman', Times, serif; font-size: 12px; font-weight: bold; margin: 1px 0; }
+  table.grid td.title-bar { font-size: 26px; font-weight: bold; padding: 8px 0; }
+
+  input[type="text"], input[type="number"] {
+    border: none;
+    background: transparent;
+    width: 100%;
+    font-family: inherit;
+    font-size: inherit;
+    padding: 0;
+  }
+  input[type="text"]:focus, input[type="number"]:focus {
+    outline: 1px dashed #999;
+    background: #fffde7;
+  }
+  .items-table th { font-size: 11.5px; }
+  .items-table td { font-size: 11.5px; }
+  .desc-field {
+    width: 100%;
+    min-height: 1.2em;
+    white-space: normal;
+    word-wrap: break-word;
+    outline: none;
+  }
+  .desc-field:focus {
+    outline: 1px dashed #999;
+    background: #fffde7;
+  }
+</style>
+</head>
+<body>
+
+<div class="invoice">
+<table class="grid">
+  <colgroup>
+    <col style="width:3%"><col style="width:21%"><col style="width:5%"><col style="width:6%">
+    <col style="width:8%"><col style="width:5%"><col style="width:8%"><col style="width:5%">
+    <col style="width:8%"><col style="width:5%"><col style="width:8%"><col style="width:9%">
+  </colgroup>
+
+  <!-- Logo / company header (outer border, no internal lines) -->
+  <tr>
+    <td colspan="12" style="border:1px solid #000; padding:8px 0; position:relative;">
+      <div style="position:absolute; left:20px; top:50%; transform:translateY(-50%);">
+        <img class="logo-img" src="LOGO" alt="UMA MICRON Logo">
+      </div>
+      <div style="text-align:center;">
+        <p class="company-name">UMA MICRON</p>
+        <p class="company-sub">PLOT NO 1116 G.I.D.C. RANOLI, N.H.NO. 8,</p>
+        <p class="company-sub">VADODARA - 391350, GUJARAT INDIA</p>
+        <p class="company-sub">Tel: +91 97120 00297, Email : info@umamicron.com</p>
+        <p class="company-sub">GSTIN: 24AGBPP8564D1ZE</p>
+      </div>
+    </td>
+  </tr>
+
+  <!-- Title -->
+  <tr>
+    <td colspan="12" class="center bold fill title-bar">Performa Invoice</td>
+  </tr>
+
+  <!-- PI info -->
+  <tr>
+    <td colspan="2" class="left bold">PI No:</td>
+    <td colspan="4" class="left"><input type="text" value="UMA/IN/24-25/0001"></td>
+    <td colspan="3" class="center bold">Delivery Challan No.</td>
+    <td colspan="3" class="center"><input type="text" value="285"></td>
+  </tr>
+  <tr>
+    <td colspan="2" class="left bold">PI Date:</td>
+    <td colspan="4" class="left"><input type="text" value="01/04/2024"></td>
+    <td colspan="3" class="center bold">Date :</td>
+    <td colspan="3" class="center"><input type="text" value="01/04/2024"></td>
+  </tr>
+  <tr>
+    <td colspan="6" class="left bold">State : GUJARAT</td>
+    <td colspan="3" class="center bold">Code</td>
+    <td colspan="3" class="center"><input type="text" value="24"></td>
+  </tr>
+
+  <!-- Bill to / Ship to headers -->
+  <tr>
+    <td colspan="6" class="center bold fill">Bill to Party</td>
+    <td colspan="6" class="center bold fill">Ship to Party</td>
+  </tr>
+  <tr>
+    <td colspan="2" class="left bold">Name :</td>
+    <td colspan="4" class="left"><input type="text"></td>
+    <td colspan="2" class="left bold">Name :</td>
+    <td colspan="4" class="left"><input type="text"></td>
+  </tr>
+  <tr>
+    <td colspan="2" class="left bold">Address :</td>
+    <td colspan="4" class="left"><input type="text"></td>
+    <td colspan="2" class="left bold">Address :</td>
+    <td colspan="4" class="left"><input type="text"></td>
+  </tr>
+  <tr>
+    <td colspan="2" class="left">&nbsp;</td>
+    <td colspan="4" class="left"><input type="text"></td>
+    <td colspan="2" class="left">&nbsp;</td>
+    <td colspan="4" class="left"><input type="text"></td>
+  </tr>
+  <tr>
+    <td colspan="2" class="left">&nbsp;</td>
+    <td colspan="4" class="left"><input type="text"></td>
+    <td colspan="2" class="left">&nbsp;</td>
+    <td colspan="4" class="left"><input type="text"></td>
+  </tr>
+  <tr>
+    <td colspan="2" class="left bold">State :</td>
+    <td colspan="2" class="left"><input type="text"></td>
+    <td class="center bold">Code</td>
+    <td class="center"><input type="text"></td>
+    <td colspan="2" class="left bold">State :</td>
+    <td colspan="2" class="left"><input type="text"></td>
+    <td class="center bold">Code</td>
+    <td class="center"><input type="text"></td>
+  </tr>
+  <tr>
+    <td colspan="2" class="left bold">GSTIN :</td>
+    <td colspan="4" class="left"><input type="text"></td>
+    <td colspan="2" class="left bold">GSTIN :</td>
+    <td colspan="4" class="left"><input type="text"></td>
+  </tr>
+
+  <!-- Items table header -->
+  <tr class="items-table">
+    <th rowspan="2">S.<br>No.</th>
+    <th rowspan="2">Description</th>
+    <th rowspan="2">Qty</th>
+    <th rowspan="2">Rate</th>
+    <th rowspan="2">Amount</th>
+    <th colspan="2">SGST</th>
+    <th colspan="2">CGST</th>
+    <th colspan="2">IGST</th>
+    <th rowspan="2">Total</th>
+  </tr>
+  <tr class="items-table">
+    <th>Rate</th><th>Amount</th>
+    <th>Rate</th><th>Amount</th>
+    <th>Rate</th><th>Amount</th>
+  </tr>
+
+  <tbody id="itemsBody" class="items-table"></tbody>
+
+  <tr class="fill bold">
+    <td colspan="2" class="center">Total</td>
+    <td class="center" id="totQty">0</td>
+    <td></td>
+    <td class="right" id="totAmount">0.00</td>
+    <td></td>
+    <td class="right" id="totSgstAmt">0.00</td>
+    <td></td>
+    <td class="right" id="totCgstAmt">0.00</td>
+    <td></td>
+    <td class="right" id="totIgstAmt">0.00</td>
+    <td class="right" id="totLine">0.00</td>
+  </tr>
+
+  <!-- Bank details + tax summary -->
+  <tr>
+    <td colspan="6" rowspan="6" class="left" style="vertical-align:top;">
+      <div class="bold" style="margin-bottom:4px;">OUR BANK DETAILS</div>
+      <div style="display:flex;"><div style="width:140px;" class="bold">Bank Name</div><div>: AXIS BANK LTD</div></div>
+      <div style="display:flex;"><div style="width:140px;" class="bold">A/c Name</div><div>: UMA MICRON</div></div>
+      <div style="display:flex;"><div style="width:140px;" class="bold">Current A/c No.</div><div>: 916020061629671</div></div>
+      <div style="display:flex;"><div style="width:140px;" class="bold">IFS CODE</div><div>: UTIB0000383</div></div>
+      <div style="display:flex;"><div style="width:140px;" class="bold">Branch</div><div>: Nizampura</div></div>
+    </td>
+    <td colspan="4" class="left bold">Total Amount before Tax</td>
+    <td colspan="2" class="right" id="sumBeforeTax">0.00</td>
+  </tr>
+  <tr>
+    <td colspan="4" class="left bold">CGST</td>
+    <td colspan="2" class="right" id="sumCgst">0.00</td>
+  </tr>
+  <tr>
+    <td colspan="4" class="left bold">SGST</td>
+    <td colspan="2" class="right" id="sumSgst">0.00</td>
+  </tr>
+  <tr>
+    <td colspan="4" class="left bold">IGST</td>
+    <td colspan="2" class="right" id="sumIgst">0.00</td>
+  </tr>
+  <tr>
+    <td colspan="4" class="left bold">Total Tax Amount</td>
+    <td colspan="2" class="right" id="sumTaxAmt">0.00</td>
+  </tr>
+  <tr>
+    <td colspan="4" class="left bold fill">Total Amount after Tax</td>
+    <td colspan="2" class="right bold fill" id="sumGrandTotal">0.00</td>
+  </tr>
+
+  <!-- Notes -->
+  <tr>
+    <td colspan="5" rowspan="6" class="left" style="font-size:11px; vertical-align:top;">
+      <b>NOTE:</b><br><br>
+      <b>PACKING MATERIALS AND TRANSPORTATION<br>CHARGES WILL BE CHAGRE EXTRA AS ACTUAL</b><br><br>
+      <b>Terms &amp; conditions</b><br>
+      1) Subject to vadodara Juridiction.<br>
+      2) Payment 100% ADVANCE AGAINST PI
+    </td>
+    <td colspan="7" class="left" style="font-size:11px; vertical-align:top;">
+      Ceritified that the particulars given above are true and correct
+    </td>
+  </tr>
+  <tr>
+    <td colspan="7" class="center bold" style="font-size:12.5px; border-top:1px solid #000;">For UMA MICRON</td>
+  </tr>
+  <tr>
+    <td colspan="3" rowspan="4">&nbsp;</td>
+    <td colspan="4" rowspan="4">&nbsp;</td>
+  </tr>
+  <tr></tr>
+  <tr></tr>
+  <tr></tr>
+
+  <!-- Signature -->
+  <tr>
+    <td colspan="5" class="left bold" style="font-size:11px;">this is system generated PI so no need to sign</td>
+    <td colspan="3" class="center bold">Seal</td>
+    <td colspan="4" class="center bold">Authorised signatory</td>
+  </tr>
+
+</table>
+</div>
+
+<script>
+const descriptions = [
+  "Minimum Cleaning Charges(998842)",
+  "Processing Charges(998842)",
+  "PSD Report Charges(998346)",
+  "Filter Bag Charges(591190)",
+  "Sieving Charges(998842)",
+  "HDPE Drum (39233090)",
+  "Liner (39233090)",
+  "Courier Charges(996812)",
+  "Transportation (996511)",
+  "Batch change over charges(998842)",
+  "", "", ""
+];
+
+const tbody = document.getElementById('itemsBody');
+
+descriptions.forEach((desc, i) => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="center">${desc ? i + 1 : ''}</td>
+    <td class="left"><div class="desc-field" contenteditable="true">${desc}</div></td>
+    <td class="center"><input type="number" class="qty" step="any"></td>
+    <td class="center"><input type="number" class="rate" step="any"></td>
+    <td class="right amount">0.00</td>
+    <td class="center"><input type="number" class="sgstRate" step="any"></td>
+    <td class="right sgstAmt">0.00</td>
+    <td class="center"><input type="number" class="cgstRate" step="any"></td>
+    <td class="right cgstAmt">0.00</td>
+    <td class="center"><input type="number" class="igstRate" step="any"></td>
+    <td class="right igstAmt">0.00</td>
+    <td class="right lineTotal">0.00</td>
+  `;
+  tbody.appendChild(tr);
+});
+
+function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+function fmt(v) { return v.toFixed(2); }
+
+function recalc() {
+  let totQty = 0, totAmount = 0, totSgstAmt = 0, totCgstAmt = 0, totIgstAmt = 0, totLine = 0;
+
+  tbody.querySelectorAll('tr').forEach(tr => {
+    const qty = num(tr.querySelector('.qty').value);
+    const rate = num(tr.querySelector('.rate').value);
+    const amount = qty * rate;
+
+    const sgstRate = num(tr.querySelector('.sgstRate').value);
+    const cgstRate = num(tr.querySelector('.cgstRate').value);
+    const igstRate = num(tr.querySelector('.igstRate').value);
+
+    const sgstAmt = amount * sgstRate / 100;
+    const cgstAmt = amount * cgstRate / 100;
+    const igstAmt = amount * igstRate / 100;
+    const lineTotal = amount + sgstAmt + cgstAmt + igstAmt;
+
+    tr.querySelector('.amount').textContent = fmt(amount);
+    tr.querySelector('.sgstAmt').textContent = fmt(sgstAmt);
+    tr.querySelector('.cgstAmt').textContent = fmt(cgstAmt);
+    tr.querySelector('.igstAmt').textContent = fmt(igstAmt);
+    tr.querySelector('.lineTotal').textContent = fmt(lineTotal);
+
+    totQty += qty;
+    totAmount += amount;
+    totSgstAmt += sgstAmt;
+    totCgstAmt += cgstAmt;
+    totIgstAmt += igstAmt;
+    totLine += lineTotal;
+  });
+
+  document.getElementById('totQty').textContent = totQty || 0;
+  document.getElementById('totAmount').textContent = fmt(totAmount);
+  document.getElementById('totSgstAmt').textContent = fmt(totSgstAmt);
+  document.getElementById('totCgstAmt').textContent = fmt(totCgstAmt);
+  document.getElementById('totIgstAmt').textContent = fmt(totIgstAmt);
+  document.getElementById('totLine').textContent = fmt(totLine);
+
+  document.getElementById('sumBeforeTax').textContent = fmt(totAmount);
+  document.getElementById('sumCgst').textContent = fmt(totCgstAmt);
+  document.getElementById('sumSgst').textContent = fmt(totSgstAmt);
+  document.getElementById('sumIgst').textContent = fmt(totIgstAmt);
+  const totalTax = totSgstAmt + totCgstAmt + totIgstAmt;
+  document.getElementById('sumTaxAmt').textContent = fmt(totalTax);
+  document.getElementById('sumGrandTotal').textContent = fmt(totAmount + totalTax);
+}
+
+tbody.addEventListener('input', recalc);
+recalc();
+</script>
+
+</body>
+</html>
+add this when im going to download the pi
+</user_query>
