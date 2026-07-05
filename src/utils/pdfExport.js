@@ -9,6 +9,16 @@ import {
   formatCompanyAddressLines,
   getContactLine
 } from './companyProfile';
+import { renderTaxInvoicePdf } from './taxInvoiceHtml';
+import {
+  TI_CHARGES_LIST,
+  TI_EMPTY_ROWS,
+  formatPdfDateSlash,
+  formatPdfDateDmy,
+  getPdfProductLines,
+  buildTiChargeAmounts,
+  getPdfChargeLineQty
+} from './taxInvoiceLayout';
 
 const getProfile = (data) => mergeCompanyProfile(data?.companyProfile || getStoredCompanyProfile());
 
@@ -462,137 +472,6 @@ const buildGeneric = (doc, docType, data) => {
 };
 
 const PDF_MARGIN = 14;
-const TI_EMPTY_ROWS = 2;
-
-const formatPdfDateSlash = (d) => {
-  if (!d || d === 'N/A') return d === 'N/A' ? 'N/A' : '';
-  try {
-    const str = String(d);
-    const date = str.length === 10 && str[4] === '-'
-      ? new Date(`${str}T00:00:00`)
-      : new Date(d);
-    if (Number.isNaN(date.getTime())) return str;
-    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
-  } catch {
-    return String(d);
-  }
-};
-
-const formatPdfDateDmy = (d) => {
-  if (!d || d === 'N/A') return d === 'N/A' ? 'N/A' : '';
-  try {
-    const str = String(d);
-    const date = str.length === 10 && str[4] === '-'
-      ? new Date(`${str}T00:00:00`)
-      : new Date(d);
-    if (Number.isNaN(date.getTime())) return str;
-    return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
-  } catch {
-    return String(d);
-  }
-};
-
-const TI_CHARGES_LIST = [
-  { key: 'cleaning', label: 'Minimum Cleaning Charges(998842)', sgst: 6, cgst: 6 },
-  { key: 'processing', label: 'Processing Charges(998842)', sgst: 6, cgst: 6 },
-  { key: 'psdReport', label: 'PSD Report Charges(998346)', sgst: 9, cgst: 9 },
-  { key: 'filterBag', label: 'Filter Bag Charges(591190)', sgst: 6, cgst: 6 },
-  { key: 'sieving', label: 'Sieving Charges(998842)', sgst: 6, cgst: 6 },
-  { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', sgst: 9, cgst: 9 },
-  { key: 'liner', label: 'Liner (39233090)', sgst: 9, cgst: 9 },
-  { key: 'courier', label: 'Courier Charges(996812)', sgst: 9, cgst: 9 },
-  { key: 'transportation', label: 'Transportation (996511)', sgst: 9, cgst: 9 },
-  { key: 'batchChangeover', label: 'Batch change over charges(998842)', sgst: 6, cgst: 6 }
-];
-
-const MATERIAL_QTY_CHARGE_KEYS = ['cleaning', 'processing', 'sieving', 'other'];
-
-const getPdfChargeLineQty = (data, key, materialQty) => {
-  const saved = data.qtys?.[key];
-  if (saved != null && saved !== '') return parseFloat(saved) || 0;
-  if (MATERIAL_QTY_CHARGE_KEYS.includes(key)) return materialQty || 1;
-  return 1;
-};
-
-const buildTiChargeAmounts = (data) => {
-  const amounts = {};
-  const materialQty = parseFloat(data.qty) || 0;
-  const productLines = getPdfProductLines(data);
-  const normName = (s) => (s || '').trim().toLowerCase();
-
-  const addLine = (key, qty, rate, amt) => {
-    if (!amounts[key]) amounts[key] = { qty: 0, rate: 0, amt: 0 };
-    const lineQty = parseFloat(qty) || 0;
-    const lineRate = parseFloat(rate) || 0;
-    const lineAmt = parseFloat(amt) || 0;
-    amounts[key].qty += lineQty;
-    amounts[key].amt += lineAmt;
-    if (lineRate) amounts[key].rate = lineRate;
-  };
-
-  if (data.productCharges && Object.keys(data.productCharges).length > 0) {
-    const pcMap = data.productCharges;
-    const chargeKeys = Object.keys(pcMap);
-    const orderedNames = [];
-    const seen = new Set();
-    const addName = (name) => {
-      if (!name) return;
-      const nk = normName(name);
-      if (seen.has(nk)) return;
-      seen.add(nk);
-      orderedNames.push(name);
-    };
-    productLines.forEach(p => addName(p.name));
-    chargeKeys.forEach(k => addName(k));
-
-    orderedNames.forEach((name) => {
-      const chargeKey = chargeKeys.find(k => normName(k) === normName(name)) || name;
-      const pc = pcMap[chargeKey];
-      if (!pc) return;
-      const summary = productLines.find(p => normName(p.name) === normName(name));
-      const prodQty = summary?.qty || 0;
-      if (pc.charges?.processing) {
-        const rate = parseFloat(pc.rates?.processing || 0);
-        const lineQty = prodQty || parseFloat(pc.qtys?.processing) || 0;
-        addLine('processing', lineQty, rate, lineQty * rate);
-      }
-      TI_CHARGES_LIST.forEach((c) => {
-        if (c.key === 'processing') return;
-        if (pc.charges?.[c.key]) {
-          const rowQty = pc.qtys?.[c.key] != null && pc.qtys?.[c.key] !== ''
-            ? (parseFloat(pc.qtys[c.key]) || 0)
-            : 1;
-          const rate = parseFloat(pc.rates?.[c.key] || 0);
-          addLine(c.key, rowQty, rate, rowQty * rate);
-        }
-      });
-    });
-  } else {
-    if (data.charges?.processing) {
-      if (productLines.length) {
-        productLines.forEach(({ qty: lineQtyVal }) => {
-          const procRate = parseFloat(data.rates?.processing || 0);
-          const lineQty = lineQtyVal || materialQty;
-          addLine('processing', lineQty, procRate, lineQty * procRate);
-        });
-      } else {
-        const procQty = getPdfChargeLineQty(data, 'processing', materialQty);
-        const procRate = parseFloat(data.rates?.processing || 0);
-        addLine('processing', procQty, procRate, procQty * procRate);
-      }
-    }
-    TI_CHARGES_LIST.forEach((c) => {
-      if (c.key === 'processing') return;
-      if (data.charges?.[c.key]) {
-        const rowQty = getPdfChargeLineQty(data, c.key, materialQty);
-        const rate = parseFloat(data.rates?.[c.key] || 0);
-        addLine(c.key, rowQty, rate, rowQty * rate);
-      }
-    });
-  }
-
-  return amounts;
-};
 
 const drawOuterPageBorder = (doc) => {
   const w = doc.internal.pageSize.getWidth();
@@ -600,346 +479,6 @@ const drawOuterPageBorder = (doc) => {
   doc.setLineWidth(0.8);
   doc.setDrawColor(0, 0, 0);
   doc.rect(10, 10, w - 20, h - 20);
-};
-
-const buildTaxInvoicePDF = (doc, data) => {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const profile = getProfile(data);
-  const gridMargin = { left: PDF_MARGIN, right: PDF_MARGIN };
-  const gridStyles = {
-    lineColor: [0, 0, 0],
-    lineWidth: 0.5,
-    textColor: 0,
-    fontSize: 9,
-    fontStyle: 'bold',
-    cellPadding: 1.5
-  };
-
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Original\nDuplicate', pageWidth - PDF_MARGIN, 12, { align: 'right' });
-
-  const headerEndY = drawPdfCompanyHeaderBoxed(doc, { profile, variant: 'ti' });
-
-  autoTable(doc, {
-    startY: headerEndY,
-    body: [[{ content: 'Tax Invoice', styles: { halign: 'center', fontStyle: 'bold', fontSize: 20 } }]],
-    theme: 'grid',
-    styles: { ...gridStyles, fontStyle: 'bold', cellPadding: 3 },
-    margin: gridMargin
-  });
-
-  const docNo = data.invoiceNo || 'N/A';
-  const docDate = formatPdfDateSlash(data.date) || 'N/A';
-  const refNo = data.partyDocNo || data.challanNo || '';
-  const refDate = formatPdfDateSlash(data.partyDocDate) || '';
-  const dcNo = data.dcNo || '';
-  const dcDate = formatPdfDateSlash(data.dcDate) || data.dcDate || '';
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY,
-    body: [
-      ['Invoice No:', { content: docNo, styles: { fontStyle: 'bold' } }, 'Invoice Date:', { content: docDate, styles: { fontStyle: 'bold' } }],
-      ['Delivery Challan No.', dcNo, 'Date :', dcDate],
-      [{ content: '', styles: { lineWidth: { top: 0, bottom: 0, left: 0.5, right: 0.5 } } }, { content: '', styles: { lineWidth: { top: 0, bottom: 0, left: 0, right: 0.5 } } }, 'PO No./Challan No.', refNo]
-    ],
-    theme: 'grid',
-    styles: gridStyles,
-    columnStyles: { 0: { cellWidth: 35 }, 1: { cellWidth: 56 }, 2: { cellWidth: 35 }, 3: { cellWidth: 56 } },
-    margin: gridMargin
-  });
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY,
-    body: [
-      ['State : GUJARAT', 'Code', '24', 'Date :', { content: refDate, colSpan: 2 }]
-    ],
-    theme: 'grid',
-    styles: gridStyles,
-    columnStyles: {
-      0: { cellWidth: 60 }, 1: { cellWidth: 15 }, 2: { cellWidth: 16 },
-      3: { cellWidth: 35 }, 4: { cellWidth: 28 }, 5: { cellWidth: 28 }
-    },
-    margin: gridMargin
-  });
-
-  const billState = data.billState || data.state || 'GUJARAT';
-  const shipState = data.shipState || data.state || 'GUJARAT';
-  const billCode = data.billStateCode || data.stateCode || '24';
-  const shipCode = data.shipStateCode || data.stateCode || '24';
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY,
-    body: [
-      [
-        { content: 'Bill to Party', colSpan: 2, styles: { halign: 'center' } },
-        { content: 'Ship to Party', colSpan: 2, styles: { halign: 'center' } }
-      ],
-      ['Name :', data.partyName || '', 'Name :', data.shipName || data.partyName || ''],
-      ['Address :', data.billAddress || data.address || '', 'Address :', data.shipAddress || data.address || ''],
-      ['', '', '', ''],
-      ['', '', '', ''],
-      [`State : ${billState}`, billCode, `State : ${shipState}`, shipCode],
-      [`GSTIN : ${data.gstinBill || data.gstin || ''}`, '', `GSTIN : ${data.gstinShip || data.gstin || ''}`, '']
-    ],
-    theme: 'grid',
-    styles: { ...gridStyles, fontStyle: 'normal', minCellHeight: 8 },
-    columnStyles: {
-      0: { cellWidth: 22, fontStyle: 'bold' },
-      1: { cellWidth: 69 },
-      2: { cellWidth: 22, fontStyle: 'bold' },
-      3: { cellWidth: 69 }
-    },
-    margin: gridMargin
-  });
-
-  const head = [
-    [
-      { content: 'S.\nNo.', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-      { content: 'Description', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-      { content: 'Qty', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-      { content: 'Rate', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-      { content: 'Amount', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-      { content: 'SGST', colSpan: 2, styles: { halign: 'center' } },
-      { content: 'CGST', colSpan: 2, styles: { halign: 'center' } },
-      { content: 'IGST', colSpan: 2, styles: { halign: 'center' } },
-      { content: 'Total', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }
-    ],
-    [
-      { content: 'Rate', styles: { halign: 'center' } },
-      { content: 'Amount', styles: { halign: 'center' } },
-      { content: 'Rate', styles: { halign: 'center' } },
-      { content: 'Amount', styles: { halign: 'center' } },
-      { content: 'Rate', styles: { halign: 'center' } },
-      { content: 'Amount', styles: { halign: 'center' } }
-    ]
-  ];
-
-  const chargeAmounts = buildTiChargeAmounts(data);
-  let itemsBody = [];
-  let totalAmt = 0;
-  let totalSgst = 0;
-  let totalCgst = 0;
-  let totalIgst = 0;
-  let totalAll = 0;
-  let totalQty = 0;
-
-  TI_CHARGES_LIST.forEach((charge) => {
-    const line = chargeAmounts[charge.key] || { qty: 0, rate: 0, amt: 0 };
-    const amt = line.amt || 0;
-    const sgstRate = charge.sgst;
-    const cgstRate = charge.cgst;
-    const igstRate = 0;
-    const sgstAmt = amt * (sgstRate / 100);
-    const cgstAmt = amt * (cgstRate / 100);
-    const igstAmt = 0;
-    const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
-    const qtyDisplay = line.qty
-      ? (Number.isInteger(line.qty) ? line.qty : line.qty.toFixed(2))
-      : '';
-    const rateDisplay = line.rate ? line.rate.toFixed(2) : '';
-
-    itemsBody.push([
-      '',
-      charge.label,
-      qtyDisplay,
-      rateDisplay,
-      amt.toFixed(2),
-      sgstRate,
-      sgstAmt.toFixed(2),
-      cgstRate,
-      cgstAmt.toFixed(2),
-      igstRate,
-      igstAmt.toFixed(2),
-      rowTotal.toFixed(2)
-    ]);
-    totalAmt += amt;
-    totalSgst += sgstAmt;
-    totalCgst += cgstAmt;
-    totalIgst += igstAmt;
-    totalAll += rowTotal;
-    if (line.qty) totalQty += line.qty;
-  });
-
-  const extraRows = [];
-  const hsnCode = data.hsnCode || data.hsn || '';
-  if (hsnCode) {
-    extraRows.push(['', `HSN CODE : ${hsnCode}`, '', '', '0.00', '', '0.00', '', '0.00', '', '0.00', '0.00']);
-  }
-  if (data.customCharges?.length) {
-    data.customCharges.forEach((cc) => {
-      if (!cc.checked) return;
-      const ccQty = parseFloat(cc.qty) || 1;
-      const rate = parseFloat(cc.rate) || 0;
-      const amt = ccQty * rate;
-      if (amt <= 0) return;
-      const sgstRate = 9;
-      const cgstRate = 9;
-      const sgstAmt = amt * 0.09;
-      const cgstAmt = amt * 0.09;
-      const rowTotal = amt + sgstAmt + cgstAmt;
-      extraRows.push([
-        '',
-        cc.name || '',
-        ccQty,
-        rate.toFixed(2),
-        amt.toFixed(2),
-        sgstRate,
-        sgstAmt.toFixed(2),
-        cgstRate,
-        cgstAmt.toFixed(2),
-        0,
-        '0.00',
-        rowTotal.toFixed(2)
-      ]);
-      totalAmt += amt;
-      totalSgst += sgstAmt;
-      totalCgst += cgstAmt;
-      totalAll += rowTotal;
-    });
-  }
-
-  for (let i = 0; i < TI_EMPTY_ROWS; i++) {
-    if (extraRows[i]) {
-      itemsBody.push(extraRows[i]);
-    } else {
-      itemsBody.push(['', '', '', '', '0.00', '', '0.00', '', '0.00', '', '0.00', '0.00']);
-    }
-  }
-  extraRows.slice(TI_EMPTY_ROWS).forEach((row) => itemsBody.push(row));
-
-  const discount = parseFloat(data.discount) || 0;
-  if (discount > 0) {
-    const grossAmt = totalAmt;
-    totalAmt = Math.max(0, grossAmt - discount);
-    const ratio = grossAmt > 0 ? totalAmt / grossAmt : 0;
-    totalSgst *= ratio;
-    totalCgst *= ratio;
-    totalIgst *= ratio;
-    totalAll = totalAmt + totalSgst + totalCgst + totalIgst;
-  }
-
-  itemsBody.push([
-    { content: 'Total', colSpan: 2, styles: { halign: 'center', fontStyle: 'bold' } },
-    totalQty || 0,
-    '',
-    totalAmt.toFixed(2),
-    '', totalSgst.toFixed(2),
-    '', totalCgst.toFixed(2),
-    '', totalIgst.toFixed(2),
-    totalAll.toFixed(2)
-  ]);
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY,
-    head,
-    body: itemsBody,
-    theme: 'grid',
-    styles: {
-      lineColor: [0, 0, 0],
-      lineWidth: 0.5,
-      textColor: 0,
-      fontSize: 8,
-      cellPadding: 1.5,
-      minCellHeight: 6,
-      valign: 'top'
-    },
-    columnStyles: {
-      0: { cellWidth: 8, halign: 'center' },
-      1: { cellWidth: 'auto', halign: 'left' },
-      2: { cellWidth: 10, halign: 'center' },
-      3: { cellWidth: 15, halign: 'right' },
-      4: { cellWidth: 17, halign: 'right' },
-      5: { cellWidth: 8, halign: 'right' },
-      6: { cellWidth: 14, halign: 'right' },
-      7: { cellWidth: 8, halign: 'right' },
-      8: { cellWidth: 14, halign: 'right' },
-      9: { cellWidth: 8, halign: 'right' },
-      10: { cellWidth: 14, halign: 'right' },
-      11: { cellWidth: 20, halign: 'right', fontStyle: 'bold' }
-    },
-    margin: gridMargin
-  });
-
-  const tableY = doc.lastAutoTable.finalY;
-  const contentWidth = pageWidth - PDF_MARGIN * 2;
-  const leftWidth = contentWidth * 0.55;
-  const rightWidth = contentWidth * 0.45;
-  const bankGrid = { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 8, cellPadding: 2 };
-
-  autoTable(doc, {
-    startY: tableY,
-    tableWidth: leftWidth,
-    margin: { left: PDF_MARGIN, right: 0 },
-    body: [
-      [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold', textDecoration: 'underline', lineWidth: { top: 0.5, bottom: 0, left: 0.5, right: 0.5 } } }],
-      [{
-        content: `Bank Name : AXIS BANK LTD\nA/c Name : ${profile.companyName}\nCurrent A/c No. : 916020061629671\nIFS CODE : UTIB0000383\nBranch : Nizampura`,
-        styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 28, fontStyle: 'normal' }
-      }]
-    ],
-    theme: 'grid',
-    styles: bankGrid
-  });
-  const bankY = doc.lastAutoTable.finalY;
-
-  autoTable(doc, {
-    startY: tableY,
-    tableWidth: rightWidth,
-    margin: { left: PDF_MARGIN + leftWidth, right: PDF_MARGIN },
-    body: [
-      ['Total Amount before Tax', { content: totalAmt.toFixed(2), styles: { halign: 'right', fontStyle: 'bold' } }],
-      ['SGST', { content: totalSgst.toFixed(2), styles: { halign: 'right' } }],
-      ['CGST', { content: totalCgst.toFixed(2), styles: { halign: 'right' } }],
-      ['IGST', { content: totalIgst.toFixed(2), styles: { halign: 'right' } }],
-      ['Total Tax Amount', { content: (totalCgst + totalSgst + totalIgst).toFixed(2), styles: { halign: 'right', fontStyle: 'bold' } }],
-      [{ content: 'Total Amount after Tax', styles: { fontStyle: 'bold', fontSize: 10 } }, { content: totalAll.toFixed(2), styles: { halign: 'right', fontStyle: 'bold', fontSize: 10 } }]
-    ],
-    theme: 'grid',
-    styles: { ...bankGrid, lineWidth: { top: 0.5, bottom: 0.5, left: 0, right: 0.5 }, fontSize: 9 },
-    columnStyles: { 0: { cellWidth: rightWidth * 0.68 }, 1: { cellWidth: rightWidth * 0.32 } }
-  });
-  const totalsY = doc.lastAutoTable.finalY;
-  const footerRow2Y = Math.max(bankY, totalsY);
-
-  autoTable(doc, {
-    startY: footerRow2Y,
-    tableWidth: leftWidth,
-    margin: { left: PDF_MARGIN, right: 0 },
-    body: [[{
-      content: 'Terms & conditions\n1. Subject to vadodara Juridiction.\n2. Payment Term as per our agree terms.\n3. Interest will charged @ 24% per annum if amount remaining unpaid from due date.',
-      styles: { minCellHeight: 38, fontStyle: 'normal', lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, valign: 'top' }
-    }]],
-    theme: 'grid',
-    styles: bankGrid
-  });
-
-  autoTable(doc, {
-    startY: footerRow2Y,
-    tableWidth: rightWidth,
-    margin: { left: PDF_MARGIN + leftWidth, right: PDF_MARGIN },
-    body: [
-      [{
-        content: 'Ceritified that the particulars given above are true and correct',
-        colSpan: 2,
-        styles: { halign: 'center', fontSize: 8, minCellHeight: 10, lineWidth: { top: 0, bottom: 0.5, left: 0, right: 0.5 } }
-      }],
-      [{
-        content: `For ${profile.companyName}`,
-        colSpan: 2,
-        styles: { halign: 'center', fontStyle: 'bold', minCellHeight: 18, lineWidth: { top: 0, bottom: 0.5, left: 0, right: 0.5 } }
-      }],
-      [
-        { content: 'Seal', styles: { halign: 'center', minCellHeight: 16, lineWidth: { top: 0, bottom: 0.5, left: 0, right: 0.5 } } },
-        { content: 'Authorised signatory', styles: { halign: 'center', minCellHeight: 16, lineWidth: { top: 0, bottom: 0.5, left: 0, right: 0.5 } } }
-      ]
-    ],
-    theme: 'grid',
-    styles: bankGrid,
-    columnStyles: { 0: { cellWidth: rightWidth * 0.4 }, 1: { cellWidth: rightWidth * 0.6 } }
-  });
-
-  drawOuterPageBorder(doc);
 };
 
 const PO_HEADER_FILL = [180, 200, 240];
@@ -1195,25 +734,6 @@ const buildPurchaseOrderPDF = (doc, data) => {
   doc.text('Seal', PDF_MARGIN + leftWidth * 0.3 + 14, sealY + 9, { align: 'center' });
 
   drawOuterPageBorder(doc);
-};
-
-const getPdfProductLines = (data) => {
-  if (data.productSummaries?.length) {
-    return data.productSummaries.map(p => ({
-      name: p.prodName || '',
-      qty: parseFloat(p.qty) || 0
-    })).filter(p => p.name);
-  }
-  if (data.productName?.includes(',')) {
-    return data.productName.split(',').map(name => ({
-      name: name.trim(),
-      qty: 0
-    })).filter(p => p.name);
-  }
-  if (data.productName) {
-    return [{ name: data.productName, qty: parseFloat(data.qty) || 0 }];
-  }
-  return [];
 };
 
 const PI_HEADER_FILL = [189, 215, 238];
@@ -1968,7 +1488,6 @@ const buildPDF = (docType, data) => {
   let docNo = data.invoiceNo || data.bprNo || data.plNo || data.dcNo || data.psdNo || data.receiptNo || data.noteNo || 'N/A';
   
   if (docType === 'TI') {
-    buildTaxInvoicePDF(doc, data);
     docNo = data.invoiceNo || 'N/A';
   } else if (docType === 'PO') {
     buildPurchaseOrderPDF(doc, data);
@@ -2101,12 +1620,20 @@ const buildOldLogic = (doc, docType, data) => {
 
 export const exportToPDF = (docType, data) => {
   const enriched = { ...data, companyProfile: data?.companyProfile || getStoredCompanyProfile() };
+  if (docType === 'TI') {
+    renderTaxInvoicePdf(enriched, { mode: 'save' }).catch((err) => console.error('TI PDF export failed:', err));
+    return;
+  }
   const { doc, docNo } = buildPDF(docType, enriched);
   doc.save(`${docType}_${docNo}.pdf`);
 };
 
 export const viewPDF = (docType, data) => {
   const enriched = { ...data, companyProfile: data?.companyProfile || getStoredCompanyProfile() };
+  if (docType === 'TI') {
+    renderTaxInvoicePdf(enriched, { mode: 'view' }).catch((err) => console.error('TI PDF view failed:', err));
+    return;
+  }
   const { doc, docNo } = buildPDF(docType, enriched);
   const url = doc.output('bloburl');
   const win = window.open(url, '_blank');

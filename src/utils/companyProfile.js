@@ -107,12 +107,14 @@ const drawFallbackLogo = (doc, x, y) => {
   doc.setTextColor(0, 0, 0);
 };
 
-export const drawCompanyLogo = (doc, x, y, profile) => {
+export const drawCompanyLogo = (doc, x, y, profile, size = {}) => {
   const p = mergeCompanyProfile(profile);
+  const w = size.width ?? 28;
+  const h = size.height ?? 28;
   if (p.logo && p.logo.startsWith('data:image')) {
     try {
       const format = p.logo.includes('image/jpeg') ? 'JPEG' : 'PNG';
-      doc.addImage(p.logo, format, x, y, 28, 28);
+      doc.addImage(p.logo, format, x, y, w, h);
       return;
     } catch {
       drawFallbackLogo(doc, x, y);
@@ -175,12 +177,14 @@ export const drawPdfCompanyHeaderBoxed = (doc, options = {}) => {
   const isTi = options.variant === 'ti';
   const isPo = options.variant === 'po';
   const boxTop = options.boxTop ?? 15;
-  const boxHeight = options.boxHeight ?? 30;
+  const boxHeight = options.boxHeight ?? (isTi ? 32 : 30);
+  const logoW = isTi ? 38 : 28;
+  const logoH = isTi ? 30 : 28;
 
   doc.setLineWidth(0.5);
   doc.setDrawColor(0, 0, 0);
   doc.rect(14, boxTop, pageWidth - 28, boxHeight);
-  drawCompanyLogo(doc, 20, boxTop + 3, profile);
+  drawCompanyLogo(doc, 18, boxTop + 2, profile, { width: logoW, height: logoH });
 
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(14);
