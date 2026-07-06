@@ -114,21 +114,20 @@ const DC_STYLES = `
   .dc-footer-label { font-weight: bold; white-space: nowrap; width: 38%; }
   .dc-footer-value { min-height: 18px; }
   .dc-sign-box {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
     text-align: center;
     font-weight: bold;
-    min-height: 88px;
-    vertical-align: bottom;
-    position: relative;
-    padding-bottom: 4px;
+    min-height: 96px;
+    height: 100%;
+    padding: 8px 6px 6px;
+    box-sizing: border-box;
   }
-  .dc-sign-title { padding-top: 6px; }
-  .dc-sign-label {
-    position: absolute;
-    bottom: 4px;
-    left: 0;
-    right: 0;
-    font-size: 11px;
-  }
+  .dc-sign-title { font-size: 12px; line-height: 1.4; }
+  .dc-sign-space { flex: 1; min-height: 44px; width: 100%; }
+  .dc-sign-label { font-size: 11px; line-height: 1.4; }
   .dc-company-gstin { font-weight: bold; font-size: 11.5px; }
   .logo-wrap { display: inline-block; vertical-align: middle; margin-right: 8px; }
   .logo-wrap img, .logo-wrap svg { width: 72px; height: 72px; object-fit: contain; }
@@ -268,15 +267,17 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
         </td>
         <td colspan="2" style="padding:0; vertical-align:top;">
           <table class="dc-grid" style="border:none; height:100%;">
-            <tr>
-              <td class="dc-sign-box" style="border-left:none; border-top:none; border-right:none;">
+            <tr style="height:50%;">
+              <td class="dc-sign-box" style="border-left:none; border-top:none; border-right:none; min-height:100px;">
                 <div class="dc-sign-title">For ${esc(profile.companyName)}</div>
+                <div class="dc-sign-space"></div>
                 <div class="dc-sign-label">Authorised Signatory</div>
               </td>
             </tr>
-            <tr>
-              <td class="dc-sign-box" style="border-left:none; border-right:none; border-bottom:none;">
+            <tr style="height:50%;">
+              <td class="dc-sign-box" style="border-left:none; border-right:none; border-bottom:none; min-height:100px;">
                 <div class="dc-sign-title">RECEIVED BY :</div>
+                <div class="dc-sign-space"></div>
                 <div class="dc-sign-label">Authorised Signatory</div>
               </td>
             </tr>
