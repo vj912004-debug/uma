@@ -4,7 +4,8 @@ import { formatTiHeaderAddressLines, getTiContactLine, mergeCompanyProfile } fro
 import {
   TI_CHARGES_LIST,
   calcTiTotals,
-  formatPdfDateSlash
+  formatPdfDateSlash,
+  getPartyAddressRows
 } from './taxInvoiceLayout';
 
 const esc = (v) => String(v ?? '')
@@ -98,7 +99,7 @@ const TI_STYLES = `
   .meta-table .code-cell { font-weight: bold; white-space: nowrap; text-align: center; }
   .meta-table .code-value { text-align: center; }
   .party-header td { text-align: center; font-weight: bold; background: #fff; }
-  .party-table td { height: 20px; }
+  .party-table td { vertical-align: top; }
   .party-table .field-label { font-weight: bold; white-space: nowrap; }
   .party-table .code-label { font-weight: bold; text-align: center; }
   .items-table th, .items-table td { text-align: center; font-size: 12px; }
@@ -258,6 +259,27 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   const companyStateCode = esc('24');
 
   const { rowsHtml, totals } = buildItemRowsHtml(data);
+  const partyAddressHtml = getPartyAddressRows(
+    data.billAddress || data.address || '',
+    data.shipAddress || data.address || ''
+  ).map((row, i) => {
+    if (i === 0) {
+      return `
+      <tr>
+        <td class="field-label">Address :</td>
+        <td>${esc(row.bill)}</td>
+        <td class="field-label">Address :</td>
+        <td>${esc(row.ship)}</td>
+      </tr>`;
+    }
+    return `
+      <tr>
+        <td></td>
+        <td>${esc(row.bill)}</td>
+        <td></td>
+        <td>${esc(row.ship)}</td>
+      </tr>`;
+  }).join('');
 
   return `
 <style>${TI_STYLES}</style>
@@ -319,14 +341,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <td class="field-label">Name :</td>
         <td>${esc(data.shipName || data.partyName || '')}</td>
       </tr>
-      <tr>
-        <td class="field-label">Address :</td>
-        <td>${esc(data.billAddress || data.address || '')}</td>
-        <td class="field-label">Address :</td>
-        <td>${esc(data.shipAddress || data.address || '')}</td>
-      </tr>
-      <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
-      <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+      ${partyAddressHtml}
       <tr>
         <td class="field-label">State :</td>
         <td class="code-label">Code</td>

@@ -15,6 +15,42 @@ export const TI_CHARGES_LIST = [
 
 export const TI_EMPTY_ROWS = 2;
 
+/** Split party address into display lines (explicit newlines or word-wrap). */
+export const splitPartyAddressLines = (address, charsPerLine = 48) => {
+  const text = (address || '').trim();
+  if (!text) return [];
+  const explicit = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (explicit.length > 1) return explicit;
+  const raw = explicit[0] || text;
+  if (raw.length <= charsPerLine) return [raw];
+  const words = raw.split(/\s+/);
+  const lines = [];
+  let cur = '';
+  words.forEach((w) => {
+    const next = cur ? `${cur} ${w}` : w;
+    if (next.length > charsPerLine && cur) {
+      lines.push(cur);
+      cur = w;
+    } else {
+      cur = next;
+    }
+  });
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [raw];
+};
+
+/** Aligned bill/ship address rows; extra rows only when address needs multiple lines. */
+export const getPartyAddressRows = (billAddress, shipAddress, charsPerLine = 48) => {
+  const billLines = splitPartyAddressLines(billAddress, charsPerLine);
+  const shipLines = splitPartyAddressLines(shipAddress, charsPerLine);
+  const count = Math.max(billLines.length, shipLines.length, 1);
+  const rows = [];
+  for (let i = 0; i < count; i++) {
+    rows.push({ bill: billLines[i] || '', ship: shipLines[i] || '' });
+  }
+  return rows;
+};
+
 const MATERIAL_QTY_CHARGE_KEYS = ['cleaning', 'processing', 'sieving', 'other'];
 
 export const formatPdfDateSlash = (d) => {

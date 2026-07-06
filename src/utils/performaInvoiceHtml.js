@@ -4,7 +4,8 @@ import { formatTiHeaderAddressLines, getTiContactLine, mergeCompanyProfile } fro
 import {
   TI_CHARGES_LIST,
   calcTiTotals,
-  formatPdfDateSlash
+  formatPdfDateSlash,
+  getPartyAddressRows
 } from './taxInvoiceLayout';
 
 const esc = (v) => String(v ?? '')
@@ -144,6 +145,27 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
 
   const { rowsHtml, totals } = buildItemRowsHtml(data);
   const totalTax = totals.totalSgst + totals.totalCgst + totals.totalIgst;
+  const partyAddressHtml = getPartyAddressRows(
+    data.billAddress || data.address || '',
+    data.shipAddress || data.address || ''
+  ).map((row, i) => {
+    if (i === 0) {
+      return `
+      <tr>
+        <td colspan="2" class="left bold">Address :</td>
+        <td colspan="4" class="left">${esc(row.bill)}</td>
+        <td colspan="2" class="left bold">Address :</td>
+        <td colspan="4" class="left">${esc(row.ship)}</td>
+      </tr>`;
+    }
+    return `
+      <tr>
+        <td colspan="2"></td>
+        <td colspan="4" class="left">${esc(row.bill)}</td>
+        <td colspan="2"></td>
+        <td colspan="4" class="left">${esc(row.ship)}</td>
+      </tr>`;
+  }).join('');
 
   return `
 <style>${PI_STYLES}</style>
@@ -201,24 +223,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
         <td colspan="2" class="left bold">Name :</td>
         <td colspan="4" class="left">${esc(data.shipName || data.partyName || '')}</td>
       </tr>
-      <tr>
-        <td colspan="2" class="left bold">Address :</td>
-        <td colspan="4" class="left">${esc(data.billAddress || data.address || '')}</td>
-        <td colspan="2" class="left bold">Address :</td>
-        <td colspan="4" class="left">${esc(data.shipAddress || data.address || '')}</td>
-      </tr>
-      <tr>
-        <td colspan="2" class="left">&nbsp;</td>
-        <td colspan="4" class="left">&nbsp;</td>
-        <td colspan="2" class="left">&nbsp;</td>
-        <td colspan="4" class="left">&nbsp;</td>
-      </tr>
-      <tr>
-        <td colspan="2" class="left">&nbsp;</td>
-        <td colspan="4" class="left">&nbsp;</td>
-        <td colspan="2" class="left">&nbsp;</td>
-        <td colspan="4" class="left">&nbsp;</td>
-      </tr>
+      ${partyAddressHtml}
       <tr>
         <td colspan="2" class="left bold">State :</td>
         <td colspan="2" class="left">${esc(data.billState || data.state || '')}</td>
