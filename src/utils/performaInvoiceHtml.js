@@ -76,7 +76,48 @@ const PI_STYLES = `
   table.grid td.title-bar { font-size: 26px; font-weight: bold; padding: 8px 0; }
   .items-table th { font-size: 11.5px; background: #bdd7ee; }
   .items-table td { font-size: 11.5px; }
-  .bank-label { width: 140px; }
+  .bank-label { width: 148px; }
+  .pi-footer td { padding: 7px 9px; }
+  .pi-footer-bank {
+    min-height: 138px;
+    padding: 10px 12px;
+    line-height: 1.55;
+    vertical-align: top;
+  }
+  .pi-footer-bank .bank-line { margin-bottom: 4px; }
+  .pi-footer-total td { padding: 8px 10px; font-size: 12.5px; }
+  .pi-footer-note {
+    min-height: 152px;
+    padding: 12px 12px;
+    font-size: 11.5px;
+    line-height: 1.6;
+    vertical-align: top;
+  }
+  .pi-footer-cert {
+    padding: 10px 12px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    vertical-align: top;
+  }
+  .pi-footer-for {
+    padding: 12px 10px;
+    font-size: 13px;
+    min-height: 36px;
+  }
+  .pi-footer-sign-space td {
+    min-height: 78px;
+    vertical-align: top;
+  }
+  .pi-footer-seal td {
+    padding: 12px 10px 10px;
+    min-height: 46px;
+    vertical-align: bottom;
+    font-size: 12.5px;
+  }
+  .pi-footer-generated {
+    padding: 10px 12px;
+    font-size: 11.5px;
+  }
 `;
 
 const buildItemRowsHtml = (data) => {
@@ -274,64 +315,65 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
         <td class="right">${fmtMoney(totals.totalAll)}</td>
       </tr>
 
-      <tr>
-        <td colspan="6" rowspan="6" class="left" style="vertical-align:top;">
-          <div class="bold" style="margin-bottom:4px;">OUR BANK DETAILS</div>
-          <div style="display:flex;"><div class="bank-label bold">Bank Name</div><div>: AXIS BANK LTD</div></div>
-          <div style="display:flex;"><div class="bank-label bold">A/c Name</div><div>: ${esc(profile.companyName)}</div></div>
-          <div style="display:flex;"><div class="bank-label bold">Current A/c No.</div><div>: 916020061629671</div></div>
-          <div style="display:flex;"><div class="bank-label bold">IFS CODE</div><div>: UTIB0000383</div></div>
-          <div style="display:flex;"><div class="bank-label bold">Branch</div><div>: Nizampura</div></div>
+      <tr class="pi-footer">
+        <td colspan="6" rowspan="6" class="left pi-footer-bank">
+          <div class="bold" style="margin-bottom:6px;">OUR BANK DETAILS</div>
+          <div class="bank-line" style="display:flex;"><div class="bank-label bold">Bank Name</div><div>: AXIS BANK LTD</div></div>
+          <div class="bank-line" style="display:flex;"><div class="bank-label bold">A/c Name</div><div>: ${esc(profile.companyName)}</div></div>
+          <div class="bank-line" style="display:flex;"><div class="bank-label bold">Current A/c No.</div><div>: 916020061629671</div></div>
+          <div class="bank-line" style="display:flex;"><div class="bank-label bold">IFS CODE</div><div>: UTIB0000383</div></div>
+          <div class="bank-line" style="display:flex;"><div class="bank-label bold">Branch</div><div>: Nizampura</div></div>
         </td>
-        <td colspan="4" class="left bold">Total Amount before Tax</td>
-        <td colspan="2" class="right">${fmtMoney(totals.totalAmt)}</td>
+        <td colspan="4" class="left bold pi-footer-total">Total Amount before Tax</td>
+        <td colspan="2" class="right pi-footer-total">${fmtMoney(totals.totalAmt)}</td>
       </tr>
-      <tr>
+      <tr class="pi-footer pi-footer-total">
         <td colspan="4" class="left bold">CGST</td>
         <td colspan="2" class="right">${fmtMoney(totals.totalCgst)}</td>
       </tr>
-      <tr>
+      <tr class="pi-footer pi-footer-total">
         <td colspan="4" class="left bold">SGST</td>
         <td colspan="2" class="right">${fmtMoney(totals.totalSgst)}</td>
       </tr>
-      <tr>
+      <tr class="pi-footer pi-footer-total">
         <td colspan="4" class="left bold">IGST</td>
         <td colspan="2" class="right">${fmtMoney(totals.totalIgst)}</td>
       </tr>
-      <tr>
+      <tr class="pi-footer pi-footer-total">
         <td colspan="4" class="left bold">Total Tax Amount</td>
         <td colspan="2" class="right">${fmtMoney(totalTax)}</td>
       </tr>
-      <tr>
+      <tr class="pi-footer pi-footer-total">
         <td colspan="4" class="left bold fill">Total Amount after Tax</td>
         <td colspan="2" class="right bold fill">${fmtMoney(totals.totalAll)}</td>
       </tr>
 
-      <tr>
-        <td colspan="5" rowspan="6" class="left" style="font-size:11px; vertical-align:top;">
+      <tr class="pi-footer">
+        <td colspan="5" rowspan="7" class="left pi-footer-note">
           <b>NOTE:</b><br><br>
           <b>PACKING MATERIALS AND TRANSPORTATION<br>CHARGES WILL BE CHAGRE EXTRA AS ACTUAL</b><br><br>
           <b>Terms &amp; conditions</b><br>
           1) Subject to vadodara Juridiction.<br>
           2) Payment 100% ADVANCE AGAINST PI
         </td>
-        <td colspan="7" class="left" style="font-size:11px; vertical-align:top;">
+        <td colspan="7" class="left pi-footer-cert">
           Ceritified that the particulars given above are true and correct
         </td>
       </tr>
-      <tr>
-        <td colspan="7" class="center bold" style="font-size:12.5px;">For ${esc(profile.companyName)}</td>
+      <tr class="pi-footer">
+        <td colspan="7" class="center bold pi-footer-for">For ${esc(profile.companyName)}</td>
       </tr>
-      <tr>
-        <td colspan="3" rowspan="4">&nbsp;</td>
-        <td colspan="4" rowspan="4">&nbsp;</td>
+      <tr class="pi-footer pi-footer-sign-space">
+        <td colspan="3" rowspan="5">&nbsp;</td>
+        <td colspan="4" rowspan="5">&nbsp;</td>
       </tr>
-      <tr></tr>
-      <tr></tr>
-      <tr></tr>
+      <tr class="pi-footer pi-footer-sign-space"></tr>
+      <tr class="pi-footer pi-footer-sign-space"></tr>
+      <tr class="pi-footer pi-footer-sign-space"></tr>
+      <tr class="pi-footer pi-footer-sign-space"></tr>
 
-      <tr>
-        <td colspan="5" class="left bold" style="font-size:11px;">this is system generated PI so no need to sign</td>
+      <tr class="pi-footer pi-footer-seal">
+        <td colspan="5" class="left bold pi-footer-generated">this is system generated PI so no need to sign</td>
         <td colspan="3" class="center bold">Seal</td>
         <td colspan="4" class="center bold">Authorised signatory</td>
       </tr>
