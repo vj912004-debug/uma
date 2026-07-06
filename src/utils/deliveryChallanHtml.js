@@ -42,13 +42,44 @@ const formatDcEmailLine = (profile) => {
 };
 
 const buildAlignedCellHtml = (lines, field) => {
-  const blocks = lines.map((line) => {
+  if (!lines.length) return '&nbsp;';
+  return lines.map((line) => {
     const val = line[field];
-    const display = val === '' || val === null || val === undefined ? '&nbsp;' : esc(val);
+    const display = val === '' || val === null || val === undefined ? '' : esc(val);
     const cls = field === 'text' ? 'dc-line dc-desc' : (field === 'qty' ? 'dc-line dc-qty' : 'dc-line dc-drums');
-    return `<div class="${cls}">${field === 'text' ? esc(line.text) : display}</div>`;
-  });
-  return blocks.join('');
+    const content = field === 'text' ? esc(line.text) : display;
+    return content ? `<div class="${cls}">${content}</div>` : '';
+  }).join('');
+};
+
+const buildDcFooterRows = (data, profileGstin) => {
+  const rows = [];
+  const add = (label, value) => {
+    if (value) rows.push({ label, value });
+  };
+
+  add('Vehicle No.', data.vehicleNo);
+  add('Drivers name :', data.driverName);
+  add('Driver\'s Contact no. :', data.driverContact || data.driverPhone);
+  add('Transporter\'s Name :', data.transporterName || data.transporter);
+
+  if (profileGstin) {
+    rows.push({ label: 'GSTIN', value: profileGstin, isGstin: true });
+  }
+
+  return rows;
+};
+
+const buildDcMetaRows = (dcNo, dcDate, poNo, poDate) => {
+  const rows = [
+    { label: 'Delivery Challan No. :', value: dcNo },
+    { label: 'Date :', value: dcDate }
+  ];
+  if (poNo || poDate) {
+    rows.push({ label: 'PO /DC NO.', value: poNo });
+    rows.push({ label: 'Date :', value: poDate });
+  }
+  return rows;
 };
 
 const DC_STYLES = `
@@ -90,9 +121,9 @@ const DC_STYLES = `
   .dc-company-sub { font-size: 11.5px; font-weight: bold; line-height: 1.35; }
   .dc-meta-label { font-weight: bold; white-space: nowrap; }
   .dc-meta-value { font-weight: bold; }
-  .dc-to-label { font-weight: bold; font-size: 12px; }
-  .dc-address-block { min-height: 72px; font-size: 12px; line-height: 1.4; white-space: pre-wrap; }
-  .dc-gstin-box { min-height: 72px; font-weight: bold; }
+  .dc-to-label { font-weight: bold; font-size: 12px; margin-bottom: 2px; }
+  .dc-address-block { font-size: 12px; line-height: 1.4; white-space: pre-wrap; }
+  .dc-gstin-box { font-weight: bold; }
   .dc-state-row td { font-weight: bold; font-size: 12px; }
   .dc-items th {
     text-align: center;
@@ -105,14 +136,14 @@ const DC_STYLES = `
   .dc-desc-col { width: 52%; }
   .dc-drums-col { width: 20%; text-align: center; }
   .dc-qty-col { width: 20%; text-align: right; }
-  .dc-line { min-height: 18px; line-height: 18px; }
+  .dc-line { line-height: 1.35; padding: 1px 0; }
   .dc-desc { text-align: left; }
   .dc-drums { text-align: center; }
   .dc-qty { text-align: right; }
   .dc-total-row td { font-weight: bold; font-size: 12.5px; }
   .dc-total-label { text-align: center; }
   .dc-footer-label { font-weight: bold; white-space: nowrap; width: 38%; }
-  .dc-footer-value { min-height: 18px; }
+  .dc-footer-value { }
   .dc-sign-box {
     display: flex;
     flex-direction: column;
@@ -120,13 +151,13 @@ const DC_STYLES = `
     align-items: center;
     text-align: center;
     font-weight: bold;
-    min-height: 96px;
+    min-height: 72px;
     height: 100%;
-    padding: 8px 6px 6px;
+    padding: 6px;
     box-sizing: border-box;
   }
   .dc-sign-title { font-size: 12px; line-height: 1.4; }
-  .dc-sign-space { flex: 1; min-height: 44px; width: 100%; }
+  .dc-sign-space { flex: 1; min-height: 28px; width: 100%; }
   .dc-sign-label { font-size: 11px; line-height: 1.4; }
   .dc-company-gstin { font-weight: bold; font-size: 11.5px; }
   .logo-wrap { display: inline-block; vertical-align: middle; margin-right: 8px; }
@@ -160,6 +191,32 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     data.shipAddress || data.billAddress || data.address || ''
   ].filter(Boolean).join('\n');
 
+  const metaRows = buildDcMetaRows(dcNo, dcDate, poNo, poDate);
+  const metaRowsHtml = metaRows.map((row, idx) => `
+            <tr>
+              <td class="dc-meta-label" style="width:46%; ${idx === 0 ? 'border-top:none; border-left:none;' : 'border-left:none;'}">${row.label}</td>
+              <td class="dc-meta-value" style="${idx === 0 ? 'border-top:none; border-right:none;' : 'border-right:none;'}">${row.value || '&nbsp;'}</td>
+            </tr>`).join('');
+
+  const footerRows = buildDcFooterRows(data, profile.gstNumber);
+  const footerRowsHtml = footerRows.map((row, idx) => {
+    if (row.isGstin) {
+      return `
+            <tr>
+              <td colspan="2" class="dc-company-gstin" style="border-left:none; border-right:none; ${idx === footerRows.length - 1 ? 'border-bottom:none;' : ''}">
+                GSTIN : ${esc(row.value)}
+              </td>
+            </tr>`;
+    }
+    return `
+            <tr>
+              <td class="dc-footer-label" style="border-left:none; ${idx === 0 ? 'border-top:none;' : ''}">${row.label}</td>
+              <td class="dc-footer-value" style="${idx === 0 ? 'border-top:none; border-right:none;' : 'border-right:none;'}">${esc(row.value)}</td>
+            </tr>`;
+  }).join('');
+
+  const signMinHeight = Math.max(72, footerRows.length * 22);
+
   return `
 <style>${DC_STYLES}</style>
 <div class="dc-host">
@@ -183,22 +240,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
         </td>
         <td colspan="2" style="width:42%; padding:0;">
           <table class="dc-grid" style="border:none; height:100%;">
-            <tr>
-              <td class="dc-meta-label" style="width:46%; border-top:none; border-left:none;">Delivery Challan No. :</td>
-              <td class="dc-meta-value" style="border-top:none; border-right:none;">${dcNo}</td>
-            </tr>
-            <tr>
-              <td class="dc-meta-label" style="border-left:none;">Date :</td>
-              <td class="dc-meta-value" style="border-right:none;">${dcDate}</td>
-            </tr>
-            <tr>
-              <td class="dc-meta-label" style="border-left:none;">PO /DC NO.</td>
-              <td class="dc-meta-value" style="border-right:none;">${poNo}</td>
-            </tr>
-            <tr>
-              <td class="dc-meta-label" style="border-left:none;">Date :</td>
-              <td class="dc-meta-value" style="border-right:none;">${poDate}</td>
-            </tr>
+            ${metaRowsHtml}
           </table>
         </td>
       </tr>
@@ -242,40 +284,20 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
       <tr>
         <td colspan="2" style="padding:0; vertical-align:top;">
           <table class="dc-grid" style="border:none;">
-            <tr>
-              <td class="dc-footer-label" style="border-left:none; border-top:none;">Vehicle No.</td>
-              <td class="dc-footer-value" style="border-top:none; border-right:none;">${esc(data.vehicleNo || '')}</td>
-            </tr>
-            <tr>
-              <td class="dc-footer-label" style="border-left:none;">Drivers name :</td>
-              <td class="dc-footer-value" style="border-right:none;">${esc(data.driverName || '')}</td>
-            </tr>
-            <tr>
-              <td class="dc-footer-label" style="border-left:none;">Driver's Contact no. :</td>
-              <td class="dc-footer-value" style="border-right:none;">${esc(data.driverContact || data.driverPhone || '')}</td>
-            </tr>
-            <tr>
-              <td class="dc-footer-label" style="border-left:none;">Transporter's Name :</td>
-              <td class="dc-footer-value" style="border-right:none;">${esc(data.transporterName || data.transporter || '')}</td>
-            </tr>
-            <tr>
-              <td colspan="2" class="dc-company-gstin" style="border-left:none; border-right:none; border-bottom:none;">
-                GSTIN : ${esc(profile.gstNumber)}
-              </td>
-            </tr>
+            ${footerRowsHtml}
           </table>
         </td>
         <td colspan="2" style="padding:0; vertical-align:top;">
           <table class="dc-grid" style="border:none; height:100%;">
             <tr style="height:50%;">
-              <td class="dc-sign-box" style="border-left:none; border-top:none; border-right:none; min-height:100px;">
+              <td class="dc-sign-box" style="border-left:none; border-top:none; border-right:none; min-height:${signMinHeight}px;">
                 <div class="dc-sign-title">For ${esc(profile.companyName)}</div>
                 <div class="dc-sign-space"></div>
                 <div class="dc-sign-label">Authorised Signatory</div>
               </td>
             </tr>
             <tr style="height:50%;">
-              <td class="dc-sign-box" style="border-left:none; border-right:none; border-bottom:none; min-height:100px;">
+              <td class="dc-sign-box" style="border-left:none; border-right:none; border-bottom:none; min-height:${signMinHeight}px;">
                 <div class="dc-sign-title">RECEIVED BY :</div>
                 <div class="dc-sign-space"></div>
                 <div class="dc-sign-label">Authorised Signatory</div>

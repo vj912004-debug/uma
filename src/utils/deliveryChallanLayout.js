@@ -54,7 +54,7 @@ export const buildDcPrintLines = (dc, appData = {}) => {
 
   const products = selected.length
     ? selected
-    : (dc.productName ? dc.productName.split(',').map((s) => s.trim()).filter(Boolean) : ['']);
+    : (dc.productName ? dc.productName.split(',').map((s) => s.trim()).filter(Boolean) : []);
 
   const lines = [];
 
@@ -98,13 +98,15 @@ export const buildDcPrintLines = (dc, appData = {}) => {
     lines.push({ kind: 'product', text: dc.productName, drums: '', qty: '' });
   }
 
-  const value = parseFloat(dc.value) || 0;
-  lines.push({
-    kind: 'value',
-    text: `Total goods value Rs : ${fmtMoney(value)}`,
-    drums: '',
-    qty: ''
-  });
+  const value = parseFloat(dc.value);
+  if (!Number.isNaN(value) && value > 0) {
+    lines.push({
+      kind: 'value',
+      text: `Total goods value Rs : ${fmtMoney(value)}`,
+      drums: '',
+      qty: ''
+    });
+  }
 
   const totalDrums = parseInt(dc.totalDrums, 10)
     || lines.reduce((s, l) => s + (parseInt(l.drums, 10) || 0), 0);

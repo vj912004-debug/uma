@@ -27,7 +27,7 @@ const emptyDCForm = (docNo = '') => ({
   selectedProducts: [],
   qty: 0,
   totalDrums: 0,
-  value: 0,
+  value: '',
   vehicleNo: '',
   driverName: '',
   termsAndConditions: DEFAULT_TERMS
@@ -330,8 +330,8 @@ const DeliveryChallan = () => {
                   <input type="number" className="input-field" required value={form.totalDrums} onChange={e => setForm({...form, totalDrums: parseInt(e.target.value, 10) || 0})} />
                 </div>
                 <div>
-                  <label>Value of Goods (₹) {activeMR ? <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400 }}>from MR</span> : null}</label>
-                  <input type="number" className="input-field" required value={form.value} onChange={e => setForm({...form, value: parseFloat(e.target.value) || 0})} />
+                  <label>Value of Goods (₹)</label>
+                  <input type="number" className="input-field" min="0" step="0.01" placeholder="Leave blank if not required on print" value={form.value} onChange={e => setForm({...form, value: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0)})} />
                 </div>
 
                 <div style={{ gridColumn: 'span 2' }}>

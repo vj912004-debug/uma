@@ -3,7 +3,6 @@ import html2canvas from 'html2canvas';
 import { formatTiHeaderAddressLines, getTiContactLine, mergeCompanyProfile } from './companyProfile';
 import {
   TI_CHARGES_LIST,
-  TI_EMPTY_ROWS,
   calcTiTotals,
   formatPdfDateSlash
 } from './taxInvoiceLayout';
@@ -185,37 +184,44 @@ const TI_STYLES = `
 const buildItemRowsHtml = (data) => {
   const { chargeAmounts, totalAmt, totalSgst, totalCgst, totalIgst, totalAll, totalQty } = calcTiTotals(data);
   const rows = [];
+  let sr = 0;
 
-  TI_CHARGES_LIST.forEach((charge) => {
-    const line = chargeAmounts[charge.key] || { qty: 0, rate: 0, amt: 0 };
-    const amt = line.amt || 0;
-    const sgstAmt = amt * (charge.sgst / 100);
-    const cgstAmt = amt * (charge.cgst / 100);
+  const pushRow = (label, qty, rate, amt, sgstRate, cgstRate) => {
+    const sgstAmt = amt * (sgstRate / 100);
+    const cgstAmt = amt * (cgstRate / 100);
     const rowTotal = amt + sgstAmt + cgstAmt;
+    sr += 1;
     rows.push(`
       <tr>
-        <td></td>
-        <td class="desc">${esc(charge.label)}</td>
-        <td>${esc(fmtQty(line.qty))}</td>
-        <td>${line.rate ? esc(line.rate.toFixed(2)) : ''}</td>
+        <td>${sr}</td>
+        <td class="desc">${esc(label)}</td>
+        <td>${esc(fmtQty(qty))}</td>
+        <td>${rate ? esc(parseFloat(rate).toFixed(2)) : ''}</td>
         <td class="num">${fmtMoney(amt)}</td>
-        <td>${charge.sgst}</td>
+        <td>${sgstRate}</td>
         <td class="num">${fmtMoney(sgstAmt)}</td>
-        <td>${charge.cgst}</td>
+        <td>${cgstRate}</td>
         <td class="num">${fmtMoney(cgstAmt)}</td>
         <td></td>
         <td class="num">${fmtMoney(0)}</td>
         <td class="num">${fmtMoney(rowTotal)}</td>
       </tr>`);
+  };
+
+  TI_CHARGES_LIST.forEach((charge) => {
+    const line = chargeAmounts[charge.key];
+    if (!line) return;
+    pushRow(charge.label, line.qty, line.rate, line.amt || 0, charge.sgst, charge.cgst);
   });
 
-  for (let i = 0; i < TI_EMPTY_ROWS; i++) {
-    rows.push(`
-      <tr>
-        <td></td><td class="desc"></td><td></td><td></td><td class="num">0.00</td>
-        <td>6</td><td class="num">0.00</td><td>6</td><td class="num">0.00</td><td></td><td class="num">0.00</td><td class="num">0.00</td>
-      </tr>`);
-  }
+  (data.customCharges || []).forEach((cc) => {
+    if (!cc.checked) return;
+    const ccQty = parseFloat(cc.qty) || 1;
+    const rate = parseFloat(cc.rate) || 0;
+    const amt = ccQty * rate;
+    if (amt <= 0) return;
+    pushRow(cc.name || '', ccQty, rate, amt, 9, 9);
+  });
 
   rows.push(`
     <tr class="total-row">

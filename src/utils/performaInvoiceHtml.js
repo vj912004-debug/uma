@@ -7,8 +7,6 @@ import {
   formatPdfDateSlash
 } from './taxInvoiceLayout';
 
-const PI_EMPTY_ROWS = 3;
-
 const esc = (v) => String(v ?? '')
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
@@ -83,47 +81,44 @@ const PI_STYLES = `
 const buildItemRowsHtml = (data) => {
   const { chargeAmounts, totalAmt, totalSgst, totalCgst, totalIgst, totalAll, totalQty } = calcTiTotals(data);
   const rows = [];
+  let sr = 0;
 
-  TI_CHARGES_LIST.forEach((charge, idx) => {
-    const line = chargeAmounts[charge.key] || { qty: 0, rate: 0, amt: 0 };
-    const amt = line.amt || 0;
-    const sgstAmt = amt * (charge.sgst / 100);
-    const cgstAmt = amt * (charge.cgst / 100);
+  const pushRow = (label, qty, rate, amt, sgstRate, cgstRate) => {
+    const sgstAmt = amt * (sgstRate / 100);
+    const cgstAmt = amt * (cgstRate / 100);
     const rowTotal = amt + sgstAmt + cgstAmt;
+    sr += 1;
     rows.push(`
       <tr class="items-table">
-        <td class="center">${idx + 1}</td>
-        <td class="left">${esc(charge.label)}</td>
-        <td class="center">${esc(fmtQty(line.qty))}</td>
-        <td class="center">${line.rate ? esc(line.rate.toFixed(2)) : ''}</td>
+        <td class="center">${sr}</td>
+        <td class="left">${esc(label)}</td>
+        <td class="center">${esc(fmtQty(qty))}</td>
+        <td class="center">${rate ? esc(parseFloat(rate).toFixed(2)) : ''}</td>
         <td class="right">${fmtMoney(amt)}</td>
-        <td class="center">${charge.sgst || ''}</td>
+        <td class="center">${sgstRate || ''}</td>
         <td class="right">${fmtMoney(sgstAmt)}</td>
-        <td class="center">${charge.cgst || ''}</td>
+        <td class="center">${cgstRate || ''}</td>
         <td class="right">${fmtMoney(cgstAmt)}</td>
         <td class="center"></td>
         <td class="right">${fmtMoney(0)}</td>
         <td class="right">${fmtMoney(rowTotal)}</td>
       </tr>`);
+  };
+
+  TI_CHARGES_LIST.forEach((charge) => {
+    const line = chargeAmounts[charge.key];
+    if (!line) return;
+    pushRow(charge.label, line.qty, line.rate, line.amt || 0, charge.sgst, charge.cgst);
   });
 
-  for (let i = 0; i < PI_EMPTY_ROWS; i++) {
-    rows.push(`
-      <tr class="items-table">
-        <td class="center"></td>
-        <td class="left"></td>
-        <td class="center"></td>
-        <td class="center"></td>
-        <td class="right">0.00</td>
-        <td class="center"></td>
-        <td class="right">0.00</td>
-        <td class="center"></td>
-        <td class="right">0.00</td>
-        <td class="center"></td>
-        <td class="right">0.00</td>
-        <td class="right">0.00</td>
-      </tr>`);
-  }
+  (data.customCharges || []).forEach((cc) => {
+    if (!cc.checked) return;
+    const ccQty = parseFloat(cc.qty) || 1;
+    const rate = parseFloat(cc.rate) || 0;
+    const amt = ccQty * rate;
+    if (amt <= 0) return;
+    pushRow(cc.name || '', ccQty, rate, amt, 9, 9);
+  });
 
   return {
     rowsHtml: rows.join(''),

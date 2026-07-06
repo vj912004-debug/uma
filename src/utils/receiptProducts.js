@@ -325,7 +325,7 @@ export const getMRMaterialValue = (mr) => {
 /** Build DC qty/drums/value/labels from MR + PL for selected products. */
 export const buildDCFieldsFromProducts = (mr, pl, prodOpts, selectedProductNames = []) => {
   if (!mr) {
-    return { productSummaries: [], productName: '', qty: 0, totalDrums: 0, value: 0 };
+    return { productSummaries: [], productName: '', qty: 0, totalDrums: 0 };
   }
   const allSummaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
   const selectedSet = new Set((selectedProductNames || []).map(n => norm(n)));
@@ -346,13 +346,8 @@ export const buildDCFieldsFromProducts = (mr, pl, prodOpts, selectedProductNames
   const qty = productSummaries.reduce((s, p) => s + (parseFloat(p.qty) || 0), 0);
   const totalDrums = productSummaries.reduce((s, p) => s + (parseInt(p.drums, 10) || 0), 0);
   const productName = productSummaries.map(p => p.prodName).filter(Boolean).join(', ');
-  const mrValue = getMRMaterialValue(mr);
-  const totalMrQty = allSummaries.reduce((s, p) => s + (parseFloat(p.qty) || 0), 0) || parseFloat(mr.totalQty) || 0;
-  const value = totalMrQty > 0 && qty > 0 && qty < totalMrQty
-    ? (mrValue * qty) / totalMrQty
-    : mrValue;
 
-  return { productSummaries, productName, qty, totalDrums, value };
+  return { productSummaries, productName, qty, totalDrums };
 };
 
 export const buildPLProductSummaries = (pl, mr, prodOpts = {}) => {
