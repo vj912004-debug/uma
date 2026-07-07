@@ -54,7 +54,15 @@ const PI_STYLES = `
     width: 950px;
     color: #1a1a1a;
   }
-  .pi-doc { width: 100%; background: #fff; }
+  .pi-doc {
+    width: 100%;
+    background: #fff;
+    min-height: 1270px;
+    display: flex;
+    flex-direction: column;
+  }
+  .pi-main { flex: 1 1 auto; display: flex; flex-direction: column; }
+  .pi-items-wrap { flex: 1 1 auto; display: flex; flex-direction: column; margin-bottom: 12px; }
 
   .pi-header { display: flex; align-items: flex-start; margin-bottom: 12px; }
   .pi-logo { flex: 0 0 auto; margin-right: 14px; padding-top: 4px; }
@@ -163,6 +171,12 @@ const PI_STYLES = `
     text-align: center;
     letter-spacing: 1px;
   }
+  .pi-items tr.blank-row td {
+    height: 26px;
+    border-color: #b7c0cf;
+  }
+  .pi-items tr.blank-row td.r { color: transparent; }
+  .pi-footer-block { flex: 0 0 auto; margin-top: auto; }
 
   .pi-bottom { display: flex; gap: 14px; margin-bottom: 12px; align-items: stretch; }
   .bank-card {
@@ -202,6 +216,25 @@ const PI_STYLES = `
   .pi-footbar .fb-seal { flex: 0 0 20%; border-right: 1.2px solid #9aa5b5; text-align: center; }
   .pi-footbar .fb-auth { flex: 1 1 30%; text-align: center; }
 `;
+
+/** Minimum item body rows (charges + blanks) before TOTAL — fills page like printed form. */
+const PI_MIN_ITEM_ROWS = 10;
+
+const blankItemRow = () => `
+      <tr class="blank-row">
+        <td class="c"></td>
+        <td class="l"></td>
+        <td class="c"></td>
+        <td class="c"></td>
+        <td class="r"></td>
+        <td class="c"></td>
+        <td class="r"></td>
+        <td class="c"></td>
+        <td class="r"></td>
+        <td class="c"></td>
+        <td class="r"></td>
+        <td class="r"></td>
+      </tr>`;
 
 const buildItemRowsHtml = (data) => {
   const { chargeAmounts, totalAmt, totalSgst, totalCgst, totalIgst, totalAll, totalQty } = calcTiTotals(data);
@@ -244,6 +277,12 @@ const buildItemRowsHtml = (data) => {
     if (amt <= 0) return;
     pushRow(cc.name || '', ccQty, rate, amt, 9, 9);
   });
+
+  const dataRowCount = sr;
+  const blankCount = Math.max(0, PI_MIN_ITEM_ROWS - dataRowCount);
+  for (let i = 0; i < blankCount; i++) {
+    rows.push(blankItemRow());
+  }
 
   rows.push(`
       <tr class="total-row">
@@ -337,6 +376,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
 <div class="pi-host">
   <div class="pi-doc">
 
+    <div class="pi-main">
     <div class="pi-header">
       <div class="pi-logo">${logoHtml}</div>
       <div class="pi-company">
@@ -369,6 +409,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
       ${shipCard}
     </div>
 
+    <div class="pi-items-wrap">
     <table class="pi-items">
       <colgroup>
         <col style="width:4%"><col style="width:24%"><col style="width:5.5%"><col style="width:6.5%">
@@ -397,7 +438,10 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
         ${rowsHtml}
       </tbody>
     </table>
+    </div>
+    </div>
 
+    <div class="pi-footer-block">
     <div class="pi-bottom">
       <div class="bank-card">
         <div class="bank-title">${IC_BANK}OUR BANK DETAILS</div>
@@ -440,6 +484,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
       <div class="fb-gen">this is system generated PI so no need to sign</div>
       <div class="fb-seal">Seal</div>
       <div class="fb-auth">Authorised signatory</div>
+    </div>
     </div>
 
   </div>
