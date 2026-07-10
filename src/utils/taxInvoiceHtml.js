@@ -48,7 +48,7 @@ const TI_STYLES = `
 
   .ti-host {
       background-color: #fff;
-      width: 800px;
+      width: 850px;
       padding: 25px;
       border: 2px solid var(--text-dark);
       color: var(--text-dark);
@@ -255,6 +255,7 @@ const TI_STYLES = `
       margin-bottom: 15px;
       border-radius: 6px;
       overflow: hidden;
+      table-layout: fixed;
   }
 
   .items-table th, .items-table td {
@@ -855,8 +856,8 @@ export const renderTaxInvoicePdf = async (data, { mode = 'save' } = {}) => {
       scale: 2,
       useCORS: true,
       backgroundColor: '#fff',
-      width: 800,
-      windowWidth: 800
+      width: 850,
+      windowWidth: 850
     });
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
