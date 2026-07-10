@@ -1,11 +1,12 @@
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { formatTiHeaderAddressLines, getTiContactLine, mergeCompanyProfile } from './companyProfile';
+import { formatTiHeaderAddressLines, getTiContactLine, mergeCompanyProfile, DEFAULT_COMPANY_PROFILE } from './companyProfile';
 import {
   TI_CHARGES_LIST,
   calcTiTotals,
   formatPdfDateSlash,
-  getPartyAddressRows
+  getPartyAddressRows,
+  splitPartyAddressLines
 } from './taxInvoiceLayout';
 
 const esc = (v) => String(v ?? '')
@@ -23,164 +24,439 @@ const fmtQty = (n) => {
 };
 
 const DEFAULT_TI_LOGO_HTML = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 88" width="110" height="88" aria-label="UMA MICRON Logo">
-  <ellipse cx="38" cy="44" rx="28" ry="34" fill="none" stroke="#009900" stroke-width="2.5"/>
-  <ellipse cx="52" cy="44" rx="28" ry="34" fill="none" stroke="#cc0000" stroke-width="2.5"/>
-  <text x="24" y="56" font-family="Arial Black, Arial, sans-serif" font-size="34" font-weight="700" fill="#cc0000">U</text>
-  <text x="48" y="56" font-family="Arial Black, Arial, sans-serif" font-size="34" font-weight="700" fill="#009900">M</text>
+<svg width="80" height="80" viewBox="0 0 100 100" aria-label="UMA MICRON Logo">
+  <ellipse cx="50" cy="50" rx="45" ry="30" fill="none" stroke="#28a745" stroke-width="3" transform="rotate(-30 50 50)"></ellipse>
+  <ellipse cx="50" cy="50" rx="45" ry="30" fill="none" stroke="#28a745" stroke-width="3" transform="rotate(30 50 50)"></ellipse>
+  <text x="50%" y="62%" font-family="Times New Roman, serif" font-size="45" font-weight="bold" fill="#dc3545" text-anchor="middle" letter-spacing="-2">UM</text>
 </svg>`;
 
 const TI_STYLES = `
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+      --blue-dark: #002d6b;
+      --blue-light: #e6ebf5;
+      --green-main: #5ea830;
+      --border-color: #b0c0d0;
+      --text-dark: #333;
+  }
+
+  * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, Helvetica, sans-serif;
+  }
+
   .ti-host {
-    font-family: Arial, Helvetica, sans-serif;
-    background: #e5e5e5;
-    padding: 20px;
-    width: 850px;
-    color: #000;
+      background-color: #fff;
+      width: 800px;
+      padding: 25px;
+      border: 2px solid var(--text-dark);
+      color: var(--text-dark);
+      font-size: 11.5px;
+      position: relative;
   }
-  .invoice-wrapper {
-    width: 100%;
-    background: #fff;
-    border: 2px solid #000;
-    position: relative;
-  }
-  .top-right-tag {
-    position: absolute;
-    top: 4px;
-    right: 6px;
-    font-size: 11px;
-    text-align: right;
-    line-height: 1.3;
-    z-index: 2;
-  }
+
+  /* --- HEADER SECTION --- */
   .header {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 10px 6px;
-    border-bottom: 2px solid #000;
-    min-height: 100px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 5px;
   }
-  .logo {
-    position: absolute;
-    left: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 110px;
-    height: 88px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+
+  .logo-section {
+      width: 15%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
   }
-  .logo img { width: 100%; height: 100%; object-fit: contain; }
-  .company-info { text-align: center; }
-  .company-info h1 { font-size: 24px; letter-spacing: 1px; margin: 0; }
-  .company-info p { margin: 2px 0; font-size: 12.5px; font-weight: bold; }
+
+  .logo-section img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+  }
+
+  .company-info {
+      width: 65%;
+  }
+
+  .company-name {
+      color: var(--blue-dark);
+      font-size: 26px;
+      font-weight: bold;
+      margin-bottom: 6px;
+  }
+
+  .info-line {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 4px;
+      gap: 8px;
+  }
+  
+  .info-line-multiple {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 4px;
+  }
+
+  .info-line svg {
+      color: var(--blue-dark);
+      margin-top: 2px;
+      width: 12px;
+      height: 12px;
+      flex-shrink: 0;
+  }
+
+  .gstin {
+      font-weight: bold;
+      color: var(--blue-dark);
+      margin-top: 6px;
+      font-size: 12px;
+  }
+
+  .copy-type {
+      background-color: var(--blue-dark);
+      color: #fff;
+      padding: 10px 15px;
+      font-weight: bold;
+      text-align: center;
+      line-height: 1.4;
+      clip-path: polygon(15% 0, 100% 0, 100% 100%, 0% 100%);
+      width: 130px;
+      font-size: 11px;
+      margin-top: -25px;
+      margin-right: -25px;
+  }
+
+  .header-border {
+      border-top: 2px solid var(--blue-dark);
+      margin: 10px 0;
+  }
+
+  /* --- TITLE --- */
+  .title-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      margin: 15px 0;
+  }
+
+  .title-line {
+      height: 2px;
+      width: 35px;
+      background-color: var(--green-main);
+  }
+
   .invoice-title {
-    text-align: center;
-    font-size: 30px;
-    font-weight: bold;
-    letter-spacing: 4px;
-    padding: 6px 0;
-    border-bottom: 2px solid #000;
+      color: var(--blue-dark);
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 1px;
   }
-  table.grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  table.grid td, table.grid th {
-    border: 1px solid #000;
-    padding: 3px 6px;
-    font-size: 12.5px;
-    vertical-align: top;
+
+  /* --- DETAILS GRID --- */
+  .details-grid {
+      display: grid;
+      grid-template-columns: 18% 32% 18% 32%;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 15px;
   }
-  .meta-table td { padding: 4px 6px; }
-  .meta-table .label { font-weight: bold; white-space: nowrap; }
-  .meta-table .value { }
-  .meta-table .code-cell { font-weight: bold; white-space: nowrap; text-align: center; }
-  .meta-table .code-value { text-align: center; }
-  .party-header td { text-align: center; font-weight: bold; background: #fff; }
-  .party-table td { vertical-align: top; }
-  .party-table .field-label { font-weight: bold; white-space: nowrap; }
-  .party-table .code-label { font-weight: bold; text-align: center; }
-  .items-table th, .items-table td { text-align: center; font-size: 12px; }
-  .items-table td.desc { text-align: left; }
-  .items-table th { font-weight: bold; background: #fff; }
-  .items-table td.num { text-align: right; }
-  .items-table .total-row td { font-weight: bold; font-size: 14px; }
-  .center { text-align: center; }
-  .bottom-section { display: flex; width: 100%; }
+
+  .grid-item {
+      padding: 6px 10px;
+      border-right: 1px solid var(--border-color);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+  }
+
+  .grid-item.label {
+      color: var(--blue-dark);
+      font-weight: bold;
+  }
+
+  .details-grid .grid-item:nth-child(4n) {
+      border-right: none;
+  }
+
+  .details-grid .grid-item:nth-last-child(-n+4) {
+      border-bottom: none;
+  }
+
+  /* --- PARTIES SECTION --- */
+  .parties-wrapper {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 15px;
+  }
+
+  .party-box {
+      flex: 1;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+  }
+
+  .party-header {
+      background-color: var(--blue-dark);
+      color: #fff;
+      padding: 7px 10px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+  }
+
+  .party-body {
+      padding: 10px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+  }
+
+  .party-row {
+      display: flex;
+      align-items: flex-end;
+  }
+
+  .party-label {
+      color: var(--blue-dark);
+      font-weight: bold;
+      min-width: 65px;
+      margin-bottom: -2px;
+  }
+
+  .dotted-line {
+      flex: 1;
+      border-bottom: 1px dotted #999;
+      height: 15px;
+  }
+
+  .code-box {
+      border: 1px solid var(--border-color);
+      width: 45px;
+      height: 18px;
+      border-radius: 3px;
+  }
+
+  /* --- MAIN TABLE --- */
+  .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--border-color);
+      margin-bottom: 15px;
+      border-radius: 6px;
+      overflow: hidden;
+  }
+
+  .items-table th, .items-table td {
+      border: 1px solid var(--border-color);
+      padding: 6px 5px;
+      text-align: center;
+  }
+
+  .items-table th {
+      background-color: var(--blue-dark);
+      color: #fff;
+      font-weight: normal;
+      font-size: 11px;
+  }
+  
+  .items-table .bold-th {
+      font-weight: bold;
+  }
+
+  .items-table td {
+      color: var(--text-dark);
+  }
+
+  .items-table td:nth-child(2) {
+      text-align: left; /* Description left aligned */
+  }
+  
+  .items-table tr.total-row td {
+      font-weight: bold;
+  }
+
+  .total-label {
+      background-color: var(--green-main);
+      color: #fff;
+      font-weight: bold;
+      text-align: left !important;
+      padding-left: 15px !important;
+      border-color: var(--green-main) !important;
+  }
+
+  /* --- FOOTER SECTIONS --- */
+  .footer-top {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 15px;
+  }
+
   .bank-details {
-    width: 55%;
-    border: 1px solid #000;
-    border-top: none;
-    padding: 6px 8px;
-    font-size: 12.5px;
+      flex: 6;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
   }
-  .bank-details .title { font-weight: bold; text-decoration: underline; margin-bottom: 4px; }
-  .bank-details table { width: 100%; border-collapse: collapse; }
-  .bank-details table td { border: none; padding: 1px 2px; font-size: 12.5px; }
-  .bank-details .b-label { font-weight: bold; width: 42%; }
-  .totals-box {
-    width: 45%;
-    border: 1px solid #000;
-    border-top: none;
-    border-left: none;
+
+  .bank-body {
+      padding: 8px 10px;
   }
-  .totals-box table { width: 100%; height: 100%; border-collapse: collapse; }
-  .totals-box td { font-size: 12.5px; padding: 3px 6px; border: 1px solid #000; }
-  .totals-box .t-label { font-weight: bold; }
-  .totals-box .t-value { text-align: right; width: 30%; }
-  .totals-box .grand-total td { font-weight: bold; font-size: 13.5px; }
-  .footer-section { display: flex; width: 100%; border: 1px solid #000; border-top: none; }
-  .terms {
-    width: 55%;
-    padding: 6px 8px;
-    border-right: 1px solid #000;
-    font-size: 12px;
+
+  .bank-row {
+      display: flex;
+      margin-bottom: 4px;
   }
-  .terms .title { font-weight: bold; margin-bottom: 4px; }
-  .terms ol { margin: 0; padding-left: 18px; }
-  .terms li { margin-bottom: 2px; }
-  .signatory { width: 45%; display: flex; flex-direction: column; }
-  .signatory .cert {
-    font-size: 11px;
-    text-align: center;
-    padding: 4px;
-    border-bottom: 1px solid #000;
+
+  .bank-label {
+      color: var(--blue-dark);
+      font-weight: bold;
+      width: 110px;
   }
-  .signatory .for-company {
-    font-weight: bold;
-    text-align: center;
-    padding: 4px;
-    flex-grow: 1;
-    min-height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+
+  .bank-value {
+      color: var(--text-dark);
   }
-  .signatory .seal-sign { display: flex; border-top: 1px solid #000; }
-  .signatory .seal {
-    width: 40%;
-    text-align: center;
-    font-size: 12px;
-    padding: 6px;
-    border-right: 1px solid #000;
-    min-height: 36px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
+
+  .summary-table-wrapper {
+      flex: 4;
   }
-  .signatory .auth {
-    width: 60%;
-    text-align: center;
-    font-size: 12px;
-    padding: 6px;
-    min-height: 36px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
+
+  .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+      border-style: hidden; /* Hide outer border to use wrapper's */
+      box-shadow: 0 0 0 1px var(--border-color);
+  }
+
+  .summary-table td {
+      border: 1px solid var(--border-color);
+      padding: 6px 10px;
+  }
+
+  .summary-label {
+      color: var(--blue-dark);
+      font-weight: bold;
+      width: 70%;
+  }
+
+  .summary-value {
+      text-align: right;
+      width: 30%;
+  }
+
+  .summary-tax-amount {
+      color: var(--blue-dark);
+      font-weight: bold;
+  }
+
+  .summary-total-final {
+      background-color: var(--green-main);
+      color: #fff !important;
+      font-weight: bold;
+  }
+  .summary-total-final td {
+      color: #fff;
+  }
+
+  .footer-bottom {
+      display: flex;
+      gap: 12px;
+  }
+
+  .terms-box {
+      flex: 5;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+  }
+
+  .terms-body {
+      padding: 10px 10px 10px 25px;
+  }
+
+  .terms-body ol {
+      margin: 0;
+      padding: 0;
+      color: var(--text-dark);
+  }
+
+  .terms-body li {
+      margin-bottom: 4px;
+  }
+
+  .seal-box {
+      flex: 2;
+      border: 1px dashed var(--border-color);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--blue-dark);
+      font-weight: bold;
+      gap: 5px;
+  }
+
+  .seal-box svg {
+      color: var(--green-main);
+      width: 24px;
+      height: 24px;
+  }
+
+  .sign-box {
+      flex: 4;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+  }
+
+  .sign-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 10px;
+      text-align: center;
+  }
+
+  .sign-text {
+      border-top: 1px solid var(--blue-dark);
+      padding-top: 5px;
+      color: var(--blue-dark);
+      font-weight: bold;
+      width: 90%;
+      margin: 0 auto;
   }
 `;
+
+const formatPartyAddressDivs = (address, defaultLines = 3) => {
+  const lines = splitPartyAddressLines(address, 45);
+  const divs = [];
+  for (let i = 0; i < Math.max(lines.length, defaultLines); i++) {
+    divs.push(`
+      <div class="party-row">
+        <div class="party-label">${i === 0 ? 'Address :' : ''}</div>
+        <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(lines[i] || '')}</div>
+      </div>`);
+  }
+  return divs.join('');
+};
 
 const buildItemRowsHtml = (data) => {
   const { chargeAmounts, totalAmt, totalSgst, totalCgst, totalIgst, totalAll, totalQty } = calcTiTotals(data);
@@ -194,18 +470,18 @@ const buildItemRowsHtml = (data) => {
     sr += 1;
     rows.push(`
       <tr>
-        <td>${sr}</td>
-        <td class="desc">${esc(label)}</td>
+        <td><b>${sr}</b></td>
+        <td>${esc(label)}</td>
         <td>${esc(fmtQty(qty))}</td>
-        <td>${rate ? esc(parseFloat(rate).toFixed(2)) : ''}</td>
-        <td class="num">${fmtMoney(amt)}</td>
-        <td>${sgstRate}</td>
-        <td class="num">${fmtMoney(sgstAmt)}</td>
-        <td>${cgstRate}</td>
-        <td class="num">${fmtMoney(cgstAmt)}</td>
-        <td></td>
-        <td class="num">${fmtMoney(0)}</td>
-        <td class="num">${fmtMoney(rowTotal)}</td>
+        <td>${rate ? esc(parseFloat(rate).toFixed(2)) : '0.00'}</td>
+        <td>${fmtMoney(amt)}</td>
+        <td>${sgstRate}%</td>
+        <td>${fmtMoney(sgstAmt)}</td>
+        <td>${cgstRate}%</td>
+        <td>${fmtMoney(cgstAmt)}</td>
+        <td>0%</td>
+        <td>${fmtMoney(0)}</td>
+        <td>${fmtMoney(rowTotal)}</td>
       </tr>`);
   };
 
@@ -224,16 +500,41 @@ const buildItemRowsHtml = (data) => {
     pushRow(cc.name || '', ccQty, rate, amt, 9, 9);
   });
 
+  // Pad empty rows to have at least 10 rows total
+  const minRows = 10;
+  while (sr < minRows) {
+    sr += 1;
+    rows.push(`
+      <tr>
+        <td><b>${sr}</b></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+      </tr>`);
+  }
+
+  // Totals Row
   rows.push(`
     <tr class="total-row">
-      <td colspan="2" class="center">Total</td>
+      <td colspan="2" class="total-label">TOTAL</td>
       <td>${totalQty || 0}</td>
       <td></td>
-      <td class="num">${fmtMoney(totalAmt)}</td>
-      <td></td><td class="num">${fmtMoney(totalSgst)}</td>
-      <td></td><td class="num">${fmtMoney(totalCgst)}</td>
-      <td></td><td class="num">${fmtMoney(totalIgst)}</td>
-      <td class="num">${fmtMoney(totalAll)}</td>
+      <td>${fmtMoney(totalAmt)}</td>
+      <td></td>
+      <td>${fmtMoney(totalSgst)}</td>
+      <td></td>
+      <td>${fmtMoney(totalCgst)}</td>
+      <td></td>
+      <td>${fmtMoney(totalIgst)}</td>
+      <td>${fmtMoney(totalAll)}</td>
     </tr>`);
 
   return { rowsHtml: rows.join(''), totals: { totalAmt, totalSgst, totalCgst, totalIgst, totalAll } };
@@ -259,171 +560,283 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   const companyStateCode = esc('24');
 
   const { rowsHtml, totals } = buildItemRowsHtml(data);
-  const partyAddressHtml = getPartyAddressRows(
-    data.billAddress || data.address || '',
-    data.shipAddress || data.address || ''
-  ).map((row, i) => {
-    if (i === 0) {
-      return `
-      <tr>
-        <td class="field-label">Address :</td>
-        <td>${esc(row.bill)}</td>
-        <td class="field-label">Address :</td>
-        <td>${esc(row.ship)}</td>
-      </tr>`;
-    }
-    return `
-      <tr>
-        <td></td>
-        <td>${esc(row.bill)}</td>
-        <td></td>
-        <td>${esc(row.ship)}</td>
-      </tr>`;
-  }).join('');
 
   return `
 <style>${TI_STYLES}</style>
 <div class="ti-host">
-  <div class="invoice-wrapper">
-    <div class="top-right-tag">Original<br>Duplicate</div>
-
+    <!-- Header -->
     <div class="header">
-      <div class="logo">${logoHtml}</div>
-      <div class="company-info">
-        <h1>${esc(profile.companyName)}</h1>
-        <p>${esc(addressLines[0] || '')}</p>
-        <p>${esc(addressLines[1] || '')}</p>
-        <p>${esc(contact)}</p>
-        <p>GSTIN: ${esc(profile.gstNumber)}</p>
-      </div>
-    </div>
-
-    <div class="invoice-title">Tax Invoice</div>
-
-    <table class="grid meta-table">
-      <tr>
-        <td class="label">Invoice No:</td>
-        <td class="value">${docNo}</td>
-        <td class="label">Invoice Date:</td>
-        <td class="value">${docDate}</td>
-      </tr>
-      <tr>
-        <td class="label">Delivery Challan No.</td>
-        <td class="value">${dcNo}</td>
-        <td class="label">Date :</td>
-        <td class="value">${dcDate}</td>
-      </tr>
-      <tr>
-        <td class="label"></td>
-        <td class="value"></td>
-        <td class="label">PO No./Challan No</td>
-        <td class="value">${refNo}</td>
-      </tr>
-    </table>
-    <table class="grid meta-table">
-      <tr>
-        <td class="label">State : ${companyState}</td>
-        <td class="code-cell">Code</td>
-        <td class="code-value">${companyStateCode}</td>
-        <td class="label">Date :</td>
-        <td class="value">${refDate}</td>
-      </tr>
-    </table>
-
-    <table class="grid party-table">
-      <tr class="party-header">
-        <td colspan="2">Bill to Party</td>
-        <td colspan="2">Ship to Party</td>
-      </tr>
-      <tr>
-        <td class="field-label">Name :</td>
-        <td>${esc(data.partyName || '')}</td>
-        <td class="field-label">Name :</td>
-        <td>${esc(data.shipName || data.partyName || '')}</td>
-      </tr>
-      ${partyAddressHtml}
-      <tr>
-        <td class="field-label">State :</td>
-        <td class="code-label">Code</td>
-        <td class="field-label">State :</td>
-        <td class="code-label">Code</td>
-      </tr>
-      <tr>
-        <td>${esc(data.billState || data.state || '')}</td>
-        <td class="center">${esc(data.billStateCode || data.stateCode || '')}</td>
-        <td>${esc(data.shipState || data.state || '')}</td>
-        <td class="center">${esc(data.shipStateCode || data.stateCode || '')}</td>
-      </tr>
-      <tr>
-        <td class="field-label">GSTIN :</td>
-        <td>${esc(data.gstinBill || data.gstin || '')}</td>
-        <td class="field-label">GSTIN :</td>
-        <td>${esc(data.gstinShip || data.gstin || '')}</td>
-      </tr>
-    </table>
-
-    <table class="grid items-table">
-      <tr>
-        <th rowspan="2" style="width:4%">S.<br>No.</th>
-        <th rowspan="2" style="width:24%">Description</th>
-        <th rowspan="2" style="width:6%">Qty</th>
-        <th rowspan="2" style="width:7%">Rate</th>
-        <th rowspan="2" style="width:8%">Amount</th>
-        <th colspan="2" style="width:12%">SGST</th>
-        <th colspan="2" style="width:12%">CGST</th>
-        <th colspan="2" style="width:12%">IGST</th>
-        <th rowspan="2" style="width:9%">Total</th>
-      </tr>
-      <tr>
-        <th>Rate</th><th>Amount</th>
-        <th>Rate</th><th>Amount</th>
-        <th>Rate</th><th>Amount</th>
-      </tr>
-      ${rowsHtml}
-    </table>
-
-    <div class="bottom-section">
-      <div class="bank-details">
-        <div class="title">OUR BANK DETAILS</div>
-        <table>
-          <tr><td class="b-label">Bank Name</td><td>: AXIS BANK LTD</td></tr>
-          <tr><td class="b-label">A/c Name</td><td>: ${esc(profile.companyName)}</td></tr>
-          <tr><td class="b-label">Current A/c No.</td><td>: 916020061629671</td></tr>
-          <tr><td class="b-label">IFS CODE</td><td>: UTIB0000383</td></tr>
-          <tr><td class="b-label">Branch</td><td>: Nizampura</td></tr>
-        </table>
-      </div>
-      <div class="totals-box">
-        <table>
-          <tr><td class="t-label">Total Amount before Tax</td><td class="t-value">${fmtMoney(totals.totalAmt)}</td></tr>
-          <tr><td class="t-label">SGST</td><td class="t-value">${fmtMoney(totals.totalSgst)}</td></tr>
-          <tr><td class="t-label">CGST</td><td class="t-value">${fmtMoney(totals.totalCgst)}</td></tr>
-          <tr><td class="t-label">IGST</td><td class="t-value">${fmtMoney(totals.totalIgst)}</td></tr>
-          <tr><td class="t-label">Total Tax Amount</td><td class="t-value">${fmtMoney(totals.totalSgst + totals.totalCgst + totals.totalIgst)}</td></tr>
-          <tr class="grand-total"><td class="t-label">Total Amount after Tax</td><td class="t-value">${fmtMoney(totals.totalAll)}</td></tr>
-        </table>
-      </div>
-    </div>
-
-    <div class="footer-section">
-      <div class="terms">
-        <div class="title">Terms &amp; conditions</div>
-        <ol>
-          <li>Subject to vadodara Juridiction.</li>
-          <li>Payment Term as per our agree terms.</li>
-          <li>Interest will charged @ 24% per annum if amount remaining unpaid from due date.</li>
-        </ol>
-      </div>
-      <div class="signatory">
-        <div class="cert">Certified that the particulars given above are true and correct</div>
-        <div class="for-company">For ${esc(profile.companyName)}</div>
-        <div class="seal-sign">
-          <div class="seal">Seal</div>
-          <div class="auth">Authorised signatory</div>
+        <div class="logo-section">${logoHtml}</div>
+        
+        <div class="company-info">
+            <div class="company-name">${esc(profile.companyName)}</div>
+            <div class="info-line">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                  <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                <div>${esc(addressLines[0] || '')},<br>${esc(addressLines[1] || '')}</div>
+            </div>
+            <div class="info-line-multiple">
+                <div class="info-line">
+                    <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                    <span>${esc(profile.phone || DEFAULT_COMPANY_PROFILE.phone)}</span>
+                </div>
+                <div class="info-line">
+                    <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                      <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                    <span>${esc(profile.email || DEFAULT_COMPANY_PROFILE.email)}</span>
+                </div>
+            </div>
+            <div class="gstin">GSTIN: ${esc(profile.gstNumber)}</div>
         </div>
-      </div>
+
+        <div class="copy-type">
+            ORIGINAL<br>DUPLICATE
+        </div>
     </div>
-  </div>
+
+    <div class="header-border"></div>
+
+    <!-- Title -->
+    <div class="title-wrapper">
+        <div class="title-line"></div>
+        <div class="invoice-title">TAX INVOICE</div>
+        <div class="title-line"></div>
+    </div>
+
+    <!-- Details Grid -->
+    <div class="details-grid">
+        <div class="grid-item label">Invoice No.</div>
+        <div class="grid-item">${docNo}</div>
+        <div class="grid-item label">Invoice Date</div>
+        <div class="grid-item">${docDate}</div>
+        
+        <div class="grid-item label">Delivery Challan No.</div>
+        <div class="grid-item">${dcNo}</div>
+        <div class="grid-item label">Date</div>
+        <div class="grid-item">${dcDate}</div>
+        
+        <div class="grid-item label">State</div>
+        <div class="grid-item">${companyState}</div>
+        <div class="grid-item label">PO No./Challan No.</div>
+        <div class="grid-item">${refNo}</div>
+        
+        <div class="grid-item label">Code</div>
+        <div class="grid-item">${companyStateCode}</div>
+        <div class="grid-item label">Date</div>
+        <div class="grid-item">${refDate}</div>
+    </div>
+
+    <!-- Parties Section -->
+    <div class="parties-wrapper">
+        <!-- Bill To -->
+        <div class="party-box">
+            <div class="party-header">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:#fff; flex-shrink:0;">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                &nbsp;BILL TO PARTY
+            </div>
+            <div class="party-body">
+                <div class="party-row">
+                    <div class="party-label">Name :</div>
+                    <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(data.partyName || '')}</div>
+                </div>
+                ${formatPartyAddressDivs(data.billAddress || data.address || '', 3)}
+                <div class="party-row" style="margin-top: 5px;">
+                    <div class="party-label">State :</div>
+                    <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(data.billState || data.state || '')}</div>
+                    <div class="party-label" style="min-width: 40px; margin-left: 10px;">Code</div>
+                    <div class="code-box" style="display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--blue-dark);">${esc(data.billStateCode || data.stateCode || '')}</div>
+                </div>
+                <div class="party-row" style="margin-top: 5px;">
+                    <div class="party-label">GSTIN :</div>
+                    <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(data.gstinBill || data.gstin || '')}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ship To -->
+        <div class="party-box">
+            <div class="party-header">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:#fff; flex-shrink:0;">
+                  <rect x="1" y="3" width="15" height="13"></rect>
+                  <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                  <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                  <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                </svg>
+                &nbsp;SHIP TO PARTY
+            </div>
+            <div class="party-body">
+                <div class="party-row">
+                    <div class="party-label">Name :</div>
+                    <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(data.shipName || data.partyName || '')}</div>
+                </div>
+                ${formatPartyAddressDivs(data.shipAddress || data.address || '', 3)}
+                <div class="party-row" style="margin-top: 5px;">
+                    <div class="party-label">State :</div>
+                    <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(data.shipState || data.state || '')}</div>
+                    <div class="party-label" style="min-width: 40px; margin-left: 10px;">Code</div>
+                    <div class="code-box" style="display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--blue-dark);">${esc(data.shipStateCode || data.stateCode || '')}</div>
+                </div>
+                <div class="party-row" style="margin-top: 5px;">
+                    <div class="party-label">GSTIN :</div>
+                    <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(data.gstinShip || data.gstin || '')}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Items Table -->
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th rowspan="2" class="bold-th" style="width: 4%;">S.<br>No.</th>
+                <th rowspan="2" class="bold-th" style="width: 28%;">Description</th>
+                <th rowspan="2" class="bold-th" style="width: 5%;">Qty</th>
+                <th rowspan="2" class="bold-th" style="width: 7%;">Rate</th>
+                <th rowspan="2" class="bold-th" style="width: 8%;">Amount</th>
+                <th colspan="2" class="bold-th">SGST</th>
+                <th colspan="2" class="bold-th">CGST</th>
+                <th colspan="2" class="bold-th">IGST</th>
+                <th rowspan="2" class="bold-th" style="width: 8%;">Total</th>
+            </tr>
+            <tr>
+                <th style="width: 5%;">Rate</th>
+                <th style="width: 7%;">Amount</th>
+                <th style="width: 5%;">Rate</th>
+                <th style="width: 7%;">Amount</th>
+                <th style="width: 5%;">Rate</th>
+                <th style="width: 7%;">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${rowsHtml}
+        </tbody>
+    </table>
+
+    <!-- Footer Top (Bank & Summary) -->
+    <div class="footer-top">
+        <!-- Bank Details -->
+        <div class="bank-details">
+            <div class="party-header">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:#fff; flex-shrink:0;">
+                  <line x1="3" y1="22" x2="21" y2="22"></line>
+                  <line x1="6" y1="18" x2="6" y2="11"></line>
+                  <line x1="10" y1="18" x2="10" y2="11"></line>
+                  <line x1="14" y1="18" x2="14" y2="11"></line>
+                  <line x1="18" y1="18" x2="18" y2="11"></line>
+                  <polygon points="12 2 20 7 4 7 12 2"></polygon>
+                </svg>
+                &nbsp;OUR BANK DETAILS
+            </div>
+            <div class="bank-body">
+                <div class="bank-row">
+                    <div class="bank-label">Bank Name</div>
+                    <div class="bank-value">: AXIS BANK LTD</div>
+                </div>
+                <div class="bank-row">
+                    <div class="bank-label">A/c Name</div>
+                    <div class="bank-value">: ${esc(profile.companyName)}</div>
+                </div>
+                <div class="bank-row">
+                    <div class="bank-label">Current A/c No.</div>
+                    <div class="bank-value">: 9160200616152671</div>
+                </div>
+                <div class="bank-row">
+                    <div class="bank-label">IFS CODE</div>
+                    <div class="bank-value">: UTIB0003083</div>
+                </div>
+                <div class="bank-row">
+                    <div class="bank-label">Branch</div>
+                    <div class="bank-value">: Nizampura</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Summary Table -->
+        <div class="summary-table-wrapper">
+            <table class="summary-table">
+                <tr>
+                    <td class="summary-label">Total Amount Before Tax</td>
+                    <td class="summary-value">${fmtMoney(totals.totalAmt)}</td>
+                </tr>
+                <tr>
+                    <td class="summary-label">SGST</td>
+                    <td class="summary-value">${fmtMoney(totals.totalSgst)}</td>
+                </tr>
+                <tr>
+                    <td class="summary-label">CGST</td>
+                    <td class="summary-value">${fmtMoney(totals.totalCgst)}</td>
+                </tr>
+                <tr>
+                    <td class="summary-label">IGST</td>
+                    <td class="summary-value">${fmtMoney(totals.totalIgst)}</td>
+                </tr>
+                <tr>
+                    <td class="summary-label summary-tax-amount">Total Tax Amount</td>
+                    <td class="summary-value summary-tax-amount">${fmtMoney(totals.totalSgst + totals.totalCgst + totals.totalIgst)}</td>
+                </tr>
+                <tr class="summary-total-final">
+                    <td>Total Amount after Tax</td>
+                    <td class="summary-value">${fmtMoney(totals.totalAll)}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Footer Bottom (Terms, Seal, Signature) -->
+    <div class="footer-bottom">
+        <div class="terms-box">
+            <div class="party-header">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:#fff; flex-shrink:0;">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                &nbsp;TERMS & CONDITIONS
+            </div>
+            <div class="terms-body">
+                <ol>
+                    <li>Subject to Vadodara Jurisdiction.</li>
+                    <li>Payment Terms as per our agreed terms.</li>
+                    <li>Interest will charged @ 24% per annum if amount remaining unpaid from due date.</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="seal-box">
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"></circle>
+              <circle cx="12" cy="12" r="6"></circle>
+              <path d="M12 9v6M9 12h6"></path>
+            </svg>
+            <div>Seal</div>
+        </div>
+
+        <div class="sign-box">
+            <div class="party-header">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:#fff; flex-shrink:0;">
+                  <path d="M12 20h9"></path>
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                </svg>
+                &nbsp;FOR ${esc(profile.companyName.toUpperCase())}
+            </div>
+            <div class="sign-area">
+                <div class="sign-text">Authorised Signatory</div>
+            </div>
+        </div>
+    </div>
 </div>`;
 };
 
@@ -441,9 +854,9 @@ export const renderTaxInvoicePdf = async (data, { mode = 'save' } = {}) => {
     const canvas = await html2canvas(target, {
       scale: 2,
       useCORS: true,
-      backgroundColor: '#e5e5e5',
-      width: 850,
-      windowWidth: 850
+      backgroundColor: '#fff',
+      width: 800,
+      windowWidth: 800
     });
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
