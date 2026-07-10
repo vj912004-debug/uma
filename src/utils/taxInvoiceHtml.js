@@ -549,7 +549,6 @@ const buildItemRowsHtml = (data) => {
 export const buildTaxInvoiceHtml = (data, profileInput) => {
   const profile = mergeCompanyProfile(profileInput);
   const addressLines = formatTiHeaderAddressLines(profile);
-  const contact = getTiContactLine(profile);
   const logoSrc = profile.logo && profile.logo.startsWith('data:image') ? profile.logo : '';
   const logoHtml = logoSrc
     ? `<img src="${logoSrc}" alt="UMA MICRON Logo">`
@@ -567,8 +566,18 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
 
   const { rowsHtml, totals } = buildItemRowsHtml(data);
 
+  // Inline SVG icons — identical appearance to Font Awesome, but render in html2canvas without CDN
+  const IC_MAP_MARKER = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 384 512" style="fill:#002d6b;flex-shrink:0;margin-top:2px;"><path d="M172.268 501.67C26.97 291.031 0 269.413 0 192 0 85.961 85.961 0 192 0s192 85.961 192 192c0 77.413-26.97 99.031-172.268 309.67-9.535 13.774-29.93 13.773-39.464 0zM192 272c44.183 0 80-35.817 80-80s-35.817-80-80-80-80 35.817-80 80 35.817 80 80 80z"/></svg>`;
+  const IC_PHONE = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 512 512" style="fill:#002d6b;flex-shrink:0;margin-top:2px;"><path d="M493.4 24.6l-104-24c-11.3-2.6-22.9 3.3-27.5 13.9l-48 112c-4.2 9.8-1.4 21.3 6.9 28l60.6 49.6c-36 76.7-98.9 140.5-177.2 177.2l-49.6-60.6c-6.8-8.3-18.2-11.1-28-6.9l-112 48C3.9 366.5-2 378.1.6 389.4l24 104C27.1 504.2 36.7 512 48 512c256.1 0 464-207.5 464-464 0-11.2-7.7-20.9-18.6-23.4z"/></svg>`;
+  const IC_ENVELOPE = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 512 512" style="fill:#002d6b;flex-shrink:0;margin-top:2px;"><path d="M502.3 190.8c3.9-3.1 9.7-.2 9.7 4.7V400c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V195.6c0-5 5.7-7.8 9.7-4.7 22.4 17.4 52.1 39.5 154.1 113.6 21.1 15.4 56.7 47.8 92.2 47.6 35.7.3 72-32.8 92.3-47.6 102-74.1 131.6-96.3 154-113.7zM256 320c23.2.4 56.6-29.2 73.4-41.4 132.7-96.3 142.8-104.7 173.4-128.7 5.8-4.5 9.2-11.5 9.2-18.9v-19c0-26.5-21.5-48-48-48H48C21.5 64 0 85.5 0 112v19c0 7.4 3.4 14.3 9.2 18.9 30.6 23.9 40.7 32.4 173.4 128.7 16.8 12.2 50.2 41.8 73.4 41.4z"/></svg>`;
+  const IC_USERS = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 640 512" style="fill:#fff;flex-shrink:0;"><path d="M96 224c35.3 0 64-28.7 64-64s-28.7-64-64-64-64 28.7-64 64 28.7 64 64 64zm448 0c35.3 0 64-28.7 64-64s-28.7-64-64-64-64 28.7-64 64 28.7 64 64 64zm32 32h-64c-17.6 0-33.5 7.1-45.1 18.6 40.3 22.1 68.9 62 75.1 109.4h66c17.7 0 32-14.3 32-32v-32c0-35.3-28.7-64-64-64zm-256 0c61.9 0 112-50.1 112-112S381.9 32 320 32 208 82.1 208 144s50.1 112 112 112zm76.8 32h-8.3c-20.8 10-43.9 16-68.5 16s-47.6-6-68.5-16h-8.3C179.6 288 128 339.6 128 403.2V432c0 26.5 21.5 48 48 48h288c26.5 0 48-21.5 48-48v-28.8c0-63.6-51.6-115.2-115.2-115.2zm-223.7-13.4C161.5 263.1 145.6 256 128 256H64c-35.3 0-64 28.7-64 64v32c0 17.7 14.3 32 32 32h65.9c6.3-47.4 34.9-87.3 75.2-109.4z"/></svg>`;
+  const IC_TRUCK = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 640 512" style="fill:#fff;flex-shrink:0;"><path d="M624 352h-16V243.9c0-12.7-5.1-24.9-14.1-33.9L494 110.1c-9-9-21.2-14.1-33.9-14.1H416V48c0-26.5-21.5-48-48-48H48C21.5 0 0 21.5 0 48v320c0 26.5 21.5 48 48 48h16c0 53 43 96 96 96s96-43 96-96h128c0 53 43 96 96 96s96-43 96-96h48c8.8 0 16-7.2 16-16v-32c0-8.8-7.2-16-16-16zM160 464c-26.5 0-48-21.5-48-48s21.5-48 48-48 48 21.5 48 48-21.5 48-48 48zm320 0c-26.5 0-48-21.5-48-48s21.5-48 48-48 48 21.5 48 48-21.5 48-48 48zm80-208H416V144h44.1l99.9 99.9V256z"/></svg>`;
+  const IC_UNIVERSITY = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 512 512" style="fill:#fff;flex-shrink:0;"><path d="M496 128v16a8 8 0 0 1-8 8h-24v12c0 6.627-5.373 12-12 12H60c-6.627 0-12-5.373-12-12v-12H24a8 8 0 0 1-8-8v-16a8 8 0 0 1 4.941-7.392l232-88a7.996 7.996 0 0 1 6.118 0l232 88A8 8 0 0 1 496 128zm-24 304H40c-13.255 0-24 10.745-24 24v16a8 8 0 0 0 8 8h480a8 8 0 0 0 8-8v-16c0-13.255-10.745-24-24-24zM96 192v192H60c-6.627 0-12 5.373-12 12v20h416v-20c0-6.627-5.373-12-12-12h-36V192h-64v192h-64V192h-64v192h-64V192H96z"/></svg>`;
+  const IC_FILE_ALT = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 384 512" style="fill:#fff;flex-shrink:0;"><path d="M224 136V0H24C10.7 0 0 10.7 0 24v464c0 13.3 10.7 24 24 24h336c13.3 0 24-10.7 24-24V160H248c-13.2 0-24-10.8-24-24zm64 236c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-64c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-72v8c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12zm96-153.1L305.1 32c-4.5-4.5-10.6-7-17-7H272v128h128v-17.1c0-6.3-2.5-12.4-7-16.9z"/></svg>`;
+  const IC_STAMP = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 512 512" style="fill:#5ea830;"><path d="M497.941 395.716l-75.313-75.313A64 64 0 0 0 377.373 304H264V248c39.776 0 72-32.224 72-72v-24c0-12.853-10.675-24-24-24H200c-13.325 0-24 11.147-24 24v24c0 39.776 32.224 72 72 72v56H211.98c-20.937 0-40.01 7.914-54.612 22.515l-75.26 75.26C51.98 421.808 32 459.671 32 496c0 8.837 7.163 16 16 16h416c8.837 0 16-7.163 16-16 0-36.329-19.98-74.192-48.059-100.284zM48.013 208H24c-13.255 0-24 10.745-24 24v40c0 13.255 10.745 24 24 24h24.013C64 282.507 80 256 80 256s-16-26.507-31.987-48zm415.974 0H440c-16 21.493-32 48-32 48s16 26.507 32 48h23.987c13.255 0 24-10.745 24-24v-40c0-13.255-10.745-24-24-24zM256 0c-61.856 0-112 50.144-112 112h224C368 50.144 317.856 0 256 0z"/></svg>`;
+  const IC_PEN_NIB = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 512 512" style="fill:#fff;flex-shrink:0;"><path d="M373.888 168.112c-7.493-7.493-17.443-11.718-28.028-11.718H320V96c0-17.673-14.327-32-32-32h-64c-17.673 0-32 14.327-32 32v64h-25.86c-10.585 0-20.535 4.225-28.028 11.718L16 320h480L373.888 168.112zM256 336c-8.837 0-16-7.163-16-16s7.163-16 16-16 16 7.163 16 16-7.163 16-16 16zM0 384v48c0 8.837 7.163 16 16 16h480c8.837 0 16-7.163 16-16v-48H0z"/></svg>`;
+
   return `
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>${TI_STYLES}</style>
 <div class="invoice-container">
     <!-- Header -->
@@ -578,16 +587,16 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <div class="company-info">
             <div class="company-name">${esc(profile.companyName)}</div>
             <div class="info-line">
-                <i class="fas fa-map-marker-alt"></i>
+                ${IC_MAP_MARKER}
                 <div>${esc(addressLines[0] || '')},<br>${esc(addressLines[1] || '')}</div>
             </div>
             <div class="info-line-multiple">
                 <div class="info-line">
-                    <i class="fas fa-phone-alt"></i>
+                    ${IC_PHONE}
                     <span>${esc(profile.phone || DEFAULT_COMPANY_PROFILE.phone)}</span>
                 </div>
                 <div class="info-line">
-                    <i class="fas fa-envelope"></i>
+                    ${IC_ENVELOPE}
                     <span>${esc(profile.email || DEFAULT_COMPANY_PROFILE.email)}</span>
                 </div>
             </div>
@@ -636,7 +645,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <!-- Bill To -->
         <div class="party-box">
             <div class="party-header">
-                <i class="fas fa-users"></i> BILL TO PARTY
+                ${IC_USERS} BILL TO PARTY
             </div>
             <div class="party-body">
                 <div class="party-row">
@@ -660,7 +669,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <!-- Ship To -->
         <div class="party-box">
             <div class="party-header">
-                <i class="fas fa-truck"></i> SHIP TO PARTY
+                ${IC_TRUCK} SHIP TO PARTY
             </div>
             <div class="party-body">
                 <div class="party-row">
@@ -715,7 +724,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <!-- Bank Details -->
         <div class="bank-details">
             <div class="party-header">
-                <i class="fas fa-university"></i> OUR BANK DETAILS
+                ${IC_UNIVERSITY} OUR BANK DETAILS
             </div>
             <div class="bank-body">
                 <div class="bank-row">
@@ -776,7 +785,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     <div class="footer-bottom">
         <div class="terms-box">
             <div class="party-header">
-                <i class="fas fa-file-alt"></i> TERMS & CONDITIONS
+                ${IC_FILE_ALT} TERMS &amp; CONDITIONS
             </div>
             <div class="terms-body">
                 <ol>
@@ -788,13 +797,13 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         </div>
 
         <div class="seal-box">
-            <i class="fas fa-stamp"></i>
+            ${IC_STAMP}
             <div>Seal</div>
         </div>
 
         <div class="sign-box">
             <div class="party-header">
-                <i class="fas fa-pen-nib"></i> FOR ${esc(profile.companyName.toUpperCase())}
+                ${IC_PEN_NIB} FOR ${esc(profile.companyName.toUpperCase())}
             </div>
             <div class="sign-area">
                 <div class="sign-text">Authorised Signatory</div>
