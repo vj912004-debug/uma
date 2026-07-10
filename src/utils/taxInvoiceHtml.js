@@ -24,10 +24,10 @@ const fmtQty = (n) => {
 };
 
 const DEFAULT_TI_LOGO_HTML = `
-<svg width="80" height="80" viewBox="0 0 100 100" aria-label="UMA MICRON Logo">
-  <ellipse cx="50" cy="50" rx="45" ry="30" fill="none" stroke="#28a745" stroke-width="3" transform="rotate(-30 50 50)"></ellipse>
-  <ellipse cx="50" cy="50" rx="45" ry="30" fill="none" stroke="#28a745" stroke-width="3" transform="rotate(30 50 50)"></ellipse>
-  <text x="50%" y="62%" font-family="Times New Roman, serif" font-size="45" font-weight="bold" fill="#dc3545" text-anchor="middle" letter-spacing="-2">UM</text>
+<svg width="80" height="80" viewBox="0 0 100 100">
+    <ellipse cx="50" cy="50" rx="45" ry="30" fill="none" stroke="#28a745" stroke-width="3" transform="rotate(-30 50 50)"></ellipse>
+    <ellipse cx="50" cy="50" rx="45" ry="30" fill="none" stroke="#28a745" stroke-width="3" transform="rotate(30 50 50)"></ellipse>
+    <text x="50%" y="62%" font-family="Times New Roman, serif" font-size="45" font-weight="bold" fill="#dc3545" text-anchor="middle" letter-spacing="-2">UM</text>
 </svg>`;
 
 const TI_STYLES = `
@@ -46,10 +46,18 @@ const TI_STYLES = `
       font-family: Arial, Helvetica, sans-serif;
   }
 
-  .ti-host {
+  body {
+      background-color: #e0e0e0;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+  }
+
+  .invoice-container {
       background-color: #fff;
-      width: 850px;
+      width: 800px;
       padding: 25px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
       border: 2px solid var(--text-dark);
       color: var(--text-dark);
       font-size: 11.5px;
@@ -72,8 +80,8 @@ const TI_STYLES = `
   }
 
   .logo-section img {
-      max-width: 100%;
-      max-height: 100%;
+      max-width: 80px;
+      max-height: 80px;
       object-fit: contain;
   }
 
@@ -101,12 +109,10 @@ const TI_STYLES = `
       margin-bottom: 4px;
   }
 
-  .info-line svg {
+  .info-line i {
       color: var(--blue-dark);
       margin-top: 2px;
       width: 12px;
-      height: 12px;
-      flex-shrink: 0;
   }
 
   .gstin {
@@ -412,10 +418,9 @@ const TI_STYLES = `
       gap: 5px;
   }
 
-  .seal-box svg {
+  .seal-box i {
       color: var(--green-main);
-      width: 24px;
-      height: 24px;
+      font-size: 24px;
   }
 
   .sign-box {
@@ -453,7 +458,7 @@ const formatPartyAddressDivs = (address, defaultLines = 3) => {
     divs.push(`
       <div class="party-row">
         <div class="party-label">${i === 0 ? 'Address :' : ''}</div>
-        <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(lines[i] || '')}</div>
+        <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(lines[i] || '')}</div>
       </div>`);
   }
   return divs.join('');
@@ -563,8 +568,9 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   const { rowsHtml, totals } = buildItemRowsHtml(data);
 
   return `
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>${TI_STYLES}</style>
-<div class="ti-host">
+<div class="invoice-container">
     <!-- Header -->
     <div class="header">
         <div class="logo-section">${logoHtml}</div>
@@ -572,24 +578,16 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <div class="company-info">
             <div class="company-name">${esc(profile.companyName)}</div>
             <div class="info-line">
-                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                  <circle cx="12" cy="10" r="3"></circle>
-                </svg>
+                <i class="fas fa-map-marker-alt"></i>
                 <div>${esc(addressLines[0] || '')},<br>${esc(addressLines[1] || '')}</div>
             </div>
             <div class="info-line-multiple">
                 <div class="info-line">
-                    <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                    </svg>
+                    <i class="fas fa-phone-alt"></i>
                     <span>${esc(profile.phone || DEFAULT_COMPANY_PROFILE.phone)}</span>
                 </div>
                 <div class="info-line">
-                    <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                      <polyline points="22,6 12,13 2,6"></polyline>
-                    </svg>
+                    <i class="fas fa-envelope"></i>
                     <span>${esc(profile.email || DEFAULT_COMPANY_PROFILE.email)}</span>
                 </div>
             </div>
@@ -638,29 +636,23 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <!-- Bill To -->
         <div class="party-box">
             <div class="party-header">
-                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:#fff; flex-shrink:0;">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="9" cy="7" r="4"></circle>
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                </svg>
-                &nbsp;BILL TO PARTY
+                <i class="fas fa-users"></i> BILL TO PARTY
             </div>
             <div class="party-body">
                 <div class="party-row">
                     <div class="party-label">Name :</div>
-                    <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(data.partyName || '')}</div>
+                    <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(data.partyName || '')}</div>
                 </div>
                 ${formatPartyAddressDivs(data.billAddress || data.address || '', 3)}
                 <div class="party-row" style="margin-top: 5px;">
                     <div class="party-label">State :</div>
-                    <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(data.billState || data.state || '')}</div>
+                    <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(data.billState || data.state || '')}</div>
                     <div class="party-label" style="min-width: 40px; margin-left: 10px;">Code</div>
                     <div class="code-box" style="display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--blue-dark);">${esc(data.billStateCode || data.stateCode || '')}</div>
                 </div>
                 <div class="party-row" style="margin-top: 5px;">
                     <div class="party-label">GSTIN :</div>
-                    <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(data.gstinBill || data.gstin || '')}</div>
+                    <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(data.gstinBill || data.gstin || '')}</div>
                 </div>
             </div>
         </div>
@@ -668,29 +660,23 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <!-- Ship To -->
         <div class="party-box">
             <div class="party-header">
-                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:#fff; flex-shrink:0;">
-                  <rect x="1" y="3" width="15" height="13"></rect>
-                  <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-                  <circle cx="5.5" cy="18.5" r="2.5"></circle>
-                  <circle cx="18.5" cy="18.5" r="2.5"></circle>
-                </svg>
-                &nbsp;SHIP TO PARTY
+                <i class="fas fa-truck"></i> SHIP TO PARTY
             </div>
             <div class="party-body">
                 <div class="party-row">
                     <div class="party-label">Name :</div>
-                    <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(data.shipName || data.partyName || '')}</div>
+                    <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(data.shipName || data.partyName || '')}</div>
                 </div>
                 ${formatPartyAddressDivs(data.shipAddress || data.address || '', 3)}
                 <div class="party-row" style="margin-top: 5px;">
                     <div class="party-label">State :</div>
-                    <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(data.shipState || data.state || '')}</div>
+                    <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(data.shipState || data.state || '')}</div>
                     <div class="party-label" style="min-width: 40px; margin-left: 10px;">Code</div>
                     <div class="code-box" style="display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--blue-dark);">${esc(data.shipStateCode || data.stateCode || '')}</div>
                 </div>
                 <div class="party-row" style="margin-top: 5px;">
                     <div class="party-label">GSTIN :</div>
-                    <div class="dotted-line" style="padding-left: 4px; font-weight: 600; color: #333;">${esc(data.gstinShip || data.gstin || '')}</div>
+                    <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(data.gstinShip || data.gstin || '')}</div>
                 </div>
             </div>
         </div>
@@ -729,15 +715,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <!-- Bank Details -->
         <div class="bank-details">
             <div class="party-header">
-                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:#fff; flex-shrink:0;">
-                  <line x1="3" y1="22" x2="21" y2="22"></line>
-                  <line x1="6" y1="18" x2="6" y2="11"></line>
-                  <line x1="10" y1="18" x2="10" y2="11"></line>
-                  <line x1="14" y1="18" x2="14" y2="11"></line>
-                  <line x1="18" y1="18" x2="18" y2="11"></line>
-                  <polygon points="12 2 20 7 4 7 12 2"></polygon>
-                </svg>
-                &nbsp;OUR BANK DETAILS
+                <i class="fas fa-university"></i> OUR BANK DETAILS
             </div>
             <div class="bank-body">
                 <div class="bank-row">
@@ -798,14 +776,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     <div class="footer-bottom">
         <div class="terms-box">
             <div class="party-header">
-                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:#fff; flex-shrink:0;">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                  <line x1="16" y1="13" x2="8" y2="13"></line>
-                  <line x1="16" y1="17" x2="8" y2="17"></line>
-                  <polyline points="10 9 9 9 8 9"></polyline>
-                </svg>
-                &nbsp;TERMS & CONDITIONS
+                <i class="fas fa-file-alt"></i> TERMS & CONDITIONS
             </div>
             <div class="terms-body">
                 <ol>
@@ -817,21 +788,13 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         </div>
 
         <div class="seal-box">
-            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="9"></circle>
-              <circle cx="12" cy="12" r="6"></circle>
-              <path d="M12 9v6M9 12h6"></path>
-            </svg>
+            <i class="fas fa-stamp"></i>
             <div>Seal</div>
         </div>
 
         <div class="sign-box">
             <div class="party-header">
-                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:#fff; flex-shrink:0;">
-                  <path d="M12 20h9"></path>
-                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                </svg>
-                &nbsp;FOR ${esc(profile.companyName.toUpperCase())}
+                <i class="fas fa-pen-nib"></i> FOR ${esc(profile.companyName.toUpperCase())}
             </div>
             <div class="sign-area">
                 <div class="sign-text">Authorised Signatory</div>
@@ -849,15 +812,15 @@ export const renderTaxInvoicePdf = async (data, { mode = 'save' } = {}) => {
   document.body.appendChild(host);
 
   try {
-    const target = host.querySelector('.ti-host');
+    const target = host.querySelector('.invoice-container');
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
     const canvas = await html2canvas(target, {
       scale: 2,
       useCORS: true,
       backgroundColor: '#fff',
-      width: 850,
-      windowWidth: 850
+      width: 800,
+      windowWidth: 800
     });
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
