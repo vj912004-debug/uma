@@ -389,7 +389,7 @@ const buildBPR = (doc, data) => {
     startY: 22,
     margin,
     body: [
-      [{ content: 'Batch Processing Record', colSpan: 6, styles: { halign: 'center', fontStyle: 'bold', fontSize: 11 } }],
+      [{ content: `Batch Processing Record - ${data.bprNo || 'N/A'}`, colSpan: 6, styles: { halign: 'center', fontStyle: 'bold', fontSize: 11 } }],
       ['Customer Name :', { content: data.partyName || data.customerName || '', colSpan: 5 }],
       ['Product Name :', { content: data.productName || '', colSpan: 5 }],
       ['Total Quantity (kg) :', data.totalInputQty ?? '', 'Batch No. :', primaryBatchNo, `Total No. Batch : ${totalNoBatch}`, `Total Drum : ${totalDrums}`],
@@ -399,27 +399,27 @@ const buildBPR = (doc, data) => {
       [{ content: 'Particle size require', colSpan: 2, styles: { halign: 'center' } }, { content: 'Sizing report require', colSpan: 2, styles: { halign: 'center' } }, { content: 'Particle size result', colSpan: 2, styles: { halign: 'center' } }],
       [{ content: data.psdRequirement || '', colSpan: 2 }, { content: data.sizingReportRequired || '', colSpan: 2 }, { content: data.particleSizeResult || '', colSpan: 2 }],
       [{ content: 'PSD Note', colSpan: 2, styles: { halign: 'center', fontStyle: 'bold' } }, { content: data.psdNote || '', colSpan: 4 }],
-      [{ content: 'Is the Micronizar cleaned?', colSpan: 5 }, bprCheck(data.cleaningChecklist?.equipmentCleaned)],
-      [{ content: 'Is the processesing Area Cleaned?', colSpan: 5 }, bprCheck(data.cleaningChecklist?.areaCleaned)],
+      [{ content: 'Is the Micronizer cleaned?', colSpan: 5 }, bprCheck(data.cleaningChecklist?.equipmentCleaned)],
+      [{ content: 'Is the processing Area Cleaned?', colSpan: 5 }, bprCheck(data.cleaningChecklist?.areaCleaned)],
       [{ content: 'Is the filter Bag before process packed and labeled in LDPE Bag ?', colSpan: 5 }, bprCheck(data.cleaningChecklist?.lineClearance)],
       [{ content: 'Is the bag is clean and black spot free?', colSpan: 5 }, bprCheck(data.cleaningChecklist?.bagClean)],
       [{ content: 'Feeding pressure', colSpan: 3, styles: { halign: 'center', fontStyle: 'bold' } }, { content: 'Milling Pressure', colSpan: 3, styles: { halign: 'center', fontStyle: 'bold' } }],
       ['S.P.', 'D.P.', 'T.P.', 'F.P.', { content: 'Fi.P.', colSpan: 2 }],
       ...pressureRows.map((row) => [row[0], row[1], row[2], row[3], { content: row[4], colSpan: 2 }]),
-      [{ content: 'Packing Materails Used', colSpan: 6, styles: { fontStyle: 'bold' } }],
-      ['White LD Bags', 'Black LD Bags', 'Brow Tapes', 'Drum Used', { content: 'Other Details', colSpan: 2 }],
+      [{ content: 'Packing Materials Used', colSpan: 6, styles: { fontStyle: 'bold' } }],
+      ['White LD Bags', 'Black LD Bags', 'Brown Tapes', 'Drum Used', { content: 'Other Details', colSpan: 2 }],
       [pc.whiteLdBags || pc.linersUsed || '', pc.blackLdBags || '', pc.brownTapes || '', pc.drumUsed || pc.fiberDrumsUsed || '', { content: pc.otherDetails || pc.hdpeDrumsUsed || '', colSpan: 2 }],
       [{ content: 'Dispatch Material Quantity Details', colSpan: 6, styles: { fontStyle: 'bold' } }],
       ['Micronized Material net weight', 'Lumps Net weight', 'Floor Dust Net weight', { content: 'Net Process Loss', colSpan: 2 }, 'Remark'],
       [dispatchedNet !== '0.00' ? dispatchedNet : '', data.lumpsNetWeight || '', data.floorDustNetWeight || '', { content: data.processLoss || '', colSpan: 2 }, data.dispatchRemark || ''],
       ['Process completion', 'Date', data.processCompletionDate ? fmtDate(data.processCompletionDate) : '', 'Time', data.processCompletionTime || '', ''],
-      [{ content: 'Is Filter Bag Packed in HDPE bag and lable & stored properly after processing ?', colSpan: 5 }, bprCheck(data.filterBagPacked)],
+      [{ content: 'Is Filter Bag Packed in HDPE bag and label & stored properly after processing ?', colSpan: 5 }, bprCheck(data.filterBagPacked)],
       [{ content: 'Remark', colSpan: 6, styles: { fontStyle: 'bold' } }],
-      [{ content: data.remark || '\n\n\n\n', colSpan: 6, styles: { minCellHeight: 28, valign: 'top' } }],
-      [{ content: 'Operatores Singnature', colSpan: 3, styles: { halign: 'center', minCellHeight: 18, valign: 'bottom' } }, { content: "Plant Supervisor's Signature", colSpan: 3, styles: { halign: 'center', minCellHeight: 18, valign: 'bottom' } }]
+      [{ content: data.remark || '\n\n', colSpan: 6, styles: { minCellHeight: 12, valign: 'top' } }],
+      [{ content: "Operator's Signature", colSpan: 3, styles: { halign: 'center', minCellHeight: 10, valign: 'bottom' } }, { content: "Plant Supervisor's Signature", colSpan: 3, styles: { halign: 'center', minCellHeight: 10, valign: 'bottom' } }]
     ],
     theme: 'grid',
-    styles: BPR_GRID
+    styles: { ...BPR_GRID, fontSize: 8, cellPadding: 1.5 }
   });
 
   // ----- Page 2: Batch Packing Record -----
@@ -443,10 +443,10 @@ const buildBPR = (doc, data) => {
   }
 
   packingBody.push(
-    [{ content: 'Micronized Material Net Weight', colSpan: 4, styles: { halign: 'left' } }, dispatchedNet !== '0.00' ? dispatchedNet : '', '', '', '', '', '', '', ''],
-    [{ content: 'Lumps Net Weight', colSpan: 4, styles: { halign: 'left' } }, data.lumpsNetWeight || '', '', '', '', '', '', '', ''],
-    [{ content: 'Sample Net Weight', colSpan: 4, styles: { halign: 'left' } }, data.sampleNetWeight || '', '', '', '', '', '', '', ''],
-    [{ content: 'Irrecoverable Loss', colSpan: 4, styles: { halign: 'left' } }, data.irrecoverableLoss || data.processLoss || '', '', '', '', '', '', '', ''],
+    [{ content: 'Micronized Material Net Weight', colSpan: 4, styles: { halign: 'left' } }, dispatchedNet !== '0.00' ? dispatchedNet : '', { content: '', colSpan: 5 }],
+    [{ content: 'Lumps Net Weight', colSpan: 4, styles: { halign: 'left' } }, data.lumpsNetWeight || '', { content: '', colSpan: 5 }],
+    [{ content: 'Sample Net Weight', colSpan: 4, styles: { halign: 'left' } }, data.sampleNetWeight || '', { content: '', colSpan: 5 }],
+    [{ content: 'Irrecoverable Loss', colSpan: 4, styles: { halign: 'left' } }, data.irrecoverableLoss || data.processLoss || '', { content: '', colSpan: 5 }],
     [{ content: '', colSpan: 5, styles: { minCellHeight: 10 } }, { content: "Plant Supervisor's Sign", colSpan: 5, styles: { halign: 'center', valign: 'bottom', minCellHeight: 18 } }]
   );
 
@@ -454,7 +454,7 @@ const buildBPR = (doc, data) => {
     startY: 22,
     margin,
     head: [
-      [{ content: 'Batch Packing Record', colSpan: 5, styles: { halign: 'center', fontStyle: 'bold' } }, { content: `Date : ${fmtDate(data.date)}`, colSpan: 5, styles: { halign: 'center', fontStyle: 'bold' } }],
+      [{ content: `Batch Packing Record - ${data.bprNo || 'N/A'}`, colSpan: 5, styles: { halign: 'center', fontStyle: 'bold' } }, { content: `Date : ${fmtDate(data.date)}`, colSpan: 5, styles: { halign: 'center', fontStyle: 'bold' } }],
       [{ content: 'Received Materials Weight', colSpan: 5, styles: { halign: 'center', fontStyle: 'bold' } }, { content: 'Dispatched (micronized) Materials Weight', colSpan: 5, styles: { halign: 'center', fontStyle: 'bold' } }],
       ['Batch No.', 'Drum No', 'Gross Weight (kg)', 'Tare Weight (kg)', 'Net Weight (kg)', 'Batch No.', 'Drum No', 'Gross Weight (kg)', 'Tare Weight (kg)', 'Net Weight (kg)']
     ],
