@@ -53,15 +53,15 @@ const TI_STYLES = `
 
   body {
     background-color: #e4e9f2;
-    padding: 30px 10px;
+    padding: 10px;
     color: var(--text-color);
   }
 
   .invoice-card {
     background-color: #ffffff;
-    width: 820px;
+    width: 760px;
     margin: 0 auto;
-    padding: 24px;
+    padding: 18px;
     border: 2px solid var(--primary-blue);
     border-radius: 6px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
@@ -358,13 +358,16 @@ const TI_STYLES = `
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 12px;
+    table-layout: fixed;
   }
 
   .main-ledger-table th, .main-ledger-table td {
     border: 1px solid var(--border-color);
-    padding: 5px 3px;
-    font-size: 11px;
+    padding: 4px 2px;
+    font-size: 10.5px;
     text-align: center;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   .main-ledger-table th {
@@ -382,7 +385,9 @@ const TI_STYLES = `
 
   .main-ledger-table td.align-left {
     text-align: left;
-    padding-left: 8px;
+    padding-left: 6px;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   .main-ledger-table tr.data-row {
@@ -836,23 +841,23 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   <table class="main-ledger-table">
     <thead>
       <tr>
-        <th rowspan="2" style="width:4.5%;">Sr.<br>No.</th>
-        <th rowspan="2" style="width:33.5%;">Description</th>
-        <th rowspan="2" style="width:6%;">Qty</th>
-        <th rowspan="2" style="width:7.5%;">Rate</th>
-        <th rowspan="2" style="width:9.5%;">Amount</th>
+        <th rowspan="2" style="width:4%;">Sr.<br>No.</th>
+        <th rowspan="2" style="width:28%;">Description</th>
+        <th rowspan="2" style="width:5%;">Qty</th>
+        <th rowspan="2" style="width:7%;">Rate</th>
+        <th rowspan="2" style="width:8%;">Amount</th>
         <th colspan="2" style="width:10%;">SGST</th>
         <th colspan="2" style="width:10%;">CGST</th>
         <th colspan="2" style="width:10%;">IGST</th>
-        <th rowspan="2" style="width:9%;">Total</th>
+        <th rowspan="2" style="width:8%;">Total</th>
       </tr>
       <tr>
         <th class="sub-head" style="width:4%;">Rate</th>
-        <th class="sub-head" style="width:6%;">Amount</th>
+        <th class="sub-head" style="width:6%;">Amt</th>
         <th class="sub-head" style="width:4%;">Rate</th>
-        <th class="sub-head" style="width:6%;">Amount</th>
+        <th class="sub-head" style="width:6%;">Amt</th>
         <th class="sub-head" style="width:4%;">Rate</th>
-        <th class="sub-head" style="width:6%;">Amount</th>
+        <th class="sub-head" style="width:6%;">Amt</th>
       </tr>
     </thead>
     <tbody>
@@ -946,8 +951,8 @@ export const renderTaxInvoicePdf = async (data, { mode = 'save' } = {}) => {
       scale: 2,
       useCORS: true,
       backgroundColor: '#fff',
-      width: 820,
-      windowWidth: 820
+      width: 760,
+      windowWidth: 760
     });
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
