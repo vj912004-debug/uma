@@ -23,454 +23,562 @@ const fmtQty = (n) => {
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
 };
 
+// SVG logo matching the circular UM design from the screenshot
 const DEFAULT_TI_LOGO_HTML = `
-<svg width="80" height="80" viewBox="0 0 100 100">
-    <ellipse cx="50" cy="50" rx="45" ry="30" fill="none" stroke="#28a745" stroke-width="3" transform="rotate(-30 50 50)"></ellipse>
-    <ellipse cx="50" cy="50" rx="45" ry="30" fill="none" stroke="#28a745" stroke-width="3" transform="rotate(30 50 50)"></ellipse>
-    <text x="50%" y="62%" font-family="Times New Roman, serif" font-size="45" font-weight="bold" fill="#dc3545" text-anchor="middle" letter-spacing="-2">UM</text>
+<svg width="90" height="90" viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="45" cy="45" r="43" fill="none" stroke="#d61c1c" stroke-width="3"/>
+  <ellipse cx="45" cy="45" rx="52" ry="18" fill="none" stroke="#00499c" stroke-width="2.5"
+    transform="rotate(-22 45 45)" stroke-dasharray="115 45"/>
+  <ellipse cx="45" cy="45" rx="52" ry="18" fill="none" stroke="#00499c" stroke-width="2.5"
+    transform="rotate(22 45 45)" stroke-dasharray="45 115"/>
+  <text x="45" y="58" font-family="Times New Roman, serif" font-size="30" font-weight="900"
+    fill="#d61c1c" text-anchor="middle">UM</text>
 </svg>`;
 
 const TI_STYLES = `
   :root {
-      --blue-dark: #002d6b;
-      --blue-light: #e6ebf5;
-      --green-main: #5ea830;
-      --border-color: #b0c0d0;
-      --text-dark: #333;
+    --primary-blue: #00499c;
+    --dark-blue: #003171;
+    --light-bg: #f4f8fc;
+    --border-color: #a3c7f5;
+    --text-color: #000000;
   }
 
   * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: Arial, Helvetica, sans-serif;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
   }
 
   body {
-      background-color: #e0e0e0;
-      display: flex;
-      justify-content: center;
-      padding: 20px;
+    background-color: #e4e9f2;
+    padding: 30px 10px;
+    color: var(--text-color);
   }
 
-  .invoice-container {
-      background-color: #fff;
-      width: 800px;
-      padding: 25px;
-      box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
-      border: 2px solid var(--text-dark);
-      color: var(--text-dark);
-      font-size: 11.5px;
-      position: relative;
+  .invoice-card {
+    background-color: #ffffff;
+    width: 820px;
+    margin: 0 auto;
+    padding: 24px;
+    border: 2px solid var(--primary-blue);
+    border-radius: 6px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
   }
 
-  /* --- HEADER SECTION --- */
-  .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 5px;
+  /* --- HEADER --- */
+  .header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
   }
 
-  .logo-section {
-      width: 15%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-  }
-
-  .logo-section img {
-      max-width: 80px;
-      max-height: 80px;
-      object-fit: contain;
+  .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 15px;
   }
 
   .company-info {
-      width: 65%;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
-  .company-name {
-      color: var(--blue-dark);
-      font-size: 26px;
-      font-weight: bold;
-      margin-bottom: 6px;
+  .title-brand {
+    font-size: 34px;
+    font-weight: bold;
+    color: var(--primary-blue);
+    letter-spacing: 0.5px;
+    line-height: 1.1;
   }
 
-  .info-line {
-      display: flex;
-      align-items: flex-start;
-      margin-bottom: 4px;
-      gap: 8px;
-  }
-  
-  .info-line-multiple {
-      display: flex;
-      gap: 20px;
-      margin-bottom: 4px;
+  .address-txt {
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 1.4;
+    color: #111;
+    margin-top: 2px;
   }
 
-  .info-line i {
-      color: var(--blue-dark);
-      margin-top: 2px;
-      width: 12px;
+  .contact-row {
+    display: flex;
+    gap: 15px;
+    font-size: 11px;
+    font-weight: bold;
+    margin-top: 4px;
+    align-items: center;
   }
 
-  .gstin-badge {
-      display: inline-block;
-      background-color: var(--blue-dark);
-      color: #fff;
-      font-weight: bold;
-      font-size: 11.5px;
-      padding: 4px 10px;
-      border-radius: 4px;
-      margin-top: 6px;
-      letter-spacing: 0.5px;
+  .contact-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
 
-  .copy-type {
-      background-color: var(--blue-dark);
-      color: #fff;
-      padding: 10px 15px;
-      font-weight: bold;
-      text-align: center;
-      line-height: 1.4;
-      clip-path: polygon(15% 0, 100% 0, 100% 100%, 0% 100%);
-      width: 130px;
-      font-size: 11px;
-      margin-top: -25px;
-      margin-right: -25px;
+  .icon-circle {
+    background-color: var(--primary-blue);
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-style: normal;
   }
 
-  .header-border {
-      border-top: 2px solid var(--blue-dark);
-      margin: 10px 0;
+  .gst-pill {
+    background-color: var(--primary-blue);
+    color: white;
+    padding: 4px 14px;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 12px;
+    display: inline-block;
+    margin-top: 8px;
+    width: fit-content;
   }
 
-  /* --- TITLE BANNER --- */
-  .title-banner {
-      background-color: var(--blue-dark);
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 18px;
-      margin-bottom: 14px;
-      border-radius: 0;
+  /* ORIGINAL / DUPLICATE badge */
+  .badge-box {
+    border: 2px solid var(--primary-blue);
+    background-color: var(--primary-blue);
+    color: white;
+    border-radius: 6px;
+    overflow: hidden;
+    width: 110px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: bold;
   }
 
-  .title-banner-text {
-      font-size: 28px;
-      font-weight: bold;
-      letter-spacing: 2px;
+  .badge-top {
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.4);
   }
 
-  .title-banner-icon {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+  .badge-bottom {
+    padding: 5px 0;
   }
 
-  /* --- DETAILS GRID --- */
-  .details-grid {
-      border: 1px solid var(--border-color);
-      border-radius: 4px;
-      overflow: hidden;
-      margin-bottom: 15px;
-      width: 100%;
-      border-collapse: collapse;
+  /* --- TAX INVOICE BANNER --- */
+  .invoice-banner-container {
+    position: relative;
+    height: 46px;
+    margin-bottom: 12px;
   }
 
-  .details-grid td {
-      padding: 6px 10px;
-      border: 1px solid var(--border-color);
-      vertical-align: middle;
+  .invoice-banner-blue {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 388px;
+    height: 44px;
+    background-color: var(--primary-blue);
+    clip-path: polygon(35px 0%, 100% 0%, 100% 100%, 0% 100%);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 15px;
+    color: white;
   }
 
-  .details-grid .label {
-      color: var(--blue-dark);
-      font-weight: bold;
-      white-space: nowrap;
+  .banner-text-flex {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 26px;
+    font-weight: bold;
+    letter-spacing: 1px;
   }
 
-  .details-grid .state-row td {
-      padding: 6px 10px;
+  .banner-icon {
+    font-size: 20px;
   }
 
-  /* --- PARTIES SECTION --- */
-  .parties-wrapper {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 15px;
+  /* --- METADATA GRID --- */
+  .meta-section-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 12px;
   }
 
-  .party-box {
-      flex: 1;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
+  .structured-table {
+    width: 100%;
+    border-collapse: collapse;
   }
 
-  .party-header {
-      background-color: var(--blue-dark);
-      color: #fff;
-      padding: 7px 10px;
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+  .structured-table td {
+    border: 1px solid var(--border-color);
+    padding: 6px 8px;
+    font-size: 11.5px;
+    height: 30px;
   }
 
-  .party-body {
-      padding: 10px;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+  .structured-table td.lbl {
+    color: var(--primary-blue);
+    font-weight: bold;
+    width: 38%;
   }
 
-  .party-row {
-      display: flex;
-      align-items: flex-end;
+  .structured-table td.val {
+    font-weight: normal;
+    color: #000;
   }
 
-  .party-label {
-      color: var(--blue-dark);
-      font-weight: bold;
-      min-width: 65px;
-      margin-bottom: -2px;
+  .split-cell-flex {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    margin: -6px -8px;
   }
 
-  .dotted-line {
-      flex: 1;
-      border-bottom: 1px dotted #999;
-      height: 15px;
+  .split-left {
+    padding: 6px 8px;
+    flex-grow: 1;
   }
 
-  .code-box {
-      border: 1px solid var(--border-color);
-      width: 45px;
-      height: 18px;
-      border-radius: 3px;
+  .split-code-label {
+    border-left: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
+    background-color: var(--light-bg);
+    color: var(--primary-blue);
+    font-weight: bold;
+    padding: 6px 12px;
+    text-align: center;
   }
 
-  /* --- MAIN TABLE --- */
-  .items-table {
-      width: 100%;
-      border-collapse: collapse;
-      border: 1px solid var(--border-color);
-      margin-bottom: 15px;
-      border-radius: 6px;
-      overflow: hidden;
-      table-layout: fixed;
+  .split-code-val {
+    padding: 6px 16px;
+    font-weight: bold;
+    text-align: center;
   }
 
-  .items-table th, .items-table td {
-      border: 1px solid var(--border-color);
-      padding: 6px 5px;
-      text-align: center;
+  /* --- BILL TO / SHIP TO --- */
+  .party-section-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 12px;
   }
 
-  .items-table th {
-      background-color: var(--blue-dark);
-      color: #fff;
-      font-weight: normal;
-      font-size: 11px;
-  }
-  
-  .items-table .bold-th {
-      font-weight: bold;
+  .party-card-panel {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
   }
 
-  .items-table td {
-      color: var(--text-dark);
+  .party-card-header {
+    background-color: var(--primary-blue);
+    color: white;
+    padding: 6px 10px;
+    font-weight: bold;
+    font-size: 12px;
+    letter-spacing: 0.5px;
   }
 
-  .items-table td:nth-child(2) {
-      text-align: left; /* Description left aligned */
-  }
-  
-  .items-table tr.total-row td {
-      font-weight: bold;
-  }
-
-  .total-label {
-      background-color: var(--blue-dark);
-      color: #fff;
-      font-weight: bold;
-      text-align: right !important;
-      padding-right: 10px !important;
-      border-color: var(--blue-dark) !important;
+  .party-card-body {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
   }
 
-  /* --- FOOTER SECTIONS --- */
-  .footer-top {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 15px;
+  .form-row-item {
+    display: flex;
+    align-items: flex-end;
+    font-size: 11.5px;
   }
 
-  .bank-details {
-      flex: 6;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      overflow: hidden;
+  .form-lbl {
+    width: 55px;
+    font-weight: bold;
+    color: #000;
+    flex-shrink: 0;
   }
 
-  .bank-body {
-      padding: 8px 10px;
+  .form-sep {
+    width: 15px;
+    font-weight: bold;
+    flex-shrink: 0;
   }
 
-  .bank-row {
-      display: flex;
-      margin-bottom: 4px;
+  .form-line-input {
+    flex-grow: 1;
+    border-bottom: 1px solid #c0d3eb;
+    height: 15px;
+    padding-bottom: 1px;
+    font-weight: bold;
+    color: #000;
+    font-size: 11.5px;
   }
 
-  .bank-label {
-      color: var(--blue-dark);
-      font-weight: bold;
-      width: 110px;
+  .form-triple-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
   }
 
-  .bank-value {
-      color: var(--text-dark);
+  .state-container {
+    display: flex;
+    border: 1px solid var(--border-color);
+    align-items: center;
+    font-size: 11.5px;
+    margin-left: auto;
+    width: 110px;
+    height: 24px;
+    flex-shrink: 0;
   }
 
-  .summary-table-wrapper {
-      flex: 4;
+  .state-code-lbl {
+    background-color: var(--light-bg);
+    color: var(--primary-blue);
+    font-weight: bold;
+    padding: 0 8px;
+    border-right: 1px solid var(--border-color);
+    height: 100%;
+    display: flex;
+    align-items: center;
   }
 
-  .summary-table {
-      width: 100%;
-      border-collapse: collapse;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      overflow: hidden;
-      border-style: hidden; /* Hide outer border to use wrapper's */
-      box-shadow: 0 0 0 1px var(--border-color);
+  .state-code-val {
+    flex-grow: 1;
+    text-align: center;
+    font-weight: bold;
   }
 
-  .summary-table td {
-      border: 1px solid var(--border-color);
-      padding: 6px 10px;
+  /* --- ITEMS TABLE --- */
+  .main-ledger-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 12px;
   }
 
-  .summary-label {
-      color: var(--blue-dark);
-      font-weight: bold;
-      width: 70%;
+  .main-ledger-table th, .main-ledger-table td {
+    border: 1px solid var(--border-color);
+    padding: 5px 3px;
+    font-size: 11px;
+    text-align: center;
   }
 
-  .summary-value {
-      text-align: right;
-      width: 30%;
+  .main-ledger-table th {
+    background-color: var(--primary-blue);
+    color: white;
+    font-weight: bold;
   }
 
-  .summary-tax-amount {
-      color: var(--blue-dark);
-      font-weight: bold;
+  .main-ledger-table th.sub-head {
+    background-color: var(--primary-blue);
+    border-top: 1px solid #ffffff44;
+    font-size: 10px;
+    font-weight: normal;
   }
 
-  .summary-total-final {
-      background-color: var(--blue-dark);
-      color: #fff !important;
-      font-weight: bold;
-  }
-  .summary-total-final td {
-      color: #fff;
+  .main-ledger-table td.align-left {
+    text-align: left;
+    padding-left: 8px;
   }
 
-  .footer-bottom {
-      display: flex;
-      gap: 12px;
+  .main-ledger-table tr.data-row {
+    height: 21px;
   }
 
-  .terms-box {
-      flex: 5;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      overflow: hidden;
+  .main-ledger-table tr.summary-row {
+    background-color: var(--light-bg);
+    font-weight: bold;
+    color: var(--primary-blue);
+    height: 26px;
   }
 
-  .terms-body {
-      padding: 10px 10px 10px 25px;
+  .main-ledger-table tr.summary-row td {
+    font-size: 12px;
+    color: var(--primary-blue);
   }
 
-  .terms-body ol {
-      margin: 0;
-      padding: 0;
-      color: var(--text-dark);
+  /* --- BANK & TOTALS --- */
+  .bottom-split-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 15px;
+    margin-bottom: 15px;
   }
 
-  .terms-body li {
-      margin-bottom: 4px;
+  .bank-info-panel {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    background-color: #fff;
   }
 
-  .seal-box {
-      flex: 2;
-      border: 1px dashed var(--border-color);
-      border-radius: 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: var(--blue-dark);
-      font-weight: bold;
-      gap: 5px;
+  .bank-info-header {
+    background-color: var(--primary-blue);
+    color: white;
+    padding: 6px 10px;
+    font-weight: bold;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
-  .seal-box i {
-      color: var(--green-main);
-      font-size: 24px;
+  .bank-info-body {
+    padding: 12px;
+    display: grid;
+    grid-template-columns: 115px 15px 1fr;
+    row-gap: 8px;
+    font-size: 11.5px;
   }
 
-  .sign-box {
-      flex: 4;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
+  .bank-row-lbl {
+    color: var(--primary-blue);
+    font-weight: bold;
   }
 
-  .sign-top-text {
-      padding: 8px 10px 4px 10px;
-      color: var(--text-dark);
-      font-size: 10.5px;
-      text-align: center;
+  .bank-row-val {
+    font-weight: bold;
+    color: #000;
   }
 
-  .sign-area {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      padding: 10px;
-      text-align: center;
+  .totals-summary-table {
+    width: 100%;
+    border-collapse: collapse;
   }
 
-  .sign-text {
-      border-top: 1px solid var(--blue-dark);
-      padding-top: 5px;
-      color: var(--blue-dark);
-      font-weight: bold;
-      width: 90%;
-      margin: 0 auto;
+  .totals-summary-table td {
+    border: 1px solid var(--border-color);
+    padding: 6px 10px;
+    font-size: 11.5px;
+  }
+
+  .totals-summary-table tr.blue-tint-row td {
+    background-color: var(--light-bg);
+    color: var(--primary-blue);
+    font-weight: bold;
+  }
+
+  .totals-summary-table tr.grand-final-row td {
+    background-color: var(--primary-blue);
+    color: white;
+    font-weight: bold;
+    font-size: 13.5px;
+    padding: 7px 10px;
+  }
+
+  /* --- FOOTER --- */
+  .footer-declaration-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 0.6fr 1.2fr;
+    gap: 10px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 15px;
+    align-items: flex-end;
+  }
+
+  .terms-block {
+    font-size: 10.5px;
+  }
+
+  .terms-block-heading {
+    color: var(--primary-blue);
+    font-weight: bold;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+  }
+
+  .terms-block ol {
+    padding-left: 14px;
+    line-height: 1.45;
+    font-weight: bold;
+    color: #111;
+  }
+
+  .seal-block {
+    text-align: center;
+    font-size: 11px;
+    font-weight: bold;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .seal-circle-placeholder {
+    width: 58px;
+    height: 58px;
+    border: 2px dashed var(--primary-blue);
+    border-radius: 50%;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-blue);
+    font-size: 26px;
+  }
+
+  .seal-line-decor {
+    width: 80px;
+    height: 1px;
+    background-color: #b0cbe8;
+    margin-bottom: 10px;
+  }
+
+  .sign-block {
+    text-align: center;
+  }
+
+  .sign-certify-txt {
+    font-size: 9.5px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: #222;
+  }
+
+  .sign-company-lbl {
+    font-weight: bold;
+    color: var(--primary-blue);
+    font-size: 12px;
+    margin-bottom: 45px;
+  }
+
+  .sign-hr-line {
+    border-top: 1px solid #b0cbe8;
+    width: 85%;
+    margin: 0 auto 5px auto;
+  }
+
+  .sign-title-lbl {
+    font-weight: bold;
+    font-size: 11px;
+    color: #000;
+  }
+
+  @media print {
+    body { background-color: #ffffff; padding: 0; }
+    .invoice-card { box-shadow: none; width: 100%; border: 2px solid var(--primary-blue); }
   }
 `;
 
-const formatPartyAddressDivs = (address, defaultLines = 3) => {
-  const lines = splitPartyAddressLines(address, 45);
-  const divs = [];
+// Build address lines for the party section
+const formatPartyAddressRows = (address, defaultLines = 3) => {
+  const lines = splitPartyAddressLines(address, 48);
+  const rows = [];
   for (let i = 0; i < Math.max(lines.length, defaultLines); i++) {
-    divs.push(`
-      <div class="party-row">
-        <div class="party-label">${i === 0 ? 'Address :' : ''}</div>
-        <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(lines[i] || '')}</div>
+    rows.push(`
+      <div class="form-row-item">
+        <div class="form-lbl">${i === 0 ? 'Address' : ''}</div>
+        <div class="form-sep">${i === 0 ? ':' : ''}</div>
+        <div class="form-line-input">${esc(lines[i] || '')}</div>
       </div>`);
   }
-  return divs.join('');
+  return rows.join('');
 };
 
 const buildItemRowsHtml = (data) => {
@@ -484,17 +592,17 @@ const buildItemRowsHtml = (data) => {
     const rowTotal = amt + sgstAmt + cgstAmt;
     sr += 1;
     rows.push(`
-      <tr>
-        <td><b>${sr}</b></td>
-        <td>${esc(label)}</td>
+      <tr class="data-row">
+        <td>${sr}</td>
+        <td class="align-left">${esc(label)}</td>
         <td>${esc(fmtQty(qty))}</td>
         <td>${rate ? esc(parseFloat(rate).toFixed(2)) : '0.00'}</td>
         <td>${fmtMoney(amt)}</td>
-        <td>${sgstRate}%</td>
+        <td>${sgstRate}</td>
         <td>${fmtMoney(sgstAmt)}</td>
-        <td>${cgstRate}%</td>
+        <td>${cgstRate}</td>
         <td>${fmtMoney(cgstAmt)}</td>
-        <td>0%</td>
+        <td>0</td>
         <td>${fmtMoney(0)}</td>
         <td>${fmtMoney(rowTotal)}</td>
       </tr>`);
@@ -515,33 +623,24 @@ const buildItemRowsHtml = (data) => {
     pushRow(cc.name || '', ccQty, rate, amt, 9, 9);
   });
 
-  // Pad empty rows to have at least 10 rows total
+  // Pad to minimum 10 rows
   const minRows = 10;
   while (sr < minRows) {
     sr += 1;
     rows.push(`
-      <tr>
-        <td><b>${sr}</b></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
+      <tr class="data-row">
+        <td>${sr}</td>
+        <td class="align-left"></td>
+        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
       </tr>`);
   }
 
-  // Totals Row
+  // Totals summary row
   rows.push(`
-    <tr class="total-row">
-      <td colspan="2" class="total-label">TOTAL</td>
+    <tr class="summary-row">
+      <td colspan="2" style="text-align:right;padding-right:25px;">TOTAL</td>
       <td>${totalQty || 0}</td>
-      <td></td>
+      <td style="color:#888;">-</td>
       <td>${fmtMoney(totalAmt)}</td>
       <td></td>
       <td>${fmtMoney(totalSgst)}</td>
@@ -560,279 +659,275 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   const addressLines = formatTiHeaderAddressLines(profile);
   const logoSrc = profile.logo && profile.logo.startsWith('data:image') ? profile.logo : '';
   const logoHtml = logoSrc
-    ? `<img src="${logoSrc}" alt="UMA MICRON Logo">`
+    ? `<img src="${logoSrc}" alt="Logo" style="width:90px;height:90px;object-fit:contain;">`
     : DEFAULT_TI_LOGO_HTML;
 
-  const docNo = esc(data.invoiceNo || 'N/A');
+  const docNo   = esc(data.invoiceNo || 'N/A');
   const docDate = esc(formatPdfDateSlash(data.date) || 'N/A');
-  const refNo = esc(data.partyDocNo || data.challanNo || '');
+  const refNo   = esc(data.partyDocNo || data.challanNo || '');
   const refDate = esc(formatPdfDateSlash(data.partyDocDate) || '');
-  const dcNo = esc(data.dcNo || '');
-  const dcDate = esc(formatPdfDateSlash(data.dcDate) || data.dcDate || '');
+  const dcNo    = esc(data.dcNo || '');
+  const dcDate  = esc(formatPdfDateSlash(data.dcDate) || data.dcDate || '');
 
-  const companyState = esc(profile.state || 'GUJARAT');
+  const companyState     = esc(profile.state || 'GUJARAT');
   const companyStateCode = esc('24');
 
   const { rowsHtml, totals } = buildItemRowsHtml(data);
 
-  // Inline SVG icons — identical appearance to Font Awesome, but render in html2canvas without CDN
-  const IC_MAP_MARKER = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 384 512" style="fill:#002d6b;flex-shrink:0;margin-top:2px;"><path d="M172.268 501.67C26.97 291.031 0 269.413 0 192 0 85.961 85.961 0 192 0s192 85.961 192 192c0 77.413-26.97 99.031-172.268 309.67-9.535 13.774-29.93 13.773-39.464 0zM192 272c44.183 0 80-35.817 80-80s-35.817-80-80-80-80 35.817-80 80 35.817 80 80 80z"/></svg>`;
-  const IC_PHONE = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 512 512" style="fill:#002d6b;flex-shrink:0;margin-top:2px;"><path d="M493.4 24.6l-104-24c-11.3-2.6-22.9 3.3-27.5 13.9l-48 112c-4.2 9.8-1.4 21.3 6.9 28l60.6 49.6c-36 76.7-98.9 140.5-177.2 177.2l-49.6-60.6c-6.8-8.3-18.2-11.1-28-6.9l-112 48C3.9 366.5-2 378.1.6 389.4l24 104C27.1 504.2 36.7 512 48 512c256.1 0 464-207.5 464-464 0-11.2-7.7-20.9-18.6-23.4z"/></svg>`;
-  const IC_ENVELOPE = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 512 512" style="fill:#002d6b;flex-shrink:0;margin-top:2px;"><path d="M502.3 190.8c3.9-3.1 9.7-.2 9.7 4.7V400c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V195.6c0-5 5.7-7.8 9.7-4.7 22.4 17.4 52.1 39.5 154.1 113.6 21.1 15.4 56.7 47.8 92.2 47.6 35.7.3 72-32.8 92.3-47.6 102-74.1 131.6-96.3 154-113.7zM256 320c23.2.4 56.6-29.2 73.4-41.4 132.7-96.3 142.8-104.7 173.4-128.7 5.8-4.5 9.2-11.5 9.2-18.9v-19c0-26.5-21.5-48-48-48H48C21.5 64 0 85.5 0 112v19c0 7.4 3.4 14.3 9.2 18.9 30.6 23.9 40.7 32.4 173.4 128.7 16.8 12.2 50.2 41.8 73.4 41.4z"/></svg>`;
-  const IC_USERS = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 640 512" style="fill:#fff;flex-shrink:0;"><path d="M96 224c35.3 0 64-28.7 64-64s-28.7-64-64-64-64 28.7-64 64 28.7 64 64 64zm448 0c35.3 0 64-28.7 64-64s-28.7-64-64-64-64 28.7-64 64 28.7 64 64 64zm32 32h-64c-17.6 0-33.5 7.1-45.1 18.6 40.3 22.1 68.9 62 75.1 109.4h66c17.7 0 32-14.3 32-32v-32c0-35.3-28.7-64-64-64zm-256 0c61.9 0 112-50.1 112-112S381.9 32 320 32 208 82.1 208 144s50.1 112 112 112zm76.8 32h-8.3c-20.8 10-43.9 16-68.5 16s-47.6-6-68.5-16h-8.3C179.6 288 128 339.6 128 403.2V432c0 26.5 21.5 48 48 48h288c26.5 0 48-21.5 48-48v-28.8c0-63.6-51.6-115.2-115.2-115.2zm-223.7-13.4C161.5 263.1 145.6 256 128 256H64c-35.3 0-64 28.7-64 64v32c0 17.7 14.3 32 32 32h65.9c6.3-47.4 34.9-87.3 75.2-109.4z"/></svg>`;
-  const IC_TRUCK = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 640 512" style="fill:#fff;flex-shrink:0;"><path d="M624 352h-16V243.9c0-12.7-5.1-24.9-14.1-33.9L494 110.1c-9-9-21.2-14.1-33.9-14.1H416V48c0-26.5-21.5-48-48-48H48C21.5 0 0 21.5 0 48v320c0 26.5 21.5 48 48 48h16c0 53 43 96 96 96s96-43 96-96h128c0 53 43 96 96 96s96-43 96-96h48c8.8 0 16-7.2 16-16v-32c0-8.8-7.2-16-16-16zM160 464c-26.5 0-48-21.5-48-48s21.5-48 48-48 48 21.5 48 48-21.5 48-48 48zm320 0c-26.5 0-48-21.5-48-48s21.5-48 48-48 48 21.5 48 48-21.5 48-48 48zm80-208H416V144h44.1l99.9 99.9V256z"/></svg>`;
-  const IC_UNIVERSITY = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 512 512" style="fill:#fff;flex-shrink:0;"><path d="M496 128v16a8 8 0 0 1-8 8h-24v12c0 6.627-5.373 12-12 12H60c-6.627 0-12-5.373-12-12v-12H24a8 8 0 0 1-8-8v-16a8 8 0 0 1 4.941-7.392l232-88a7.996 7.996 0 0 1 6.118 0l232 88A8 8 0 0 1 496 128zm-24 304H40c-13.255 0-24 10.745-24 24v16a8 8 0 0 0 8 8h480a8 8 0 0 0 8-8v-16c0-13.255-10.745-24-24-24zM96 192v192H60c-6.627 0-12 5.373-12 12v20h416v-20c0-6.627-5.373-12-12-12h-36V192h-64v192h-64V192h-64v192h-64V192H96z"/></svg>`;
-  const IC_FILE_ALT = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 384 512" style="fill:#fff;flex-shrink:0;"><path d="M224 136V0H24C10.7 0 0 10.7 0 24v464c0 13.3 10.7 24 24 24h336c13.3 0 24-10.7 24-24V160H248c-13.2 0-24-10.8-24-24zm64 236c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-64c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-72v8c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12zm96-153.1L305.1 32c-4.5-4.5-10.6-7-17-7H272v128h128v-17.1c0-6.3-2.5-12.4-7-16.9z"/></svg>`;
-  const IC_STAMP = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 512 512" style="fill:#5ea830;"><path d="M497.941 395.716l-75.313-75.313A64 64 0 0 0 377.373 304H264V248c39.776 0 72-32.224 72-72v-24c0-12.853-10.675-24-24-24H200c-13.325 0-24 11.147-24 24v24c0 39.776 32.224 72 72 72v56H211.98c-20.937 0-40.01 7.914-54.612 22.515l-75.26 75.26C51.98 421.808 32 459.671 32 496c0 8.837 7.163 16 16 16h416c8.837 0 16-7.163 16-16 0-36.329-19.98-74.192-48.059-100.284zM48.013 208H24c-13.255 0-24 10.745-24 24v40c0 13.255 10.745 24 24 24h24.013C64 282.507 80 256 80 256s-16-26.507-31.987-48zm415.974 0H440c-16 21.493-32 48-32 48s16 26.507 32 48h23.987c13.255 0 24-10.745 24-24v-40c0-13.255-10.745-24-24-24zM256 0c-61.856 0-112 50.144-112 112h224C368 50.144 317.856 0 256 0z"/></svg>`;
-  const IC_PEN_NIB = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 512 512" style="fill:#fff;flex-shrink:0;"><path d="M373.888 168.112c-7.493-7.493-17.443-11.718-28.028-11.718H320V96c0-17.673-14.327-32-32-32h-64c-17.673 0-32 14.327-32 32v64h-25.86c-10.585 0-20.535 4.225-28.028 11.718L16 320h480L373.888 168.112zM256 336c-8.837 0-16-7.163-16-16s7.163-16 16-16 16 7.163 16 16-7.163 16-16 16zM0 384v48c0 8.837 7.163 16 16 16h480c8.837 0 16-7.163 16-16v-48H0z"/></svg>`;
+  // Inline SVG icons (phone & email) — no CDN needed for html2canvas
+  const IC_PHONE = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 512 512" style="fill:#fff;"><path d="M493.4 24.6l-104-24c-11.3-2.6-22.9 3.3-27.5 13.9l-48 112c-4.2 9.8-1.4 21.3 6.9 28l60.6 49.6c-36 76.7-98.9 140.5-177.2 177.2l-49.6-60.6c-6.8-8.3-18.2-11.1-28-6.9l-112 48C3.9 366.5-2 378.1.6 389.4l24 104C27.1 504.2 36.7 512 48 512c256.1 0 464-207.5 464-464 0-11.2-7.7-20.9-18.6-23.4z"/></svg>`;
+  const IC_MAIL = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 512 512" style="fill:#fff;"><path d="M502.3 190.8c3.9-3.1 9.7-.2 9.7 4.7V400c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V195.6c0-5 5.7-7.8 9.7-4.7 22.4 17.4 52.1 39.5 154.1 113.6 21.1 15.4 56.7 47.8 92.2 47.6 35.7.3 72-32.8 92.3-47.6 102-74.1 131.6-96.3 154-113.7zM256 320c23.2.4 56.6-29.2 73.4-41.4 132.7-96.3 142.8-104.7 173.4-128.7 5.8-4.5 9.2-11.5 9.2-18.9v-19c0-26.5-21.5-48-48-48H48C21.5 64 0 85.5 0 112v19c0 7.4 3.4 14.3 9.2 18.9 30.6 23.9 40.7 32.4 173.4 128.7 16.8 12.2 50.2 41.8 73.4 41.4z"/></svg>`;
+  const IC_BANK = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 512 512" style="fill:#fff;flex-shrink:0;"><path d="M496 128v16a8 8 0 0 1-8 8h-24v12c0 6.627-5.373 12-12 12H60c-6.627 0-12-5.373-12-12v-12H24a8 8 0 0 1-8-8v-16a8 8 0 0 1 4.941-7.392l232-88a7.996 7.996 0 0 1 6.118 0l232 88A8 8 0 0 1 496 128zm-24 304H40c-13.255 0-24 10.745-24 24v16a8 8 0 0 0 8 8h480a8 8 0 0 0 8-8v-16c0-13.255-10.745-24-24-24zM96 192v192H60c-6.627 0-12 5.373-12 12v20h416v-20c0-6.627-5.373-12-12-12h-36V192h-64v192h-64V192h-64v192h-64V192H96z"/></svg>`;
+  const IC_FILE = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 384 512" style="fill:var(--primary-blue);flex-shrink:0;"><path d="M224 136V0H24C10.7 0 0 10.7 0 24v464c0 13.3 10.7 24 24 24h336c13.3 0 24-10.7 24-24V160H248c-13.2 0-24-10.8-24-24zm64 236c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-64c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-72v8c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12zm96-153.1L305.1 32c-4.5-4.5-10.6-7-17-7H272v128h128v-17.1c0-6.3-2.5-12.4-7-16.9z"/></svg>`;
+  const IC_CHECK = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 512 512" style="fill:var(--primary-blue);"><path d="M173.898 439.404l-166.4-166.4c-9.997-9.997-9.997-26.206 0-36.204l36.203-36.204c9.997-9.998 26.207-9.998 36.204 0L192 312.69 432.095 72.596c9.997-9.997 26.207-9.997 36.204 0l36.203 36.204c9.997 9.997 9.997 26.206 0 36.204l-294.4 294.401c-9.998 9.997-26.207 9.997-36.204-.001z"/></svg>`;
 
-  // Rupee/invoice SVG icon for the title banner
-  const IC_RUPEE_INVOICE = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 64 64" style="fill:#fff;flex-shrink:0;"><rect x="2" y="2" width="60" height="60" rx="6" ry="6" fill="none" stroke="#fff" stroke-width="2"/><text x="32" y="44" font-family="Arial, sans-serif" font-size="34" font-weight="bold" text-anchor="middle" fill="#fff">&#8377;</text></svg>`;
+  // Party address helper
+  const partyAddrRows = (address) => formatPartyAddressRows(address, 3);
 
   return `
 <style>${TI_STYLES}</style>
-<div class="invoice-container">
-    <!-- Header -->
-    <div class="header">
-        <div class="logo-section">${logoHtml}</div>
-        
-        <div class="company-info">
-            <div class="company-name">${esc(profile.companyName)}</div>
-            <div class="info-line">
-                ${IC_MAP_MARKER}
-                <div>${esc(addressLines[0] || '')},<br>${esc(addressLines[1] || '')}</div>
-            </div>
-            <div class="info-line-multiple">
-                <div class="info-line">
-                    ${IC_PHONE}
-                    <span>${esc(profile.phone || DEFAULT_COMPANY_PROFILE.phone)}</span>
-                </div>
-                <div class="info-line">
-                    ${IC_ENVELOPE}
-                    <span>${esc(profile.email || DEFAULT_COMPANY_PROFILE.email)}</span>
-                </div>
-            </div>
-            <div class="gstin-badge">GSTIN: ${esc(profile.gstNumber)}</div>
-        </div>
+<div class="invoice-card">
 
-        <div class="copy-type">
-            ORIGINAL<br>DUPLICATE
+  <!-- HEADER -->
+  <div class="header-container">
+    <div class="logo-area">
+      ${logoHtml}
+      <div class="company-info">
+        <div class="title-brand">${esc(profile.companyName)}</div>
+        <div class="address-txt">
+          ${esc(addressLines[0] || '')},<br>
+          ${esc(addressLines[1] || '')}
         </div>
+        <div class="contact-row">
+          <div class="contact-item">
+            <span class="icon-circle">${IC_PHONE}</span>
+            ${esc(profile.phone || DEFAULT_COMPANY_PROFILE.phone)}
+          </div>
+          <div class="contact-item">
+            <span class="icon-circle">${IC_MAIL}</span>
+            ${esc(profile.email || DEFAULT_COMPANY_PROFILE.email)}
+          </div>
+        </div>
+        <div class="gst-pill">GSTIN: ${esc(profile.gstNumber)}</div>
+      </div>
     </div>
 
-    <div class="header-border"></div>
-
-    <!-- Title Banner -->
-    <div class="title-banner">
-        <div class="title-banner-text">TAX INVOICE</div>
-        <div class="title-banner-icon">
-            ${IC_RUPEE_INVOICE}
-        </div>
+    <div class="badge-box">
+      <div class="badge-top">ORIGINAL</div>
+      <div class="badge-bottom">DUPLICATE</div>
     </div>
+  </div>
 
-    <!-- Details Grid -->
-    <table class="details-grid">
-        <tr>
-            <td class="label" style="width:17%;">Invoice No.</td>
-            <td style="width:33%;">${docNo}</td>
-            <td class="label" style="width:17%;">Invoice Date</td>
-            <td style="width:33%;">${docDate}</td>
-        </tr>
-        <tr>
-            <td class="label">Delivery Challan No.</td>
-            <td>${dcNo}</td>
-            <td class="label">Date</td>
-            <td>${dcDate}</td>
-        </tr>
-        <tr>
-            <td class="label">State</td>
-            <td style="display:flex;align-items:center;gap:0;">
-                <span style="flex:1;">${companyState}</span>
-                <span style="font-weight:bold;color:var(--blue-dark);padding:0 8px;">Code</span>
-                <span style="border:1px solid var(--border-color);padding:2px 8px;min-width:28px;text-align:center;font-weight:bold;color:var(--blue-dark);">${companyStateCode}</span>
-            </td>
-            <td class="label">PO No./Challan No.</td>
-            <td>${refNo}</td>
-        </tr>
-        <tr>
-            <td class="label" style="border-bottom:none;"></td>
-            <td style="border-bottom:none;"></td>
-            <td class="label" style="border-bottom:none;">Date</td>
-            <td style="border-bottom:none;">${refDate}</td>
-        </tr>
+  <!-- TAX INVOICE BANNER -->
+  <div class="invoice-banner-container">
+    <div class="invoice-banner-blue">
+      <div class="banner-text-flex">
+        <span>TAX INVOICE</span>
+        <span class="banner-icon">${IC_FILE}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- METADATA BLOCKS -->
+  <div class="meta-section-grid">
+    <table class="structured-table">
+      <tr>
+        <td class="lbl">Invoice No.</td>
+        <td class="val">${docNo}</td>
+      </tr>
+      <tr>
+        <td class="lbl">Delivery Challan No.</td>
+        <td class="val">${dcNo}</td>
+      </tr>
+      <tr>
+        <td class="lbl">State</td>
+        <td class="val" style="padding:0;">
+          <div class="split-cell-flex">
+            <div class="split-left">${companyState}</div>
+            <div class="split-code-label">Code</div>
+            <div class="split-code-val">${companyStateCode}</div>
+          </div>
+        </td>
+      </tr>
     </table>
 
-    <!-- Parties Section -->
-    <div class="parties-wrapper">
-        <!-- Bill To -->
-        <div class="party-box">
-            <div class="party-header">
-                ${IC_USERS} BILL TO PARTY
-            </div>
-            <div class="party-body">
-                <div class="party-row">
-                    <div class="party-label">Name :</div>
-                    <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(data.partyName || '')}</div>
-                </div>
-                ${formatPartyAddressDivs(data.billAddress || data.address || '', 3)}
-                <div class="party-row" style="margin-top: 5px;">
-                    <div class="party-label">State :</div>
-                    <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(data.billState || data.state || '')}</div>
-                    <div class="party-label" style="min-width: 40px; margin-left: 10px;">Code</div>
-                    <div class="code-box" style="display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--blue-dark);">${esc(data.billStateCode || data.stateCode || '')}</div>
-                </div>
-                <div class="party-row" style="margin-top: 5px;">
-                    <div class="party-label">GSTIN :</div>
-                    <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(data.gstinBill || data.gstin || '')}</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Ship To -->
-        <div class="party-box">
-            <div class="party-header">
-                ${IC_TRUCK} SHIP TO PARTY
-            </div>
-            <div class="party-body">
-                <div class="party-row">
-                    <div class="party-label">Name :</div>
-                    <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(data.shipName || data.partyName || '')}</div>
-                </div>
-                ${formatPartyAddressDivs(data.shipAddress || data.address || '', 3)}
-                <div class="party-row" style="margin-top: 5px;">
-                    <div class="party-label">State :</div>
-                    <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(data.shipState || data.state || '')}</div>
-                    <div class="party-label" style="min-width: 40px; margin-left: 10px;">Code</div>
-                    <div class="code-box" style="display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--blue-dark);">${esc(data.shipStateCode || data.stateCode || '')}</div>
-                </div>
-                <div class="party-row" style="margin-top: 5px;">
-                    <div class="party-label">GSTIN :</div>
-                    <div class="dotted-line" style="padding-left: 5px; font-weight: bold; color: var(--text-dark);">${esc(data.gstinShip || data.gstin || '')}</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Main Items Table -->
-    <table class="items-table">
-        <thead>
-            <tr>
-                <th rowspan="2" class="bold-th" style="width: 4%;">S.<br>No.</th>
-                <th rowspan="2" class="bold-th" style="width: 28%;">Description</th>
-                <th rowspan="2" class="bold-th" style="width: 5%;">Qty</th>
-                <th rowspan="2" class="bold-th" style="width: 7%;">Rate</th>
-                <th rowspan="2" class="bold-th" style="width: 8%;">Amount</th>
-                <th colspan="2" class="bold-th">SGST</th>
-                <th colspan="2" class="bold-th">CGST</th>
-                <th colspan="2" class="bold-th">IGST</th>
-                <th rowspan="2" class="bold-th" style="width: 8%;">Total</th>
-            </tr>
-            <tr>
-                <th style="width: 5%;">Rate</th>
-                <th style="width: 7%;">Amount</th>
-                <th style="width: 5%;">Rate</th>
-                <th style="width: 7%;">Amount</th>
-                <th style="width: 5%;">Rate</th>
-                <th style="width: 7%;">Amount</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${rowsHtml}
-        </tbody>
+    <table class="structured-table">
+      <tr>
+        <td class="lbl">Invoice Date</td>
+        <td class="val">${docDate}</td>
+      </tr>
+      <tr>
+        <td class="lbl">Date</td>
+        <td class="val">${dcDate}</td>
+      </tr>
+      <tr>
+        <td class="lbl">PO No./Challan No.</td>
+        <td class="val">${refNo}</td>
+      </tr>
+      <tr>
+        <td class="lbl">Date</td>
+        <td class="val">${refDate}</td>
+      </tr>
     </table>
+  </div>
 
-    <!-- Footer Top (Bank & Summary) -->
-    <div class="footer-top">
-        <!-- Bank Details -->
-        <div class="bank-details">
-            <div class="party-header">
-                ${IC_UNIVERSITY} OUR BANK DETAILS
-            </div>
-            <div class="bank-body">
-                <div class="bank-row">
-                    <div class="bank-label">Bank Name</div>
-                    <div class="bank-value">: AXIS BANK LTD</div>
-                </div>
-                <div class="bank-row">
-                    <div class="bank-label">A/c Name</div>
-                    <div class="bank-value">: ${esc(profile.companyName)}</div>
-                </div>
-                <div class="bank-row">
-                    <div class="bank-label">Current A/c No.</div>
-                    <div class="bank-value">: 9160200616152671</div>
-                </div>
-                <div class="bank-row">
-                    <div class="bank-label">IFS CODE</div>
-                    <div class="bank-value">: UTIB0003083</div>
-                </div>
-                <div class="bank-row">
-                    <div class="bank-label">Branch</div>
-                    <div class="bank-value">: Nizampura</div>
-                </div>
-            </div>
+  <!-- BILL TO & SHIP TO -->
+  <div class="party-section-grid">
+    <!-- Bill To -->
+    <div class="party-card-panel">
+      <div class="party-card-header">BILL TO PARTY</div>
+      <div class="party-card-body">
+        <div class="form-row-item">
+          <div class="form-lbl">Name</div>
+          <div class="form-sep">:</div>
+          <div class="form-line-input">${esc(data.partyName || '')}</div>
         </div>
-        
-        <!-- Summary Table -->
-        <div class="summary-table-wrapper">
-            <table class="summary-table">
-                <tr>
-                    <td class="summary-label">Total Amount Before Tax</td>
-                    <td class="summary-value">${fmtMoney(totals.totalAmt)}</td>
-                </tr>
-                <tr>
-                    <td class="summary-label">SGST</td>
-                    <td class="summary-value">${fmtMoney(totals.totalSgst)}</td>
-                </tr>
-                <tr>
-                    <td class="summary-label">CGST</td>
-                    <td class="summary-value">${fmtMoney(totals.totalCgst)}</td>
-                </tr>
-                <tr>
-                    <td class="summary-label">IGST</td>
-                    <td class="summary-value">${fmtMoney(totals.totalIgst)}</td>
-                </tr>
-                <tr>
-                    <td class="summary-label summary-tax-amount">Total Tax Amount</td>
-                    <td class="summary-value summary-tax-amount">${fmtMoney(totals.totalSgst + totals.totalCgst + totals.totalIgst)}</td>
-                </tr>
-                <tr class="summary-total-final">
-                    <td>Total Amount after Tax</td>
-                    <td class="summary-value">${fmtMoney(totals.totalAll)}</td>
-                </tr>
-            </table>
+        ${partyAddrRows(data.billAddress || data.address || '')}
+        <div class="form-triple-row">
+          <div class="form-row-item" style="flex-grow:1;">
+            <div class="form-lbl">State</div>
+            <div class="form-sep">:</div>
+            <div class="form-line-input" style="margin-right:10px;">${esc(data.billState || data.state || '')}</div>
+          </div>
+          <div class="state-container">
+            <div class="state-code-lbl">Code</div>
+            <div class="state-code-val">${esc(data.billStateCode || data.stateCode || '')}</div>
+          </div>
         </div>
+        <div class="form-row-item">
+          <div class="form-lbl">GSTIN</div>
+          <div class="form-sep">:</div>
+          <div class="form-line-input">${esc(data.gstinBill || data.gstin || '')}</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Footer Bottom (Terms, Seal, Signature) -->
-    <div class="footer-bottom">
-        <div class="terms-box">
-            <div class="party-header">
-                ${IC_FILE_ALT} TERMS &amp; CONDITIONS
-            </div>
-            <div class="terms-body">
-                <ol>
-                    <li>Subject to Vadodara Jurisdiction.</li>
-                    <li>Payment Terms as per our agreed terms.</li>
-                    <li>Interest will charged @ 24% per annum if amount remaining unpaid from due date.</li>
-                </ol>
-            </div>
+    <!-- Ship To -->
+    <div class="party-card-panel">
+      <div class="party-card-header">SHIP TO PARTY</div>
+      <div class="party-card-body">
+        <div class="form-row-item">
+          <div class="form-lbl">Name</div>
+          <div class="form-sep">:</div>
+          <div class="form-line-input">${esc(data.shipName || data.partyName || '')}</div>
         </div>
-
-        <div class="seal-box">
-            ${IC_STAMP}
-            <div>Seal</div>
+        ${partyAddrRows(data.shipAddress || data.address || '')}
+        <div class="form-triple-row">
+          <div class="form-row-item" style="flex-grow:1;">
+            <div class="form-lbl">State</div>
+            <div class="form-sep">:</div>
+            <div class="form-line-input" style="margin-right:10px;">${esc(data.shipState || data.state || '')}</div>
+          </div>
+          <div class="state-container">
+            <div class="state-code-lbl">Code</div>
+            <div class="state-code-val">${esc(data.shipStateCode || data.stateCode || '')}</div>
+          </div>
         </div>
-
-        <div class="sign-box">
-            <div class="sign-top-text">Certified that the particulars given above are true and correct.</div>
-            <div class="party-header" style="justify-content:center;">
-                FOR ${esc(profile.companyName.toUpperCase())}
-            </div>
-            <div class="sign-area">
-                <div class="sign-text">Authorised Signatory</div>
-            </div>
+        <div class="form-row-item">
+          <div class="form-lbl">GSTIN</div>
+          <div class="form-sep">:</div>
+          <div class="form-line-input">${esc(data.gstinShip || data.gstin || '')}</div>
         </div>
+      </div>
     </div>
+  </div>
+
+  <!-- ITEMS TABLE -->
+  <table class="main-ledger-table">
+    <thead>
+      <tr>
+        <th rowspan="2" style="width:4.5%;">Sr.<br>No.</th>
+        <th rowspan="2" style="width:33.5%;">Description</th>
+        <th rowspan="2" style="width:6%;">Qty</th>
+        <th rowspan="2" style="width:7.5%;">Rate</th>
+        <th rowspan="2" style="width:9.5%;">Amount</th>
+        <th colspan="2" style="width:10%;">SGST</th>
+        <th colspan="2" style="width:10%;">CGST</th>
+        <th colspan="2" style="width:10%;">IGST</th>
+        <th rowspan="2" style="width:9%;">Total</th>
+      </tr>
+      <tr>
+        <th class="sub-head" style="width:4%;">Rate</th>
+        <th class="sub-head" style="width:6%;">Amount</th>
+        <th class="sub-head" style="width:4%;">Rate</th>
+        <th class="sub-head" style="width:6%;">Amount</th>
+        <th class="sub-head" style="width:4%;">Rate</th>
+        <th class="sub-head" style="width:6%;">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+
+  <!-- BANK & TOTALS -->
+  <div class="bottom-split-grid">
+    <div class="bank-info-panel">
+      <div class="bank-info-header">
+        ${IC_BANK} OUR BANK DETAILS
+      </div>
+      <div class="bank-info-body">
+        <div class="bank-row-lbl">Bank Name</div><div>:</div><div class="bank-row-val">AXIS BANK LTD</div>
+        <div class="bank-row-lbl">A/C Name</div><div>:</div><div class="bank-row-val">${esc(profile.companyName)}</div>
+        <div class="bank-row-lbl">Current A/C No.</div><div>:</div><div class="bank-row-val">916020061829671</div>
+        <div class="bank-row-lbl">IFS CODE</div><div>:</div><div class="bank-row-val">UTIB0002018</div>
+        <div class="bank-row-lbl">Branch</div><div>:</div><div class="bank-row-val">Nizampura</div>
+      </div>
+    </div>
+
+    <table class="totals-summary-table">
+      <tr>
+        <td style="font-weight:bold;width:65%;">Total Amount before Tax</td>
+        <td style="text-align:right;font-weight:bold;">${fmtMoney(totals.totalAmt)}</td>
+      </tr>
+      <tr>
+        <td>SGST</td>
+        <td style="text-align:right;">${fmtMoney(totals.totalSgst)}</td>
+      </tr>
+      <tr>
+        <td>CGST</td>
+        <td style="text-align:right;">${fmtMoney(totals.totalCgst)}</td>
+      </tr>
+      <tr>
+        <td>IGST</td>
+        <td style="text-align:right;">${fmtMoney(totals.totalIgst)}</td>
+      </tr>
+      <tr class="blue-tint-row">
+        <td>Total Tax Amount</td>
+        <td style="text-align:right;">${fmtMoney(totals.totalSgst + totals.totalCgst + totals.totalIgst)}</td>
+      </tr>
+      <tr class="grand-final-row">
+        <td>Total Amount after Tax</td>
+        <td style="text-align:right;">${fmtMoney(totals.totalAll)}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- FOOTER: TERMS / SEAL / SIGNATURE -->
+  <div class="footer-declaration-grid">
+    <div class="terms-block">
+      <div class="terms-block-heading">${IC_FILE} TERMS &amp; CONDITIONS</div>
+      <ol>
+        <li>Subject to Vadodara Jurisdiction.</li>
+        <li>Payment Terms as per our agreed terms.</li>
+        <li>Interest will charged @ 24% per annum if amount remaining unpaid from due date.</li>
+      </ol>
+    </div>
+
+    <div class="seal-block">
+      <div class="seal-circle-placeholder">${IC_CHECK}</div>
+      <div class="seal-line-decor"></div>
+      <div>Seal</div>
+    </div>
+
+    <div class="sign-block">
+      <div class="sign-certify-txt">Certified that the particulars given above are true and correct.</div>
+      <div class="sign-company-lbl">For ${esc(profile.companyName.toUpperCase())}</div>
+      <div class="sign-hr-line"></div>
+      <div class="sign-title-lbl">Authorised Signatory</div>
+    </div>
+  </div>
+
 </div>`;
 };
 
@@ -844,15 +939,15 @@ export const renderTaxInvoicePdf = async (data, { mode = 'save' } = {}) => {
   document.body.appendChild(host);
 
   try {
-    const target = host.querySelector('.invoice-container');
+    const target = host.querySelector('.invoice-card');
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
     const canvas = await html2canvas(target, {
       scale: 2,
       useCORS: true,
       backgroundColor: '#fff',
-      width: 800,
-      windowWidth: 800
+      width: 820,
+      windowWidth: 820
     });
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
