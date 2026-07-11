@@ -115,11 +115,16 @@ const TI_STYLES = `
       width: 12px;
   }
 
-  .gstin {
+  .gstin-badge {
+      display: inline-block;
+      background-color: var(--blue-dark);
+      color: #fff;
       font-weight: bold;
-      color: var(--blue-dark);
+      font-size: 11.5px;
+      padding: 4px 10px;
+      border-radius: 4px;
       margin-top: 6px;
-      font-size: 12px;
+      letter-spacing: 0.5px;
   }
 
   .copy-type {
@@ -141,57 +146,54 @@ const TI_STYLES = `
       margin: 10px 0;
   }
 
-  /* --- TITLE --- */
-  .title-wrapper {
+  /* --- TITLE BANNER --- */
+  .title-banner {
+      background-color: var(--blue-dark);
+      color: #fff;
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 15px;
-      margin: 15px 0;
+      justify-content: space-between;
+      padding: 10px 18px;
+      margin-bottom: 14px;
+      border-radius: 0;
   }
 
-  .title-line {
-      height: 2px;
-      width: 35px;
-      background-color: var(--green-main);
-  }
-
-  .invoice-title {
-      color: var(--blue-dark);
-      font-size: 20px;
+  .title-banner-text {
+      font-size: 28px;
       font-weight: bold;
-      letter-spacing: 1px;
+      letter-spacing: 2px;
+  }
+
+  .title-banner-icon {
+      display: flex;
+      align-items: center;
+      gap: 6px;
   }
 
   /* --- DETAILS GRID --- */
   .details-grid {
-      display: grid;
-      grid-template-columns: 18% 32% 18% 32%;
       border: 1px solid var(--border-color);
-      border-radius: 6px;
+      border-radius: 4px;
       overflow: hidden;
       margin-bottom: 15px;
+      width: 100%;
+      border-collapse: collapse;
   }
 
-  .grid-item {
+  .details-grid td {
       padding: 6px 10px;
-      border-right: 1px solid var(--border-color);
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      align-items: center;
+      border: 1px solid var(--border-color);
+      vertical-align: middle;
   }
 
-  .grid-item.label {
+  .details-grid .label {
       color: var(--blue-dark);
       font-weight: bold;
+      white-space: nowrap;
   }
 
-  .details-grid .grid-item:nth-child(4n) {
-      border-right: none;
-  }
-
-  .details-grid .grid-item:nth-last-child(-n+4) {
-      border-bottom: none;
+  .details-grid .state-row td {
+      padding: 6px 10px;
   }
 
   /* --- PARTIES SECTION --- */
@@ -294,12 +296,12 @@ const TI_STYLES = `
   }
 
   .total-label {
-      background-color: var(--green-main);
+      background-color: var(--blue-dark);
       color: #fff;
       font-weight: bold;
-      text-align: left !important;
-      padding-left: 15px !important;
-      border-color: var(--green-main) !important;
+      text-align: right !important;
+      padding-right: 10px !important;
+      border-color: var(--blue-dark) !important;
   }
 
   /* --- FOOTER SECTIONS --- */
@@ -371,7 +373,7 @@ const TI_STYLES = `
   }
 
   .summary-total-final {
-      background-color: var(--green-main);
+      background-color: var(--blue-dark);
       color: #fff !important;
       font-weight: bold;
   }
@@ -430,6 +432,13 @@ const TI_STYLES = `
       overflow: hidden;
       display: flex;
       flex-direction: column;
+  }
+
+  .sign-top-text {
+      padding: 8px 10px 4px 10px;
+      color: var(--text-dark);
+      font-size: 10.5px;
+      text-align: center;
   }
 
   .sign-area {
@@ -577,6 +586,9 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   const IC_STAMP = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 512 512" style="fill:#5ea830;"><path d="M497.941 395.716l-75.313-75.313A64 64 0 0 0 377.373 304H264V248c39.776 0 72-32.224 72-72v-24c0-12.853-10.675-24-24-24H200c-13.325 0-24 11.147-24 24v24c0 39.776 32.224 72 72 72v56H211.98c-20.937 0-40.01 7.914-54.612 22.515l-75.26 75.26C51.98 421.808 32 459.671 32 496c0 8.837 7.163 16 16 16h416c8.837 0 16-7.163 16-16 0-36.329-19.98-74.192-48.059-100.284zM48.013 208H24c-13.255 0-24 10.745-24 24v40c0 13.255 10.745 24 24 24h24.013C64 282.507 80 256 80 256s-16-26.507-31.987-48zm415.974 0H440c-16 21.493-32 48-32 48s16 26.507 32 48h23.987c13.255 0 24-10.745 24-24v-40c0-13.255-10.745-24-24-24zM256 0c-61.856 0-112 50.144-112 112h224C368 50.144 317.856 0 256 0z"/></svg>`;
   const IC_PEN_NIB = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 512 512" style="fill:#fff;flex-shrink:0;"><path d="M373.888 168.112c-7.493-7.493-17.443-11.718-28.028-11.718H320V96c0-17.673-14.327-32-32-32h-64c-17.673 0-32 14.327-32 32v64h-25.86c-10.585 0-20.535 4.225-28.028 11.718L16 320h480L373.888 168.112zM256 336c-8.837 0-16-7.163-16-16s7.163-16 16-16 16 7.163 16 16-7.163 16-16 16zM0 384v48c0 8.837 7.163 16 16 16h480c8.837 0 16-7.163 16-16v-48H0z"/></svg>`;
 
+  // Rupee/invoice SVG icon for the title banner
+  const IC_RUPEE_INVOICE = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 64 64" style="fill:#fff;flex-shrink:0;"><rect x="2" y="2" width="60" height="60" rx="6" ry="6" fill="none" stroke="#fff" stroke-width="2"/><text x="32" y="44" font-family="Arial, sans-serif" font-size="34" font-weight="bold" text-anchor="middle" fill="#fff">&#8377;</text></svg>`;
+
   return `
 <style>${TI_STYLES}</style>
 <div class="invoice-container">
@@ -600,7 +612,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
                     <span>${esc(profile.email || DEFAULT_COMPANY_PROFILE.email)}</span>
                 </div>
             </div>
-            <div class="gstin">GSTIN: ${esc(profile.gstNumber)}</div>
+            <div class="gstin-badge">GSTIN: ${esc(profile.gstNumber)}</div>
         </div>
 
         <div class="copy-type">
@@ -610,35 +622,45 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
 
     <div class="header-border"></div>
 
-    <!-- Title -->
-    <div class="title-wrapper">
-        <div class="title-line"></div>
-        <div class="invoice-title">TAX INVOICE</div>
-        <div class="title-line"></div>
+    <!-- Title Banner -->
+    <div class="title-banner">
+        <div class="title-banner-text">TAX INVOICE</div>
+        <div class="title-banner-icon">
+            ${IC_RUPEE_INVOICE}
+        </div>
     </div>
 
     <!-- Details Grid -->
-    <div class="details-grid">
-        <div class="grid-item label">Invoice No.</div>
-        <div class="grid-item">${docNo}</div>
-        <div class="grid-item label">Invoice Date</div>
-        <div class="grid-item">${docDate}</div>
-        
-        <div class="grid-item label">Delivery Challan No.</div>
-        <div class="grid-item">${dcNo}</div>
-        <div class="grid-item label">Date</div>
-        <div class="grid-item">${dcDate}</div>
-        
-        <div class="grid-item label">State</div>
-        <div class="grid-item">${companyState}</div>
-        <div class="grid-item label">PO No./Challan No.</div>
-        <div class="grid-item">${refNo}</div>
-        
-        <div class="grid-item label">Code</div>
-        <div class="grid-item">${companyStateCode}</div>
-        <div class="grid-item label">Date</div>
-        <div class="grid-item">${refDate}</div>
-    </div>
+    <table class="details-grid">
+        <tr>
+            <td class="label" style="width:17%;">Invoice No.</td>
+            <td style="width:33%;">${docNo}</td>
+            <td class="label" style="width:17%;">Invoice Date</td>
+            <td style="width:33%;">${docDate}</td>
+        </tr>
+        <tr>
+            <td class="label">Delivery Challan No.</td>
+            <td>${dcNo}</td>
+            <td class="label">Date</td>
+            <td>${dcDate}</td>
+        </tr>
+        <tr>
+            <td class="label">State</td>
+            <td style="display:flex;align-items:center;gap:0;">
+                <span style="flex:1;">${companyState}</span>
+                <span style="font-weight:bold;color:var(--blue-dark);padding:0 8px;">Code</span>
+                <span style="border:1px solid var(--border-color);padding:2px 8px;min-width:28px;text-align:center;font-weight:bold;color:var(--blue-dark);">${companyStateCode}</span>
+            </td>
+            <td class="label">PO No./Challan No.</td>
+            <td>${refNo}</td>
+        </tr>
+        <tr>
+            <td class="label" style="border-bottom:none;"></td>
+            <td style="border-bottom:none;"></td>
+            <td class="label" style="border-bottom:none;">Date</td>
+            <td style="border-bottom:none;">${refDate}</td>
+        </tr>
+    </table>
 
     <!-- Parties Section -->
     <div class="parties-wrapper">
@@ -802,8 +824,9 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         </div>
 
         <div class="sign-box">
-            <div class="party-header">
-                ${IC_PEN_NIB} FOR ${esc(profile.companyName.toUpperCase())}
+            <div class="sign-top-text">Certified that the particulars given above are true and correct.</div>
+            <div class="party-header" style="justify-content:center;">
+                FOR ${esc(profile.companyName.toUpperCase())}
             </div>
             <div class="sign-area">
                 <div class="sign-text">Authorised Signatory</div>
