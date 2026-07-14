@@ -58,15 +58,15 @@ const TI_STYLES = `
   }
 
   .ti-host {
-    width: 800px;
-    padding: 20px;
+    width: 900px;
+    padding: 40px;
     background-color: #ffffff;
     margin: 0 auto;
   }
 
   .invoice-card {
     background-color: #ffffff;
-    width: 760px;
+    width: 800px;
     margin: 0 auto;
     padding: 18px;
     border: 2px solid var(--primary-blue);
@@ -948,7 +948,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
 export const renderTaxInvoicePdf = async (data, { mode = 'save' } = {}) => {
   const html = buildTaxInvoiceHtml(data, data.companyProfile);
   const host = document.createElement('div');
-  host.style.cssText = 'position:fixed;left:-12000px;top:0;z-index:-1;';
+  host.style.cssText = 'position:fixed;left:-12000px;top:0;z-index:-1;width:1200px;';
   host.innerHTML = html;
   document.body.appendChild(host);
 
@@ -960,8 +960,8 @@ export const renderTaxInvoicePdf = async (data, { mode = 'save' } = {}) => {
       scale: 2,
       useCORS: true,
       backgroundColor: '#fff',
-      width: 800,
-      windowWidth: 800
+      width: 900,
+      windowWidth: 900
     });
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
