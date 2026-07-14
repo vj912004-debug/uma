@@ -52,9 +52,16 @@ const TI_STYLES = `
   }
 
   body {
-    background-color: #e4e9f2;
-    padding: 10px;
+    background-color: #ffffff;
+    padding: 0;
     color: var(--text-color);
+  }
+
+  .ti-host {
+    width: 800px;
+    padding: 20px;
+    background-color: #ffffff;
+    margin: 0 auto;
   }
 
   .invoice-card {
@@ -64,7 +71,6 @@ const TI_STYLES = `
     padding: 18px;
     border: 2px solid var(--primary-blue);
     border-radius: 6px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
   }
 
   /* --- HEADER --- */
@@ -567,6 +573,7 @@ const TI_STYLES = `
 
   @media print {
     body { background-color: #ffffff; padding: 0; }
+    .ti-host { padding: 0; width: 100%; }
     .invoice-card { box-shadow: none; width: 100%; border: 2px solid var(--primary-blue); }
   }
 `;
@@ -691,6 +698,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
 
   return `
 <style>${TI_STYLES}</style>
+<div class="ti-host">
 <div class="invoice-card">
 
   <!-- HEADER -->
@@ -933,6 +941,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     </div>
   </div>
 
+</div>
 </div>`;
 };
 
@@ -944,15 +953,15 @@ export const renderTaxInvoicePdf = async (data, { mode = 'save' } = {}) => {
   document.body.appendChild(host);
 
   try {
-    const target = host.querySelector('.invoice-card');
+    const target = host.querySelector('.ti-host');
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
     const canvas = await html2canvas(target, {
       scale: 2,
       useCORS: true,
       backgroundColor: '#fff',
-      width: 760,
-      windowWidth: 760
+      width: 800,
+      windowWidth: 800
     });
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
