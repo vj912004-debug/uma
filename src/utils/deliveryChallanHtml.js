@@ -20,26 +20,11 @@ const fmtQty = (n) => {
 };
 
 const DEFAULT_DC_LOGO_HTML = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 88 88" width="72" height="72" aria-label="UMA MICRON Logo">
-  <ellipse cx="30" cy="44" rx="22" ry="26" fill="none" stroke="#009900" stroke-width="2"/>
-  <ellipse cx="42" cy="44" rx="22" ry="26" fill="none" stroke="#cc0000" stroke-width="2"/>
-  <text x="18" y="52" font-family="Arial Black, Arial, sans-serif" font-size="26" font-weight="700" fill="#cc0000">U</text>
-  <text x="36" y="52" font-family="Arial Black, Arial, sans-serif" font-size="26" font-weight="700" fill="#009900">M</text>
-</svg>`;
-
-const formatDcCompanyAddress = (profile) => {
-  const p = mergeCompanyProfile(profile);
-  const cityLine = [p.city, p.pincode].filter(Boolean).join('-');
-  const region = [cityLine, p.state, p.country].filter(Boolean).join(', ');
-  const line1 = (p.addressLine1 || '').replace(/,\s*$/, '');
-  const line2 = region || '';
-  return [line1, line2].filter(Boolean);
-};
-
-const formatDcEmailLine = (profile) => {
-  const p = mergeCompanyProfile(profile);
-  return p.email ? `Email - ${p.email}` : '';
-};
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="48" height="48" style="display:block;">
+  <circle cx="50" cy="50" r="45" fill="none" stroke="#000" stroke-width="4"/>
+  <text x="50" y="65" font-family="Arial, sans-serif" font-size="40" font-weight="900" fill="#000" text-anchor="middle">UM</text>
+</svg>
+`;
 
 const buildAlignedCellHtml = (lines, field) => {
   if (!lines.length) return '&nbsp;';
@@ -87,13 +72,62 @@ const DC_STYLES = `
   .dc-host {
     font-family: Arial, Helvetica, sans-serif;
     background: #fff;
-    padding: 16px;
+    padding: 30px;
     width: 850px;
+    min-height: 1202px;
     color: #000;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .dc-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #000;
+    margin-bottom: 20px;
+  }
+  .dc-header-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+  .dc-header-company {
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 4px;
+    font-family: "Times New Roman", Times, serif;
+    letter-spacing: 0.5px;
+  }
+  .dc-header-sub {
+    font-size: 13px;
+    color: #333;
+  }
+  .dc-header-right {
+    font-size: 11px;
+    color: #000;
+    max-width: 450px;
+    text-align: right;
+  }
+  .dc-page-footer {
+    position: absolute;
+    bottom: 30px;
+    left: 30px;
+    right: 30px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #000;
+    border-top: 1px solid #ddd;
+    padding-top: 10px;
   }
   .dc-wrapper {
     border: 1px solid #000;
     background: #fff;
+    flex: 0 0 auto;
+    margin-bottom: 60px;
   }
   table.dc-grid {
     width: 100%;
@@ -113,12 +147,6 @@ const DC_STYLES = `
     letter-spacing: 0.5px;
     padding: 6px 0;
   }
-  .dc-company-name {
-    font-size: 20px;
-    font-weight: bold;
-    margin-bottom: 2px;
-  }
-  .dc-company-sub { font-size: 11.5px; font-weight: bold; line-height: 1.35; }
   .dc-meta-label { font-weight: bold; white-space: nowrap; }
   .dc-meta-value { font-weight: bold; }
   .dc-to-label { font-weight: bold; font-size: 12px; margin-bottom: 2px; }
@@ -160,8 +188,6 @@ const DC_STYLES = `
   .dc-sign-space { flex: 1; min-height: 28px; width: 100%; }
   .dc-sign-label { font-size: 11px; line-height: 1.4; }
   .dc-company-gstin { font-weight: bold; font-size: 11.5px; }
-  .logo-wrap { display: inline-block; vertical-align: middle; margin-right: 8px; }
-  .logo-wrap img, .logo-wrap svg { width: 72px; height: 72px; object-fit: contain; }
 `;
 
 export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
@@ -170,12 +196,6 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   const { lines, totalDrums, totalQty } = buildDcPrintLines(data, appData);
 
   const logoSrc = profile.logo && profile.logo.startsWith('data:image') ? profile.logo : '';
-  const logoHtml = logoSrc
-    ? `<img src="${logoSrc}" alt="Logo">`
-    : DEFAULT_DC_LOGO_HTML;
-
-  const addressLines = formatDcCompanyAddress(profile);
-  const emailLine = formatDcEmailLine(profile);
 
   const dcNo = esc(data.dcNo || 'N/A');
   const dcDate = esc(formatDcDateSlash(data.date) || 'N/A');
@@ -220,6 +240,19 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   return `
 <style>${DC_STYLES}</style>
 <div class="dc-host">
+  <div class="dc-page-header">
+    <div class="dc-header-left">
+      ${logoSrc ? `<img src="${logoSrc}" style="width: 50px; height: 50px; object-fit: contain;">` : DEFAULT_DC_LOGO_HTML}
+      <div>
+        <div class="dc-header-company">UMA MICRON</div>
+        <div class="dc-header-sub">Micronization of API's</div>
+      </div>
+    </div>
+    <div class="dc-header-right">
+      Plot No. 1116 G.I.D.C. Ranol, N.H. No. 8, Ranol, Dist. Vadodara-391350
+    </div>
+  </div>
+
   <div class="dc-wrapper">
     <table class="dc-grid">
       <tr>
@@ -227,31 +260,15 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
       </tr>
 
       <tr>
-        <td colspan="2" style="width:58%; padding:8px 10px;">
-          <div style="display:flex; align-items:center;">
-            <div class="logo-wrap">${logoHtml}</div>
-            <div>
-              <div class="dc-company-name">${esc(profile.companyName)}</div>
-              <div class="dc-company-sub">${esc(addressLines[0] || '')}</div>
-              <div class="dc-company-sub">${esc(addressLines[1] || '')}</div>
-              <div class="dc-company-sub">${esc(emailLine)}</div>
-            </div>
-          </div>
+        <td colspan="2" style="width:58%; padding:10px;">
+          <div class="dc-to-label">To,</div>
+          <div class="dc-address-block">${esc(toAddress)}</div>
+          <div class="dc-gstin-box" style="margin-top: 8px;">GSTIN : ${partyGstin}</div>
         </td>
-        <td colspan="2" style="width:42%; padding:0;">
+        <td colspan="2" style="width:42%; padding:0; vertical-align:top;">
           <table class="dc-grid" style="border:none; height:100%;">
             ${metaRowsHtml}
           </table>
-        </td>
-      </tr>
-
-      <tr>
-        <td colspan="2" style="width:58%;">
-          <div class="dc-to-label">To,</div>
-          <div class="dc-address-block">${esc(toAddress)}</div>
-        </td>
-        <td colspan="2" class="dc-gstin-box" style="width:42%;">
-          GSTIN : ${partyGstin}
         </td>
       </tr>
 
@@ -307,6 +324,11 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
         </td>
       </tr>
     </table>
+  </div>
+  
+  <div class="dc-page-footer">
+    <div>M - 09712000297</div>
+    <div>info@umamicron.com &nbsp;-&nbsp; www.umamicron.com</div>
   </div>
 </div>`;
 };
