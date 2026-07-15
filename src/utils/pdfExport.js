@@ -12,6 +12,7 @@ import {
 import { renderTaxInvoicePdf } from './taxInvoiceHtml';
 import { renderPerformaInvoicePdf } from './performaInvoiceHtml';
 import { renderDeliveryChallanPdf } from './deliveryChallanHtml';
+import { renderQuotationPdf } from './quotationPdf';
 import { getDcAppData } from './deliveryChallanLayout';
 import {
   TI_CHARGES_LIST,
@@ -1506,95 +1507,132 @@ const plCalcNet = (row) => {
 
 const buildPackingListPDF = (doc, data) => {
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   const margin = { left: PDF_MARGIN, right: PDF_MARGIN };
   const batches = data.batches || [];
 
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('PACKING LIST', pageWidth / 2, 22, { align: 'center' });
-
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
   const productName = (data.productName || '').toUpperCase();
   const totalQty = (parseFloat(data.totalWeight) || batches.reduce((sum, b) => sum + plCalcNet(b), 0)).toFixed(2);
   const totalDrums = data.totalDrums || batches.length || 0;
   const dateStr = formatPdfDateSlash(data.date) || '';
+  const batchDateStr = formatPdfDateSlash(data.batchDate) || '';
 
-  let metaY = 34;
-  [
-    `Name of Product: :${productName}`,
-    `Total Quantity: :${totalQty} KGS`,
-    `Total Drums: :${totalDrums}`,
-    `Date: :${dateStr}`
-  ].forEach((line) => {
-    doc.text(line, margin.left, metaY);
-    metaY += 6;
-  });
+  // Draw first page Title & Meta
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PACKING LIST', pageWidth / 2, 34, { align: 'center' });
+  doc.setLineWidth(0.5);
+  const titleWidth = doc.getTextWidth('PACKING LIST');
+  doc.line((pageWidth - titleWidth) / 2, 35, (pageWidth + titleWidth) / 2, 35);
 
-  const batchOrder = [];
-  const batchMap = {};
-  batches.forEach((b) => {
-    const key = b.batchNo || 'Unknown';
-    if (!batchMap[key]) {
-      batchMap[key] = [];
-      batchOrder.push(key);
-    }
-    batchMap[key].push(b);
-  });
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Name of Product :`, margin.left, 46);
+  doc.setFont('helvetica', 'normal');
+  doc.text(` ${productName}`, margin.left + doc.getTextWidth('Name of Product :'), 46);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Total Quantity :`, margin.left, 53);
+  doc.setFont('helvetica', 'normal');
+  doc.text(` ${totalQty} KGS`, margin.left + doc.getTextWidth('Total Quantity :'), 53);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Total Drums :`, margin.left, 60);
+  doc.setFont('helvetica', 'normal');
+  doc.text(` ${totalDrums}`, margin.left + doc.getTextWidth('Total Drums :'), 60);
+
+  // Right side meta
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Date :`, pageWidth - margin.right - 28, 46, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.text(` ${dateStr}`, pageWidth - margin.right - 28, 46, { align: 'left' });
+  
+  if (batchDateStr) {
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Batch Date :`, pageWidth - margin.right - 28, 53, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.text(` ${batchDateStr}`, pageWidth - margin.right - 28, 53, { align: 'left' });
+  }
 
   const plBody = [];
   let sr = 1;
+  let grandNet = 0;
 
-  batchOrder.forEach((batchKey, groupIdx) => {
-    let batchNetTotal = 0;
-    batchMap[batchKey].forEach((b) => {
-      const net = plCalcNet(b);
-      batchNetTotal += net;
-      plBody.push([
-        sr++,
-        b.batchNo || '',
-        b.drumNo ?? '',
-        plFmtWt(b.gross),
-        plFmtWt(b.tare),
-        net > 0 ? net.toFixed(2) : plFmtWt(b.net)
-      ]);
-    });
-
+  batches.forEach((b) => {
+    const net = plCalcNet(b);
+    grandNet += net;
     plBody.push([
-      '', '', '', '',
-      { content: 'TOTAL', styles: { fontStyle: 'bold', halign: 'center' } },
-      { content: batchNetTotal.toFixed(2), styles: { fontStyle: 'bold', halign: 'center' } }
+      sr++,
+      b.batchNo || '',
+      b.drumNo ?? '',
+      plFmtWt(b.gross),
+      plFmtWt(b.tare),
+      net > 0 ? net.toFixed(2) : plFmtWt(b.net)
     ]);
-
-    if (groupIdx < batchOrder.length - 1) {
-      plBody.push(['', '', '', '', '', '']);
-    }
   });
 
+  plBody.push([
+    { content: 'TOTAL', colSpan: 5, styles: { fontStyle: 'bold', halign: 'left' } },
+    { content: grandNet.toFixed(2), styles: { fontStyle: 'bold', halign: 'right' } }
+  ]);
+
   autoTable(doc, {
-    startY: metaY + 8,
-    margin,
+    startY: 68,
+    margin: { top: 32, left: margin.left, right: margin.right, bottom: 20 },
     head: [[
-      { content: 'Sr. No', styles: { fontStyle: 'bold' } },
-      { content: 'Batch No.', styles: { fontStyle: 'bold' } },
-      { content: 'Drum No.', styles: { fontStyle: 'bold' } },
-      { content: 'Gross Wt. (kg)', styles: { fontStyle: 'bold' } },
-      { content: 'Tare Wt. (kg)', styles: { fontStyle: 'bold' } },
-      { content: 'Net Wt. (kg)', styles: { fontStyle: 'bold' } }
+      { content: 'Sr. No.', styles: { fontStyle: 'bold', halign: 'left' } },
+      { content: 'Batch No.', styles: { fontStyle: 'bold', halign: 'left' } },
+      { content: 'Drum No.', styles: { fontStyle: 'bold', halign: 'center' } },
+      { content: 'Gross Wt. (kg)', styles: { fontStyle: 'bold', halign: 'center' } },
+      { content: 'Tare Wt. (kg)', styles: { fontStyle: 'bold', halign: 'center' } },
+      { content: 'Net Wt. (kg)', styles: { fontStyle: 'bold', halign: 'center' } }
     ]],
     body: plBody,
     theme: 'grid',
-    styles: PL_GRID,
-    headStyles: { ...PL_GRID, fontStyle: 'bold', fillColor: [255, 255, 255] },
+    styles: { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, cellPadding: 2.5, valign: 'middle' },
+    headStyles: { fillColor: [255, 255, 255], textColor: 0 },
     showHead: 'everyPage',
     columnStyles: {
-      0: { cellWidth: 14 },
-      1: { cellWidth: 34 },
-      2: { cellWidth: 16 },
-      3: { cellWidth: 28 },
-      4: { cellWidth: 28 },
-      5: { cellWidth: 28 }
+      0: { cellWidth: 15, halign: 'left' },
+      1: { cellWidth: 42, halign: 'left' },
+      2: { cellWidth: 22, halign: 'center' },
+      3: { cellWidth: 32, halign: 'right' },
+      4: { cellWidth: 32, halign: 'right' },
+      5: { cellWidth: 32, halign: 'right' }
+    },
+    didDrawPage: (dataObj) => {
+      // Header
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.5);
+      
+      // Draw Logo UM
+      doc.circle(22, 16.5, 7.5);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('UM', 22, 18, { align: 'center' });
+      
+      // Draw Name
+      doc.setFontSize(15);
+      doc.text('UMA MICRON', 32, 15.5);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Micronization of API's", 32, 19.5);
+      
+      // Address
+      doc.setFontSize(7);
+      doc.text('Plot No. 1116 G.I.D.C. Ranol, N.H. No. 8, Ranol, Dist. Vadodara-391350', pageWidth - 14, 16.5, { align: 'right' });
+      
+      // Header thick line
+      doc.setLineWidth(0.8);
+      doc.line(14, 25, pageWidth - 14, 25);
+      
+      // Footer
+      doc.setLineWidth(0.2);
+      doc.line(14, pageHeight - 15, pageWidth - 14, pageHeight - 15);
+      doc.setFontSize(7);
+      doc.text('M - 09712000297', 14, pageHeight - 10);
+      doc.text('info@umamicron.com - www.umamicron.com', pageWidth - 14, pageHeight - 10, { align: 'right' });
     }
   });
 };
@@ -1700,6 +1738,10 @@ export const exportToPDF = (docType, data) => {
       .catch((err) => console.error('DC PDF export failed:', err));
     return;
   }
+  if (docType === 'QUOTATION') {
+    renderQuotationPdf(enriched, { mode: 'save' }).catch((err) => console.error('Quotation PDF export failed:', err));
+    return;
+  }
   const { doc, docNo } = buildPDF(docType, enriched);
   doc.save(`${docType}_${docNo}.pdf`);
 };
@@ -1717,6 +1759,10 @@ export const viewPDF = (docType, data) => {
   if (docType === 'DC') {
     renderDeliveryChallanPdf({ ...enriched, appData: getDcAppData() }, { mode: 'view' })
       .catch((err) => console.error('DC PDF view failed:', err));
+    return;
+  }
+  if (docType === 'QUOTATION') {
+    renderQuotationPdf(enriched, { mode: 'view' }).catch((err) => console.error('Quotation PDF view failed:', err));
     return;
   }
   const { doc, docNo } = buildPDF(docType, enriched);
