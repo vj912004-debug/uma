@@ -72,13 +72,17 @@ const DC_STYLES = `
   .dc-host {
     font-family: Arial, Helvetica, sans-serif;
     background: #fff;
-    padding: 30px;
-    width: 850px;
-    min-height: 1202px;
+    width: 900px;
     color: #000;
-    position: relative;
+  }
+  .dc-page {
+    width: 100%;
+    height: 1273px;
+    background: #fff;
     display: flex;
     flex-direction: column;
+    padding: 40px 50px;
+    position: relative;
   }
   .dc-page-header {
     display: flex;
@@ -113,9 +117,9 @@ const DC_STYLES = `
   }
   .dc-page-footer {
     position: absolute;
-    bottom: 30px;
-    left: 30px;
-    right: 30px;
+    bottom: 40px;
+    left: 50px;
+    right: 50px;
     display: flex;
     justify-content: space-between;
     font-size: 11px;
@@ -240,6 +244,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   return `
 <style>${DC_STYLES}</style>
 <div class="dc-host">
+  <div class="dc-page">
   <div class="dc-page-header">
     <div class="dc-header-left">
       ${logoSrc ? `<img src="${logoSrc}" style="width: 50px; height: 50px; object-fit: contain;">` : DEFAULT_DC_LOGO_HTML}
@@ -330,6 +335,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     <div>M - 09712000297</div>
     <div>info@umamicron.com &nbsp;-&nbsp; www.umamicron.com</div>
   </div>
+  </div>
 </div>`;
 };
 
@@ -342,15 +348,15 @@ export const renderDeliveryChallanPdf = async (data, { mode = 'save' } = {}) => 
   document.body.appendChild(host);
 
   try {
-    const target = host.querySelector('.dc-host');
+    const target = host.querySelector('.dc-page');
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
     const canvas = await html2canvas(target, {
       scale: 2,
       useCORS: true,
       backgroundColor: '#ffffff',
-      width: 850,
-      windowWidth: 850
+      width: 900,
+      windowWidth: 900
     });
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
