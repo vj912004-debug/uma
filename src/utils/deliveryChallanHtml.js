@@ -19,182 +19,282 @@ const fmtQty = (n) => {
   return v.toFixed(2);
 };
 
-const DEFAULT_DC_LOGO_HTML = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="48" height="48" style="display:block;">
-  <circle cx="50" cy="50" r="45" fill="none" stroke="#000" stroke-width="4"/>
-  <text x="50" y="65" font-family="Arial, sans-serif" font-size="40" font-weight="900" fill="#000" text-anchor="middle">UM</text>
-</svg>
-`;
-
-const buildAlignedCellHtml = (lines, field) => {
-  if (!lines.length) return '&nbsp;';
-  return lines.map((line) => {
-    const val = line[field];
-    const display = val === '' || val === null || val === undefined ? '' : esc(val);
-    const cls = field === 'text' ? 'dc-line dc-desc' : (field === 'qty' ? 'dc-line dc-qty' : 'dc-line dc-drums');
-    const content = field === 'text' ? esc(line.text) : display;
-    return content ? `<div class="${cls}">${content}</div>` : '';
-  }).join('');
-};
-
-const buildDcFooterRows = (data, profileGstin) => {
-  const rows = [];
-  const add = (label, value) => {
-    if (value) rows.push({ label, value });
-  };
-
-  add('Vehicle No.', data.vehicleNo);
-  add('Drivers name :', data.driverName);
-  add('Driver\'s Contact no. :', data.driverContact || data.driverPhone);
-  add('Transporter\'s Name :', data.transporterName || data.transporter);
-
-  if (profileGstin) {
-    rows.push({ label: 'GSTIN', value: profileGstin, isGstin: true });
-  }
-
-  return rows;
-};
-
-const buildDcMetaRows = (dcNo, dcDate, poNo, poDate) => {
-  const rows = [
-    { label: 'Delivery Challan No. :', value: dcNo },
-    { label: 'Date :', value: dcDate }
-  ];
-  if (poNo || poDate) {
-    rows.push({ label: 'PO /DC NO.', value: poNo });
-    rows.push({ label: 'Date :', value: poDate });
-  }
-  return rows;
-};
-
 const DC_STYLES = `
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  .dc-host {
-    font-family: Arial, Helvetica, sans-serif;
-    background: #fff;
-    width: 900px;
-    color: #000;
-  }
-  .dc-page {
-    width: 100%;
-    height: 1273px;
-    background: #fff;
-    display: flex;
-    flex-direction: column;
-    padding: 40px 50px;
-    position: relative;
-  }
-  .dc-page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    padding-bottom: 12px;
-    border-bottom: 2px solid #000;
-    margin-bottom: 20px;
-  }
-  .dc-header-left {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-  }
-  .dc-header-company {
-    font-size: 26px;
-    font-weight: 800;
-    line-height: 1;
-    margin-bottom: 4px;
-    font-family: "Times New Roman", Times, serif;
-    letter-spacing: 0.5px;
-  }
-  .dc-header-sub {
-    font-size: 13px;
-    color: #333;
-  }
-  .dc-header-right {
-    font-size: 11px;
-    color: #000;
-    max-width: 450px;
-    text-align: right;
-  }
-  .dc-page-footer {
-    position: absolute;
-    bottom: 40px;
-    left: 50px;
-    right: 50px;
-    display: flex;
-    justify-content: space-between;
-    font-size: 11px;
-    color: #000;
-    border-top: 1px solid #ddd;
-    padding-top: 10px;
-  }
-  .dc-wrapper {
-    border: 1px solid #000;
-    background: #fff;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 50px;
-  }
-  table.dc-grid {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-    flex: 1;
-  }
-  table.dc-grid td, table.dc-grid th {
-    border: 1px solid #000;
-    padding: 4px 6px;
-    vertical-align: top;
-    font-size: 12px;
-  }
-  .dc-title {
-    text-align: center;
-    font-weight: bold;
-    font-size: 15px;
-    letter-spacing: 0.5px;
-    padding: 6px 0;
-  }
-  .dc-meta-label { font-weight: bold; white-space: nowrap; }
-  .dc-meta-value { font-weight: bold; }
-  .dc-to-label { font-weight: bold; font-size: 12px; margin-bottom: 2px; }
-  .dc-address-block { font-size: 12px; line-height: 1.4; white-space: pre-wrap; }
-  .dc-gstin-box { font-weight: bold; }
-  .dc-state-row td { font-weight: bold; font-size: 12px; }
-  .dc-items th {
-    text-align: center;
-    font-weight: bold;
-    font-size: 11.5px;
-    vertical-align: middle;
-  }
-  .dc-items td { font-size: 11.5px; }
-  .dc-sr { text-align: center; vertical-align: top; width: 8%; }
-  .dc-desc-col { width: 52%; }
-  .dc-drums-col { width: 20%; text-align: center; }
-  .dc-qty-col { width: 20%; text-align: right; }
-  .dc-line { line-height: 1.35; padding: 1px 0; }
-  .dc-desc { text-align: left; }
-  .dc-drums { text-align: center; }
-  .dc-qty { text-align: right; }
-  .dc-total-row td { font-weight: bold; font-size: 12.5px; }
-  .dc-total-label { text-align: center; }
-  .dc-footer-label { font-weight: bold; white-space: nowrap; width: 38%; }
-  .dc-footer-value { }
-  .dc-sign-box {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: center;
-    text-align: center;
-    font-weight: bold;
-    min-height: 72px;
-    height: 100%;
-    padding: 6px;
-    box-sizing: border-box;
-  }
-  .dc-sign-title { font-size: 12px; line-height: 1.4; }
-  .dc-sign-space { flex: 1; min-height: 28px; width: 100%; }
-  .dc-sign-label { font-size: 11px; line-height: 1.4; }
-  .dc-company-gstin { font-weight: bold; font-size: 11.5px; }
+        :root {
+            --primary-color: #1e3a8a; /* Modern corporate navy */
+            --text-dark: #1f2937;
+            --text-light: #4b5563;
+            --border-color: #e5e7eb;
+            --bg-light: #f9fafb;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        .dc-host {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: var(--text-dark);
+            background-color: #f3f4f6;
+            line-height: 1.5;
+            width: 850px;
+            min-height: 1202px;
+        }
+
+        .challan-container {
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff;
+            padding: 40px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 8px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header Layout */
+        .header-section {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 30px;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 20px;
+            margin-bottom: 25px;
+        }
+
+        .company-logo-area {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .company-logo-area h1 {
+            color: var(--primary-color);
+            margin: 0 0 5px 0;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .company-address {
+            font-size: 13px;
+            color: var(--text-light);
+            margin: 0;
+        }
+
+        .document-title-badge {
+            background-color: var(--primary-color);
+            color: #ffffff;
+            text-align: center;
+            padding: 6px 15px;
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+
+        /* Meta Data Grid */
+        .meta-details-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            font-size: 13px;
+        }
+
+        .meta-item {
+            background-color: var(--bg-light);
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        .meta-label {
+            font-weight: 600;
+            color: var(--text-light);
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .meta-value {
+            color: var(--text-dark);
+            font-weight: 500;
+        }
+
+        /* Shipping Info Section */
+        .shipping-section {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--primary-color);
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 4px;
+        }
+
+        .address-box {
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+
+        .address-box strong {
+            display: block;
+            font-size: 16px;
+            margin-bottom: 5px;
+            color: var(--text-dark);
+        }
+
+        /* Modernized Items Table */
+        .items-table-wrapper {
+            flex: 1;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        .items-table th {
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 12px;
+            padding: 12px 10px;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 2px solid var(--border-color);
+            text-align: left;
+        }
+
+        .items-table td {
+            padding: 15px 10px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+            vertical-align: top;
+        }
+
+        .items-table th.text-right, .items-table td.text-right {
+            text-align: right;
+        }
+
+        .items-table th.text-center, .items-table td.text-center {
+            text-align: center;
+        }
+
+        .description-cell p {
+            margin: 0 0 10px 0;
+            font-weight: 600;
+            color: var(--text-dark);
+            white-space: pre-wrap;
+        }
+
+        .batch-badge {
+            display: inline-block;
+            background-color: #eff6ff;
+            color: #1e40af;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid #bfdbfe;
+        }
+
+        .value-highlight {
+            margin-top: 15px;
+            font-size: 14px;
+            color: var(--text-light);
+        }
+
+        .value-highlight strong {
+            color: var(--text-dark);
+            font-size: 15px;
+        }
+
+        /* Totals & Summary Row */
+        .total-row td {
+            font-weight: 700;
+            background-color: var(--bg-light);
+            border-top: 2px solid var(--border-color);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        /* Logistics & Signatures Footer Grid */
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: auto;
+        }
+
+        .logistics-card, .signature-card {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            background-color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 140px;
+        }
+
+        .logistics-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 13px;
+        }
+
+        .logistics-list li {
+            margin-bottom: 6px;
+            color: var(--text-light);
+        }
+
+        .logistics-list strong {
+            color: var(--text-dark);
+            display: inline-block;
+            width: 140px;
+        }
+
+        .signature-area {
+            text-align: center;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-light);
+        }
+
+        @media print {
+            .dc-host {
+                background-color: #ffffff;
+                padding: 0;
+            }
+            .challan-container {
+                box-shadow: none;
+                padding: 0;
+            }
+            .meta-item {
+                background-color: #ffffff !important;
+                print-color-adjust: exact;
+            }
+            .batch-badge {
+                background-color: #ffffff !important;
+                border: 1px solid #000000 !important;
+            }
+        }
 `;
 
 export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
@@ -203,6 +303,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   const { lines, totalDrums, totalQty } = buildDcPrintLines(data, appData);
 
   const logoSrc = profile.logo && profile.logo.startsWith('data:image') ? profile.logo : '';
+  const logoHtml = logoSrc ? `<img src="${logoSrc}" style="width: 50px; height: 50px; object-fit: contain;">` : '';
 
   const dcNo = esc(data.dcNo || 'N/A');
   const dcDate = esc(formatDcDateSlash(data.date) || 'N/A');
@@ -211,142 +312,156 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
 
   const shipState = esc(data.shipState || data.billState || data.state || profile.state || 'GUJARAT');
   const stateCode = esc(data.shipStateCode || data.billStateCode || data.stateCode || '24');
-  const partyGstin = esc(data.gstinShip || data.gstinBill || data.gstin || '');
+  
+  const buyerGstin = esc(data.gstinShip || data.gstinBill || data.gstin || '');
+  const sellerGstin = esc(profile.gstNumber || '');
 
-  const toAddress = [
-    data.partyName || '',
-    data.shipAddress || data.billAddress || data.address || ''
-  ].filter(Boolean).join('\n');
+  const partyName = esc(data.partyName || '');
+  const partyAddress = esc(data.shipAddress || data.billAddress || data.address || '');
 
-  const metaRows = buildDcMetaRows(dcNo, dcDate, poNo, poDate);
-  const metaRowsHtml = metaRows.map((row, idx) => `
-            <tr>
-              <td class="dc-meta-label" style="width:46%; ${idx === 0 ? 'border-top:none; border-left:none;' : 'border-left:none;'}">${row.label}</td>
-              <td class="dc-meta-value" style="${idx === 0 ? 'border-top:none; border-right:none;' : 'border-right:none;'}">${row.value || '&nbsp;'}</td>
-            </tr>`).join('');
-
-  const footerRows = buildDcFooterRows(data, profile.gstNumber);
-  const footerRowsHtml = footerRows.map((row, idx) => {
-    if (row.isGstin) {
-      return `
-            <tr>
-              <td colspan="2" class="dc-company-gstin" style="border-left:none; border-right:none; ${idx === footerRows.length - 1 ? 'border-bottom:none;' : ''}">
-                GSTIN : ${esc(row.value)}
-              </td>
-            </tr>`;
-    }
+  // Format Items rows
+  const itemsHtml = lines.map((line, idx) => {
+    // If the text contains "BATCH", we can attempt to format it slightly, but safest is just rendering the text natively.
+    // We'll wrap the raw text cleanly.
     return `
-            <tr>
-              <td class="dc-footer-label" style="border-left:none; ${idx === 0 ? 'border-top:none;' : ''}">${row.label}</td>
-              <td class="dc-footer-value" style="${idx === 0 ? 'border-top:none; border-right:none;' : 'border-right:none;'}">${esc(row.value)}</td>
-            </tr>`;
+      <tr>
+        <td class="text-center">${idx + 1}</td>
+        <td class="description-cell">
+            <p>${esc(line.text)}</p>
+        </td>
+        <td class="text-center" style="font-weight: 500;">${esc(line.drums)}</td>
+        <td class="text-right" style="font-weight: 500;">${esc(line.qty)}</td>
+      </tr>
+    `;
   }).join('');
-
-  const signMinHeight = Math.max(72, footerRows.length * 22);
 
   return `
 <style>${DC_STYLES}</style>
 <div class="dc-host">
-  <div class="dc-page">
-  <div class="dc-page-header">
-    <div class="dc-header-left">
-      ${logoSrc ? `<img src="${logoSrc}" style="width: 50px; height: 50px; object-fit: contain;">` : DEFAULT_DC_LOGO_HTML}
-      <div>
-        <div class="dc-header-company">UMA MICRON</div>
-        <div class="dc-header-sub">Micronization of API's</div>
-      </div>
+    <div class="challan-container">
+        
+        <!-- Top Header Layout -->
+        <div class="header-section">
+            <div class="company-logo-area">
+                ${logoHtml}
+                <div>
+                    <h1>${esc(profile.companyName)}</h1>
+                    <p class="company-address">
+                        ${esc(profile.addressLine1 || '')}<br>
+                        ${esc(profile.city || '')} ${esc(profile.pincode || '')}, ${esc(profile.state || '')}<br>
+                        <strong>Email:</strong> ${esc(profile.email || '')}
+                    </p>
+                </div>
+            </div>
+            
+            <div style="text-align: right;">
+                <div class="document-title-badge">Delivery Challan</div>
+                <div class="meta-details-grid">
+                    <div class="meta-item" style="text-align: left;">
+                        <span class="meta-label">Challan No.</span>
+                        <span class="meta-value">${dcNo}</span>
+                    </div>
+                    <div class="meta-item" style="text-align: left;">
+                        <span class="meta-label">Date</span>
+                        <span class="meta-value">${dcDate}</span>
+                    </div>
+                    <div class="meta-item" style="text-align: left;">
+                        <span class="meta-label">PO / DC No.</span>
+                        <span class="meta-value">${poNo || '—'}</span>
+                    </div>
+                    <div class="meta-item" style="text-align: left;">
+                        <span class="meta-label">PO Date</span>
+                        <span class="meta-value">${poDate || '—'}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Client and Origin Details -->
+        <div class="shipping-section">
+            <div>
+                <h3 class="section-title">To (Consignee)</h3>
+                <div class="address-box">
+                    <strong>${partyName}</strong>
+                    ${partyAddress}
+                </div>
+            </div>
+            <div>
+                <h3 class="section-title">Tax Registration</h3>
+                <div class="meta-details-grid" style="grid-template-columns: 1fr;">
+                    <div class="meta-item">
+                        <span class="meta-label">Seller GSTIN</span>
+                        <span class="meta-value">${sellerGstin}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">State / State Code</span>
+                        <span class="meta-value">${shipState} (Code: ${stateCode})</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Line Items Table -->
+        <div class="items-table-wrapper">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th style="width: 8%;" class="text-center">Sr. No.</th>
+                        <th style="width: 62%;">Description of Goods</th>
+                        <th style="width: 15%;" class="text-center">Total Drums</th>
+                        <th style="width: 15%;" class="text-right">Quantity (kg)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${itemsHtml}
+                    <!-- Total Summary Row -->
+                    <tr class="total-row">
+                        <td></td>
+                        <td>TOTAL</td>
+                        <td class="text-center">${totalDrums || 0}</td>
+                        <td class="text-right">${fmtQty(totalQty)}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Bottom Logistics & Signatures Grid -->
+        <div class="footer-grid">
+            <div class="logistics-card">
+                <h3 class="section-title" style="margin-bottom: 10px;">Logistics & Transport Details</h3>
+                <ul class="logistics-list">
+                    <li><strong>Vehicle No:</strong> ${esc(data.vehicleNo || '—')}</li>
+                    <li><strong>Driver's Name:</strong> ${esc(data.driverName || '—')}</li>
+                    <li><strong>Driver's Contact:</strong> ${esc(data.driverContact || data.driverPhone || '—')}</li>
+                    <li><strong>Transporter:</strong> ${esc(data.transporterName || data.transporter || '—')}</li>
+                    <li style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 6px;">
+                        <strong>Buyer GSTIN:</strong> ${buyerGstin || '—'}
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="logistics-card">
+                <h3 class="section-title" style="margin-bottom: 10px;">For ${esc(profile.companyName)}</h3>
+                <div></div> <!-- Spacer -->
+                <div class="signature-area">
+                    Authorized Signatory
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-grid" style="margin-top: 15px;">
+            <div class="logistics-card" style="min-height: 110px; grid-column: span 2;">
+                <h3 class="section-title" style="margin-bottom: 10px;">Acknowledgment</h3>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; height: 100%;">
+                    <span style="font-size: 13px; color: var(--text-light)">Received the above material in good condition.</span>
+                    <div class="signature-area" style="min-width: 200px;">
+                        Receiver's Signature & Stamp
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
-    <div class="dc-header-right">
-      Plot No. 1116 G.I.D.C. Ranol, N.H. No. 8, Ranol, Dist. Vadodara-391350
-    </div>
-  </div>
-
-  <div class="dc-wrapper">
-    <table class="dc-grid">
-      <tr>
-        <td colspan="4" class="dc-title">DELIVERY CHALLAN</td>
-      </tr>
-
-      <tr>
-        <td colspan="2" style="width:58%; padding:10px;">
-          <div class="dc-to-label">To,</div>
-          <div class="dc-address-block">${esc(toAddress)}</div>
-          <div class="dc-gstin-box" style="margin-top: 8px;">GSTIN : ${partyGstin}</div>
-        </td>
-        <td colspan="2" style="width:42%; padding:0; vertical-align:top;">
-          <table class="dc-grid" style="border:none; height:100%;">
-            ${metaRowsHtml}
-          </table>
-        </td>
-      </tr>
-
-      <tr class="dc-state-row">
-        <td colspan="2">State : ${shipState}</td>
-        <td colspan="2" style="text-align:right;">Code : ${stateCode}</td>
-      </tr>
-
-      <tr class="dc-items">
-        <th class="dc-sr">Sr. No.</th>
-        <th class="dc-desc-col">DESCRIPTION</th>
-        <th class="dc-drums-col">TOTAL NO. OF DRUMS</th>
-        <th class="dc-qty-col">QUANTITY (kg)</th>
-      </tr>
-
-      <tr class="dc-items">
-        <td class="dc-sr">1</td>
-        <td class="dc-desc-col">${buildAlignedCellHtml(lines, 'text')}</td>
-        <td class="dc-drums-col">${buildAlignedCellHtml(lines, 'drums')}</td>
-        <td class="dc-qty-col">${buildAlignedCellHtml(lines, 'qty')}</td>
-      </tr>
-      ${Array(15).fill(0).map((_, i) => `
-      <tr class="dc-items" style="${i === 14 ? 'height: 100%;' : 'height: 24px;'}">
-        <td class="dc-sr" style="color:transparent;">${i + 2}</td>
-        <td></td>
-        <td></td>
-        <td></td>
-      </tr>
-      `).join('')}
-
-      <tr class="dc-total-row">
-        <td></td>
-        <td class="dc-total-label">TOTAL</td>
-        <td style="text-align:center;">${totalDrums || 0}</td>
-        <td style="text-align:right;">${fmtQty(totalQty)}</td>
-      </tr>
-
-      <tr>
-        <td colspan="2" style="padding:0; vertical-align:top;">
-          <table class="dc-grid" style="border:none;">
-            ${footerRowsHtml}
-          </table>
-        </td>
-        <td colspan="2" style="padding:0; vertical-align:top;">
-          <table class="dc-grid" style="border:none; height:100%;">
-            <tr style="height:50%;">
-              <td class="dc-sign-box" style="border-left:none; border-top:none; border-right:none; min-height:${signMinHeight}px;">
-                <div class="dc-sign-title">For ${esc(profile.companyName)}</div>
-                <div class="dc-sign-space"></div>
-                <div class="dc-sign-label">Authorised Signatory</div>
-              </td>
-            </tr>
-            <tr style="height:50%;">
-              <td class="dc-sign-box" style="border-left:none; border-right:none; border-bottom:none; min-height:${signMinHeight}px;">
-                <div class="dc-sign-title">RECEIVED BY :</div>
-                <div class="dc-sign-space"></div>
-                <div class="dc-sign-label">Authorised Signatory</div>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </div>
-  
-  <div class="dc-page-footer">
-    <div>M - 09712000297</div>
-    <div>info@umamicron.com &nbsp;-&nbsp; www.umamicron.com</div>
-  </div>
-  </div>
 </div>`;
 };
 
@@ -359,15 +474,14 @@ export const renderDeliveryChallanPdf = async (data, { mode = 'save' } = {}) => 
   document.body.appendChild(host);
 
   try {
-    const target = host.querySelector('.dc-page');
+    const target = host.querySelector('.dc-host');
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
     const canvas = await html2canvas(target, {
       scale: 2,
       useCORS: true,
       backgroundColor: '#ffffff',
-      width: 900,
-      windowWidth: 900
+      width: 850
     });
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
