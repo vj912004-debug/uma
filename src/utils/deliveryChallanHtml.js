@@ -130,13 +130,16 @@ const DC_STYLES = `
   .dc-wrapper {
     border: 1px solid #000;
     background: #fff;
-    flex: 0 0 auto;
-    margin-bottom: 60px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 50px;
   }
   table.dc-grid {
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
+    flex: 1;
   }
   table.dc-grid td, table.dc-grid th {
     border: 1px solid #000;
@@ -295,8 +298,8 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
         <td class="dc-drums-col">${buildAlignedCellHtml(lines, 'drums')}</td>
         <td class="dc-qty-col">${buildAlignedCellHtml(lines, 'qty')}</td>
       </tr>
-      ${Array(14).fill(0).map((_, i) => `
-      <tr class="dc-items" style="height: 24px;">
+      ${Array(15).fill(0).map((_, i) => `
+      <tr class="dc-items" style="${i === 14 ? 'height: 100%;' : 'height: 24px;'}">
         <td class="dc-sr" style="color:transparent;">${i + 2}</td>
         <td></td>
         <td></td>
