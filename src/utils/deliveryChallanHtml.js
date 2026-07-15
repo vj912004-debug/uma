@@ -295,6 +295,14 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
         <td class="dc-drums-col">${buildAlignedCellHtml(lines, 'drums')}</td>
         <td class="dc-qty-col">${buildAlignedCellHtml(lines, 'qty')}</td>
       </tr>
+      ${Array(14).fill(0).map((_, i) => `
+      <tr class="dc-items" style="height: 24px;">
+        <td class="dc-sr" style="color:transparent;">${i + 2}</td>
+        <td></td>
+        <td></td>
+        <td></td>
+      </tr>
+      `).join('')}
 
       <tr class="dc-total-row">
         <td></td>
