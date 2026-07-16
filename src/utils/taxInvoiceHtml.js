@@ -2,7 +2,6 @@ import { mergeCompanyProfile } from './companyProfile';
 import {
   TI_CHARGES_LIST,
   calcTiTotals,
-  formatPdfDateSlash,
   formatPdfDateDmy,
   splitPartyAddressLines
 } from './taxInvoiceLayout';
@@ -11,10 +10,11 @@ import {
   fmtMoney,
   fmtQty,
   PRINT_PAGE_W,
-  renderHtmlToPdf
+  renderHtmlToPdf,
+  buildPrintLogoHtml
 } from './printTheme';
 
-const TI_MIN_ROWS = 7; // Adjusted for the new layout
+const TI_MIN_ROWS = 15; // Adjusted to fill A4 page properly
 
 const extractDescAndHsn = (label) => {
   const match = label.match(/(.*?)\s*\((\d+)\)$/);
@@ -199,29 +199,16 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         }
 
         .logo-graphic {
-            border: 2px solid var(--brand-green);
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
+            width: 65px;
+            height: 65px;
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
         }
-        .logo-graphic::before {
-            content: '';
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            border: 2px solid var(--primary-purple);
-            border-radius: 50%;
-        }
-        .logo-graphic span {
-            font-size: 24px;
-            font-weight: bold;
-            color: var(--primary-purple);
-            z-index: 1;
-            font-family: 'Times New Roman', Times, serif;
+        .logo-graphic img, .logo-graphic svg {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
 
         .logo-text h1 {
@@ -509,6 +496,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
             padding: 4px 8px;
             margin-top: 10px;
             font-size: 9.5px;
+            border-radius: 3px;
         }
     </style>
 </head>
@@ -522,7 +510,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     <div class="header-top">
         <div class="logo-container">
             <div class="logo-graphic">
-                <span>M</span>
+                ${buildPrintLogoHtml(profile)}
             </div>
             <div class="logo-text">
                 <h1>${escHtml(profile.companyName || 'UMA MICRON')}</h1>
@@ -557,12 +545,12 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         </div>
         
         <div class="meta-col border-left">
-            <div class="data-row"><div class="data-label">📋 Invoice No.</div><div class="data-value">: &nbsp;${docNo}</div></div>
-            <div class="data-row"><div class="data-label">📅 Invoice Date</div><div class="data-value">: &nbsp;${docDate}</div></div>
-            <div class="data-row" style="margin-top: 5px;"><div class="data-label">📋 PO No.</div><div class="data-value">: &nbsp;${poNo}</div></div>
-            <div class="data-row"><div class="data-label">&nbsp; &nbsp; PO Date</div><div class="data-value">: &nbsp;${poDate}</div></div>
-            <div class="data-row"><div class="data-label">&nbsp; &nbsp; Delivery Challan No.</div><div class="data-value">: &nbsp;${dcNo}</div></div>
-            <div class="data-row"><div class="data-label">&nbsp; &nbsp; DC Date</div><div class="data-value">: &nbsp;${dcDate}</div></div>
+            <div class="data-row"><div class="data-label"><i class="bi bi-file-earmark-text"></i> Invoice No.</div><div class="data-value">: &nbsp;${docNo}</div></div>
+            <div class="data-row"><div class="data-label"><i class="bi bi-calendar3"></i> Invoice Date</div><div class="data-value">: &nbsp;${docDate}</div></div>
+            <div class="data-row" style="margin-top: 5px;"><div class="data-label"><i class="bi bi-file-earmark-text"></i> PO No.</div><div class="data-value">: &nbsp;${poNo}</div></div>
+            <div class="data-row"><div class="data-label" style="padding-left: 16px;">PO Date</div><div class="data-value">: &nbsp;${poDate}</div></div>
+            <div class="data-row"><div class="data-label" style="padding-left: 16px;">Delivery Challan No.</div><div class="data-value">: &nbsp;${dcNo}</div></div>
+            <div class="data-row"><div class="data-label" style="padding-left: 16px;">DC Date</div><div class="data-value">: &nbsp;${dcDate}</div></div>
         </div>
     </div>
 
@@ -650,7 +638,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     <!-- Footnotes Legal Terms & Sign-off Layout Box -->
     <div class="footer-terms-container">
         <div class="terms-column">
-            <div class="box-heading" style="margin-bottom:4px;"><i class="bi bi-card-checklist"></i> TERMS & CONDITIONS</div>
+            <div class="box-heading" style="margin-bottom:4px; border:none;"><i class="bi bi-card-checklist"></i> TERMS & CONDITIONS</div>
             <ol>
                 <li>Subject to Vadodara Jurisdiction.</li>
                 <li>Payment terms as per our agreed terms.</li>
@@ -658,7 +646,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
             </ol>
         </div>
         <div class="terms-column" style="border-left: 1px solid var(--border-purple); padding-left: 10px;">
-            <div class="box-heading" style="margin-bottom:4px;"><i class="bi bi-shield-check"></i> DECLARATION</div>
+            <div class="box-heading" style="margin-bottom:4px; border:none;"><i class="bi bi-shield-check"></i> DECLARATION</div>
             <p>We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.</p>
         </div>
         <div class="terms-column">
