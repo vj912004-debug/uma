@@ -32,6 +32,10 @@ const CreditNotes = () => {
     partyId: '',
     partyName: '',
     refInvoice: '',
+    refInvoiceDate: '',
+    poNo: '',
+    reference: '',
+    reason: '',
     particulars: '',
     charges: defaultChargeFlags({ other: true }),
     rates: defaultChargeRates(['other']),
@@ -57,6 +61,10 @@ const CreditNotes = () => {
       partyId: '',
       partyName: '',
       refInvoice: '',
+      refInvoiceDate: '',
+      poNo: '',
+      reference: '',
+      reason: '',
       particulars: '',
       charges: defaultChargeFlags({ other: true }),
       rates: defaultChargeRates(['other']),
@@ -185,7 +193,16 @@ const CreditNotes = () => {
                     <td style={{ fontWeight: 600 }}>₹{parseFloat(note.amount || 0).toFixed(2)}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={() => exportToPDF('CN', note)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={16} /></button>
+                        <button onClick={() => {
+                          const party = data.parties?.find(p => p.id === note.partyId) || {};
+                          exportToPDF('CN', {
+                            ...note,
+                            address: party.address,
+                            state: party.state,
+                            stateCode: party.stateCode,
+                            gstin: party.gstin
+                          });
+                        }} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={16} /></button>
                         <button onClick={() => handleEdit(note)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={16} /></button>
                         <button onClick={() => deleteItemSoftly('creditNotes', note.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }}><Trash2 size={16} /></button>
                       </div>
@@ -226,7 +243,31 @@ const CreditNotes = () => {
                   <input type="text" className="input-field" value={form.refInvoice} onChange={e => setForm({...form, refInvoice: e.target.value})} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label>Particulars / Reason *</label>
+                  <label>Ref Invoice Date</label>
+                  <input type="date" className="input-field" value={form.refInvoiceDate} onChange={e => setForm({...form, refInvoiceDate: e.target.value})} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Customer PO No.</label>
+                  <input type="text" className="input-field" value={form.poNo} onChange={e => setForm({...form, poNo: e.target.value})} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Reference</label>
+                  <input type="text" className="input-field" value={form.reference} onChange={e => setForm({...form, reference: e.target.value})} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Reason for Credit Note</label>
+                  <select className="input-field" value={form.reason} onChange={e => setForm({...form, reason: e.target.value})}>
+                    <option value="">-- Select Reason --</option>
+                    <option value="Sales Return">Sales Return</option>
+                    <option value="Rate Difference">Rate Difference</option>
+                    <option value="Discount">Discount</option>
+                    <option value="Excess Billing">Excess Billing</option>
+                    <option value="Material Rejection">Material Rejection</option>
+                    <option value="Others">Others</option>
+                  </select>
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Particulars / Other Reason *</label>
                   <textarea className="input-field" rows="1" required value={form.particulars} onChange={e => setForm({...form, particulars: e.target.value})} />
                 </div>
               </div>
