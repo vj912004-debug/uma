@@ -153,16 +153,18 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
     </tr>`).join('');
 
   const rightColHtml = `
-    <div style="background-color: var(--light-purple-bg); border-radius: 6px; padding: 6px 8px; border: 1.5px solid var(--border-purple); height: 100%; box-sizing: border-box;">
-        <div style="color: var(--primary-purple); font-weight: bold; font-size: 11px; text-align: center; border-bottom: 1.5px solid var(--border-purple); padding-bottom: 4px; margin-bottom: 6px;">REFERENCE DETAILS</div>
-        <table style="width: 100%; font-size: 10.5px; border-collapse: collapse; line-height: 1.4;">
-            <tr><td style="width: 18px; vertical-align: top;"><i class="bi bi-file-earmark-text" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; width: 110px; vertical-align: top;">${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} No.</td><td style="vertical-align: top;">: ${docNo}</td></tr>
-            <tr><td style="vertical-align: top;"><i class="bi bi-calendar3" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} Date</td><td style="vertical-align: top;">: ${docDate}</td></tr>
-            <tr><td style="vertical-align: top;"><i class="bi bi-file-earmark-text" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Original Invoice No.</td><td style="vertical-align: top;">: ${refInvoice}</td></tr>
-            <tr><td style="vertical-align: top;"><i class="bi bi-calendar3" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Original Invoice Date</td><td style="vertical-align: top;">: ${escHtml(formatPdfDateDmy(data.refInvoiceDate) || '')}</td></tr>
-            <tr><td style="vertical-align: top;"><i class="bi bi-person-badge" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Customer PO No.</td><td style="vertical-align: top;">: ${escHtml(data.poNo || 'Verbal')}</td></tr>
-            <tr><td style="vertical-align: top;"><i class="bi bi-tag" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Reference</td><td style="vertical-align: top;">: ${escHtml(data.reference || '')}</td></tr>
-        </table>
+    <div style="background-color: #fff; border-radius: 6px; border: 1.5px solid var(--border-purple); height: 100%; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column;">
+        <div style="background-color: var(--light-purple-bg); color: var(--primary-purple); font-weight: bold; font-size: 11px; text-align: center; border-bottom: 1.5px solid var(--border-purple); padding: 5px 8px;">REFERENCE DETAILS</div>
+        <div style="padding: 6px 8px; flex: 1;">
+            <table style="width: 100%; font-size: 10.5px; border-collapse: collapse; line-height: 1.4;">
+                <tr><td style="width: 18px; vertical-align: top;"><i class="bi bi-file-earmark-text" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; width: 115px; vertical-align: top;">${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} No.</td><td style="vertical-align: top;">: ${docNo}</td></tr>
+                <tr><td style="vertical-align: top;"><i class="bi bi-calendar3" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} Date</td><td style="vertical-align: top;">: ${docDate}</td></tr>
+                <tr><td style="vertical-align: top;"><i class="bi bi-file-earmark-text" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Original Invoice No.</td><td style="vertical-align: top;">: ${refInvoice}</td></tr>
+                <tr><td style="vertical-align: top;"><i class="bi bi-calendar3" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Original Invoice Date</td><td style="vertical-align: top;">: ${escHtml(formatPdfDateDmy(data.refInvoiceDate) || '')}</td></tr>
+                <tr><td style="vertical-align: top;"><i class="bi bi-person-badge" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Customer PO No.</td><td style="vertical-align: top;">: ${escHtml(data.poNo || 'Verbal')}</td></tr>
+                <tr><td style="vertical-align: top;"><i class="bi bi-tag" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Reference</td><td style="vertical-align: top;">: ${escHtml(data.reference || '')}</td></tr>
+            </table>
+        </div>
     </div>
   `;
 
@@ -294,9 +296,9 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
 
     <div class="bottom-summary-grid">
         ${filePrefix === 'DN' ? buildBankDetailsBox(profile) : `
-        <div class="bank-details-box" style="display: flex; flex-direction: column;">
+        <div class="bank-details-box">
             <div class="box-heading"><i class="bi bi-journal-text"></i> NOTES</div>
-            <ul style="padding-left: 24px; font-size: 11px; line-height: 1.8; margin-top: 4px; flex: 1;">
+            <ul style="padding-left: 20px; font-size: 11px; line-height: 1.5; margin-top: 8px;">
                 <li>Amount will be adjusted against the next invoice.</li>
                 <li>Please quote the ${escHtml(title)} Number for future reference.</li>
             </ul>
@@ -308,7 +310,7 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
                 <div class="charge-row"><span>Add : CGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span>₹ &nbsp;${fmtMoney(totalCgst)}</span></div>
                 <div class="charge-row"><span>Add : SGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span>₹ &nbsp;${fmtMoney(totalSgst)}</span></div>
                 <div class="charge-row"><span>Add : IGST @ 18%</span><span>${totalIgst > 0 ? `₹ &nbsp;${fmtMoney(totalIgst)}` : '-'}</span></div>
-                <div class="charge-row bold" style="border-top: 1px solid var(--grid-line-purple); padding-top:6px; margin-top: 2px;"><span>Total Tax Amount</span><span>₹ &nbsp;${fmtMoney(totalCgst + totalSgst + totalIgst)}</span></div>
+                <div class="charge-row" style="border-top: 1px solid var(--grid-line-purple); padding-top:6px; margin-top: 2px;"><span>Total Tax Amount</span><span>₹ &nbsp;${fmtMoney(totalCgst + totalSgst + totalIgst)}</span></div>
                 <div class="charge-row"><span>Round Off</span><span>₹ &nbsp;${fmtMoney(roundOff)}</span></div>
             </div>
             <div class="grand-total-banner">

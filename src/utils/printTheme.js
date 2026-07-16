@@ -463,11 +463,11 @@ export const buildBankDetailsBox = (profile) => `
 export const buildFooterTerms = (companyName, termsHtml, declarationHtml) => `
   <div class="footer-terms-container">
       <div class="terms-column">
-          <div class="box-heading" style="margin-bottom:4px; border:none;"><i class="bi bi-card-checklist"></i> TERMS & CONDITIONS</div>
+          <div class="box-heading" style="margin-bottom:4px; border:none; background:none; padding:0;"><i class="bi bi-card-checklist"></i> TERMS & CONDITIONS</div>
           ${termsHtml}
       </div>
       <div class="terms-column" style="border-left: 1px solid var(--border-purple); padding-left: 10px;">
-          <div class="box-heading" style="margin-bottom:4px; border:none;"><i class="bi bi-shield-check"></i> DECLARATION</div>
+          <div class="box-heading" style="margin-bottom:4px; border:none; background:none; padding:0;"><i class="bi bi-shield-check"></i> DECLARATION</div>
           ${declarationHtml}
       </div>
       <div class="terms-column">
