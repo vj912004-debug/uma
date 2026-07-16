@@ -4,6 +4,7 @@ import {
   IC,
   escHtml,
   getSharedPrintStyles,
+  PRINT_PAGE_W,
   buildPrintCompanyHeader,
   buildPrintTitle,
   buildDetailsGrid,
@@ -84,31 +85,14 @@ export const buildBprHtml = (data, profileInput) => {
 
   return `
 <style>${getSharedPrintStyles()}
-  .print-host { padding: 0; background: #fff; width: 850px; }
-  .pdf-page {
-    background: #fff;
-    width: 850px;
-    padding: 22px;
-    box-sizing: border-box;
-  }
-  .invoice-container {
-    background: #fff;
-    width: 100%;
-    border: 2px solid #333;
-    padding: 18px;
-    position: relative;
-    overflow: hidden;
-  }
   .bpr-section { border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; margin-bottom: 12px; }
-  .bpr-section .party-header { font-size: 11.5px; }
-  .bpr-body { padding: 8px 10px; }
+  .bpr-body { padding: 10px 12px; }
   .bpr-grid { width: 100%; border-collapse: collapse; }
-  .bpr-grid td { border: 1px solid var(--border-color); padding: 5px 6px; font-size: 11px; vertical-align: middle; }
+  .bpr-grid td { border: 1px solid var(--border-color); padding: 7px 8px; font-size: 12.5px; vertical-align: middle; }
   .bpr-grid td.lbl { color: var(--blue-dark); font-weight: bold; width: 28%; background: #f5f8fc; }
-  .checklist-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dotted #ccc; font-size: 11px; }
+  .checklist-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dotted #ccc; font-size: 12.5px; }
   .checklist-row:last-child { border-bottom: none; }
-  .title-wrapper { margin: 12px 0 14px; }
-  .items-table { margin-bottom: 12px; }
+  .footer-bottom { margin-top: auto; }
 </style>
 <div class="print-host">
   <div class="pdf-page">
@@ -282,6 +266,7 @@ export const renderBprPdf = async (data, { mode = 'save' } = {}) => {
     mode,
     filePrefix: 'BPR',
     docNo: data.bprNo || 'N/A',
-    width: 850
+    width: PRINT_PAGE_W,
+    fitPage: true
   });
 };

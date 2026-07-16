@@ -10,6 +10,7 @@ import {
   fmtMoney,
   fmtQty,
   getSharedPrintStyles,
+  PRINT_PAGE_W,
   buildPrintCompanyHeader,
   buildPrintTitle,
   buildDetailsGrid,
@@ -20,7 +21,7 @@ import {
 } from './printTheme';
 
 const NOTE_CHARGES = [...STANDARD_CHARGES_LIST, OTHER_CHARGE_ITEM];
-const NOTE_MIN_ROWS = 8;
+const NOTE_MIN_ROWS = 10;
 
 const calcNoteLines = (data) => {
   const taxRate = parseFloat(data.taxRate) || 18;
@@ -135,66 +136,68 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
     html: `
 <style>${getSharedPrintStyles()}</style>
 <div class="print-host">
-  <div class="invoice-container">
-    ${buildPrintCompanyHeader(profile, { showCopyBadge: true, copyBadgeHtml: 'ORIGINAL<br>DUPLICATE' })}
-    ${buildPrintTitle(title)}
-    ${buildDetailsGrid([
-      [`${filePrefix} No.`, docNo, 'Date', docDate],
-      ['Party Name', escHtml(data.partyName || ''), 'Ref. Invoice', refInvoice],
-      ['State', escHtml(profile.state || 'GUJARAT'), 'Code', '24'],
-      ['Tax Rate', `${parseFloat(data.taxRate) || 18}%`, 'Discount', fmtMoney(data.discount || 0)]
-    ])}
-    <div class="parties-wrapper">
-      <div class="party-box" style="flex:1;">
-        <div class="party-header">${IC.users} BILL TO PARTY</div>
-        <div class="party-body">
-          <div class="party-row"><div class="party-label">Name :</div><div class="dotted-line">${escHtml(data.partyName || '')}</div></div>
-          <div class="party-row"><div class="party-label">Address :</div><div class="dotted-line">&nbsp;</div></div>
-          <div class="party-row"><div class="party-label">GSTIN :</div><div class="dotted-line">&nbsp;</div></div>
+  <div class="pdf-page">
+    <div class="invoice-container">
+      ${buildPrintCompanyHeader(profile, { showCopyBadge: true, copyBadgeHtml: 'ORIGINAL<br>DUPLICATE' })}
+      ${buildPrintTitle(title)}
+      ${buildDetailsGrid([
+        [`${filePrefix} No.`, docNo, 'Date', docDate],
+        ['Party Name', escHtml(data.partyName || ''), 'Ref. Invoice', refInvoice],
+        ['State', escHtml(profile.state || 'GUJARAT'), 'Code', '24'],
+        ['Tax Rate', `${parseFloat(data.taxRate) || 18}%`, 'Discount', fmtMoney(data.discount || 0)]
+      ])}
+      <div class="parties-wrapper">
+        <div class="party-box" style="flex:1;">
+          <div class="party-header">${IC.users} BILL TO PARTY</div>
+          <div class="party-body">
+            <div class="party-row"><div class="party-label">Name :</div><div class="dotted-line">${escHtml(data.partyName || '')}</div></div>
+            <div class="party-row"><div class="party-label">Address :</div><div class="dotted-line">&nbsp;</div></div>
+            <div class="party-row"><div class="party-label">GSTIN :</div><div class="dotted-line">&nbsp;</div></div>
+          </div>
         </div>
       </div>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th rowspan="2" style="width:4%">S.<br>No.</th>
+            <th rowspan="2" style="width:26%">Description</th>
+            <th rowspan="2" style="width:5%">Qty</th>
+            <th rowspan="2" style="width:7%">Rate</th>
+            <th rowspan="2" style="width:8%">Amount</th>
+            <th colspan="2">SGST</th>
+            <th colspan="2">CGST</th>
+            <th colspan="2">IGST</th>
+            <th rowspan="2" style="width:8%">Total</th>
+          </tr>
+          <tr>
+            <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
+            <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
+            <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${bodyRows}${blanks}
+          <tr class="total-row">
+            <td colspan="2" class="total-label">TOTAL</td>
+            <td>${totalQty || 0}</td>
+            <td></td>
+            <td class="num">${fmtMoney(totalAmt)}</td>
+            <td></td>
+            <td class="num">${fmtMoney(totalSgst)}</td>
+            <td></td>
+            <td class="num">${fmtMoney(totalCgst)}</td>
+            <td></td>
+            <td class="num">${fmtMoney(totalIgst)}</td>
+            <td class="num">${fmtMoney(totalAll)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="footer-top">
+        ${buildBankDetailsBox(profile.companyName)}
+        ${buildSummaryTable({ totalAmt, totalSgst, totalCgst, totalIgst, totalAll })}
+      </div>
+      ${buildTermsSealSign(profile.companyName, terms)}
     </div>
-    <table class="items-table">
-      <thead>
-        <tr>
-          <th rowspan="2" style="width:4%">S.<br>No.</th>
-          <th rowspan="2" style="width:26%">Description</th>
-          <th rowspan="2" style="width:5%">Qty</th>
-          <th rowspan="2" style="width:7%">Rate</th>
-          <th rowspan="2" style="width:8%">Amount</th>
-          <th colspan="2">SGST</th>
-          <th colspan="2">CGST</th>
-          <th colspan="2">IGST</th>
-          <th rowspan="2" style="width:8%">Total</th>
-        </tr>
-        <tr>
-          <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
-          <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
-          <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${bodyRows}${blanks}
-        <tr class="total-row">
-          <td colspan="2" class="total-label">TOTAL</td>
-          <td>${totalQty || 0}</td>
-          <td></td>
-          <td class="num">${fmtMoney(totalAmt)}</td>
-          <td></td>
-          <td class="num">${fmtMoney(totalSgst)}</td>
-          <td></td>
-          <td class="num">${fmtMoney(totalCgst)}</td>
-          <td></td>
-          <td class="num">${fmtMoney(totalIgst)}</td>
-          <td class="num">${fmtMoney(totalAll)}</td>
-        </tr>
-      </tbody>
-    </table>
-    <div class="footer-top">
-      ${buildBankDetailsBox(profile.companyName)}
-      ${buildSummaryTable({ totalAmt, totalSgst, totalCgst, totalIgst, totalAll })}
-    </div>
-    ${buildTermsSealSign(profile.companyName, terms)}
   </div>
 </div>`,
     docNo: data.noteNo || 'N/A'
@@ -203,10 +206,10 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
 
 export const renderDebitNotePdf = async (data, { mode = 'save' } = {}) => {
   const { html, docNo } = buildNoteHtml(data, data.companyProfile, { title: 'DEBIT NOTE', filePrefix: 'DN' });
-  await renderHtmlToPdf(html, { mode, filePrefix: 'DN', docNo, width: 850 });
+  await renderHtmlToPdf(html, { mode, filePrefix: 'DN', docNo, width: PRINT_PAGE_W, fitPage: true });
 };
 
 export const renderCreditNotePdf = async (data, { mode = 'save' } = {}) => {
   const { html, docNo } = buildNoteHtml(data, data.companyProfile, { title: 'CREDIT NOTE', filePrefix: 'CN' });
-  await renderHtmlToPdf(html, { mode, filePrefix: 'CN', docNo, width: 850 });
+  await renderHtmlToPdf(html, { mode, filePrefix: 'CN', docNo, width: PRINT_PAGE_W, fitPage: true });
 };

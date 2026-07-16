@@ -11,6 +11,7 @@ import {
   fmtMoney,
   fmtQty,
   getSharedPrintStyles,
+  PRINT_PAGE_W,
   buildPrintCompanyHeader,
   buildPrintTitle,
   buildDetailsGrid,
@@ -117,57 +118,59 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   return `
 <style>${getSharedPrintStyles()}</style>
 <div class="print-host">
-  <div class="invoice-container">
-    ${buildPrintCompanyHeader(profile, { showCopyBadge: true })}
-    ${buildPrintTitle('TAX INVOICE')}
-    ${buildDetailsGrid([
-      ['Invoice No.', docNo, 'Invoice Date', docDate],
-      ['Delivery Challan No.', dcNo, 'Date', dcDate],
-      ['State', companyState, 'PO No./Challan No.', refNo],
-      ['Code', '24', 'Date', refDate]
-    ])}
-    <div class="parties-wrapper">
-      ${buildPartyBox('BILL TO PARTY', IC.users, {
-        name: data.partyName,
-        addressLines: billAddr.slice(0, 3),
-        state: data.billState || data.state,
-        stateCode: data.billStateCode || data.stateCode,
-        gstin: data.gstinBill || data.gstin
-      })}
-      ${buildPartyBox('SHIP TO PARTY', IC.truck, {
-        name: data.shipName || data.partyName,
-        addressLines: shipAddr.slice(0, 3),
-        state: data.shipState || data.state,
-        stateCode: data.shipStateCode || data.stateCode,
-        gstin: data.gstinShip || data.gstin
-      })}
+  <div class="pdf-page">
+    <div class="invoice-container">
+      ${buildPrintCompanyHeader(profile, { showCopyBadge: true })}
+      ${buildPrintTitle('TAX INVOICE')}
+      ${buildDetailsGrid([
+        ['Invoice No.', docNo, 'Invoice Date', docDate],
+        ['Delivery Challan No.', dcNo, 'Date', dcDate],
+        ['State', companyState, 'PO No./Challan No.', refNo],
+        ['Code', '24', 'Date', refDate]
+      ])}
+      <div class="parties-wrapper">
+        ${buildPartyBox('BILL TO PARTY', IC.users, {
+          name: data.partyName,
+          addressLines: billAddr.slice(0, 3),
+          state: data.billState || data.state,
+          stateCode: data.billStateCode || data.stateCode,
+          gstin: data.gstinBill || data.gstin
+        })}
+        ${buildPartyBox('SHIP TO PARTY', IC.truck, {
+          name: data.shipName || data.partyName,
+          addressLines: shipAddr.slice(0, 3),
+          state: data.shipState || data.state,
+          stateCode: data.shipStateCode || data.stateCode,
+          gstin: data.gstinShip || data.gstin
+        })}
+      </div>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th rowspan="2" style="width:4%">S.<br>No.</th>
+            <th rowspan="2" style="width:26%">Description</th>
+            <th rowspan="2" style="width:5%">Qty</th>
+            <th rowspan="2" style="width:7%">Rate</th>
+            <th rowspan="2" style="width:8%">Amount</th>
+            <th colspan="2">SGST</th>
+            <th colspan="2">CGST</th>
+            <th colspan="2">IGST</th>
+            <th rowspan="2" style="width:8%">Total</th>
+          </tr>
+          <tr>
+            <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
+            <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
+            <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+      <div class="footer-top">
+        ${buildBankDetailsBox(profile.companyName)}
+        ${buildSummaryTable(totals)}
+      </div>
+      ${buildTermsSealSign(profile.companyName, terms)}
     </div>
-    <table class="items-table">
-      <thead>
-        <tr>
-          <th rowspan="2" style="width:4%">S.<br>No.</th>
-          <th rowspan="2" style="width:26%">Description</th>
-          <th rowspan="2" style="width:5%">Qty</th>
-          <th rowspan="2" style="width:7%">Rate</th>
-          <th rowspan="2" style="width:8%">Amount</th>
-          <th colspan="2">SGST</th>
-          <th colspan="2">CGST</th>
-          <th colspan="2">IGST</th>
-          <th rowspan="2" style="width:8%">Total</th>
-        </tr>
-        <tr>
-          <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
-          <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
-          <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
-        </tr>
-      </thead>
-      <tbody>${rowsHtml}</tbody>
-    </table>
-    <div class="footer-top">
-      ${buildBankDetailsBox(profile.companyName)}
-      ${buildSummaryTable(totals)}
-    </div>
-    ${buildTermsSealSign(profile.companyName, terms)}
   </div>
 </div>`;
 };
@@ -178,6 +181,7 @@ export const renderTaxInvoicePdf = async (data, { mode = 'save' } = {}) => {
     mode,
     filePrefix: 'TI',
     docNo: data.invoiceNo || 'N/A',
-    width: 850
+    width: PRINT_PAGE_W,
+    fitPage: true
   });
 };
