@@ -479,11 +479,11 @@ export const buildFooterTerms = (companyName, termsHtml, declarationHtml) => `
       </div>
   </div>`;
 
-export const buildStatusBar = (pageText = 'Page 1 of 1') => `
+export const buildStatusBar = (pageText = 'Page 1 of 1', customText = 'This is a computer generated document.') => `
   <div class="bottom-status-bar">
       <span>Thank you for your business!</span>
       <span>E. & O.E.</span>
-      <span>This is a computer generated document.</span>
+      <span>${escHtml(customText)}</span>
       <span>${escHtml(pageText)}</span>
   </div>`;
 

@@ -141,7 +141,7 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
       <td>${fmtMoney(r.amt)}</td>
       <td>${fmtMoney(r.cgstAmt)}</td>
       <td>${fmtMoney(r.sgstAmt)}</td>
-      <td>-</td>
+      <td class="center">-</td>
       <td>${fmtMoney(r.rowTotal)}</td>
     </tr>`;
   }).join('');
@@ -149,14 +149,14 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
   const blanks = Array.from({ length: Math.max(0, NOTE_MIN_ROWS - rows.length) }, () => `
     <tr class="filler-row">
       <td></td><td></td><td></td><td></td><td></td>
-      <td></td><td></td><td></td><td></td><td></td>
+      <td></td><td></td><td></td><td class="center">-</td><td>-</td>
     </tr>`).join('');
 
   const rightColHtml = `
     <div style="background-color: var(--light-purple-bg); border-radius: 6px; padding: 6px; border: 1px solid var(--border-purple);">
         <div style="color: var(--primary-purple); font-weight: bold; font-size: 11px; text-align: center; border-bottom: 1px solid var(--border-purple); padding-bottom: 4px; margin-bottom: 6px;">REFERENCE DETAILS</div>
-        <div class="data-row"><div class="data-label"><i class="bi bi-file-earmark-text"></i> ${title} No.</div><div class="data-value">: &nbsp;${docNo}</div></div>
-        <div class="data-row"><div class="data-label"><i class="bi bi-calendar3"></i> ${title} Date</div><div class="data-value">: &nbsp;${docDate}</div></div>
+        <div class="data-row"><div class="data-label"><i class="bi bi-file-earmark-text"></i> ${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} No.</div><div class="data-value">: &nbsp;${docNo}</div></div>
+        <div class="data-row"><div class="data-label"><i class="bi bi-calendar3"></i> ${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} Date</div><div class="data-value">: &nbsp;${docDate}</div></div>
         <div class="data-row" style="margin-top: 5px;"><div class="data-label"><i class="bi bi-file-earmark-text"></i> Original Invoice No.</div><div class="data-value">: &nbsp;${refInvoice}</div></div>
         <div class="data-row"><div class="data-label"><i class="bi bi-calendar3"></i> Original Invoice Date</div><div class="data-value">: &nbsp;${escHtml(formatPdfDateDmy(data.refInvoiceDate) || '')}</div></div>
         <div class="data-row" style="margin-top: 5px;"><div class="data-label"><i class="bi bi-file-earmark-text"></i> Customer PO No.</div><div class="data-value">: &nbsp;${escHtml(data.poNo || 'Verbal')}</div></div>
@@ -183,12 +183,12 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
             <i class="bi bi-card-text"></i> REASON FOR ${filePrefix === 'CN' ? 'CREDIT' : 'DEBIT'} NOTE
         </div>
         <div style="display: flex; gap: 15px; flex: 1;">
-            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Sales Return' ? 'checked' : ''} disabled> Sales Return</label>
-            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Rate Difference' ? 'checked' : ''} disabled> Rate Difference</label>
-            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Discount' ? 'checked' : ''} disabled> Discount</label>
-            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Excess Billing' ? 'checked' : ''} disabled> Excess Billing</label>
-            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Material Rejection' ? 'checked' : ''} disabled> Material Rejection</label>
-            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${!['Sales Return', 'Rate Difference', 'Discount', 'Excess Billing', 'Material Rejection'].includes(data.reason) && data.reason ? 'checked' : ''} disabled> Others <span style="border-bottom: 1px solid #000; display: inline-block; width: 60px;">${!['Sales Return', 'Rate Difference', 'Discount', 'Excess Billing', 'Material Rejection'].includes(data.reason) && data.reason ? escHtml(data.reason) : ''}</span></label>
+            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Sales Return' ? 'checked="checked"' : ''}> Sales Return</label>
+            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Rate Difference' ? 'checked="checked"' : ''}> Rate Difference</label>
+            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Discount' ? 'checked="checked"' : ''}> Discount</label>
+            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Excess Billing' ? 'checked="checked"' : ''}> Excess Billing</label>
+            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Material Rejection' ? 'checked="checked"' : ''}> Material Rejection</label>
+            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${!['Sales Return', 'Rate Difference', 'Discount', 'Excess Billing', 'Material Rejection'].includes(data.reason) && data.reason ? 'checked="checked"' : ''}> Others <span style="border-bottom: 1px solid #000; display: inline-block; width: 60px;">${!['Sales Return', 'Rate Difference', 'Discount', 'Excess Billing', 'Material Rejection'].includes(data.reason) && data.reason ? escHtml(data.reason) : ''}</span></label>
         </div>
     </div>
   `;
@@ -267,7 +267,7 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
                     <td>${fmtMoney(totalAmt)}</td>
                     <td>${fmtMoney(totalCgst)}</td>
                     <td>${fmtMoney(totalSgst)}</td>
-                    <td>-</td>
+                    <td class="center">-</td>
                     <td>${fmtMoney(totalAll)}</td>
                 </tr>
             </tbody>
@@ -299,7 +299,7 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
     </div>
 
     ${buildFooterTerms(profile.companyName, termsHtml, declarationHtml)}
-    ${buildStatusBar(`This is a computer generated ${title.toLowerCase()}.`)}
+    ${buildStatusBar('Page 1 of 1', `This is a computer generated ${title.toLowerCase()}.`)}
 
 </div>
 </div>
