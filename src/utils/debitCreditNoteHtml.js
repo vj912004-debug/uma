@@ -225,7 +225,10 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
     <style>
         ${getSharedPrintStyles()}
         .meta-col.border-left { border-left: none !important; padding-left: 0 !important; }
-        .meta-strip { grid-template-columns: 1.2fr 0.8fr 1.2fr; align-items: stretch; }
+        .meta-strip { align-items: stretch; }
+        .meta-strip > .meta-col:nth-child(1) { flex: 1.2; }
+        .meta-strip > .meta-col:nth-child(2) { flex: 0.8; }
+        .meta-strip > .meta-col:nth-child(3) { flex: 1.2; }
         .watermark {
             position: absolute;
             top: 50%;

@@ -139,12 +139,12 @@ export const buildQuotationHtml = (data, profileInput) => {
             border-right: 1px solid var(--border-purple);
         }
         .qtn-terms-grid {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
+            display: flex;
             gap: 8px;
             margin-bottom: 12px;
         }
         .qtn-term-box {
+            flex: 1;
             border: 1px solid var(--border-purple);
             border-radius: 4px;
             padding: 8px 6px;
@@ -371,10 +371,10 @@ export const buildQuotationHtml = (data, profileInput) => {
     <div style="flex: 1; display: flex; flex-direction: column; gap: 15px; margin-top: 10px;">
         
         <!-- Top Row: 3 Columns -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+        <div style="display: flex; gap: 15px;">
             
             <!-- Col 1 -->
-            <div style="display: flex; flex-direction: column; gap: 15px;">
+            <div style="display: flex; flex-direction: column; gap: 15px; flex: 1;">
                 <div class="qtn-box">
                     <div class="qtn-box-header"><i class="bi bi-file-earmark-text"></i> TERMS & CONDITIONS</div>
                     <div class="qtn-box-body">
@@ -404,7 +404,7 @@ export const buildQuotationHtml = (data, profileInput) => {
             </div>
 
             <!-- Col 2 -->
-            <div class="qtn-box">
+            <div class="qtn-box" style="flex: 1;">
                 <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-gear"></i> MATERIAL & PROCESS CONDITIONS</div>
                 <div class="qtn-box-body">
                     <ul style="padding-left: 15px; margin: 0; font-size: 10px;">
@@ -416,7 +416,7 @@ export const buildQuotationHtml = (data, profileInput) => {
             </div>
 
             <!-- Col 3 -->
-            <div class="qtn-box">
+            <div class="qtn-box" style="flex: 1;">
                 <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-person-check"></i> CUSTOMER RESPONSIBILITIES</div>
                 <div class="qtn-box-body">
                     <ol style="padding-left: 15px; margin: 0; font-size: 10px;">
@@ -429,10 +429,10 @@ export const buildQuotationHtml = (data, profileInput) => {
         </div>
 
         <!-- Bottom Row: 2 Columns -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+        <div style="display: flex; gap: 15px;">
             
             <!-- Col 1 -->
-            <div class="qtn-box">
+            <div class="qtn-box" style="flex: 1;">
                 <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-journal-text"></i> IMPORTANT NOTES</div>
                 <div class="qtn-box-body">
                     <ul style="padding-left: 15px; margin: 0; font-size: 10px;">
@@ -444,7 +444,7 @@ export const buildQuotationHtml = (data, profileInput) => {
             </div>
 
             <!-- Col 2 -->
-            <div class="qtn-box" style="display: flex; flex-direction: column;">
+            <div class="qtn-box" style="display: flex; flex-direction: column; flex: 1;">
                 <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-shield-check"></i> DECLARATION</div>
                 <div class="qtn-box-body" style="flex: 1; display: flex; flex-direction: column;">
                     <div style="font-size: 10px; margin-bottom: 30px;">
@@ -475,10 +475,10 @@ export const buildQuotationHtml = (data, profileInput) => {
     <div style="flex: 1; display: flex; flex-direction: column; gap: 15px; margin-top: 10px;">
         
         <!-- Top Row: 3 Columns -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+        <div style="display: flex; gap: 15px;">
             
             <!-- Col 1 -->
-            <div style="display: flex; flex-direction: column; gap: 15px;">
+            <div style="display: flex; flex-direction: column; gap: 15px; flex: 1;">
                 <div class="qtn-box">
                     <div class="qtn-box-header"><i class="bi bi-file-earmark-text"></i> TERMS & CONDITIONS</div>
                     <div class="qtn-box-body">
@@ -508,7 +508,7 @@ export const buildQuotationHtml = (data, profileInput) => {
             </div>
 
             <!-- Col 2 -->
-            <div class="qtn-box">
+            <div class="qtn-box" style="flex: 1;">
                 <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-gear"></i> MATERIAL & PROCESS CONDITIONS</div>
                 <div class="qtn-box-body">
                     <ul style="padding-left: 15px; margin: 0; font-size: 10px;">
@@ -520,7 +520,7 @@ export const buildQuotationHtml = (data, profileInput) => {
             </div>
 
             <!-- Col 3 -->
-            <div class="qtn-box">
+            <div class="qtn-box" style="flex: 1;">
                 <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-person-check"></i> CUSTOMER RESPONSIBILITIES</div>
                 <div class="qtn-box-body">
                     <ol style="padding-left: 15px; margin: 0; font-size: 10px;">
@@ -533,10 +533,10 @@ export const buildQuotationHtml = (data, profileInput) => {
         </div>
 
         <!-- Bottom Row: 2 Columns -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+        <div style="display: flex; gap: 15px;">
             
             <!-- Col 1 -->
-            <div class="qtn-box">
+            <div class="qtn-box" style="flex: 1;">
                 <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-journal-text"></i> IMPORTANT NOTES</div>
                 <div class="qtn-box-body">
                     <ul style="padding-left: 15px; margin: 0; font-size: 10px;">
@@ -548,7 +548,7 @@ export const buildQuotationHtml = (data, profileInput) => {
             </div>
 
             <!-- Col 2 -->
-            <div class="qtn-box" style="display: flex; flex-direction: column;">
+            <div class="qtn-box" style="display: flex; flex-direction: column; flex: 1;">
                 <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-shield-check"></i> DECLARATION</div>
                 <div class="qtn-box-body" style="flex: 1; display: flex; flex-direction: column;">
                     <div style="font-size: 10px; margin-bottom: 30px;">

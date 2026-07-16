@@ -111,11 +111,11 @@ export const buildBprHtml = (data, profileInput) => {
         .checklist-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dotted var(--border-purple); font-size: 11px; }
         .checklist-row:last-child { border-bottom: none; }
         .bpr-meta-grid {
-            display: grid; grid-template-columns: 18% 32% 18% 32%;
+            display: flex; flex-wrap: wrap;
             border: 1.5px solid var(--border-purple); border-radius: 6px; overflow: hidden; margin-bottom: 12px;
         }
-        .bpr-meta-item { padding: 6px 10px; border-right: 1px solid var(--border-purple); border-bottom: 1px solid var(--border-purple); display: flex; align-items: center; font-size: 11px; }
-        .bpr-meta-item.label { color: var(--primary-purple); font-weight: bold; background: var(--light-purple-bg); }
+        .bpr-meta-item { padding: 6px 10px; border-right: 1px solid var(--border-purple); border-bottom: 1px solid var(--border-purple); display: flex; align-items: center; font-size: 11px; width: 32%; box-sizing: border-box; }
+        .bpr-meta-item.label { color: var(--primary-purple); font-weight: bold; background: var(--light-purple-bg); width: 18%; }
         .bpr-meta-grid .bpr-meta-item:nth-child(4n) { border-right: none; }
         .bpr-meta-grid .bpr-meta-item:nth-last-child(-n+4) { border-bottom: none; }
         .footer-bottom { display: flex; gap: 12px; margin-top: auto; }

@@ -89,11 +89,12 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     <style>
         ${getSharedPrintStyles()}
         .dc-footer-grid {
-            display: grid;
-            grid-template-columns: 1.15fr 0.85fr;
+            display: flex;
             gap: 12px;
             margin-top: 10px;
         }
+        .dc-footer-grid > div:nth-child(1) { flex: 1.15; }
+        .dc-footer-grid > div:nth-child(2) { flex: 0.85; }
         .dc-meta-card {
             border: 1.5px solid var(--border-purple);
             border-radius: 6px;

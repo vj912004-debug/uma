@@ -138,12 +138,14 @@ export const getSharedPrintStyles = () => `
 
   /* Vendor and Document Info Metadata Strip */
   .meta-strip {
-      display: grid;
-      grid-template-columns: 1.15fr 0.85fr 1fr;
+      display: flex;
       gap: 10px;
       padding: 8px 0;
       border-bottom: 1.5px solid var(--primary-purple);
   }
+  .meta-strip > .meta-col:nth-child(1) { flex: 1.15; }
+  .meta-strip > .meta-col:nth-child(2) { flex: 0.85; }
+  .meta-strip > .meta-col:nth-child(3) { flex: 1; }
 
   .meta-col {
       display: flex;
@@ -185,13 +187,13 @@ export const getSharedPrintStyles = () => `
 
   /* Bill To / Ship To Cards Layout */
   .billing-container {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      display: flex;
       gap: 12px;
       margin-top: 8px;
   }
 
   .bill-card {
+      flex: 1;
       border: 1.5px solid var(--border-purple);
       border-radius: 6px;
       overflow: hidden;
@@ -236,6 +238,9 @@ export const getSharedPrintStyles = () => `
   .table-container {
       margin-top: 10px;
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
   }
 
   .invoice-table {
@@ -280,11 +285,12 @@ export const getSharedPrintStyles = () => `
 
   /* Bottom Financial Summary Breakdown blocks */
   .bottom-summary-grid {
-      display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
+      display: flex;
       gap: 12px;
       margin-top: 10px;
   }
+  .bottom-summary-grid > div:nth-child(1) { flex: 1.15; }
+  .bottom-summary-grid > div:nth-child(2) { flex: 0.85; }
 
   .bank-details-box {
       border: 1.5px solid var(--border-purple);
@@ -335,14 +341,16 @@ export const getSharedPrintStyles = () => `
 
   /* Footer Conditions and Sign-off Area */
   .footer-terms-container {
-      display: grid;
-      grid-template-columns: 1.1fr 0.9fr 1fr;
+      display: flex;
       gap: 12px;
       border: 1.5px solid var(--border-purple);
       border-radius: 6px;
       margin-top: 10px;
       padding: 8px;
   }
+  .footer-terms-container > .terms-column:nth-child(1) { flex: 1.1; }
+  .footer-terms-container > .terms-column:nth-child(2) { flex: 0.9; }
+  .footer-terms-container > .terms-column:nth-child(3) { flex: 1; }
 
   .terms-column {
       font-size: 10px;
