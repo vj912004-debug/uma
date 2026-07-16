@@ -61,9 +61,10 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
         <td class="center">${cellQty(line.qty)}</td>
       </tr>`);
   });
-  while (bodyRows.length < DC_MIN_ROWS) {
+  const blanksCount = Math.max(0, DC_MIN_ROWS - bodyRows.length);
+  for (let i = 0; i < blanksCount; i++) {
     bodyRows.push(`
-      <tr class="filler-row">
+      <tr class="filler-row"${i === blanksCount - 1 ? ' style="height: 100%;"' : ''}>
         <td></td><td></td><td></td><td></td>
       </tr>`);
   }

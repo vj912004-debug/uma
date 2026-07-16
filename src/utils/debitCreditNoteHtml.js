@@ -146,8 +146,9 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
     </tr>`;
   }).join('');
 
-  const blanks = Array.from({ length: Math.max(0, NOTE_MIN_ROWS - rows.length) }, () => `
-    <tr class="filler-row">
+  const blanksCount = Math.max(0, NOTE_MIN_ROWS - rows.length);
+  const blanks = Array.from({ length: blanksCount }, (_, i) => `
+    <tr class="filler-row"${i === blanksCount - 1 ? ' style="height: 100%;"' : ''}>
       <td></td><td></td><td></td><td></td><td></td>
       <td></td><td></td><td></td><td class="center">-</td><td>-</td>
     </tr>`).join('');

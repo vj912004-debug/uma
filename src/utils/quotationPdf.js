@@ -228,59 +228,61 @@ export const buildQuotationHtml = (data, profileInput) => {
     <div style="display: flex; gap: 15px; flex: 1;">
         
         <!-- Left Sidebar (30%) -->
-        <div style="width: 30%; display: flex; flex-direction: column; gap: 12px;">
+        <div style="width: 30%; display: flex; flex-direction: column; justify-content: space-between;">
             
-            <!-- PREPARED FOR -->
-            <div class="qtn-box">
-                <div class="qtn-box-header"><i class="bi bi-person-circle"></i> PREPARED FOR</div>
-                <div class="qtn-box-body">
-                    <div style="font-weight: bold; font-size: 12px; color: var(--primary-purple); margin-bottom: 8px;">${escHtml(data.partyName)}</div>
-                    <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-                        <i class="bi bi-geo-alt-fill" style="color: var(--primary-purple); margin-top: 2px;"></i>
-                        <div>${splitAddress(data.partyAddress)}</div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- PREPARED FOR -->
+                <div class="qtn-box">
+                    <div class="qtn-box-header"><i class="bi bi-person-circle"></i> PREPARED FOR</div>
+                    <div class="qtn-box-body">
+                        <div style="font-weight: bold; font-size: 12px; color: var(--primary-purple); margin-bottom: 8px;">${escHtml(data.partyName)}</div>
+                        <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                            <i class="bi bi-geo-alt-fill" style="color: var(--primary-purple); margin-top: 2px;"></i>
+                            <div>${splitAddress(data.partyAddress)}</div>
+                        </div>
+                        <table style="width: 100%; font-size: 10px; line-height: 1.6;">
+                            <tr><td style="font-weight: bold; width: 80px;">GSTIN</td><td>: ${escHtml(data.gstNumber || '')}</td></tr>
+                            <tr><td style="font-weight: bold;">Contact Person</td><td>: ${escHtml(data.contactPerson || '')}</td></tr>
+                            <tr><td style="font-weight: bold;">Mobile</td><td>: ${escHtml(data.mobile || '')}</td></tr>
+                            <tr><td style="font-weight: bold;">Email</td><td>: ${escHtml(data.email || '')}</td></tr>
+                        </table>
                     </div>
-                    <table style="width: 100%; font-size: 10px; line-height: 1.6;">
-                        <tr><td style="font-weight: bold; width: 80px;">GSTIN</td><td>: ${escHtml(data.gstNumber || '')}</td></tr>
-                        <tr><td style="font-weight: bold;">Contact Person</td><td>: ${escHtml(data.contactPerson || '')}</td></tr>
-                        <tr><td style="font-weight: bold;">Mobile</td><td>: ${escHtml(data.mobile || '')}</td></tr>
-                        <tr><td style="font-weight: bold;">Email</td><td>: ${escHtml(data.email || '')}</td></tr>
-                    </table>
                 </div>
-            </div>
 
-            <!-- WHY UMA MICRON -->
-            <div class="qtn-box outline-only">
-                <div class="qtn-box-header" style="background-color: var(--light-purple-bg); justify-content: center;">WHY UMA MICRON?</div>
-                <div class="qtn-box-body" style="padding: 15px 10px;">
-                    <div class="sidebar-icon-row">
-                        <div class="sidebar-icon"><i class="bi bi-shield-check"></i></div>
-                        <div class="sidebar-text">cGMP<br>Compliant Facility</div>
-                    </div>
-                    <div class="sidebar-icon-row">
-                        <div class="sidebar-icon"><i class="bi bi-diagram-3"></i></div>
-                        <div class="sidebar-text">Contract<br>Micronization</div>
-                    </div>
-                    <div class="sidebar-icon-row">
-                        <div class="sidebar-icon"><i class="bi bi-bar-chart-fill"></i></div>
-                        <div class="sidebar-text">PSD<br>Development</div>
-                    </div>
-                    <div class="sidebar-icon-row">
-                        <div class="sidebar-icon"><i class="bi bi-gear-fill"></i></div>
-                        <div class="sidebar-text">Jet Milling<br>Technology</div>
-                    </div>
-                    <div class="sidebar-icon-row">
-                        <div class="sidebar-icon"><i class="bi bi-award-fill"></i></div>
-                        <div class="sidebar-text">Quality<br>Assurance</div>
-                    </div>
-                    <div class="sidebar-icon-row" style="margin-bottom: 0;">
-                        <div class="sidebar-icon"><i class="bi bi-building"></i></div>
-                        <div class="sidebar-text">Spacious<br>Warehouse</div>
+                <!-- WHY UMA MICRON -->
+                <div class="qtn-box outline-only">
+                    <div class="qtn-box-header" style="background-color: var(--light-purple-bg); justify-content: center;">WHY UMA MICRON?</div>
+                    <div class="qtn-box-body" style="padding: 15px 10px;">
+                        <div class="sidebar-icon-row">
+                            <div class="sidebar-icon"><i class="bi bi-shield-check"></i></div>
+                            <div class="sidebar-text">cGMP<br>Compliant Facility</div>
+                        </div>
+                        <div class="sidebar-icon-row">
+                            <div class="sidebar-icon"><i class="bi bi-diagram-3"></i></div>
+                            <div class="sidebar-text">Contract<br>Micronization</div>
+                        </div>
+                        <div class="sidebar-icon-row">
+                            <div class="sidebar-icon"><i class="bi bi-bar-chart-fill"></i></div>
+                            <div class="sidebar-text">PSD<br>Development</div>
+                        </div>
+                        <div class="sidebar-icon-row">
+                            <div class="sidebar-icon"><i class="bi bi-gear-fill"></i></div>
+                            <div class="sidebar-text">Jet Milling<br>Technology</div>
+                        </div>
+                        <div class="sidebar-icon-row">
+                            <div class="sidebar-icon"><i class="bi bi-award-fill"></i></div>
+                            <div class="sidebar-text">Quality<br>Assurance</div>
+                        </div>
+                        <div class="sidebar-icon-row" style="margin-bottom: 0;">
+                            <div class="sidebar-icon"><i class="bi bi-building"></i></div>
+                            <div class="sidebar-text">Spacious<br>Warehouse</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Stamp -->
-            <div style="display: flex; justify-content: center; margin-top: auto; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: center; margin-bottom: 20px;">
                 <div style="width: 90px; height: 90px; border: 1.5px solid var(--primary-purple); border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative;">
                     <div style="position: absolute; width: 80px; height: 80px; border: 1px solid var(--primary-purple); border-radius: 50%;"></div>
                     <div style="text-align: center; color: var(--primary-purple); font-size: 10px; font-weight: bold; line-height: 1.2;">
@@ -292,109 +294,111 @@ export const buildQuotationHtml = (data, profileInput) => {
         </div>
 
         <!-- Right Content (70%) -->
-        <div style="width: 70%; display: flex; flex-direction: column; gap: 12px;">
+        <div style="width: 70%; display: flex; flex-direction: column; justify-content: space-between;">
             
-            <!-- QUOTATION DETAILS -->
-            <div class="qtn-box" style="position: relative;">
-                <div class="qtn-box-header"><i class="bi bi-file-earmark-text"></i> QUOTATION DETAILS</div>
-                <div class="qtn-box-body">
-                    <table style="width: calc(100% - 80px); font-size: 10.5px; line-height: 1.8;">
-                        <tr><td style="width: 25px;"><i class="bi bi-file-earmark-text" style="color: var(--primary-purple); font-size: 14px;"></i></td><td style="font-weight: bold; width: 100px;">Quotation No.</td><td>: ${qtnNo}</td></tr>
-                        <tr><td><i class="bi bi-calendar3" style="color: var(--primary-purple); font-size: 14px;"></i></td><td style="font-weight: bold;">Quotation Date</td><td>: ${qtnDate}</td></tr>
-                        <tr><td><i class="bi bi-clock" style="color: var(--primary-purple); font-size: 14px;"></i></td><td style="font-weight: bold;">Validity</td><td>: ${validityDate}</td></tr>
-                        <tr><td><i class="bi bi-person" style="color: var(--primary-purple); font-size: 14px;"></i></td><td style="font-weight: bold;">Contact Person</td><td>: ${escHtml(data.signatoryName || 'Amit Patel')}</td></tr>
-                        <tr><td><i class="bi bi-telephone" style="color: var(--primary-purple); font-size: 14px;"></i></td><td style="font-weight: bold;">Mobile</td><td>: ${escHtml(profile.phone || '+91 97120 00297')}</td></tr>
-                        <tr><td><i class="bi bi-envelope" style="color: var(--primary-purple); font-size: 14px;"></i></td><td style="font-weight: bold;">Email</td><td>: ${escHtml(profile.email || 'info@umamicron.com')}</td></tr>
-                    </table>
-                </div>
-                <!-- 30 DAYS Badge -->
-                <div style="position: absolute; right: 20px; top: 35px; text-align: center;">
-                    <div style="width: 65px; height: 65px; background-color: var(--primary-purple); border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; border: 2px solid white; outline: 2px solid var(--primary-purple); box-shadow: 0 0 0 3px white, 0 0 0 4px var(--primary-purple);">
-                        <i class="bi bi-star-fill" style="font-size: 8px; margin-bottom: 2px;"></i>
-                        <div style="font-size: 8px;">VALID FOR</div>
-                        <div style="font-size: 12px; font-weight: bold;">30 DAYS</div>
-                        <div style="font-size: 8px; margin-top: 2px;">★ ★ ★</div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- QUOTATION DETAILS -->
+                <div class="qtn-box" style="position: relative;">
+                    <div class="qtn-box-header"><i class="bi bi-file-earmark-text"></i> QUOTATION DETAILS</div>
+                    <div class="qtn-box-body">
+                        <table style="width: calc(100% - 80px); font-size: 10.5px; line-height: 1.8;">
+                            <tr><td style="width: 25px;"><i class="bi bi-file-earmark-text" style="color: var(--primary-purple); font-size: 14px;"></i></td><td style="font-weight: bold; width: 100px;">Quotation No.</td><td>: ${qtnNo}</td></tr>
+                            <tr><td><i class="bi bi-calendar3" style="color: var(--primary-purple); font-size: 14px;"></i></td><td style="font-weight: bold;">Quotation Date</td><td>: ${qtnDate}</td></tr>
+                            <tr><td><i class="bi bi-clock" style="color: var(--primary-purple); font-size: 14px;"></i></td><td style="font-weight: bold;">Validity</td><td>: ${validityDate}</td></tr>
+                            <tr><td><i class="bi bi-person" style="color: var(--primary-purple); font-size: 14px;"></i></td><td style="font-weight: bold;">Contact Person</td><td>: ${escHtml(data.signatoryName || 'Amit Patel')}</td></tr>
+                            <tr><td><i class="bi bi-telephone" style="color: var(--primary-purple); font-size: 14px;"></i></td><td style="font-weight: bold;">Mobile</td><td>: ${escHtml(profile.phone || '+91 97120 00297')}</td></tr>
+                            <tr><td><i class="bi bi-envelope" style="color: var(--primary-purple); font-size: 14px;"></i></td><td style="font-weight: bold;">Email</td><td>: ${escHtml(profile.email || 'info@umamicron.com')}</td></tr>
+                        </table>
+                    </div>
+                    <!-- 30 DAYS Badge -->
+                    <div style="position: absolute; right: 20px; top: 35px; text-align: center;">
+                        <div style="width: 65px; height: 65px; background-color: var(--primary-purple); border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; border: 2px solid white; outline: 2px solid var(--primary-purple); box-shadow: 0 0 0 3px white, 0 0 0 4px var(--primary-purple);">
+                            <i class="bi bi-star-fill" style="font-size: 8px; margin-bottom: 2px;"></i>
+                            <div style="font-size: 8px;">VALID FOR</div>
+                            <div style="font-size: 12px; font-weight: bold;">30 DAYS</div>
+                            <div style="font-size: 8px; margin-top: 2px;">★ ★ ★</div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- SUBJECT -->
-            <div class="qtn-subject">
-                <div style="background-color: var(--primary-purple); color: white; padding: 3px 6px; border-radius: 4px;"><i class="bi bi-card-text"></i></div>
-                <div style="font-weight: bold; color: var(--primary-purple);">SUBJECT:</div>
-                <div>${escHtml(data.subject || 'Quotation for Micronization Services')}</div>
-            </div>
+                <!-- SUBJECT -->
+                <div class="qtn-subject">
+                    <div style="background-color: var(--primary-purple); color: white; padding: 3px 6px; border-radius: 4px;"><i class="bi bi-card-text"></i></div>
+                    <div style="font-weight: bold; color: var(--primary-purple);">SUBJECT:</div>
+                    <div>${escHtml(data.subject || 'Quotation for Micronization Services')}</div>
+                </div>
 
-            <!-- Letter -->
-            <div class="qtn-letter">
-                <p style="margin-bottom: 8px;"><strong>Dear Sir / Madam,</strong></p>
-                <p style="margin-bottom: 8px;">With reference to the above mentioned subject, please find our offer along with relevant terms and conditions for your ready reference.</p>
-                <p style="margin-bottom: 8px;">Uma Micron, Vadodara is a Gujarat based company that offers <strong>CONTRACT MICRONIZATION SERVICES</strong> dedicated to comply the needs of the pharmaceutical industry. The facility is at Ranoli - Vadodara, operates according to cGMP standards with more than 500 sq.ft processing area and big warehouse facility.</p>
-                <p style="margin-bottom: 8px;">Micronization: Jet micronization is used to mill particles below 10-20 microns. Particle to particle impact facilitated by air flow allows for producing particles less than 10-20 microns in size.</p>
-                <p>We trust our offer will be in line with your requirement and if you have any techno-commercial queries, please feel free to contact us.</p>
-            </div>
+                <!-- Letter -->
+                <div class="qtn-letter">
+                    <p style="margin-bottom: 8px;"><strong>Dear Sir / Madam,</strong></p>
+                    <p style="margin-bottom: 8px;">With reference to the above mentioned subject, please find our offer along with relevant terms and conditions for your ready reference.</p>
+                    <p style="margin-bottom: 8px;">Uma Micron, Vadodara is a Gujarat based company that offers <strong>CONTRACT MICRONIZATION SERVICES</strong> dedicated to comply the needs of the pharmaceutical industry. The facility is at Ranoli - Vadodara, operates according to cGMP standards with more than 500 sq.ft processing area and big warehouse facility.</p>
+                    <p style="margin-bottom: 8px;">Micronization: Jet micronization is used to mill particles below 10-20 microns. Particle to particle impact facilitated by air flow allows for producing particles less than 10-20 microns in size.</p>
+                    <p>We trust our offer will be in line with your requirement and if you have any techno-commercial queries, please feel free to contact us.</p>
+                </div>
 
-            <!-- COMMERCIAL OFFER -->
-            <div class="qtn-box">
-                <div class="qtn-box-header"><i class="bi bi-people"></i> COMMERCIAL OFFER - MICRONIZATION CHARGES</div>
-                <table class="qtn-table">
-                    <tr>
-                        <th style="width: 8%;">Sr. No.</th>
-                        <th style="width: 35%;">Description</th>
-                        <th style="width: 20%;">PSD Requirement</th>
-                        <th style="width: 12%;">Unit</th>
-                        <th style="width: 12%;">Rate (₹)</th>
-                        <th style="width: 13%;">Remarks</th>
-                    </tr>
-                    ${mainCharges.map((c, i) => `
-                    <tr>
-                        <td>${i + 1}</td>
-                        <td style="text-align: left;">${escHtml(c.description)}</td>
-                        <td>${c.psdRequirement ? escHtml(c.psdRequirement) : '&mdash;'}</td>
-                        <td>${extractUnit(c.rate)}</td>
-                        <td style="font-weight: bold;">${extractRate(c.rate)}</td>
-                        <td>&mdash;</td>
-                    </tr>
-                    `).join('')}
-                </table>
-            </div>
-
-            <!-- OPTIONAL SERVICES & NOTE -->
-            <div style="display: flex; gap: 12px;">
-                <div class="qtn-box" style="flex: 1.4;">
-                    <div class="qtn-box-header"><i class="bi bi-gear-fill"></i> OPTIONAL SERVICES (IF REQUIRED)</div>
+                <!-- COMMERCIAL OFFER -->
+                <div class="qtn-box">
+                    <div class="qtn-box-header"><i class="bi bi-people"></i> COMMERCIAL OFFER - MICRONIZATION CHARGES</div>
                     <table class="qtn-table">
                         <tr>
-                            <th style="width: 10%;">Sr. No.</th>
-                            <th style="width: 50%;">Description</th>
-                            <th style="width: 20%;">Unit</th>
-                            <th style="width: 20%;">Rate (₹)</th>
+                            <th style="width: 8%;">Sr. No.</th>
+                            <th style="width: 35%;">Description</th>
+                            <th style="width: 20%;">PSD Requirement</th>
+                            <th style="width: 12%;">Unit</th>
+                            <th style="width: 12%;">Rate (₹)</th>
+                            <th style="width: 13%;">Remarks</th>
                         </tr>
-                        ${optionalCharges.map((c, i) => `
+                        ${mainCharges.map((c, i) => `
                         <tr>
                             <td>${i + 1}</td>
                             <td style="text-align: left;">${escHtml(c.description)}</td>
+                            <td>${c.psdRequirement ? escHtml(c.psdRequirement) : '&mdash;'}</td>
                             <td>${extractUnit(c.rate)}</td>
                             <td style="font-weight: bold;">${extractRate(c.rate)}</td>
+                            <td>&mdash;</td>
                         </tr>
                         `).join('')}
                     </table>
                 </div>
-                <div class="qtn-box outline-only" style="flex: 1;">
-                    <div class="qtn-box-header"><i class="bi bi-journal-text"></i> NOTE</div>
-                    <div class="qtn-box-body" style="padding: 8px;">
-                        <ul style="padding-left: 15px; margin: 0; font-size: 9px; line-height: 1.5;">
-                            <li style="margin-bottom: 4px;">Prices mentioned are exclusive of GST.</li>
-                            <li style="margin-bottom: 4px;">GST will be charged extra as applicable.</li>
-                            <li style="margin-bottom: 4px;">Transportation, Insurance & Packing Charges will be extra.</li>
-                            <li>Rates are subject to change without prior notice.</li>
-                        </ul>
+
+                <!-- OPTIONAL SERVICES & NOTE -->
+                <div style="display: flex; gap: 12px;">
+                    <div class="qtn-box" style="flex: 1.4;">
+                        <div class="qtn-box-header"><i class="bi bi-gear-fill"></i> OPTIONAL SERVICES (IF REQUIRED)</div>
+                        <table class="qtn-table">
+                            <tr>
+                                <th style="width: 10%;">Sr. No.</th>
+                                <th style="width: 50%;">Description</th>
+                                <th style="width: 20%;">Unit</th>
+                                <th style="width: 20%;">Rate (₹)</th>
+                            </tr>
+                            ${optionalCharges.map((c, i) => `
+                            <tr>
+                                <td>${i + 1}</td>
+                                <td style="text-align: left;">${escHtml(c.description)}</td>
+                                <td>${extractUnit(c.rate)}</td>
+                                <td style="font-weight: bold;">${extractRate(c.rate)}</td>
+                            </tr>
+                            `).join('')}
+                        </table>
+                    </div>
+                    <div class="qtn-box outline-only" style="flex: 1;">
+                        <div class="qtn-box-header"><i class="bi bi-journal-text"></i> NOTE</div>
+                        <div class="qtn-box-body" style="padding: 8px;">
+                            <ul style="padding-left: 15px; margin: 0; font-size: 9px; line-height: 1.5;">
+                                <li style="margin-bottom: 4px;">Prices mentioned are exclusive of GST.</li>
+                                <li style="margin-bottom: 4px;">GST will be charged extra as applicable.</li>
+                                <li style="margin-bottom: 4px;">Transportation, Insurance & Packing Charges will be extra.</li>
+                                <li>Rates are subject to change without prior notice.</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Sign-off -->
-            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px; font-size: 10.5px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; font-size: 10.5px;">
                 <div>
                     Thank you for considering Uma Micron for your micronization requirements.<br>
                     We look forward to a long term business association.

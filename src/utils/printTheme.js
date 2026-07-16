@@ -65,6 +65,7 @@ export const getSharedPrintStyles = () => `
       padding: 12px;
       display: flex;
       flex-direction: column;
+      position: relative;
   }
 
   /* Top Header Logo section */
@@ -524,14 +525,22 @@ export const renderHtmlToPdf = async (html, {
 
     for (let i = 0; i < targets.length; i++) {
       const target = targets[i];
+      
+      // Fix for html2canvas blank capture on subsequent pages
+      const originalCss = target.style.cssText;
+      target.style.cssText += '; position: absolute; top: 0; left: 0; z-index: 10;';
+
       const canvas = await html2canvas(target, {
         scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff',
         width,
         windowWidth: width,
+        scrollY: 0,
         logging: false
       });
+
+      target.style.cssText = originalCss;
 
       const naturalW = usableW;
       const naturalH = (canvas.height * naturalW) / canvas.width;

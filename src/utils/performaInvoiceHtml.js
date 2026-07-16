@@ -71,9 +71,10 @@ const buildItemRowsHtml = (data) => {
     pushRow(cc.name || '', ccQty, rate, amt, 9, 9);
   });
 
-  for (let i = sr; i < PI_MIN_ROWS; i++) {
+  const blanksCount = Math.max(0, PI_MIN_ROWS - sr);
+  for (let i = 0; i < blanksCount; i++) {
     rows.push(`
-      <tr class="filler-row">
+      <tr class="filler-row"${i === blanksCount - 1 ? ' style="height: 100%;"' : ''}>
         <td></td><td></td><td></td><td></td><td></td>
         <td></td><td></td><td></td><td></td><td></td>
       </tr>`);
