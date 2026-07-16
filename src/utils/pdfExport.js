@@ -11,6 +11,7 @@ import {
 } from './companyProfile';
 
 import { renderTaxInvoicePdf } from './taxInvoiceHtml';
+import { renderPerformaInvoicePdf } from './performaInvoiceHtml';
 
 const getProfile = (data) => mergeCompanyProfile(data?.companyProfile || getStoredCompanyProfile());
 
@@ -2106,6 +2107,10 @@ export const exportToPDF = (docType, data) => {
     renderTaxInvoicePdf(enriched, { mode: 'save' }).catch((err) => console.error('TI PDF export failed:', err));
     return;
   }
+  if (docType === 'PI') {
+    renderPerformaInvoicePdf(enriched, { mode: 'save' }).catch((err) => console.error('PI PDF export failed:', err));
+    return;
+  }
   const { doc, docNo } = buildPDF(docType, enriched);
   doc.save(`${docType}_${docNo}.pdf`);
 };
@@ -2114,6 +2119,10 @@ export const viewPDF = (docType, data) => {
   const enriched = { ...data, companyProfile: data?.companyProfile || getStoredCompanyProfile() };
   if (docType === 'TI') {
     renderTaxInvoicePdf(enriched, { mode: 'view' }).catch((err) => console.error('TI PDF view failed:', err));
+    return;
+  }
+  if (docType === 'PI') {
+    renderPerformaInvoicePdf(enriched, { mode: 'view' }).catch((err) => console.error('PI PDF view failed:', err));
     return;
   }
   const { doc, docNo } = buildPDF(docType, enriched);

@@ -598,10 +598,10 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
             <div class="card-title"><i class="bi bi-person-circle"></i> BILL TO</div>
             <div class="card-body">
                 <div class="client-title">${escHtml(billName)}</div>
-                ${billAddr.map(line => \`<div>\${escHtml(line)}</div>\`).join('')}
+                ${billAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
                 <div class="card-footer-data">
                     <div class="data-row"><div class="data-label-short">GSTIN</div><div class="data-value">: &nbsp;${escHtml(billGstin)}</div></div>
-                    <div class="data-row"><div class="data-label-short">State</div><div class="data-value">: &nbsp;${escHtml(billState)} ${billStateCode ? \`(\${escHtml(billStateCode)})\` : ''}</div></div>
+                    <div class="data-row"><div class="data-label-short">State</div><div class="data-value">: &nbsp;${escHtml(billState)} ${billStateCode ? '(' + escHtml(billStateCode) + ')' : ''}</div></div>
                 </div>
             </div>
         </div>
@@ -611,10 +611,10 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
             <div class="card-title"><i class="bi bi-truck"></i> SHIP TO</div>
             <div class="card-body">
                 <div class="client-title">${escHtml(shipName)}</div>
-                ${shipAddr.map(line => \`<div>\${escHtml(line)}</div>\`).join('')}
+                ${shipAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
                 <div class="card-footer-data">
                     <div class="data-row"><div class="data-label-short">GSTIN</div><div class="data-value">: &nbsp;${escHtml(shipGstin)}</div></div>
-                    <div class="data-row"><div class="data-label-short">State</div><div class="data-value">: &nbsp;${escHtml(shipState)} ${shipStateCode ? \`(\${escHtml(shipStateCode)})\` : ''}</div></div>
+                    <div class="data-row"><div class="data-label-short">State</div><div class="data-value">: &nbsp;${escHtml(shipState)} ${shipStateCode ? '(' + escHtml(shipStateCode) + ')' : ''}</div></div>
                 </div>
             </div>
         </div>
@@ -751,9 +751,9 @@ export const renderTaxInvoicePdf = async (data, { mode = 'save' } = {}) => {
     if (mode === 'view') {
       const url = pdf.output('bloburl');
       const win = window.open(url, '_blank');
-      if (win) win.document.title = \`TI_\${data.invoiceNo || 'N/A'}\`;
+      if (win) win.document.title = `TI_${data.invoiceNo || 'N/A'}`;
     } else {
-      pdf.save(\`TI_\${data.invoiceNo || 'N/A'}.pdf\`);
+      pdf.save(`TI_${data.invoiceNo || 'N/A'}.pdf`);
     }
   } finally {
     document.body.removeChild(host);
