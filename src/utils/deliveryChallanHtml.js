@@ -1,22 +1,22 @@
 import { mergeCompanyProfile } from './companyProfile';
 import {
   buildDcPrintLines,
-  formatDcDateSlash,
   getDcAppData
 } from './deliveryChallanLayout';
+import { formatPdfDateDmy } from './taxInvoiceLayout';
 import {
-  IC,
   escHtml,
   fmtQty,
-  getSharedPrintStyles,
   PRINT_PAGE_W,
-  buildPrintCompanyHeader,
-  buildPrintTitle,
-  buildDetailsGrid,
-  renderHtmlToPdf
+  renderHtmlToPdf,
+  getSharedPrintStyles,
+  buildPrintHeader,
+  buildMetaStrip,
+  buildPartyCard,
+  buildStatusBar
 } from './printTheme';
 
-const DC_MIN_ROWS = 10;
+const DC_MIN_ROWS = 15;
 
 export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   const profile = mergeCompanyProfile(profileInput);
@@ -24,14 +24,22 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   const { lines, totalDrums, totalQty } = buildDcPrintLines(data, appData);
 
   const dcNo = escHtml(data.dcNo || 'N/A');
-  const dcDate = escHtml(formatDcDateSlash(data.date) || 'N/A');
+  const dcDate = escHtml(formatPdfDateDmy(data.date) || 'N/A');
   const poNo = escHtml(data.partyDocNo || '');
-  const poDate = escHtml(formatDcDateSlash(data.partyDocDate) || '');
-  const shipState = escHtml(data.shipState || data.billState || data.state || profile.state || 'GUJARAT');
+  const poDate = escHtml(formatPdfDateDmy(data.partyDocDate) || '');
+  const companyState = escHtml(profile.state || 'Gujarat');
+  
+  const shipState = escHtml(data.shipState || data.billState || data.state || companyState);
   const stateCode = escHtml(data.shipStateCode || data.billStateCode || data.stateCode || '24');
   const partyGstin = escHtml(data.gstinShip || data.gstinBill || data.gstin || '');
   const partyName = escHtml(data.partyName || '');
   const address = escHtml(data.shipAddress || data.billAddress || data.address || '');
+  const addressLines = address.split(/\r?\n/).filter(Boolean);
+
+  let companyPan = escHtml(profile.panNumber || '');
+  if (!companyPan && profile.gstNumber && profile.gstNumber.length >= 15) {
+    companyPan = escHtml(profile.gstNumber.substring(2, 12));
+  }
 
   const cellDrums = (v) => (parseInt(v, 10) > 0 ? escHtml(String(parseInt(v, 10))) : '');
   const cellQty = (v) => (v !== '' && v != null && parseFloat(v) > 0 ? escHtml(v) : '');
@@ -47,132 +55,132 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     }
     bodyRows.push(`
       <tr>
-        <td>${sr}</td>
-        <td class="desc">${escHtml(line.text)}</td>
-        <td>${cellDrums(line.drums)}</td>
-        <td class="num">${cellQty(line.qty)}</td>
+        <td class="center">${sr}</td>
+        <td class="left">${escHtml(line.text)}</td>
+        <td class="center">${cellDrums(line.drums)}</td>
+        <td class="center">${cellQty(line.qty)}</td>
       </tr>`);
   });
   while (bodyRows.length < DC_MIN_ROWS) {
     bodyRows.push(`
-      <tr class="blank-row">
-        <td></td><td class="desc"></td><td></td><td class="num"></td>
+      <tr class="filler-row">
+        <td></td><td></td><td></td><td></td>
       </tr>`);
   }
 
   const drumsTotal = parseInt(totalDrums, 10) > 0 ? String(parseInt(totalDrums, 10)) : '';
   const qtyTotal = parseFloat(totalQty) > 0 ? fmtQty(totalQty) : '';
 
+  const rightColHtml = `
+    <div class="data-row"><div class="data-label"><i class="bi bi-file-earmark-text"></i> Delivery Challan No.</div><div class="data-value">: &nbsp;${dcNo}</div></div>
+    <div class="data-row"><div class="data-label"><i class="bi bi-calendar3"></i> Date</div><div class="data-value">: &nbsp;${dcDate}</div></div>
+    <div class="data-row" style="margin-top: 5px;"><div class="data-label"><i class="bi bi-file-earmark-text"></i> PO / DC NO.</div><div class="data-value">: &nbsp;${poNo}</div></div>
+    <div class="data-row"><div class="data-label" style="padding-left: 16px;">Date</div><div class="data-value">: &nbsp;${poDate}</div></div>
+  `;
+
   return `
-<style>${getSharedPrintStyles()}
-  .dc-footer-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-top: auto;
-    margin-bottom: 0;
-  }
-  .dc-meta-card {
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-  .dc-meta-body { padding: 12px; flex: 1; }
-  .dc-meta-row { display: flex; margin-bottom: 8px; font-size: 12.5px; }
-  .dc-meta-label { color: var(--blue-dark); font-weight: bold; width: 150px; flex-shrink: 0; }
-  .dc-sign-stack { display: flex; flex-direction: column; gap: 12px; }
-  .dc-sign-card {
-    flex: 1;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    overflow: hidden;
-    min-height: 110px;
-    display: flex;
-    flex-direction: column;
-  }
-  .dc-sign-space { flex: 1; min-height: 56px; }
-  .dc-sign-label {
-    text-align: center;
-    font-weight: bold;
-    color: var(--blue-dark);
-    padding: 8px 10px 12px;
-    border-top: 1px solid var(--blue-dark);
-    margin: 0 14px 10px;
-    font-size: 12.5px;
-  }
-</style>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delivery Challan - ${escHtml(profile.companyName)}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        ${getSharedPrintStyles()}
+        .dc-footer-grid {
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 12px;
+            margin-top: 10px;
+        }
+        .dc-meta-card {
+            border: 1.5px solid var(--border-purple);
+            border-radius: 6px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+        }
+        .dc-meta-row { display: flex; margin-bottom: 6px; font-size: 11px; }
+        .dc-meta-label { color: var(--text-black); font-weight: bold; width: 130px; flex-shrink: 0; }
+        .dc-sign-stack { display: flex; flex-direction: column; gap: 12px; }
+        .dc-sign-card {
+            flex: 1;
+            border: 1.5px solid var(--border-purple);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            text-align: center;
+        }
+        .dc-sign-space { width: 80%; border-bottom: 1px solid #777777; margin-top: 40px; margin-bottom: 3px; }
+    </style>
+</head>
+<body>
 <div class="print-host">
-  <div class="pdf-page">
-    <div class="invoice-container">
-      ${buildPrintCompanyHeader(profile, { showCopyBadge: false })}
-      ${buildPrintTitle('DELIVERY CHALLAN')}
-      ${buildDetailsGrid([
-        ['Delivery Challan No.', dcNo, 'Date', dcDate],
-        ['PO / DC NO.', poNo, 'Date', poDate],
-        ['State', shipState, 'Code', stateCode],
-        ['GSTIN', partyGstin, '', '']
-      ])}
+<div class="pdf-page">
+<div class="invoice-box">
+    
+    ${buildPrintHeader(profile, 'DELIVERY CHALLAN', '')}
+    ${buildMetaStrip(profile, companyState, companyPan, rightColHtml)}
 
-      <div class="parties-wrapper" style="margin-bottom:12px;">
-        <div class="party-box" style="flex:1;">
-          <div class="party-header">${IC.truck} CONSIGNEE / TO</div>
-          <div class="party-body">
-            <div class="party-row"><div class="party-label">Name :</div><div class="dotted-line">${partyName}</div></div>
-            <div class="party-row"><div class="party-label">Address :</div><div class="dotted-line">${address}</div></div>
-            <div class="party-row"><div class="party-label"></div><div class="dotted-line">&nbsp;</div></div>
-            <div class="party-row"><div class="party-label">GSTIN :</div><div class="dotted-line">${partyGstin}</div></div>
-          </div>
-        </div>
-      </div>
+    <div class="billing-container" style="display: block;">
+        ${buildPartyCard('CONSIGNEE / TO', 'bi bi-truck', partyName, addressLines, partyGstin, shipState, stateCode)}
+    </div>
 
-      <table class="items-table dc-items">
-        <thead>
-          <tr>
-            <th style="width:8%">Sr. No.</th>
-            <th style="width:52%">DESCRIPTION</th>
-            <th style="width:20%">TOTAL NO. OF DRUMS</th>
-            <th style="width:20%">QUANTITY (kg)</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${bodyRows.join('')}
-          <tr class="total-row">
-            <td colspan="2" class="total-label">TOTAL</td>
-            <td>${drumsTotal}</td>
-            <td class="num">${qtyTotal}</td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="table-container">
+        <table class="invoice-table">
+            <thead>
+                <tr>
+                    <th style="width: 8%;">Sr. No.</th>
+                    <th style="width: 52%;">DESCRIPTION</th>
+                    <th style="width: 20%;">TOTAL NO. OF DRUMS</th>
+                    <th style="width: 20%;">QUANTITY (kg)</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${bodyRows.join('')}
+                <tr class="total-row">
+                    <td colspan="2" class="center">TOTAL</td>
+                    <td class="center">${drumsTotal}</td>
+                    <td class="center">${qtyTotal}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
-      <div class="dc-footer-grid">
+    <div class="dc-footer-grid">
         <div class="dc-meta-card">
-          <div class="party-header">${IC.truck} TRANSPORT DETAILS</div>
-          <div class="dc-meta-body">
-            <div class="dc-meta-row"><div class="dc-meta-label">Vehicle No.</div><div>: ${escHtml(data.vehicleNo || '')}</div></div>
-            <div class="dc-meta-row"><div class="dc-meta-label">Drivers name</div><div>: ${escHtml(data.driverName || '')}</div></div>
-            <div class="dc-meta-row"><div class="dc-meta-label">Driver's Contact</div><div>: ${escHtml(data.driverContact || data.driverPhone || '')}</div></div>
-            <div class="dc-meta-row"><div class="dc-meta-label">Transporter's Name</div><div>: ${escHtml(data.transporterName || data.transporter || '')}</div></div>
-            <div class="dc-meta-row"><div class="dc-meta-label">GSTIN</div><div>: ${escHtml(profile.gstNumber || '')}</div></div>
-          </div>
+            <div class="box-heading"><i class="bi bi-truck"></i> TRANSPORT DETAILS</div>
+            <div class="dc-meta-row"><div class="dc-meta-label">Vehicle No.</div><div class="data-value">: &nbsp;${escHtml(data.vehicleNo || '')}</div></div>
+            <div class="dc-meta-row"><div class="dc-meta-label">Drivers name</div><div class="data-value">: &nbsp;${escHtml(data.driverName || '')}</div></div>
+            <div class="dc-meta-row"><div class="dc-meta-label">Driver's Contact</div><div class="data-value">: &nbsp;${escHtml(data.driverContact || data.driverPhone || '')}</div></div>
+            <div class="dc-meta-row"><div class="dc-meta-label">Transporter's Name</div><div class="data-value">: &nbsp;${escHtml(data.transporterName || data.transporter || '')}</div></div>
+            <div class="dc-meta-row"><div class="dc-meta-label">GSTIN</div><div class="data-value">: &nbsp;${escHtml(profile.gstNumber || '')}</div></div>
         </div>
         <div class="dc-sign-stack">
-          <div class="dc-sign-card">
-            <div class="party-header">${IC.pen} FOR ${escHtml(profile.companyName)}</div>
-            <div class="dc-sign-space"></div>
-            <div class="dc-sign-label">Authorised Signatory</div>
-          </div>
-          <div class="dc-sign-card">
-            <div class="party-header">${IC.users} RECEIVED BY</div>
-            <div class="dc-sign-space"></div>
-            <div class="dc-sign-label">Authorised Signatory</div>
-          </div>
+            <div class="dc-sign-card">
+                <span style="font-weight: bold; color: var(--primary-purple); font-size: 11px;">For ${escHtml(profile.companyName || 'UMA MICRON')}</span>
+                <div class="dc-sign-space"></div>
+                <span style="font-size: 10px; color: #333;">Authorised Signatory</span>
+            </div>
+            <div class="dc-sign-card">
+                <span style="font-weight: bold; color: var(--primary-purple); font-size: 11px;">RECEIVED BY</span>
+                <div class="dc-sign-space"></div>
+                <span style="font-size: 10px; color: #333;">Authorised Signatory</span>
+            </div>
         </div>
-      </div>
     </div>
-  </div>
-</div>`;
+
+    ${buildStatusBar('Page 1 of 1')}
+
+</div>
+</div>
+</div>
+</body>
+</html>`;
 };
 
 export const renderDeliveryChallanPdf = async (data, { mode = 'save' } = {}) => {

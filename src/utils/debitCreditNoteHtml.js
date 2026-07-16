@@ -1,27 +1,26 @@
 import { mergeCompanyProfile } from './companyProfile';
-import { formatPdfDateSlash } from './taxInvoiceLayout';
+import { formatPdfDateDmy } from './taxInvoiceLayout';
 import {
   STANDARD_CHARGES_LIST,
   OTHER_CHARGE_ITEM
 } from './documentCharges';
 import {
-  IC,
   escHtml,
   fmtMoney,
   fmtQty,
-  getSharedPrintStyles,
   PRINT_PAGE_W,
-  buildPrintCompanyHeader,
-  buildPrintTitle,
-  buildDetailsGrid,
+  renderHtmlToPdf,
+  getSharedPrintStyles,
+  buildPrintHeader,
+  buildMetaStrip,
+  buildPartyCard,
   buildBankDetailsBox,
-  buildSummaryTable,
-  buildTermsSealSign,
-  renderHtmlToPdf
+  buildFooterTerms,
+  buildStatusBar
 } from './printTheme';
 
 const NOTE_CHARGES = [...STANDARD_CHARGES_LIST, OTHER_CHARGE_ITEM];
-const NOTE_MIN_ROWS = 10;
+const NOTE_MIN_ROWS = 15;
 
 const calcNoteLines = (data) => {
   const taxRate = parseFloat(data.taxRate) || 18;
@@ -60,7 +59,6 @@ const calcNoteLines = (data) => {
     totalQty += qty;
   });
 
-  // Fallback: particulars + amount when no charge lines
   if (!rows.length && (data.particulars || data.amount)) {
     const amt = parseFloat(data.subtotal) || parseFloat(data.amount) || 0;
     const sgstAmt = amt * (half / 100);
@@ -98,108 +96,140 @@ const calcNoteLines = (data) => {
 const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
   const profile = mergeCompanyProfile(profileInput);
   const docNo = escHtml(data.noteNo || 'N/A');
-  const docDate = escHtml(formatPdfDateSlash(data.date) || 'N/A');
+  const docDate = escHtml(formatPdfDateDmy(data.date) || 'N/A');
   const refInvoice = escHtml(data.refInvoice || '');
+  const companyState = escHtml(profile.state || 'Gujarat');
+  
   const { rows, totalAmt, totalSgst, totalCgst, totalIgst, totalAll, totalQty } = calcNoteLines(data);
+
+  let companyPan = escHtml(profile.panNumber || '');
+  if (!companyPan && profile.gstNumber && profile.gstNumber.length >= 15) {
+    companyPan = escHtml(profile.gstNumber.substring(2, 12));
+  }
 
   const bodyRows = rows.map((r) => `
     <tr>
-      <td><b>${r.sr}</b></td>
-      <td class="desc">${escHtml(r.label)}</td>
+      <td class="center">${r.sr}</td>
+      <td class="left">${escHtml(r.label)}</td>
+      <td class="center"></td>
       <td>${escHtml(fmtQty(r.qty))}</td>
       <td>${fmtMoney(r.rate)}</td>
-      <td class="num">${fmtMoney(r.amt)}</td>
-      <td>${r.sgstRate}%</td>
-      <td class="num">${fmtMoney(r.sgstAmt)}</td>
-      <td>${r.cgstRate}%</td>
-      <td class="num">${fmtMoney(r.cgstAmt)}</td>
-      <td>0%</td>
-      <td class="num">0.00</td>
-      <td class="num">${fmtMoney(r.rowTotal)}</td>
+      <td>${fmtMoney(r.amt)}</td>
+      <td>${fmtMoney(r.cgstAmt)}</td>
+      <td>${fmtMoney(r.sgstAmt)}</td>
+      <td>0.00</td>
+      <td>${fmtMoney(r.rowTotal)}</td>
     </tr>`).join('');
 
   const blanks = Array.from({ length: Math.max(0, NOTE_MIN_ROWS - rows.length) }, () => `
-    <tr class="blank-row">
-      <td></td><td class="desc"></td><td></td><td></td><td></td>
-      <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+    <tr class="filler-row">
+      <td></td><td></td><td></td><td></td><td></td>
+      <td></td><td></td><td></td><td></td><td></td>
     </tr>`).join('');
 
-  const terms = `
+  const rightColHtml = `
+    <div class="data-row"><div class="data-label"><i class="bi bi-file-earmark-text"></i> ${filePrefix} No.</div><div class="data-value">: &nbsp;${docNo}</div></div>
+    <div class="data-row"><div class="data-label"><i class="bi bi-calendar3"></i> Date</div><div class="data-value">: &nbsp;${docDate}</div></div>
+    <div class="data-row" style="margin-top: 5px;"><div class="data-label"><i class="bi bi-file-earmark-text"></i> Ref. Invoice</div><div class="data-value">: &nbsp;${refInvoice}</div></div>
+    <div class="data-row"><div class="data-label" style="padding-left: 16px;">Tax Rate</div><div class="data-value">: &nbsp;${parseFloat(data.taxRate) || 18}%</div></div>
+    <div class="data-row"><div class="data-label" style="padding-left: 16px;">Discount</div><div class="data-value">: &nbsp;₹ ${fmtMoney(data.discount || 0)}</div></div>
+  `;
+
+  const termsHtml = `
     <ol>
-      <li>Subject to Vadodara Jurisdiction.</li>
-      <li>This ${escHtml(title.toLowerCase())} is issued against the reference invoice mentioned above.</li>
-      <li>Interest will charged @ 24% per annum if amount remaining unpaid from due date.</li>
+        <li>Subject to Vadodara Jurisdiction.</li>
+        <li>This ${escHtml(title.toLowerCase())} is issued against the reference invoice mentioned above.</li>
+        <li>Interest will be charged @ 24% p.a. if the amount remains unpaid from the due date.</li>
     </ol>
-    ${data.particulars ? `<div class="note-block" style="margin-top:8px;">Particulars: ${escHtml(data.particulars)}</div>` : ''}`;
+    ${data.particulars ? `<div style="font-size: 9.5px; font-weight: bold; margin-top: 4px; color: var(--primary-purple);">Particulars: ${escHtml(data.particulars)}</div>` : ''}
+  `;
+  const declarationHtml = `<p>We declare that this document shows the actual price of the goods described and that all particulars are true and correct.</p>`;
+
+  const roundedTotal = Math.round(totalAll);
+  const roundOff = roundedTotal - totalAll;
 
   return {
     html: `
-<style>${getSharedPrintStyles()}</style>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escHtml(title)} - ${escHtml(profile.companyName)}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>${getSharedPrintStyles()}</style>
+</head>
+<body>
 <div class="print-host">
-  <div class="pdf-page">
-    <div class="invoice-container">
-      ${buildPrintCompanyHeader(profile, { showCopyBadge: true, copyBadgeHtml: 'ORIGINAL<br>DUPLICATE' })}
-      ${buildPrintTitle(title)}
-      ${buildDetailsGrid([
-        [`${filePrefix} No.`, docNo, 'Date', docDate],
-        ['Party Name', escHtml(data.partyName || ''), 'Ref. Invoice', refInvoice],
-        ['State', escHtml(profile.state || 'GUJARAT'), 'Code', '24'],
-        ['Tax Rate', `${parseFloat(data.taxRate) || 18}%`, 'Discount', fmtMoney(data.discount || 0)]
-      ])}
-      <div class="parties-wrapper">
-        <div class="party-box" style="flex:1;">
-          <div class="party-header">${IC.users} BILL TO PARTY</div>
-          <div class="party-body">
-            <div class="party-row"><div class="party-label">Name :</div><div class="dotted-line">${escHtml(data.partyName || '')}</div></div>
-            <div class="party-row"><div class="party-label">Address :</div><div class="dotted-line">&nbsp;</div></div>
-            <div class="party-row"><div class="party-label">GSTIN :</div><div class="dotted-line">&nbsp;</div></div>
-          </div>
-        </div>
-      </div>
-      <table class="items-table">
-        <thead>
-          <tr>
-            <th rowspan="2" style="width:4%">S.<br>No.</th>
-            <th rowspan="2" style="width:26%">Description</th>
-            <th rowspan="2" style="width:5%">Qty</th>
-            <th rowspan="2" style="width:7%">Rate</th>
-            <th rowspan="2" style="width:8%">Amount</th>
-            <th colspan="2">SGST</th>
-            <th colspan="2">CGST</th>
-            <th colspan="2">IGST</th>
-            <th rowspan="2" style="width:8%">Total</th>
-          </tr>
-          <tr>
-            <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
-            <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
-            <th style="width:5%">Rate</th><th style="width:7%">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${bodyRows}${blanks}
-          <tr class="total-row">
-            <td colspan="2" class="total-label">TOTAL</td>
-            <td>${totalQty || 0}</td>
-            <td></td>
-            <td class="num">${fmtMoney(totalAmt)}</td>
-            <td></td>
-            <td class="num">${fmtMoney(totalSgst)}</td>
-            <td></td>
-            <td class="num">${fmtMoney(totalCgst)}</td>
-            <td></td>
-            <td class="num">${fmtMoney(totalIgst)}</td>
-            <td class="num">${fmtMoney(totalAll)}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div class="footer-top">
-        ${buildBankDetailsBox(profile.companyName)}
-        ${buildSummaryTable({ totalAmt, totalSgst, totalCgst, totalIgst, totalAll })}
-      </div>
-      ${buildTermsSealSign(profile.companyName, terms)}
+<div class="pdf-page">
+<div class="invoice-box">
+    
+    ${buildPrintHeader(profile, title, 'ORIGINAL FOR RECIPIENT')}
+    ${buildMetaStrip(profile, companyState, companyPan, rightColHtml)}
+
+    <div class="billing-container" style="display: block;">
+        ${buildPartyCard('BILL TO PARTY', 'bi bi-person-circle', data.partyName || '', [], '', '', '')}
     </div>
-  </div>
-</div>`,
+
+    <div class="table-container">
+        <table class="invoice-table">
+            <thead>
+                <tr>
+                    <th style="width: 5%;">Sr. No.</th>
+                    <th style="width: 27%;">Description</th>
+                    <th style="width: 10%;">HSN / SAC</th>
+                    <th style="width: 6%;">Qty.</th>
+                    <th style="width: 10%;">Rate (₹)</th>
+                    <th style="width: 10%;">Amount (₹)</th>
+                    <th style="width: 7%;">CGST (₹)</th>
+                    <th style="width: 7%;">SGST (₹)</th>
+                    <th style="width: 6%;">IGST (₹)</th>
+                    <th style="width: 12%;">Total Amount (₹)</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${bodyRows}${blanks}
+                <tr class="total-row">
+                    <td colspan="2" class="center">TOTAL</td>
+                    <td></td>
+                    <td>${fmtQty(totalQty) || '0.00'}</td>
+                    <td></td>
+                    <td>${fmtMoney(totalAmt)}</td>
+                    <td>${fmtMoney(totalCgst)}</td>
+                    <td>${fmtMoney(totalSgst)}</td>
+                    <td>${fmtMoney(totalIgst)}</td>
+                    <td>${fmtMoney(totalAll)}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="bottom-summary-grid">
+        ${buildBankDetailsBox(profile)}
+        <div class="totals-box">
+            <div>
+                <div class="charge-row"><span>Total Amount Before Tax</span><span>₹ &nbsp;${fmtMoney(totalAmt)}</span></div>
+                <div class="charge-row"><span>Add : CGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span>₹ &nbsp;${fmtMoney(totalCgst)}</span></div>
+                <div class="charge-row"><span>Add : SGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span>₹ &nbsp;${fmtMoney(totalSgst)}</span></div>
+                <div class="charge-row"><span>Add : IGST @ 18%</span><span>₹ &nbsp;${fmtMoney(totalIgst)}</span></div>
+                <div class="charge-row bold" style="border-top: 1px solid #ddd; padding-top:4px;"><span>Total Tax Amount</span><span>₹ &nbsp;${fmtMoney(totalCgst + totalSgst + totalIgst)}</span></div>
+                <div class="charge-row"><span>Round Off</span><span>₹ &nbsp;${fmtMoney(roundOff)}</span></div>
+            </div>
+            <div class="grand-total-banner">
+                <span>GRAND TOTAL</span>
+                <span>₹ ${fmtMoney(roundedTotal)}</span>
+            </div>
+        </div>
+    </div>
+
+    ${buildFooterTerms(profile.companyName, termsHtml, declarationHtml)}
+    ${buildStatusBar('Page 1 of 1')}
+
+</div>
+</div>
+</div>
+</body>
+</html>`,
     docNo: data.noteNo || 'N/A'
   };
 };
