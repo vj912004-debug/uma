@@ -10,6 +10,8 @@ import {
   getContactLine
 } from './companyProfile';
 
+import { renderTaxInvoicePdf } from './taxInvoiceHtml';
+
 const getProfile = (data) => mergeCompanyProfile(data?.companyProfile || getStoredCompanyProfile());
 
 const buildPO_PI_TI = (doc, docType, data) => {
@@ -1968,7 +1970,6 @@ const buildPDF = (docType, data) => {
   let docNo = data.invoiceNo || data.bprNo || data.plNo || data.dcNo || data.psdNo || data.receiptNo || data.noteNo || 'N/A';
   
   if (docType === 'TI') {
-    buildTaxInvoicePDF(doc, data);
     docNo = data.invoiceNo || 'N/A';
   } else if (docType === 'PO') {
     buildPurchaseOrderPDF(doc, data);
@@ -2101,12 +2102,20 @@ const buildOldLogic = (doc, docType, data) => {
 
 export const exportToPDF = (docType, data) => {
   const enriched = { ...data, companyProfile: data?.companyProfile || getStoredCompanyProfile() };
+  if (docType === 'TI') {
+    renderTaxInvoicePdf(enriched, { mode: 'save' }).catch((err) => console.error('TI PDF export failed:', err));
+    return;
+  }
   const { doc, docNo } = buildPDF(docType, enriched);
   doc.save(`${docType}_${docNo}.pdf`);
 };
 
 export const viewPDF = (docType, data) => {
   const enriched = { ...data, companyProfile: data?.companyProfile || getStoredCompanyProfile() };
+  if (docType === 'TI') {
+    renderTaxInvoicePdf(enriched, { mode: 'view' }).catch((err) => console.error('TI PDF view failed:', err));
+    return;
+  }
   const { doc, docNo } = buildPDF(docType, enriched);
   const url = doc.output('bloburl');
   const win = window.open(url, '_blank');
