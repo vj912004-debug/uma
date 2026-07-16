@@ -52,12 +52,28 @@ export const buildQuotationHtml = (data, profileInput) => {
         ${getSharedPrintStyles()}
         .qtn-page {
             width: ${PRINT_PAGE_W}px;
-            min-height: 1123px;
+            height: 1123px;
             padding: 15px;
             box-sizing: border-box;
             background: #ffffff;
             display: flex;
             flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        .qtn-footer {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            right: 15px;
+            background-color: var(--primary-purple);
+            color: white;
+            padding: 8px 15px;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 4px;
         }
         .qtn-header {
             display: flex;
@@ -214,18 +230,18 @@ export const buildQuotationHtml = (data, profileInput) => {
             </div>
         </div>
         
-        <div class="qtn-box" style="position: relative;">
-            <div class="qtn-box-header"><i class="bi bi-file-earmark-text"></i> QUOTATION DETAILS</div>
-            <div class="qtn-box-body">
-                <table style="width: 75%; font-size: 10.5px; line-height: 1.8;">
-                    <tr><td style="width: 20px;"><i class="bi bi-file-earmark-text" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; width: 100px;">Quotation No.</td><td>: ${qtnNo}</td></tr>
-                    <tr><td><i class="bi bi-calendar3" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold;">Quotation Date</td><td>: ${qtnDate}</td></tr>
-                    <tr><td><i class="bi bi-clock" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold;">Validity</td><td>: ${validityDate}</td></tr>
-                    <tr><td><i class="bi bi-person" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold;">Contact Person</td><td>: ${escHtml(data.signatoryName || 'Amit Patel')}</td></tr>
-                    <tr><td><i class="bi bi-telephone" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold;">Mobile</td><td>: ${escHtml(profile.phone || '+91 97120 00297')}</td></tr>
-                    <tr><td><i class="bi bi-envelope" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold;">Email</td><td>: ${escHtml(profile.email || 'info@umamicron.com')}</td></tr>
-                </table>
-            </div>
+            <div class="qtn-box" style="position: relative;">
+                <div class="qtn-box-header"><i class="bi bi-file-earmark-text"></i> QUOTATION DETAILS</div>
+                <div class="qtn-box-body">
+                    <table style="width: calc(100% - 80px); font-size: 10.5px; line-height: 1.6;">
+                        <tr><td style="width: 20px;"><i class="bi bi-file-earmark-text" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; width: 90px;">Quotation No.</td><td>: ${qtnNo}</td></tr>
+                        <tr><td><i class="bi bi-calendar3" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold;">Quotation Date</td><td>: ${qtnDate}</td></tr>
+                        <tr><td><i class="bi bi-clock" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold;">Validity</td><td>: ${validityDate}</td></tr>
+                        <tr><td><i class="bi bi-person" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold;">Contact Person</td><td>: ${escHtml(data.signatoryName || 'Amit Patel')}</td></tr>
+                        <tr><td><i class="bi bi-telephone" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold;">Mobile</td><td>: ${escHtml(profile.phone || '+91 97120 00297')}</td></tr>
+                        <tr><td><i class="bi bi-envelope" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold;">Email</td><td>: ${escHtml(profile.email || 'info@umamicron.com')}</td></tr>
+                    </table>
+                </div>
             <div style="position: absolute; right: 20px; top: 35px; text-align: center;">
                 <div style="width: 65px; height: 65px; background-color: var(--primary-purple); border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; border: 2px solid white; outline: 2px solid var(--primary-purple); box-shadow: 0 0 0 3px white, 0 0 0 4px var(--primary-purple);">
                     <i class="bi bi-star-fill" style="font-size: 8px; margin-bottom: 2px;"></i>
@@ -355,7 +371,7 @@ export const buildQuotationHtml = (data, profileInput) => {
     </div>
 
     <!-- Page 1 Footer -->
-    <div style="background-color: var(--primary-purple); color: white; padding: 8px 15px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-top: auto;">
+    <div class="qtn-footer">
         <div style="font-style: italic; font-size: 13px;">Thank you for your business!</div>
         <div style="display: flex; gap: 25px;">
             <div><i class="bi bi-shield-check"></i> Quality You Can Trust</div>
@@ -462,7 +478,7 @@ export const buildQuotationHtml = (data, profileInput) => {
     </div>
 
     <!-- Page 2 Footer -->
-    <div style="background-color: var(--primary-purple); color: white; padding: 8px 15px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-top: auto;">
+    <div class="qtn-footer">
         <div style="font-style: italic; font-size: 13px;">Thank you for your business!</div>
         <div>E. & O.E.</div>
         <div style="font-weight: bold;">Page 2 of 2</div>
@@ -566,7 +582,7 @@ export const buildQuotationHtml = (data, profileInput) => {
     </div>
 
     <!-- Page 2 Footer -->
-    <div style="background-color: var(--primary-purple); color: white; padding: 8px 15px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-top: auto;">
+    <div class="qtn-footer">
         <div style="font-style: italic; font-size: 13px;">Thank you for your business!</div>
         <div>E. & O.E.</div>
         <div style="font-weight: bold;">Page 2 of 2</div>
