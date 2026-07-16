@@ -162,7 +162,7 @@ export const buildPrintCompanyHeader = (profile, { showCopyBadge = false, copyBa
   return `
     <div class="header">
       <div class="logo-section">${buildPrintLogoHtml(profile)}</div>
-      <div class="company-info">
+      <div class="company-info" style="width:${showCopyBadge ? '62%' : '80%'};">
         <div class="company-name">${name}</div>
         <div class="info-line">${IC.pin}<div>${addr1}${addr2 ? `<br>${addr2}` : ''}</div></div>
         <div class="info-line-multiple">
@@ -171,7 +171,7 @@ export const buildPrintCompanyHeader = (profile, { showCopyBadge = false, copyBa
         </div>
         <div class="gstin">GSTIN: ${escHtml(profile.gstNumber || '')}</div>
       </div>
-      ${showCopyBadge ? `<div class="copy-type">${copyBadgeHtml}</div>` : '<div style="width:120px;"></div>'}
+      ${showCopyBadge ? `<div class="copy-type">${copyBadgeHtml}</div>` : ''}
     </div>
     <div class="header-border"></div>`;
 };
@@ -265,42 +265,71 @@ export const renderHtmlToPdf = async (html, { mode = 'save', filePrefix = 'DOC',
   const { jsPDF } = await import('jspdf');
   const html2canvas = (await import('html2canvas')).default;
   const host = document.createElement('div');
-  host.style.cssText = 'position:fixed;left:-12000px;top:0;z-index:-1;';
+  host.style.cssText = 'position:fixed;left:-12000px;top:0;z-index:-1;background:#fff;';
   host.innerHTML = html;
   document.body.appendChild(host);
   try {
-    const target = host.querySelector('.print-host') || host.firstElementChild;
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const canvas = await html2canvas(target, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      width,
-      windowWidth: width
-    });
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const imgW = pageW;
-    const pxPerMm = canvas.width / imgW;
-    const pageHeightPx = pageH * pxPerMm;
-    let yPx = 0;
-    let pageIndex = 0;
-    while (yPx < canvas.height) {
-      const sliceH = Math.min(pageHeightPx, canvas.height - yPx);
-      const pageCanvas = document.createElement('canvas');
-      pageCanvas.width = canvas.width;
-      pageCanvas.height = sliceH;
-      const ctx = pageCanvas.getContext('2d');
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-      ctx.drawImage(canvas, 0, yPx, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      const sliceHmm = sliceH / pxPerMm;
-      if (pageIndex > 0) pdf.addPage();
-      pdf.addImage(pageCanvas.toDataURL('image/png'), 'PNG', 0, 0, imgW, sliceHmm);
-      yPx += sliceH;
-      pageIndex += 1;
+    const margin = 4;
+    const usableW = pageW - margin * 2;
+    const usableH = pageH - margin * 2;
+
+    const pageNodes = [...host.querySelectorAll('.pdf-page')];
+    const targets = pageNodes.length
+      ? pageNodes
+      : [host.querySelector('.print-host') || host.firstElementChild].filter(Boolean);
+
+    for (let i = 0; i < targets.length; i++) {
+      const target = targets[i];
+      const canvas = await html2canvas(target, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width,
+        windowWidth: width,
+        logging: false
+      });
+
+      const imgW = usableW;
+      const imgH = (canvas.height * imgW) / canvas.width;
+
+      if (pageNodes.length) {
+        // Dedicated pages: one canvas per PDF page, scale to fit without slicing
+        if (i > 0) pdf.addPage();
+        if (imgH <= usableH) {
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, imgW, imgH);
+        } else {
+          const scale = usableH / imgH;
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, imgW * scale, usableH);
+        }
+        continue;
+      }
+
+      // Single document: paginate by canvas slices
+      const pxPerMm = canvas.width / imgW;
+      const pageHeightPx = usableH * pxPerMm;
+      let yPx = 0;
+      let pageIndex = 0;
+      while (yPx < canvas.height - 1) {
+        const sliceH = Math.min(pageHeightPx, canvas.height - yPx);
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = Math.ceil(sliceH);
+        const ctx = pageCanvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        ctx.drawImage(canvas, 0, yPx, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+        const sliceHmm = sliceH / pxPerMm;
+        if (pageIndex > 0) pdf.addPage();
+        pdf.addImage(pageCanvas.toDataURL('image/png'), 'PNG', margin, margin, imgW, sliceHmm);
+        yPx += sliceH;
+        pageIndex += 1;
+      }
     }
+
     if (mode === 'view') {
       const url = pdf.output('bloburl');
       const win = window.open(url, '_blank');

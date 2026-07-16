@@ -470,6 +470,9 @@ export const enrichBPRForPrint = (bpr, appData = {}) => {
   const prod = getPartyProductForMR(mr, appData, bpr.productName);
   return {
     ...bpr,
+    partyName: bpr.partyName || bpr.customerName || mr.partyName || '',
+    customerName: bpr.customerName || bpr.partyName || mr.partyName || '',
+    productName: bpr.productName || mr.productName || '',
     psdNote: bpr.psdNote || prod?.psdNote || '',
     psdRequirement: bpr.psdRequirement || prod?.psdReq || ''
   };

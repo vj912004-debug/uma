@@ -75,10 +75,11 @@ export const buildDcPrintLines = (dc, appData = {}) => {
       });
     } else if (mr && prodName) {
       getProductBatches(mr, prodName, prodOpts).forEach((b) => {
+        const d = parseInt(b.drums, 10) || 0;
         lines.push({
           kind: 'batch',
           text: `BATCH NO:${b.batchNo || ''}`,
-          drums: parseInt(b.drums, 10) || 0,
+          drums: d > 0 ? d : '',
           qty: parseFloat(b.qty) > 0 ? (parseFloat(b.qty) || 0).toFixed(2) : ''
         });
       });
@@ -86,10 +87,11 @@ export const buildDcPrintLines = (dc, appData = {}) => {
   });
 
   (mr?.batches || []).filter((b) => b.isEmptyDrums).forEach((b) => {
+    const d = parseInt(b.drums, 10) || 0;
     lines.push({
       kind: 'empty',
       text: 'EMPTY DRUM',
-      drums: parseInt(b.drums, 10) || 0,
+      drums: d > 0 ? d : '',
       qty: ''
     });
   });

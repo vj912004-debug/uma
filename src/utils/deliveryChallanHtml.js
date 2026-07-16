@@ -30,25 +30,36 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   const partyName = escHtml(data.partyName || '');
   const address = escHtml(data.shipAddress || data.billAddress || data.address || '');
 
-  // Serial 1 on first content row only
-  const fixedRows = (() => {
-    let shown = false;
-    return lines.map((line) => {
-      const isContent = line.kind === 'product' || line.kind === 'batch' || line.kind === 'empty';
-      let sr = '';
-      if (isContent && !shown) {
-        sr = '1';
-        shown = true;
-      }
-      return `
+  const cellDrums = (v) => (parseInt(v, 10) > 0 ? escHtml(String(parseInt(v, 10))) : '');
+  const cellQty = (v) => (v !== '' && v != null && parseFloat(v) > 0 ? escHtml(v) : '');
+
+  const DC_MIN_ROWS = 8;
+  const bodyRows = [];
+  let shownSr = false;
+  lines.forEach((line) => {
+    const isContent = line.kind === 'product' || line.kind === 'batch' || line.kind === 'empty';
+    let sr = '';
+    if (isContent && !shownSr) {
+      sr = '1';
+      shownSr = true;
+    }
+    bodyRows.push(`
       <tr>
         <td>${sr}</td>
         <td class="desc">${escHtml(line.text)}</td>
-        <td>${line.drums !== '' && line.drums != null ? escHtml(line.drums) : ''}</td>
-        <td class="num">${line.qty !== '' && line.qty != null ? escHtml(line.qty) : ''}</td>
-      </tr>`;
-    }).join('');
-  })();
+        <td>${cellDrums(line.drums)}</td>
+        <td class="num">${cellQty(line.qty)}</td>
+      </tr>`);
+  });
+  while (bodyRows.length < DC_MIN_ROWS) {
+    bodyRows.push(`
+      <tr class="blank-row">
+        <td></td><td class="desc"></td><td></td><td class="num"></td>
+      </tr>`);
+  }
+
+  const drumsTotal = parseInt(totalDrums, 10) > 0 ? String(parseInt(totalDrums, 10)) : '';
+  const qtyTotal = parseFloat(totalQty) > 0 ? fmtQty(totalQty) : '';
 
   return `
 <style>${getSharedPrintStyles()}
@@ -96,12 +107,11 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
         </tr>
       </thead>
       <tbody>
-        ${fixedRows}
+        ${bodyRows.join('')}
         <tr class="total-row">
-          <td></td>
-          <td class="total-label">TOTAL</td>
-          <td>${totalDrums || 0}</td>
-          <td class="num">${fmtQty(totalQty) || '0.00'}</td>
+          <td colspan="2" class="total-label">TOTAL</td>
+          <td>${drumsTotal}</td>
+          <td class="num">${qtyTotal}</td>
         </tr>
       </tbody>
     </table>
