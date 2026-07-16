@@ -12,6 +12,8 @@ import {
 import { renderTaxInvoicePdf } from './taxInvoiceHtml';
 import { renderPerformaInvoicePdf } from './performaInvoiceHtml';
 import { renderDeliveryChallanPdf } from './deliveryChallanHtml';
+import { renderDebitNotePdf, renderCreditNotePdf } from './debitCreditNoteHtml';
+import { renderBprPdf } from './bprHtml';
 import { renderQuotationPdf } from './quotationPdf';
 import { getDcAppData } from './deliveryChallanLayout';
 import {
@@ -1738,6 +1740,18 @@ export const exportToPDF = (docType, data) => {
       .catch((err) => console.error('DC PDF export failed:', err));
     return;
   }
+  if (docType === 'DN') {
+    renderDebitNotePdf(enriched, { mode: 'save' }).catch((err) => console.error('DN PDF export failed:', err));
+    return;
+  }
+  if (docType === 'CN') {
+    renderCreditNotePdf(enriched, { mode: 'save' }).catch((err) => console.error('CN PDF export failed:', err));
+    return;
+  }
+  if (docType === 'BPR') {
+    renderBprPdf(enriched, { mode: 'save' }).catch((err) => console.error('BPR PDF export failed:', err));
+    return;
+  }
   if (docType === 'QUOTATION') {
     renderQuotationPdf(enriched, { mode: 'save' }).catch((err) => console.error('Quotation PDF export failed:', err));
     return;
@@ -1759,6 +1773,18 @@ export const viewPDF = (docType, data) => {
   if (docType === 'DC') {
     renderDeliveryChallanPdf({ ...enriched, appData: getDcAppData() }, { mode: 'view' })
       .catch((err) => console.error('DC PDF view failed:', err));
+    return;
+  }
+  if (docType === 'DN') {
+    renderDebitNotePdf(enriched, { mode: 'view' }).catch((err) => console.error('DN PDF view failed:', err));
+    return;
+  }
+  if (docType === 'CN') {
+    renderCreditNotePdf(enriched, { mode: 'view' }).catch((err) => console.error('CN PDF view failed:', err));
+    return;
+  }
+  if (docType === 'BPR') {
+    renderBprPdf(enriched, { mode: 'view' }).catch((err) => console.error('BPR PDF view failed:', err));
     return;
   }
   if (docType === 'QUOTATION') {
