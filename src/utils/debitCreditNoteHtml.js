@@ -136,7 +136,7 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
       <td class="center">${r.sr}</td>
       <td class="left">${escHtml(desc)}</td>
       <td class="center">${escHtml(hsn)}</td>
-      <td>${escHtml(fmtQty(r.qty))}</td>
+      <td class="center">${escHtml(fmtQty(r.qty))}</td>
       <td>${fmtMoney(r.rate)}</td>
       <td>${fmtMoney(r.amt)}</td>
       <td>${fmtMoney(r.cgstAmt)}</td>
@@ -153,14 +153,16 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
     </tr>`).join('');
 
   const rightColHtml = `
-    <div style="background-color: var(--light-purple-bg); border-radius: 6px; padding: 6px; border: 1px solid var(--border-purple);">
-        <div style="color: var(--primary-purple); font-weight: bold; font-size: 11px; text-align: center; border-bottom: 1px solid var(--border-purple); padding-bottom: 4px; margin-bottom: 6px;">REFERENCE DETAILS</div>
-        <div class="data-row"><div class="data-label"><i class="bi bi-file-earmark-text"></i> ${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} No.</div><div class="data-value">: &nbsp;${docNo}</div></div>
-        <div class="data-row"><div class="data-label"><i class="bi bi-calendar3"></i> ${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} Date</div><div class="data-value">: &nbsp;${docDate}</div></div>
-        <div class="data-row" style="margin-top: 5px;"><div class="data-label"><i class="bi bi-file-earmark-text"></i> Original Invoice No.</div><div class="data-value">: &nbsp;${refInvoice}</div></div>
-        <div class="data-row"><div class="data-label"><i class="bi bi-calendar3"></i> Original Invoice Date</div><div class="data-value">: &nbsp;${escHtml(formatPdfDateDmy(data.refInvoiceDate) || '')}</div></div>
-        <div class="data-row" style="margin-top: 5px;"><div class="data-label"><i class="bi bi-file-earmark-text"></i> Customer PO No.</div><div class="data-value">: &nbsp;${escHtml(data.poNo || 'Verbal')}</div></div>
-        <div class="data-row"><div class="data-label"><i class="bi bi-tag"></i> Reference</div><div class="data-value">: &nbsp;${escHtml(data.reference || '')}</div></div>
+    <div style="background-color: var(--light-purple-bg); border-radius: 6px; padding: 6px 8px; border: 1.5px solid var(--border-purple); height: 100%; box-sizing: border-box;">
+        <div style="color: var(--primary-purple); font-weight: bold; font-size: 11px; text-align: center; border-bottom: 1.5px solid var(--border-purple); padding-bottom: 4px; margin-bottom: 6px;">REFERENCE DETAILS</div>
+        <table style="width: 100%; font-size: 10.5px; border-collapse: collapse; line-height: 1.4;">
+            <tr><td style="width: 18px; vertical-align: top;"><i class="bi bi-file-earmark-text" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; width: 110px; vertical-align: top;">${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} No.</td><td style="vertical-align: top;">: ${docNo}</td></tr>
+            <tr><td style="vertical-align: top;"><i class="bi bi-calendar3" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} Date</td><td style="vertical-align: top;">: ${docDate}</td></tr>
+            <tr><td style="vertical-align: top;"><i class="bi bi-file-earmark-text" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Original Invoice No.</td><td style="vertical-align: top;">: ${refInvoice}</td></tr>
+            <tr><td style="vertical-align: top;"><i class="bi bi-calendar3" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Original Invoice Date</td><td style="vertical-align: top;">: ${escHtml(formatPdfDateDmy(data.refInvoiceDate) || '')}</td></tr>
+            <tr><td style="vertical-align: top;"><i class="bi bi-person-badge" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Customer PO No.</td><td style="vertical-align: top;">: ${escHtml(data.poNo || 'Verbal')}</td></tr>
+            <tr><td style="vertical-align: top;"><i class="bi bi-tag" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Reference</td><td style="vertical-align: top;">: ${escHtml(data.reference || '')}</td></tr>
+        </table>
     </div>
   `;
 
@@ -180,11 +182,11 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
   const roundOff = roundedTotal - totalAll;
 
   const reasonHtml = filePrefix === 'DN' ? `
-    <div style="display: flex; align-items: center; border: 1.5px solid var(--border-purple); border-radius: 6px; padding: 6px 10px; margin-top: 8px; font-size: 11px;">
-        <div style="color: var(--primary-purple); font-weight: bold; display: flex; align-items: center; gap: 6px; margin-right: 20px;">
+    <div style="display: flex; border: 1.5px solid var(--border-purple); border-radius: 6px; margin-top: 8px; overflow: hidden;">
+        <div style="background-color: var(--light-purple-bg); color: var(--primary-purple); font-weight: bold; padding: 6px 10px; display: flex; align-items: center; gap: 6px; border-right: 1.5px solid var(--border-purple); font-size: 11px; white-space: nowrap;">
             <i class="bi bi-card-text"></i> REASON FOR DEBIT NOTE
         </div>
-        <div style="display: flex; gap: 15px; flex: 1;">
+        <div style="display: flex; gap: 12px; align-items: center; padding: 6px 10px; flex: 1; font-size: 10.5px; flex-wrap: wrap;">
             <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Additional Charges' ? 'checked="checked"' : ''}> Additional Charges</label>
             <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Rate Revision' ? 'checked="checked"' : ''}> Rate Revision</label>
             <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Packing Charges' ? 'checked="checked"' : ''}> Packing Charges</label>
@@ -194,11 +196,11 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
         </div>
     </div>
   ` : `
-    <div style="display: flex; align-items: center; border: 1.5px solid var(--border-purple); border-radius: 6px; padding: 6px 10px; margin-top: 8px; font-size: 11px;">
-        <div style="color: var(--primary-purple); font-weight: bold; display: flex; align-items: center; gap: 6px; margin-right: 20px;">
+    <div style="display: flex; border: 1.5px solid var(--border-purple); border-radius: 6px; margin-top: 8px; overflow: hidden;">
+        <div style="background-color: var(--light-purple-bg); color: var(--primary-purple); font-weight: bold; padding: 6px 10px; display: flex; align-items: center; gap: 6px; border-right: 1.5px solid var(--border-purple); font-size: 11px; white-space: nowrap;">
             <i class="bi bi-card-text"></i> REASON FOR CREDIT NOTE
         </div>
-        <div style="display: flex; gap: 15px; flex: 1;">
+        <div style="display: flex; gap: 12px; align-items: center; padding: 6px 10px; flex: 1; font-size: 10.5px; flex-wrap: wrap;">
             <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Sales Return' ? 'checked="checked"' : ''}> Sales Return</label>
             <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Rate Difference' ? 'checked="checked"' : ''}> Rate Difference</label>
             <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Discount' ? 'checked="checked"' : ''}> Discount</label>
@@ -220,19 +222,21 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
         ${getSharedPrintStyles()}
+        .meta-col.border-left { border-left: none !important; padding-left: 0 !important; }
+        .meta-strip { grid-template-columns: 1.2fr 0.8fr 1.2fr; align-items: stretch; }
         .watermark {
             position: absolute;
-            top: 55%;
+            top: 50%;
             left: 50%;
             transform: translate(-50%, -50%) rotate(-20deg);
-            opacity: 0.08;
-            font-size: 80px;
+            opacity: 0.06;
+            font-size: 70px;
             font-weight: bold;
             color: var(--primary-purple);
             z-index: 0;
             pointer-events: none;
             white-space: nowrap;
-            letter-spacing: 5px;
+            letter-spacing: 4px;
         }
         .invoice-table tbody tr {
             position: relative;
@@ -245,8 +249,6 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
 <div class="pdf-page">
 <div class="invoice-box" style="position: relative;">
     
-    <div class="watermark">${escHtml(title)}</div>
-
     ${buildPrintHeader(profile, title, 'AGAINST TAX INVOICE')}
     ${buildMetaStrip(profile, companyState, companyPan, rightColHtml)}
 
@@ -257,18 +259,19 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
 
     ${reasonHtml}
 
-    <div class="table-container">
+    <div class="table-container" style="position: relative;">
+        <div class="watermark">${escHtml(title)}</div>
         <table class="invoice-table">
             <thead>
                 <tr>
                     <th style="width: 5%;">Sr. No.</th>
-                    <th style="width: 27%;">Description</th>
+                    <th style="width: 25%; text-align: left; padding-left: 8px;">Description</th>
                     <th style="width: 10%;">HSN / SAC</th>
                     <th style="width: 6%;">Qty.</th>
                     <th style="width: 10%;">Rate (₹)</th>
                     <th style="width: 10%;">Amount (₹)</th>
-                    <th style="width: 7%;">CGST (₹)</th>
-                    <th style="width: 7%;">SGST (₹)</th>
+                    <th style="width: 8%;">CGST (₹)</th>
+                    <th style="width: 8%;">SGST (₹)</th>
                     <th style="width: 6%;">IGST (₹)</th>
                     <th style="width: 12%;">Total Amount (₹)</th>
                 </tr>
@@ -276,9 +279,8 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
             <tbody>
                 ${bodyRows}${blanks}
                 <tr class="total-row">
-                    <td colspan="2" class="center">TOTAL</td>
-                    <td></td>
-                    <td>${fmtQty(totalQty) || '0.00'}</td>
+                    <td colspan="3" class="center" style="text-align: center;">TOTAL</td>
+                    <td class="center">${fmtQty(totalQty) || '0.00'}</td>
                     <td></td>
                     <td>${fmtMoney(totalAmt)}</td>
                     <td>${fmtMoney(totalCgst)}</td>
@@ -292,21 +294,21 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
 
     <div class="bottom-summary-grid">
         ${filePrefix === 'DN' ? buildBankDetailsBox(profile) : `
-        <div class="bank-details-box">
+        <div class="bank-details-box" style="display: flex; flex-direction: column;">
             <div class="box-heading"><i class="bi bi-journal-text"></i> NOTES</div>
-            <ul style="padding-left: 20px; font-size: 11px; line-height: 1.5; margin-top: 8px;">
+            <ul style="padding-left: 24px; font-size: 11px; line-height: 1.8; margin-top: 4px; flex: 1;">
                 <li>Amount will be adjusted against the next invoice.</li>
                 <li>Please quote the ${escHtml(title)} Number for future reference.</li>
             </ul>
         </div>
         `}
         <div class="totals-box">
-            <div>
+            <div style="padding: 4px 0;">
                 <div class="charge-row"><span>Total Amount Before Tax</span><span>₹ &nbsp;${fmtMoney(totalAmt)}</span></div>
                 <div class="charge-row"><span>Add : CGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span>₹ &nbsp;${fmtMoney(totalCgst)}</span></div>
                 <div class="charge-row"><span>Add : SGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span>₹ &nbsp;${fmtMoney(totalSgst)}</span></div>
-                <div class="charge-row"><span>Add : IGST @ 18%</span><span>₹ &nbsp;${fmtMoney(totalIgst)}</span></div>
-                <div class="charge-row bold" style="border-top: 1px solid #ddd; padding-top:4px;"><span>Total Tax Amount</span><span>₹ &nbsp;${fmtMoney(totalCgst + totalSgst + totalIgst)}</span></div>
+                <div class="charge-row"><span>Add : IGST @ 18%</span><span>${totalIgst > 0 ? `₹ &nbsp;${fmtMoney(totalIgst)}` : '-'}</span></div>
+                <div class="charge-row bold" style="border-top: 1px solid var(--grid-line-purple); padding-top:6px; margin-top: 2px;"><span>Total Tax Amount</span><span>₹ &nbsp;${fmtMoney(totalCgst + totalSgst + totalIgst)}</span></div>
                 <div class="charge-row"><span>Round Off</span><span>₹ &nbsp;${fmtMoney(roundOff)}</span></div>
             </div>
             <div class="grand-total-banner">
