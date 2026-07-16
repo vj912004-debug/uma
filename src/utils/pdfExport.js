@@ -12,6 +12,11 @@ import {
 
 import { renderTaxInvoicePdf } from './taxInvoiceHtml';
 import { renderPerformaInvoicePdf } from './performaInvoiceHtml';
+import { renderDebitNotePdf } from './debitCreditNoteHtml';
+import { renderDeliveryChallanPdf } from './deliveryChallanHtml';
+import { renderBprPdf } from './bprHtml';
+import { renderPackingListPdf } from './packingListHtml';
+import { renderQuotationPdf } from './quotationPdf';
 
 const getProfile = (data) => mergeCompanyProfile(data?.companyProfile || getStoredCompanyProfile());
 
@@ -2111,6 +2116,26 @@ export const exportToPDF = (docType, data) => {
     renderPerformaInvoicePdf(enriched, { mode: 'save' }).catch((err) => console.error('PI PDF export failed:', err));
     return;
   }
+  if (docType === 'DN') {
+    renderDebitNotePdf(enriched, { mode: 'save' }).catch((err) => console.error('DN PDF export failed:', err));
+    return;
+  }
+  if (docType === 'DC') {
+    renderDeliveryChallanPdf(enriched, { mode: 'save' }).catch((err) => console.error('DC PDF export failed:', err));
+    return;
+  }
+  if (docType === 'BPR') {
+    renderBprPdf(enriched, { mode: 'save' }).catch((err) => console.error('BPR PDF export failed:', err));
+    return;
+  }
+  if (docType === 'PL') {
+    renderPackingListPdf(enriched, { mode: 'save' }).catch((err) => console.error('PL PDF export failed:', err));
+    return;
+  }
+  if (docType === 'QUOTATION') {
+    renderQuotationPdf(enriched, { mode: 'save' }).catch((err) => console.error('Quotation PDF export failed:', err));
+    return;
+  }
   const { doc, docNo } = buildPDF(docType, enriched);
   doc.save(`${docType}_${docNo}.pdf`);
 };
@@ -2123,6 +2148,26 @@ export const viewPDF = (docType, data) => {
   }
   if (docType === 'PI') {
     renderPerformaInvoicePdf(enriched, { mode: 'view' }).catch((err) => console.error('PI PDF view failed:', err));
+    return;
+  }
+  if (docType === 'DN') {
+    renderDebitNotePdf(enriched, { mode: 'view' }).catch((err) => console.error('DN PDF view failed:', err));
+    return;
+  }
+  if (docType === 'DC') {
+    renderDeliveryChallanPdf(enriched, { mode: 'view' }).catch((err) => console.error('DC PDF view failed:', err));
+    return;
+  }
+  if (docType === 'BPR') {
+    renderBprPdf(enriched, { mode: 'view' }).catch((err) => console.error('BPR PDF view failed:', err));
+    return;
+  }
+  if (docType === 'PL') {
+    renderPackingListPdf(enriched, { mode: 'view' }).catch((err) => console.error('PL PDF view failed:', err));
+    return;
+  }
+  if (docType === 'QUOTATION') {
+    renderQuotationPdf(enriched, { mode: 'view' }).catch((err) => console.error('Quotation PDF view failed:', err));
     return;
   }
   const { doc, docNo } = buildPDF(docType, enriched);

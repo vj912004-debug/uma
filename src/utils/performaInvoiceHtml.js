@@ -20,7 +20,7 @@ import {
   buildStatusBar
 } from './printTheme';
 
-const PI_MIN_ROWS = 7;
+const PI_MIN_ROWS = 15;
 
 const extractDescAndHsn = (label) => {
   const match = label.match(/(.*?)\s*\((\d+)\)$/);
