@@ -258,11 +258,11 @@ const DebitNotes = () => {
                   <label>Reason for Debit Note</label>
                   <select className="input-field" value={form.reason} onChange={e => setForm({...form, reason: e.target.value})}>
                     <option value="">-- Select Reason --</option>
-                    <option value="Sales Return">Sales Return</option>
-                    <option value="Rate Difference">Rate Difference</option>
-                    <option value="Discount">Discount</option>
-                    <option value="Excess Billing">Excess Billing</option>
-                    <option value="Material Rejection">Material Rejection</option>
+                    <option value="Additional Charges">Additional Charges</option>
+                    <option value="Rate Revision">Rate Revision</option>
+                    <option value="Packing Charges">Packing Charges</option>
+                    <option value="Freight Charges">Freight Charges</option>
+                    <option value="Material Shortage">Material Shortage</option>
                     <option value="Others">Others</option>
                   </select>
                 </div>

@@ -172,15 +172,31 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
     </ol>
     ${data.particulars ? `<div style="font-size: 9.5px; font-weight: bold; margin-top: 4px; color: var(--primary-purple);">Particulars: ${escHtml(data.particulars)}</div>` : ''}
   `;
-  const declarationHtml = `<p>This ${escHtml(title)} is issued against the above Tax Invoice and forms an integral part of the original transaction.</p>`;
+  const declarationHtml = filePrefix === 'DN'
+    ? `<p>This Debit Note is issued against the above Tax Invoice for the additional amount recoverable.</p>`
+    : `<p>This ${escHtml(title)} is issued against the above Tax Invoice and forms an integral part of the original transaction.</p>`;
 
   const roundedTotal = Math.round(totalAll);
   const roundOff = roundedTotal - totalAll;
 
-  const reasonHtml = `
+  const reasonHtml = filePrefix === 'DN' ? `
     <div style="display: flex; align-items: center; border: 1.5px solid var(--border-purple); border-radius: 6px; padding: 6px 10px; margin-top: 8px; font-size: 11px;">
         <div style="color: var(--primary-purple); font-weight: bold; display: flex; align-items: center; gap: 6px; margin-right: 20px;">
-            <i class="bi bi-card-text"></i> REASON FOR ${filePrefix === 'CN' ? 'CREDIT' : 'DEBIT'} NOTE
+            <i class="bi bi-card-text"></i> REASON FOR DEBIT NOTE
+        </div>
+        <div style="display: flex; gap: 15px; flex: 1;">
+            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Additional Charges' ? 'checked="checked"' : ''}> Additional Charges</label>
+            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Rate Revision' ? 'checked="checked"' : ''}> Rate Revision</label>
+            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Packing Charges' ? 'checked="checked"' : ''}> Packing Charges</label>
+            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Freight Charges' ? 'checked="checked"' : ''}> Freight Charges</label>
+            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Material Shortage' ? 'checked="checked"' : ''}> Material Shortage</label>
+            <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${!['Additional Charges', 'Rate Revision', 'Packing Charges', 'Freight Charges', 'Material Shortage'].includes(data.reason) && data.reason ? 'checked="checked"' : ''}> Others <span style="border-bottom: 1px solid #000; display: inline-block; width: 60px;">${!['Additional Charges', 'Rate Revision', 'Packing Charges', 'Freight Charges', 'Material Shortage'].includes(data.reason) && data.reason ? escHtml(data.reason) : ''}</span></label>
+        </div>
+    </div>
+  ` : `
+    <div style="display: flex; align-items: center; border: 1.5px solid var(--border-purple); border-radius: 6px; padding: 6px 10px; margin-top: 8px; font-size: 11px;">
+        <div style="color: var(--primary-purple); font-weight: bold; display: flex; align-items: center; gap: 6px; margin-right: 20px;">
+            <i class="bi bi-card-text"></i> REASON FOR CREDIT NOTE
         </div>
         <div style="display: flex; gap: 15px; flex: 1;">
             <label style="display: flex; align-items: center; gap: 4px;"><input type="checkbox" ${data.reason === 'Sales Return' ? 'checked="checked"' : ''}> Sales Return</label>
@@ -275,6 +291,7 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
     </div>
 
     <div class="bottom-summary-grid">
+        ${filePrefix === 'DN' ? buildBankDetailsBox(profile) : `
         <div class="bank-details-box">
             <div class="box-heading"><i class="bi bi-journal-text"></i> NOTES</div>
             <ul style="padding-left: 20px; font-size: 11px; line-height: 1.5; margin-top: 8px;">
@@ -282,6 +299,7 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
                 <li>Please quote the ${escHtml(title)} Number for future reference.</li>
             </ul>
         </div>
+        `}
         <div class="totals-box">
             <div>
                 <div class="charge-row"><span>Total Amount Before Tax</span><span>₹ &nbsp;${fmtMoney(totalAmt)}</span></div>
