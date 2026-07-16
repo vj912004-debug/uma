@@ -354,65 +354,8 @@ export const buildQuotationHtml = (data, profileInput) => {
         </div>
     </div>
 
-    <!-- Terms & Conditions -->
-    <div style="background-color: var(--primary-purple); color: white; padding: 6px 15px; font-weight: bold; font-size: 12px; border-radius: 6px; margin-bottom: 10px;">
-        TERMS & CONDITIONS
-    </div>
-    <div class="qtn-terms-grid">
-        <div class="qtn-term-box" style="border-color: var(--border-purple);">
-            <div class="qtn-term-title" style="color: var(--primary-purple);"><i class="bi bi-receipt"></i> TAXES</div>
-            <div>GST will be charged extra as applicable.</div>
-        </div>
-        <div class="qtn-term-box" style="border-color: #90caf9;">
-            <div class="qtn-term-title" style="color: #1976d2;"><i class="bi bi-droplet"></i> PROCESS LOSS</div>
-            <div>Loss occurs during processing is on your account.</div>
-        </div>
-        <div class="qtn-term-box" style="border-color: #a5d6a7;">
-            <div class="qtn-term-title" style="color: #388e3c;"><i class="bi bi-arrow-repeat"></i> BATCH / CHANGE OVER</div>
-            <div>Change Over Charge @ ₹ 500/- per batch or per specification will be applicable.</div>
-        </div>
-        <div class="qtn-term-box" style="border-color: #ffcc80;">
-            <div class="qtn-term-title" style="color: #f57c00;"><i class="bi bi-truck"></i> OTHER CHARGES</div>
-            <div>Transportation, Insurance, Repacking material charges will be extra.</div>
-        </div>
-        <div class="qtn-term-box" style="border-color: #ef9a9a;">
-            <div class="qtn-term-title" style="color: #d32f2f;"><i class="bi bi-cash-coin"></i> PAYMENT TERMS</div>
-            <div>100% Advance against Performa Invoice.</div>
-        </div>
-        <div class="qtn-term-box" style="border-color: #80cbc4;">
-            <div class="qtn-term-title" style="color: #00796b;"><i class="bi bi-calendar-check"></i> VALIDITY</div>
-            <div>This quotation is valid up to ${validityDate}.</div>
-        </div>
-    </div>
-
-    <!-- Important Notes & Responsibilities -->
-    <div style="display: flex; gap: 15px; flex: 1;">
-        <div style="flex: 1; border: 1.5px solid var(--border-purple); border-radius: 6px; padding: 10px; font-size: 9.5px; background-color: var(--light-purple-bg);">
-            <div style="color: var(--primary-purple); font-weight: bold; font-size: 11px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;"><i class="bi bi-journal-text"></i> IMPORTANT NOTES</div>
-            <ol style="padding-left: 15px; margin: 0; line-height: 1.5;">
-                <li>Please send Purchase Order and specification letter regarding particle size requirement, material dispatch destination with preferred transporter / courier along with material.</li>
-                <li>Please send extra drums and other repacking materials considering increase of volume after micronization & micronized materials to be repacked in fresh bags.</li>
-                <li>Material must be Non-Hazardous, uniform, dry and free flow powder form. Declaration form regarding material's non hazardous property is mandatory.</li>
-            </ol>
-        </div>
-        <div style="flex: 1; border: 1.5px solid #80cbc4; border-radius: 6px; padding: 10px; font-size: 9.5px; background-color: #e0f2f1; position: relative;">
-            <div style="color: #00796b; font-weight: bold; font-size: 11px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;"><i class="bi bi-person-check"></i> CUSTOMER RESPONSIBILITIES</div>
-            <ol style="padding-left: 15px; margin: 0; line-height: 1.5;">
-                <li>Material must be non-hazardous and free from any contamination.</li>
-                <li>Material specification and desired PSD must be clearly mentioned.</li>
-                <li>All documents & regulatory forms to be provided along with material.</li>
-                <li>Repacking material to be provided if customer does not opt for our material.</li>
-            </ol>
-            <div style="position: absolute; bottom: 10px; right: 10px; text-align: center; font-size: 10px;">
-                <div style="font-weight: bold; color: var(--primary-purple); margin-bottom: 25px;">For ${escHtml(profile.companyName || 'UMA MICRON')}</div>
-                <div style="font-weight: bold; color: var(--text-black);">${escHtml(data.signatoryName || 'Amit Patel')}</div>
-                <div style="color: #555;">Authorised Signatory</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Footer -->
-    <div style="background-color: var(--primary-purple); color: white; padding: 8px 15px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-top: 12px;">
+    <!-- Page 1 Footer -->
+    <div style="background-color: var(--primary-purple); color: white; padding: 8px 15px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-top: auto;">
         <div style="font-style: italic; font-size: 13px;">Thank you for your business!</div>
         <div style="display: flex; gap: 25px;">
             <div><i class="bi bi-shield-check"></i> Quality You Can Trust</div>
@@ -420,6 +363,214 @@ export const buildQuotationHtml = (data, profileInput) => {
         </div>
     </div>
 
+  </div>
+
+  <!-- PAGE 2 -->
+  <div class="qtn-page pdf-page">
+    
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 15px; margin-top: 10px;">
+        
+        <!-- Top Row: 3 Columns -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+            
+            <!-- Col 1 -->
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div class="qtn-box">
+                    <div class="qtn-box-header"><i class="bi bi-file-earmark-text"></i> TERMS & CONDITIONS</div>
+                    <div class="qtn-box-body">
+                        <ul style="padding-left: 15px; margin: 0; font-size: 10px;">
+                            <li style="margin-bottom: 6px;">This is only processing charges, all other charges like Transportation, Insurance, Repacking material charges will be extra.</li>
+                            <li>GST will be charged extra as applicable.</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="qtn-box">
+                    <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-currency-rupee"></i> PAYMENT TERMS</div>
+                    <div class="qtn-box-body" style="font-size: 10px;">
+                        <ul style="padding-left: 15px; margin: 0;">
+                            <li style="margin-bottom: 6px;">100% Advance against Proforma Invoice.</li>
+                            <li>No process will be started without advance payment.</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="qtn-box">
+                    <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-calendar-check"></i> VALIDITY</div>
+                    <div class="qtn-box-body" style="font-size: 10px;">
+                        <ul style="padding-left: 15px; margin: 0;">
+                            <li>This quotation is valid till ${validityDate}.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Col 2 -->
+            <div class="qtn-box">
+                <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-gear"></i> MATERIAL & PROCESS CONDITIONS</div>
+                <div class="qtn-box-body">
+                    <ul style="padding-left: 15px; margin: 0; font-size: 10px;">
+                        <li style="margin-bottom: 10px;">Loss occurs during processing is on your account.</li>
+                        <li style="margin-bottom: 10px;">Same materials requirement of micronization separately batch wise of different specification of same materials then change over charge @ Rs. 500/- batch or per specification will be applicable.</li>
+                        <li>Material must be non-hazardous, uniform, dry and free flow powder form.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Col 3 -->
+            <div class="qtn-box">
+                <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-person-check"></i> CUSTOMER RESPONSIBILITIES</div>
+                <div class="qtn-box-body">
+                    <ol style="padding-left: 15px; margin: 0; font-size: 10px;">
+                        <li style="margin-bottom: 10px;">Please send Purchase Order and specification letter regarding particle size requirement, material dispatch destination with preferred transporter / courier along with material.</li>
+                        <li style="margin-bottom: 10px;">Please send extra drums and other repacking materials considering increase of volume after micronization & micronized materials to be repacked in fresh bags.</li>
+                        <li>Declaration of non-hazardous property of material is mandatory.</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Row: 2 Columns -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            
+            <!-- Col 1 -->
+            <div class="qtn-box">
+                <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-journal-text"></i> IMPORTANT NOTES</div>
+                <div class="qtn-box-body">
+                    <ul style="padding-left: 15px; margin: 0; font-size: 10px;">
+                        <li style="margin-bottom: 8px;">If properties of material change then rate will be change and PSD will change then rate will be change.</li>
+                        <li style="margin-bottom: 8px;">Any changes in taxes will be applicable as per actual.</li>
+                        <li>Disputes are subject to Vadodara Jurisdiction only.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Col 2 -->
+            <div class="qtn-box" style="display: flex; flex-direction: column;">
+                <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-shield-check"></i> DECLARATION</div>
+                <div class="qtn-box-body" style="flex: 1; display: flex; flex-direction: column;">
+                    <div style="font-size: 10px; margin-bottom: 30px;">
+                        We hereby declare that the above quotation is true and correct to the best of our knowledge.
+                    </div>
+                    <div style="margin-top: auto; text-align: right; font-size: 10px;">
+                        <div style="border-top: 1px solid var(--text-black); display: inline-block; padding-top: 5px; width: 200px; text-align: center;">
+                            Authorised Signatory
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Page 2 Footer -->
+    <div style="background-color: var(--primary-purple); color: white; padding: 8px 15px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-top: auto;">
+        <div style="font-style: italic; font-size: 13px;">Thank you for your business!</div>
+        <div>E. & O.E.</div>
+        <div style="font-weight: bold;">Page 2 of 2</div>
+    </div>
+  </div>
+
+  <!-- PAGE 2 -->
+  <div class="qtn-page pdf-page">
+    
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 15px; margin-top: 10px;">
+        
+        <!-- Top Row: 3 Columns -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+            
+            <!-- Col 1 -->
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div class="qtn-box">
+                    <div class="qtn-box-header"><i class="bi bi-file-earmark-text"></i> TERMS & CONDITIONS</div>
+                    <div class="qtn-box-body">
+                        <ul style="padding-left: 15px; margin: 0; font-size: 10px;">
+                            <li style="margin-bottom: 6px;">This is only processing charges, all other charges like Transportation, Insurance, Repacking material charges will be extra.</li>
+                            <li>GST will be charged extra as applicable.</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="qtn-box">
+                    <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-currency-rupee"></i> PAYMENT TERMS</div>
+                    <div class="qtn-box-body" style="font-size: 10px;">
+                        <ul style="padding-left: 15px; margin: 0;">
+                            <li style="margin-bottom: 6px;">100% Advance against Proforma Invoice.</li>
+                            <li>No process will be started without advance payment.</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="qtn-box">
+                    <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-calendar-check"></i> VALIDITY</div>
+                    <div class="qtn-box-body" style="font-size: 10px;">
+                        <ul style="padding-left: 15px; margin: 0;">
+                            <li>This quotation is valid till ${validityDate}.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Col 2 -->
+            <div class="qtn-box">
+                <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-gear"></i> MATERIAL & PROCESS CONDITIONS</div>
+                <div class="qtn-box-body">
+                    <ul style="padding-left: 15px; margin: 0; font-size: 10px;">
+                        <li style="margin-bottom: 10px;">Loss occurs during processing is on your account.</li>
+                        <li style="margin-bottom: 10px;">Same materials requirement of micronization separately batch wise of different specification of same materials then change over charge @ Rs. 500/- batch or per specification will be applicable.</li>
+                        <li>Material must be non-hazardous, uniform, dry and free flow powder form.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Col 3 -->
+            <div class="qtn-box">
+                <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-person-check"></i> CUSTOMER RESPONSIBILITIES</div>
+                <div class="qtn-box-body">
+                    <ol style="padding-left: 15px; margin: 0; font-size: 10px;">
+                        <li style="margin-bottom: 10px;">Please send Purchase Order and specification letter regarding particle size requirement, material dispatch destination with preferred transporter / courier along with material.</li>
+                        <li style="margin-bottom: 10px;">Please send extra drums and other repacking materials considering increase of volume after micronization & micronized materials to be repacked in fresh bags.</li>
+                        <li>Declaration of non-hazardous property of material is mandatory.</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Row: 2 Columns -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            
+            <!-- Col 1 -->
+            <div class="qtn-box">
+                <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-journal-text"></i> IMPORTANT NOTES</div>
+                <div class="qtn-box-body">
+                    <ul style="padding-left: 15px; margin: 0; font-size: 10px;">
+                        <li style="margin-bottom: 8px;">If properties of material change then rate will be change and PSD will change then rate will be change.</li>
+                        <li style="margin-bottom: 8px;">Any changes in taxes will be applicable as per actual.</li>
+                        <li>Disputes are subject to Vadodara Jurisdiction only.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Col 2 -->
+            <div class="qtn-box" style="display: flex; flex-direction: column;">
+                <div class="qtn-box-header" style="background: white; color: var(--primary-purple); border-bottom: 1.5px solid var(--border-purple);"><i class="bi bi-shield-check"></i> DECLARATION</div>
+                <div class="qtn-box-body" style="flex: 1; display: flex; flex-direction: column;">
+                    <div style="font-size: 10px; margin-bottom: 30px;">
+                        We hereby declare that the above quotation is true and correct to the best of our knowledge.
+                    </div>
+                    <div style="margin-top: auto; text-align: right; font-size: 10px;">
+                        <div style="border-top: 1px solid var(--text-black); display: inline-block; padding-top: 5px; width: 200px; text-align: center;">
+                            Authorised Signatory
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Page 2 Footer -->
+    <div style="background-color: var(--primary-purple); color: white; padding: 8px 15px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-top: auto;">
+        <div style="font-style: italic; font-size: 13px;">Thank you for your business!</div>
+        <div>E. & O.E.</div>
+        <div style="font-weight: bold;">Page 2 of 2</div>
+    </div>
   </div>
 </div>
 </body>
