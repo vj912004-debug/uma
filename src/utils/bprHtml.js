@@ -1,14 +1,6 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { formatPdfDateSlash } from './taxInvoiceLayout';
-import {
-  escHtml,
-  fmtQty,
-  getSharedPrintStyles,
-  PRINT_PAGE_W,
-  buildPrintHeader,
-  buildStatusBar,
-  renderHtmlToPdf
-} from './printTheme';
+import { escHtml, fmtQty, PRINT_PAGE_W } from './printTheme';
 
 const bprCheck = (val) => (val === true ? 'Yes' : val === false ? '' : (val || ''));
 
@@ -82,61 +74,202 @@ export const buildBprHtml = (data, profileInput) => {
   const bprNo = escHtml(data.bprNo || 'N/A');
   const bprDate = escHtml(formatPdfDateSlash(data.date) || '');
 
-  return `
-<!DOCTYPE html>
+  const logoSrc = profile?.logo && String(profile.logo).startsWith('data:image') ? profile.logo : '';
+  const logoHtml = logoSrc ? `<img src="${logoSrc}" alt="Logo">` : `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <path d="M50 8 C74 8 90 26 88 46 C86 63 72 78 55 80" fill="none" stroke="#2fa84f" stroke-width="6" stroke-linecap="round"/>
+          <path d="M50 92 C26 92 10 74 12 54 C14 37 28 22 45 20" fill="none" stroke="#f47920" stroke-width="6" stroke-linecap="round"/>
+          <polygon points="86,40 96,46 88,54" fill="#2fa84f"/>
+          <polygon points="14,60 4,54 12,46" fill="#f47920"/>
+          <text x="50" y="45" text-anchor="middle" font-family="Georgia,serif" font-weight="bold" font-size="26" fill="#f47920">U</text>
+          <text x="50" y="70" text-anchor="middle" font-family="Georgia,serif" font-weight="bold" font-size="26" fill="#3d2b7d">M</text>
+        </svg>`;
+
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BPR - ${escHtml(profile.companyName)}</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <style>
-        ${getSharedPrintStyles()}
-        .bpr-section { border: 1.5px solid var(--border-purple); border-radius: 6px; overflow: hidden; margin-bottom: 12px; }
-        .bpr-header {
-            background-color: var(--light-purple-bg);
-            color: var(--primary-purple);
-            font-weight: bold;
-            font-size: 11px;
-            padding: 5px 8px;
-            border-bottom: 1.5px solid var(--border-purple);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .bpr-body { padding: 8px 10px; }
-        .bpr-grid { width: 100%; border-collapse: collapse; }
-        .bpr-grid td { border: 1px solid var(--grid-line-purple); padding: 5px 6px; font-size: 11px; vertical-align: middle; }
-        .bpr-grid td.lbl { color: var(--text-black); font-weight: bold; width: 28%; background: var(--light-purple-bg); }
-        .checklist-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dotted var(--border-purple); font-size: 11px; }
-        .checklist-row:last-child { border-bottom: none; }
-        .bpr-meta-grid {
-            display: flex; flex-wrap: wrap;
-            border: 1.5px solid var(--border-purple); border-radius: 6px; overflow: hidden; margin-bottom: 12px;
-        }
-        .bpr-meta-item { padding: 6px 10px; border-right: 1px solid var(--border-purple); border-bottom: 1px solid var(--border-purple); display: flex; align-items: center; font-size: 11px; width: 32%; box-sizing: border-box; }
-        .bpr-meta-item.label { color: var(--primary-purple); font-weight: bold; background: var(--light-purple-bg); width: 18%; }
-        .bpr-meta-grid .bpr-meta-item:nth-child(4n) { border-right: none; }
-        .bpr-meta-grid .bpr-meta-item:nth-last-child(-n+4) { border-bottom: none; }
-        .footer-bottom { display: flex; gap: 12px; margin-top: auto; }
-        .sign-box { flex: 1; border: 1.5px solid var(--border-purple); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; min-height: 90px; }
-        .sign-area { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; padding: 10px; text-align: center; }
-        .sign-text { border-top: 1px solid #777777; padding-top: 5px; color: var(--text-black); font-weight: bold; width: 90%; margin: 0 auto; font-size: 10px; }
-        .seal-box {
-            flex: 1; border: 1.5px dashed var(--border-purple); border-radius: 6px;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            color: var(--primary-purple); font-weight: bold; gap: 5px; min-height: 90px; font-size: 11px;
-        }
-    </style>
+<meta charset="UTF-8">
+<title>BPR - ${escHtml(profile.companyName)}</title>
+<style>
+  :root{
+    --purple:#3d2b7d;
+    --purple-dark:#2f2263;
+    --lav-bg:#efeaf7;
+    --lav-border:#c9bce8;
+    --orange:#f47920;
+    --green:#2fa84f;
+    --text:#231f20;
+    --grey-line:#d9d9d9;
+    --primary-purple:#3d2b7d;
+    --border-purple:#c9bce8;
+    --light-purple-bg:#efeaf7;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#fff;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:var(--text);}
+  
+  /* A4 scaling */
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 10mm;
+    margin: 0 auto;
+    background: #fff;
+    border: none;
+    page-break-after: always;
+  }
+
+  /* Outline for the whole content */
+  .content-wrapper {
+    border: 2px solid var(--purple);
+    padding: 18px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .logo {
+    width: 78px;
+    height: 78px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .logo svg, .logo img { width: 100%; height: 100%; object-fit: contain; }
+  .brand-text h1 {
+    margin: 0;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 38px;
+    letter-spacing: 1px;
+    color: var(--purple);
+    line-height: 1;
+  }
+  .brand-text .tagline {
+    color: var(--green);
+    font-weight: 700;
+    font-size: 16px;
+    margin-top: 2px;
+  }
+  .tax-invoice-box {
+    background: var(--purple);
+    color: #fff;
+    text-align: center;
+    padding: 10px 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-width: 230px;
+  }
+  .tax-invoice-box .ti-title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    margin-bottom: 0px;
+  }
+
+  /* ===== BPR SECTIONS ===== */
+  .bpr-meta-grid {
+      display: flex; flex-wrap: wrap;
+      border: 1.5px solid var(--border-purple); margin-bottom: 12px;
+  }
+  .bpr-meta-item { padding: 6px 10px; border-right: 1px solid var(--border-purple); border-bottom: 1px solid var(--border-purple); display: flex; align-items: center; font-size: 11.5px; width: 32%; box-sizing: border-box; }
+  .bpr-meta-item.label { color: var(--purple); font-weight: bold; background: var(--lav-bg); width: 18%; }
+  .bpr-meta-grid .bpr-meta-item:nth-child(4n) { border-right: none; }
+  .bpr-meta-grid .bpr-meta-item:nth-last-child(-n+4) { border-bottom: none; }
+
+  .bpr-section { border: 1.5px solid var(--border-purple); margin-bottom: 12px; }
+  .bpr-header {
+      background-color: var(--lav-bg);
+      color: var(--purple);
+      font-weight: 800;
+      font-size: 13px;
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border-purple);
+  }
+  .bpr-body { padding: 8px 10px; font-size: 11.5px; }
+  .bpr-grid { width: 100%; border-collapse: collapse; }
+  .bpr-grid td { border: 1px solid var(--grey-line); padding: 5px 6px; font-size: 11.5px; vertical-align: middle; }
+  .bpr-grid td.lbl { color: var(--purple); font-weight: bold; width: 28%; background: var(--lav-bg); }
+  
+  .checklist-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dotted var(--border-purple); font-size: 11.5px; }
+  .checklist-row:last-child { border-bottom: none; }
+
+  /* ===== TABLE ===== */
+  table.items {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 14px;
+    font-size: 11.5px;
+  }
+  table.items thead th {
+    background: var(--purple);
+    color: #fff;
+    font-weight: 700;
+    padding: 8px 6px;
+    text-align: center;
+    border: 1px solid var(--purple);
+  }
+  table.items tbody td {
+    border: 1px solid var(--lav-border);
+    padding: 6px 6px;
+    height: 20px;
+  }
+  table.items tbody td.center { text-align: center; }
+
+  /* ===== FOOTER ===== */
+  .footer-bottom { display: flex; gap: 14px; margin-top: auto; margin-bottom: 14px; }
+  .sign-box { flex: 1; border: 1px solid var(--lav-border); display: flex; flex-direction: column; min-height: 100px; }
+  .sign-area { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; padding: 10px; text-align: center; }
+  .sign-text { border-top: 1px solid #777777; padding-top: 5px; color: var(--text); font-weight: bold; width: 90%; margin: 0 auto; font-size: 11.5px; }
+  .seal-box {
+      flex: 1; border: 1px dashed var(--purple); 
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: var(--purple); font-weight: bold; gap: 5px; min-height: 100px; font-size: 11.5px;
+  }
+
+  .barfoot {
+    background: var(--purple);
+    color: #fff;
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11.5px;
+    margin-top: auto;
+  }
+</style>
 </head>
 <body>
-<div class="print-host">
-  
+
   <!-- PAGE 1: PROCESS SCHEDULE -->
-  <div class="pdf-page">
-    <div class="invoice-box">
-      ${buildPrintHeader(profile, 'BATCH PROCESSING RECORD', '')}
+  <div class="page">
+    <div class="content-wrapper">
       
+      <div class="header">
+        <div class="brand">
+          <div class="logo">
+            ${logoHtml}
+          </div>
+          <div class="brand-text">
+            <h1>${escHtml(profile.companyName || 'UMA MICRON')}</h1>
+            <div class="tagline">Micronization of API's</div>
+          </div>
+        </div>
+        <div class="tax-invoice-box">
+          <div class="ti-title">BATCH PROCESSING RECORD</div>
+        </div>
+      </div>
+
       <div class="bpr-meta-grid">
         <div class="bpr-meta-item label">BPR No.</div><div class="bpr-meta-item">${bprNo}</div>
         <div class="bpr-meta-item label">Date</div><div class="bpr-meta-item">${bprDate}</div>
@@ -149,7 +282,7 @@ export const buildBprHtml = (data, profileInput) => {
       </div>
 
       <div class="bpr-section">
-        <div class="bpr-header"><i class="bi bi-file-earmark-text"></i> PROCESS SCHEDULE</div>
+        <div class="bpr-header">PROCESS SCHEDULE</div>
         <div class="bpr-body" style="padding:0;">
           <table class="bpr-grid">
             <tr>
@@ -181,7 +314,7 @@ export const buildBprHtml = (data, profileInput) => {
       </div>
 
       <div class="bpr-section">
-        <div class="bpr-header"><i class="bi bi-card-checklist"></i> CLEANING CHECKLIST</div>
+        <div class="bpr-header">CLEANING CHECKLIST</div>
         <div class="bpr-body">
           <div class="checklist-row"><span>Is the Micronizar cleaned?</span><b>${escHtml(bprCheck(data.cleaningChecklist?.equipmentCleaned))}</b></div>
           <div class="checklist-row"><span>Is the processesing Area Cleaned?</span><b>${escHtml(bprCheck(data.cleaningChecklist?.areaCleaned))}</b></div>
@@ -191,9 +324,9 @@ export const buildBprHtml = (data, profileInput) => {
       </div>
 
       <div class="bpr-section">
-        <div class="bpr-header"><i class="bi bi-speedometer2"></i> PRESSURE READINGS</div>
+        <div class="bpr-header">PRESSURE READINGS</div>
         <div class="bpr-body" style="padding:0;">
-          <table class="invoice-table" style="border:none;">
+          <table class="items" style="margin-bottom:0; border:none;">
             <thead>
               <tr>
                 <th colspan="3">Feeding pressure</th>
@@ -218,7 +351,7 @@ export const buildBprHtml = (data, profileInput) => {
       </div>
 
       <div class="bpr-section">
-        <div class="bpr-header"><i class="bi bi-box-seam"></i> PACKING MATERIALS &amp; DISPATCH</div>
+        <div class="bpr-header">PACKING MATERIALS &amp; DISPATCH</div>
         <div class="bpr-body" style="padding:0;">
           <table class="bpr-grid">
             <tr>
@@ -251,24 +384,44 @@ export const buildBprHtml = (data, profileInput) => {
 
       <div class="footer-bottom">
         <div class="sign-box">
-          <div class="bpr-header"><i class="bi bi-pen"></i> OPERATOR SIGNATURE</div>
+          <div class="bpr-header">OPERATOR SIGNATURE</div>
           <div class="sign-area"><div class="sign-text">Operator</div></div>
         </div>
-        <div class="seal-box"><i class="bi bi-patch-check" style="font-size: 24px;"></i><div>Seal</div></div>
+        <div class="seal-box"><div>Seal</div></div>
         <div class="sign-box">
-          <div class="bpr-header"><i class="bi bi-pen"></i> PLANT SUPERVISOR</div>
+          <div class="bpr-header">PLANT SUPERVISOR</div>
           <div class="sign-area"><div class="sign-text">Supervisor</div></div>
         </div>
       </div>
       
-      ${buildStatusBar('Page 1 of 2')}
+      <div class="barfoot">
+        <span>Thank you for your business!</span>
+        <span>E. &amp; O.E.</span>
+        <span>This is a computer generated document.</span>
+        <span>Page 1 of 2</span>
+      </div>
+
     </div>
   </div>
 
   <!-- PAGE 2: BATCH PACKING RECORD -->
-  <div class="pdf-page">
-    <div class="invoice-box">
-      ${buildPrintHeader(profile, 'BATCH PACKING RECORD', '')}
+  <div class="page">
+    <div class="content-wrapper">
+      
+      <div class="header">
+        <div class="brand">
+          <div class="logo">
+            ${logoHtml}
+          </div>
+          <div class="brand-text">
+            <h1>${escHtml(profile.companyName || 'UMA MICRON')}</h1>
+            <div class="tagline">Micronization of API's</div>
+          </div>
+        </div>
+        <div class="tax-invoice-box">
+          <div class="ti-title">BATCH PACKING RECORD</div>
+        </div>
+      </div>
       
       <div class="bpr-meta-grid">
         <div class="bpr-meta-item label">BPR No.</div><div class="bpr-meta-item">${bprNo}</div>
@@ -277,52 +430,98 @@ export const buildBprHtml = (data, profileInput) => {
         <div class="bpr-meta-item label">Customer</div><div class="bpr-meta-item">${escHtml(customerName)}</div>
       </div>
 
-      <div class="table-container">
-        <table class="invoice-table">
-          <thead>
-            <tr>
-              <th colspan="5">Received Materials Weight</th>
-              <th colspan="5">Dispatched (micronized) Materials Weight</th>
-            </tr>
-            <tr>
-              <th>Batch No.</th><th>Drum No</th><th>Gross</th><th>Tare</th><th>Net</th>
-              <th>Batch No.</th><th>Drum No</th><th>Gross</th><th>Tare</th><th>Net</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${packingRows.join('')}
-            <tr class="total-row">
-              <td colspan="4" class="center">Micronized Material Net Weight</td>
-              <td>${dispatchedNet !== '0.00' ? dispatchedNet : ''}</td>
-              <td colspan="5"></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <table class="items">
+        <thead>
+          <tr>
+            <th colspan="5">Received Materials Weight</th>
+            <th colspan="5">Dispatched (micronized) Materials Weight</th>
+          </tr>
+          <tr>
+            <th>Batch No.</th><th>Drum No</th><th>Gross</th><th>Tare</th><th>Net</th>
+            <th>Batch No.</th><th>Drum No</th><th>Gross</th><th>Tare</th><th>Net</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${packingRows.join('')}
+          <tr style="background: var(--lav-bg);">
+            <td colspan="4" class="center" style="font-weight:bold; color:var(--purple);">Micronized Material Net Weight</td>
+            <td style="font-weight:bold; color:var(--purple);">${dispatchedNet !== '0.00' ? dispatchedNet : ''}</td>
+            <td colspan="5"></td>
+          </tr>
+        </tbody>
+      </table>
 
       <div class="footer-bottom">
         <div class="sign-box" style="flex: 0 0 33%;">
-          <div class="bpr-header"><i class="bi bi-pen"></i> PLANT SUPERVISOR SIGN</div>
+          <div class="bpr-header">PLANT SUPERVISOR SIGN</div>
           <div class="sign-area"><div class="sign-text">Authorised Signatory</div></div>
         </div>
       </div>
 
-      ${buildStatusBar('Page 2 of 2')}
+      <div class="barfoot">
+        <span>Thank you for your business!</span>
+        <span>E. &amp; O.E.</span>
+        <span>This is a computer generated document.</span>
+        <span>Page 2 of 2</span>
+      </div>
+
     </div>
   </div>
 
-</div>
 </body>
 </html>`;
 };
 
 export const renderBprPdf = async (data, { mode = 'save' } = {}) => {
   const html = buildBprHtml(data, data.companyProfile);
-  await renderHtmlToPdf(html, {
-    mode,
-    filePrefix: 'BPR',
-    docNo: data.bprNo || 'N/A',
-    width: PRINT_PAGE_W,
-    fitPage: true
-  });
+  const { jsPDF } = await import('jspdf');
+  const html2canvas = (await import('html2canvas')).default;
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-12000px;top:0;z-index:-1;background:#fff;';
+  host.innerHTML = html;
+  document.body.appendChild(host);
+  try {
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 4;
+    const usableW = pageW - margin * 2;
+    const usableH = pageH - margin * 2;
+
+    const pageNodes = [...host.querySelectorAll('.page')];
+    
+    for (let i = 0; i < pageNodes.length; i++) {
+      if (i > 0) pdf.addPage();
+      const target = pageNodes[i];
+      const canvas = await html2canvas(target, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: 794,
+        windowWidth: 794,
+        logging: false
+      });
+
+      const naturalW = usableW;
+      const naturalH = (canvas.height * naturalW) / canvas.width;
+      const scale = Math.min(usableW / naturalW, usableH / naturalH, 1);
+      const drawW = naturalW * scale;
+      const drawH = naturalH * scale;
+      const x = margin + (usableW - drawW) / 2;
+      const y = margin;
+      
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, y, drawW, drawH);
+    }
+
+    if (mode === 'view') {
+      const url = pdf.output('bloburl');
+      const win = window.open(url, '_blank');
+      if (win) win.document.title = `BPR_${data.bprNo || 'N/A'}`;
+    } else {
+      pdf.save(`BPR_${data.bprNo || 'N/A'}.pdf`);
+    }
+  } finally {
+    document.body.removeChild(host);
+  }
 };
