@@ -509,9 +509,9 @@ export const renderDeliveryChallanPdf = async (data, { mode = 'save' } = {}) => 
     if (mode === 'view') {
       const url = pdf.output('bloburl');
       const win = window.open(url, '_blank');
-      if (win) win.document.title = \`DC_\${data.dcNo || 'N/A'}\`;
+      if (win) win.document.title = `DC_${data.dcNo || 'N/A'}`;
     } else {
-      pdf.save(\`DC_\${data.dcNo || 'N/A'}.pdf\`);
+      pdf.save(`DC_${data.dcNo || 'N/A'}.pdf`);
     }
   } finally {
     document.body.removeChild(host);

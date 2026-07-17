@@ -1,7 +1,7 @@
 import { mergeCompanyProfile } from './companyProfile';
 import {
-  PI_CHARGES_LIST,
-  PI_EMPTY_ROWS,
+  TI_CHARGES_LIST,
+  TI_EMPTY_ROWS,
   splitPartyAddressLines,
   formatPdfDateDmy,
   buildTiChargeAmounts
@@ -70,7 +70,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
       </tr>`);
   };
 
-  PI_CHARGES_LIST.forEach((charge) => {
+  TI_CHARGES_LIST.forEach((charge) => {
     const line = chargeAmounts[charge.key];
     if (!line) return;
     pushRow(charge.label, line.qty, line.rate, line.amt || 0, charge.sgst, charge.cgst);
