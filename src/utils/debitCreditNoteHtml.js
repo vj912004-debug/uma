@@ -20,7 +20,7 @@ import {
 } from './printTheme';
 
 const NOTE_CHARGES = [...STANDARD_CHARGES_LIST, OTHER_CHARGE_ITEM];
-const NOTE_MIN_ROWS = 15;
+const NOTE_MIN_ROWS = 10;
 
 const calcNoteLines = (data) => {
   const taxRate = parseFloat(data.taxRate) || 18;
@@ -154,16 +154,16 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
     </tr>`).join('');
 
   const rightColHtml = `
-    <div style="background-color: #fff; border-radius: 6px; border: 1.5px solid var(--border-purple); height: 100%; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column;">
+    <div style="background-color: #fff; border-radius: 6px; border: 1.5px solid var(--border-purple); box-sizing: border-box; overflow: hidden;">
         <div style="background-color: var(--light-purple-bg); color: var(--primary-purple); font-weight: bold; font-size: 11px; text-align: center; border-bottom: 1.5px solid var(--border-purple); padding: 5px 8px;">REFERENCE DETAILS</div>
-        <div style="padding: 6px 8px; flex: 1;">
-            <table style="width: 100%; font-size: 10.5px; border-collapse: collapse; line-height: 1.4;">
-                <tr><td style="width: 18px; vertical-align: top;"><i class="bi bi-file-earmark-text" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; width: 115px; vertical-align: top;">${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} No.</td><td style="vertical-align: top;">: ${docNo}</td></tr>
-                <tr><td style="vertical-align: top;"><i class="bi bi-calendar3" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} Date</td><td style="vertical-align: top;">: ${docDate}</td></tr>
-                <tr><td style="vertical-align: top;"><i class="bi bi-file-earmark-text" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Original Invoice No.</td><td style="vertical-align: top;">: ${refInvoice}</td></tr>
-                <tr><td style="vertical-align: top;"><i class="bi bi-calendar3" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Original Invoice Date</td><td style="vertical-align: top;">: ${escHtml(formatPdfDateDmy(data.refInvoiceDate) || '')}</td></tr>
-                <tr><td style="vertical-align: top;"><i class="bi bi-person-badge" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Customer PO No.</td><td style="vertical-align: top;">: ${escHtml(data.poNo || 'Verbal')}</td></tr>
-                <tr><td style="vertical-align: top;"><i class="bi bi-tag" style="color: var(--primary-purple);"></i></td><td style="font-weight: bold; vertical-align: top;">Reference</td><td style="vertical-align: top;">: ${escHtml(data.reference || '')}</td></tr>
+        <div style="padding: 5px 7px;">
+            <table class="reference-table">
+                <tr><td class="reference-icon"><i class="bi bi-file-earmark-text"></i></td><td class="reference-label">${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} No.</td><td class="reference-value">: ${docNo}</td></tr>
+                <tr><td class="reference-icon"><i class="bi bi-calendar3"></i></td><td class="reference-label">${title === 'CREDIT NOTE' ? 'Credit Note' : 'Debit Note'} Date</td><td class="reference-value">: ${docDate}</td></tr>
+                <tr><td class="reference-icon"><i class="bi bi-file-earmark-text"></i></td><td class="reference-label">Original Invoice No.</td><td class="reference-value">: ${refInvoice}</td></tr>
+                <tr><td class="reference-icon"><i class="bi bi-calendar3"></i></td><td class="reference-label">Original Invoice Date</td><td class="reference-value">: ${escHtml(formatPdfDateDmy(data.refInvoiceDate) || '')}</td></tr>
+                <tr><td class="reference-icon"><i class="bi bi-person-badge"></i></td><td class="reference-label">Customer PO No.</td><td class="reference-value">: ${escHtml(data.poNo || 'Verbal')}</td></tr>
+                <tr><td class="reference-icon"><i class="bi bi-tag"></i></td><td class="reference-label">Reference</td><td class="reference-value">: ${escHtml(data.reference || '')}</td></tr>
             </table>
         </div>
     </div>
@@ -226,10 +226,46 @@ const buildNoteHtml = (data, profileInput, { title, filePrefix }) => {
     <style>
         ${getSharedPrintStyles()}
         .meta-col.border-left { border-left: none !important; padding-left: 0 !important; }
-        .meta-strip { align-items: stretch; }
-        .meta-strip > .meta-col:nth-child(1) { flex: 1.2; }
-        .meta-strip > .meta-col:nth-child(2) { flex: 0.8; }
-        .meta-strip > .meta-col:nth-child(3) { flex: 1.2; }
+        .meta-strip { align-items: flex-start; gap: 12px; }
+        .meta-strip > .meta-col:nth-child(1) {
+            flex: 1.3;
+            min-width: 0;
+            gap: 5px;
+            font-size: 11.5px;
+        }
+        .meta-strip > .meta-col:nth-child(2) {
+            flex: 0.7;
+            min-width: 0;
+            gap: 6px;
+            padding-top: 2px;
+        }
+        .meta-strip > .meta-col:nth-child(3) { flex: 1.5; min-width: 0; }
+        .meta-strip > .meta-col:nth-child(1) .icon-line {
+            font-size: 11.5px;
+            line-height: 1.35;
+            gap: 7px;
+        }
+        .meta-strip > .meta-col:nth-child(1) .icon-line i {
+            font-size: 12.5px;
+        }
+        .meta-strip > .meta-col:nth-child(2) .data-row {
+            font-size: 11px;
+            line-height: 1.35;
+        }
+        .meta-strip > .meta-col:nth-child(2) .data-label-short {
+            width: 46px;
+        }
+        .reference-table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            font-size: 9.5px;
+            line-height: 1.25;
+        }
+        .reference-table td { padding: 2px 1px; vertical-align: top; }
+        .reference-icon { width: 17px; color: var(--primary-purple); }
+        .reference-label { width: 110px; font-weight: bold; }
+        .reference-value { overflow-wrap: anywhere; }
         .watermark {
             position: absolute;
             top: 50%;

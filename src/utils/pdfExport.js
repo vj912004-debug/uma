@@ -12,7 +12,7 @@ import {
 
 import { renderTaxInvoicePdf } from './taxInvoiceHtml';
 import { renderPerformaInvoicePdf } from './performaInvoiceHtml';
-import { renderDebitNotePdf } from './debitCreditNoteHtml';
+import { renderDebitNotePdf, renderCreditNotePdf } from './debitCreditNoteHtml';
 import { renderDeliveryChallanPdf } from './deliveryChallanHtml';
 import { renderBprPdf } from './bprHtml';
 import { renderPackingListPdf } from './packingListHtml';
@@ -2120,6 +2120,10 @@ export const exportToPDF = (docType, data) => {
     renderDebitNotePdf(enriched, { mode: 'save' }).catch((err) => console.error('DN PDF export failed:', err));
     return;
   }
+  if (docType === 'CN') {
+    renderCreditNotePdf(enriched, { mode: 'save' }).catch((err) => console.error('CN PDF export failed:', err));
+    return;
+  }
   if (docType === 'DC') {
     renderDeliveryChallanPdf(enriched, { mode: 'save' }).catch((err) => console.error('DC PDF export failed:', err));
     return;
@@ -2152,6 +2156,10 @@ export const viewPDF = (docType, data) => {
   }
   if (docType === 'DN') {
     renderDebitNotePdf(enriched, { mode: 'view' }).catch((err) => console.error('DN PDF view failed:', err));
+    return;
+  }
+  if (docType === 'CN') {
+    renderCreditNotePdf(enriched, { mode: 'view' }).catch((err) => console.error('CN PDF view failed:', err));
     return;
   }
   if (docType === 'DC') {
