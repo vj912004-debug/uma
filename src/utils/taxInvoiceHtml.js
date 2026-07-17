@@ -679,7 +679,7 @@ export const renderTaxInvoicePdf = async (data, { mode = 'save' } = {}) => {
     const usableW = pageW - margin * 2;
     const usableH = pageH - margin * 2;
 
-    const target = host.querySelector('.print-host') || host.firstElementChild;
+    const target = host.querySelector('.page') || host.firstElementChild;
     const canvas = await html2canvas(target, {
       scale: 2,
       useCORS: true,
