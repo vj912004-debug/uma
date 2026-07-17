@@ -138,7 +138,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
     companyPan = escHtml(profile.gstNumber.substring(2, 12));
   }
 
-  return \`<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -523,14 +523,14 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
 
     <div class="invoice-meta">
       <div class="block">
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">PI No.</span><span class="m-colon">:</span><span class="m-value">\${docNo}</span></div>
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="m-label">PI Date</span><span class="m-colon">:</span><span class="m-value">\${docDate}</span></div>
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">PI No.</span><span class="m-colon">:</span><span class="m-value">${docNo}</span></div>
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="m-label">PI Date</span><span class="m-colon">:</span><span class="m-value">${docDate}</span></div>
       </div>
       <div class="block">
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span class="m-label">PO No.</span><span class="m-colon">:</span><span class="m-value">\${poNo}</span></div>
-        <div class="meta-row sub"><span class="m-label">PO Date</span><span class="m-colon">:</span><span class="m-value">\${poDate}</span></div>
-        <div class="meta-row sub"><span class="m-label">Delivery Challan No.</span><span class="m-colon">:</span><span class="m-value">\${dcNo}</span></div>
-        <div class="meta-row sub"><span class="m-label">DC Date</span><span class="m-colon">:</span><span class="m-value">\${dcDate}</span></div>
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span class="m-label">PO No.</span><span class="m-colon">:</span><span class="m-value">${poNo}</span></div>
+        <div class="meta-row sub"><span class="m-label">PO Date</span><span class="m-colon">:</span><span class="m-value">${poDate}</span></div>
+        <div class="meta-row sub"><span class="m-label">Delivery Challan No.</span><span class="m-colon">:</span><span class="m-value">${dcNo}</span></div>
+        <div class="meta-row sub"><span class="m-label">DC Date</span><span class="m-colon">:</span><span class="m-value">${dcDate}</span></div>
       </div>
     </div>
   </div>
@@ -540,23 +540,23 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
     <div class="party">
       <div class="party-head"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg> BILL TO</div>
       <div class="party-body">
-        <div class="cname">\${billName}</div>
-        \${billAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
+        <div class="cname">${billName}</div>
+        ${billAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
       </div>
       <div class="party-foot">
-        <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>\${billGstin}</span></div>
-        <div class="frow"><span class="flabel">State</span><span class="fcolon">:</span><span>\${billState} \${billStateCode ? '(' + escHtml(billStateCode) + ')' : ''}</span></div>
+        <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>${billGstin}</span></div>
+        <div class="frow"><span class="flabel">State</span><span class="fcolon">:</span><span>${billState} ${billStateCode ? '(' + escHtml(billStateCode) + ')' : ''}</span></div>
       </div>
     </div>
     <div class="party">
       <div class="party-head"><svg viewBox="0 0 24 24"><path d="M3 16V7h9v9"/><path d="M12 10h5l3 3v3h-8z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg> SHIP TO</div>
       <div class="party-body">
-        <div class="cname">\${shipName}</div>
-        \${shipAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
+        <div class="cname">${shipName}</div>
+        ${shipAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
       </div>
       <div class="party-foot">
-        <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>\${shipGstin}</span></div>
-        <div class="frow"><span class="flabel">State</span><span class="fcolon">:</span><span>\${shipState} \${shipStateCode ? '(' + escHtml(shipStateCode) + ')' : ''}</span></div>
+        <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>${shipGstin}</span></div>
+        <div class="frow"><span class="flabel">State</span><span class="fcolon">:</span><span>${shipState} ${shipStateCode ? '(' + escHtml(shipStateCode) + ')' : ''}</span></div>
       </div>
     </div>
   </div>
@@ -578,18 +578,18 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
       </tr>
     </thead>
     <tbody>
-      \${rows.join('')}
+      ${rows.join('')}
     </tbody>
     <tfoot>
       <tr>
         <td colspan="3" style="text-align:center;">TOTAL</td>
-        <td class="num">\${fmtQty(totalQty) || '0.00'}</td>
+        <td class="num">${fmtQty(totalQty) || '0.00'}</td>
         <td></td>
-        <td class="num">\${fmtMoney(totalAmt)}</td>
-        <td class="num">\${fmtMoney(totalCgst)}</td>
-        <td class="num">\${fmtMoney(totalSgst)}</td>
-        <td class="num">\${fmtMoney(totalIgst)}</td>
-        <td class="num">\${fmtMoney(totalAll)}</td>
+        <td class="num">${fmtMoney(totalAmt)}</td>
+        <td class="num">${fmtMoney(totalCgst)}</td>
+        <td class="num">${fmtMoney(totalSgst)}</td>
+        <td class="num">${fmtMoney(totalIgst)}</td>
+        <td class="num">${fmtMoney(totalAll)}</td>
       </tr>
     </tfoot>
   </table>
@@ -609,16 +609,16 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
 
     <div class="totals">
       <div class="totals-body">
-        <div class="trow"><span class="tlabel">Total Amount Before Tax</span><span class="tval">&#8377; \${fmtMoney(totalAmt)}</span></div>
-        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;CGST @ 9%</span><span class="tval">&#8377; \${fmtMoney(totalCgst)}</span></div>
-        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;SGST @ 9%</span><span class="tval">&#8377; \${fmtMoney(totalSgst)}</span></div>
-        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;IGST @ 18%</span><span class="tval">&#8377; \${fmtMoney(totalIgst)}</span></div>
-        <div class="trow rule"><span class="tlabel">Total Tax Amount</span><span class="tval">&#8377; \${fmtMoney(totalCgst + totalSgst + totalIgst)}</span></div>
-        <div class="trow"><span class="tlabel">Round Off</span><span class="tval">&#8377; \${fmtMoney(roundOff)}</span></div>
+        <div class="trow"><span class="tlabel">Total Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>
+        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;CGST @ 9%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
+        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;SGST @ 9%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
+        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;IGST @ 18%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
+        <div class="trow rule"><span class="tlabel">Total Tax Amount</span><span class="tval">&#8377; ${fmtMoney(totalCgst + totalSgst + totalIgst)}</span></div>
+        <div class="trow"><span class="tlabel">Round Off</span><span class="tval">&#8377; ${fmtMoney(roundOff)}</span></div>
       </div>
       <div class="grand">
         <span>GRAND TOTAL</span>
-        <span>&#8377; \${fmtMoney(roundedTotal)}</span>
+        <span>&#8377; ${fmtMoney(roundedTotal)}</span>
       </div>
     </div>
   </div>
@@ -658,7 +658,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
 </div>
 </div>
 </body>
-</html>\`;
+</html>`;
 };
 
 export const renderPerformaInvoicePdf = async (data, { mode = 'save' } = {}) => {
