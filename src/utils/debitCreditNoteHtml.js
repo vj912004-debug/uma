@@ -506,7 +506,7 @@ const buildDebitNoteHtml = (data, profileInput) => {
 </style>
 </head>
 <body>
-<div class="sheet">
+<div class="sheet pdf-page print-host">
 
   <!-- HEADER -->
   <div class="header">
@@ -1127,7 +1127,7 @@ const buildCreditNoteHtml = (data, profileInput) => {
 </style>
 </head>
 <body>
-<div class="sheet">
+<div class="sheet pdf-page print-host">
 
   <!-- HEADER -->
   <div class="header">
