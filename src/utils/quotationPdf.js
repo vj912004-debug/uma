@@ -1082,7 +1082,7 @@ export const buildQuotationHtml = (data, profileInput) => {
       <div class="p2-intro-text">
         <p>Dear Sir / Madam,</p>
         <p>With reference to the above mentioned subject, please find our offer along with relevant terms and conditions for your ready reference.</p>
-        ${descriptionHtml ? \`<p>\${descriptionHtml}</p>\` : ''}
+        ${descriptionHtml ? `<p>${descriptionHtml}</p>` : ''}
         <p>Uma Micron, Vadodara is a Gujarat based company that offers <b>CONTRACT MICRONIZATION SERVICES</b> dedicated to comply the needs of the pharmaceutical industry. The facility is at Ranoli – Vadodara, operates according to cGMP standards with more than 500 sq.ft processing area and big warehouse facility.</p>
         <p><b>Micronization:</b> Jet micronization is used to mill particles below 10-20 microns. Particle to particle impact facilitated by air flow allows for producing particles less than 10-20 microns in size.</p>
         <p>We trust our offer will be in line with your requirement and if you have any techno-commercial queries, please feel free to contact us.</p>
@@ -1095,14 +1095,14 @@ export const buildQuotationHtml = (data, profileInput) => {
       </div>
       <table class="p2-offer">
         <tr><th style="width:6%;">Sr. No.</th><th style="width:28%;">Description</th><th style="width:16%;">PSD Requirement</th><th style="width:14%;">Unit</th><th style="width:14%;">Rate (₹)</th><th style="width:16%;">Remarks</th></tr>
-        ${mainCharges.length > 0 ? mainCharges.map((c, i) => \`
-        <tr><td>\${i + 1}</td><td class="desc">\${escHtml(c.description)}</td><td>\${c.psdRequirement ? escHtml(c.psdRequirement) : '–'}</td><td>\${extractUnit(c.rate)}</td><td>\${extractRate(c.rate)}</td><td>–</td></tr>
-        \`).join('') : \`
+        ${mainCharges.length > 0 ? mainCharges.map((c, i) => `
+        <tr><td>${i + 1}</td><td class="desc">${escHtml(c.description)}</td><td>${c.psdRequirement ? escHtml(c.psdRequirement) : '–'}</td><td>${extractUnit(c.rate)}</td><td>${extractRate(c.rate)}</td><td>–</td></tr>
+        `).join('') : `
         <tr><td>1</td><td class="desc">Minimum cleaning charges for every single process</td><td>–</td><td>Per Process</td><td>3,500.00</td><td>Mandatory</td></tr>
         <tr><td>2</td><td class="desc">Processing of your product – Fenofibrate (By our Dry Method)</td><td>d(0.9 &lt; 10 Micron)</td><td>Per Kg</td><td>70.00</td><td>Dry Method</td></tr>
         <tr><td>3</td><td class="desc">Malvern particle sizing report (Dry Method)</td><td>–</td><td>Per Report</td><td>1,350.00</td><td>Per Each</td></tr>
         <tr><td>4</td><td class="desc">Filter bag charges (One time for one product)</td><td>–</td><td>Lump Sum</td><td class="nil">Nil</td><td>One time</td></tr>
-        \`}
+        `}
       </table>
 
       <!-- OPTIONAL SERVICES + NOTE -->
@@ -1114,14 +1114,14 @@ export const buildQuotationHtml = (data, profileInput) => {
           </div>
           <table class="p2-offer">
             <tr><th style="width:10%;">Sr. No.</th><th style="width:58%;">Description</th><th style="width:16%;">Unit</th><th style="width:16%;">Rate (₹)</th></tr>
-            ${optionalCharges.length > 0 ? optionalCharges.map((c, i) => \`
-            <tr><td>\${i + 1}</td><td class="desc">\${escHtml(c.description)}</td><td>\${extractUnit(c.rate)}</td><td>\${extractRate(c.rate)}</td></tr>
-            \`).join('') : \`
+            ${optionalCharges.length > 0 ? optionalCharges.map((c, i) => `
+            <tr><td>${i + 1}</td><td class="desc">${escHtml(c.description)}</td><td>${extractUnit(c.rate)}</td><td>${extractRate(c.rate)}</td></tr>
+            `).join('') : `
             <tr><td>1</td><td class="desc">Malvern particle sizing report (Wet Method)</td><td>Per Report</td><td>1,500.00</td></tr>
             <tr><td>2</td><td class="desc">Sieving Charges (If applicable)</td><td>Per Kg</td><td>5.00</td></tr>
             <tr><td>3</td><td class="desc">HDPE Drum 60 LTR (If Required)</td><td>Per No.</td><td>550.00</td></tr>
             <tr><td>4</td><td class="desc">Liner (If Required)</td><td>Per No.</td><td>35.00</td></tr>
-            \`}
+            `}
           </table>
         </div>
         <div class="p2-note-col">
@@ -1230,11 +1230,11 @@ export const buildQuotationHtml = (data, profileInput) => {
         IMPORTANT NOTES
       </div>
       <ul>
-        ${savedNotes.length > 0 ? savedNotes.map(line => \`<li>\${escHtml(line)}</li>\`).join('') : \`
+        ${savedNotes.length > 0 ? savedNotes.map(line => `<li>${escHtml(line)}</li>`).join('') : `
         <li>If properties of material change then rate will be change and PSD will change then rate will be change.</li>
         <li>Any changes in taxes will be applicable as per actual.</li>
         <li>Disputes are subject to Vadodara Jurisdiction only.</li>
-        \`}
+        `}
       </ul>
     </div>
     <div class="p2-bcol">
