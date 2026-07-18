@@ -57,6 +57,11 @@ export const buildQuotationHtml = (data, profileInput) => {
     --purple-border: #C9BEE0;
     --green: #22874F;
     --text-dark: #2b2b2b;
+    --p2-purple-deep: #33176F;
+    --p2-purple: #52348C;
+    --p2-purple-mid: #6C4FA1;
+    --p2-purple-light: #F3F0FA;
+    --p2-purple-border: #D6CDE8;
   }
   *{box-sizing:border-box;}
   html,body{
@@ -336,7 +341,7 @@ export const buildQuotationHtml = (data, profileInput) => {
   .footer-bar .thankyou{ font-style:italic; font-weight:600; }
   .footer-bar .item{ display:flex; align-items:center; gap:6px; }
 
-  /* ===== PAGE 2 : TERMS ===== */
+  /* ===== PAGE 1 : TERMS ===== */
   .terms-hd{
     display:inline-flex;
     align-items:center;
@@ -418,10 +423,249 @@ export const buildQuotationHtml = (data, profileInput) => {
   }
   .for-uma{ text-align:right; font-size:8.8px; }
   .for-uma b{ display:block; margin-bottom:4px; color:var(--purple-deep); }
+
+
+  /* ================== PAGE 2 CSS ================== */
+  .p2-pad{ padding-left:8mm; padding-right:8mm; }
+
+  .p2-header{
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    min-height:66px;
+    padding:8px 8mm;
+    background:#fff;
+    flex-shrink:0;
+  }
+  .p2-header::after{
+    content:"";
+    position:absolute;
+    top:0; right:0; bottom:0;
+    width:42%;
+    background:var(--p2-purple-deep);
+    clip-path: polygon(18% 0, 100% 0, 100% 100%, 0% 100%);
+    z-index:0;
+  }
+  .p2-logo-block{ display:flex; align-items:center; gap:8px; position:relative; z-index:1; }
+  .p2-logo-icon{ width:38px;height:38px; }
+  .p2-company-name{ font-size:21px;font-weight:800; color:#3A1B6E; font-family: Georgia, 'Times New Roman', serif; }
+  .p2-company-tagline{ font-size:9.8px;color:#1a9e6a;font-weight:700; }
+  .p2-quote-title-block{ position:relative; z-index:1; text-align:right; color:#fff; padding-right:6px; }
+  .p2-quote-title{ font-size:25px; font-weight:800; letter-spacing:1.3px; }
+  .p2-quote-sub{ font-size:9.8px; font-weight:600; letter-spacing:1.8px; margin-top:-1px; }
+
+  .p2-top-row{
+    display:flex;
+    gap:14px;
+    padding:5px 8mm 0 8mm;
+    flex-shrink:0;
+  }
+  .p2-contact-col{
+    flex:1.3;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    font-size:10px;
+    justify-content:center;
+  }
+  .p2-contact-line{ display:flex; align-items:flex-start; gap:8px; }
+  .p2-contact-line svg{ margin-top:2px; flex-shrink:0; }
+  .p2-qd-box{
+    flex:1;
+    border:1px solid var(--p2-purple-border);
+    border-radius:6px;
+    padding:5px 12px;
+  }
+  .p2-qd-row{ display:flex; align-items:center; gap:7px; font-size:9.6px; padding:2.2px 0; }
+  .p2-qd-row svg{ flex-shrink:0; }
+  .p2-qd-row .lbl{ width:98px; color:#444; }
+  .p2-qd-row .val{ font-weight:700; }
+
+  .p2-mid-row{
+    display:flex;
+    gap:14px;
+    padding:6px 8mm 0 8mm;
+    flex-shrink:0;
+  }
+  .p2-left-col{ width:28%; display:flex; flex-direction:column; gap:6px; }
+  .p2-right-col{ width:71%; }
+
+  .p2-box-hd{
+    background:var(--p2-purple-mid);
+    color:#fff;
+    font-weight:700;
+    font-size:10.5px;
+    padding:5px 12px;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    border-radius:14px;
+    width:fit-content;
+    position:relative;
+    left:6px;
+    margin-bottom:-8px;
+    z-index:1;
+  }
+  .p2-box{
+    border:1px solid var(--p2-purple-border);
+    border-radius:6px;
+  }
+  .p2-prep-body{ padding:10px 11px 6px 11px; font-size:9.4px; line-height:1.48; }
+  .p2-prep-body .cname{ font-weight:700; color:var(--p2-purple-deep); margin-bottom:4px; }
+  .p2-prep-body .addr-line{ display:flex; gap:5px; }
+  .p2-prep-body svg{ margin-top:2px; flex-shrink:0; }
+
+  .p2-subject-line{ font-size:10.3px; margin-bottom:4px; }
+  .p2-subject-line b{ color:var(--p2-purple-deep); }
+  .p2-intro-text{ font-size:9.4px; line-height:1.42; }
+  .p2-intro-text p{ margin:0 0 3px 0; }
+
+  .p2-why-box{
+    background:var(--p2-purple-light);
+    border:1px solid var(--p2-purple-border);
+    border-radius:6px;
+    padding:8px 10px 7px 10px;
+    flex:1;
+  }
+  .p2-why-title{ font-weight:800; font-size:9.8px; color:var(--p2-purple-deep); margin-bottom:6px; }
+  .p2-why-item{ display:flex; align-items:flex-start; gap:7px; font-size:8.5px; font-weight:600; margin-bottom:4px; line-height:1.15; }
+  .p2-why-item svg{ flex-shrink:0; margin-top:1px; }
+
+  .p2-stamp{
+    width:52px;height:52px;
+    border:1.4px solid var(--p2-purple-mid);
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    font-size:5.3px;
+    font-weight:700;
+    color:var(--p2-purple-mid);
+    transform:rotate(-10deg);
+    margin:3px auto 0 auto;
+  }
+
+  .p2-table-hd{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    background:var(--p2-purple-deep);
+    color:#fff;
+    font-weight:700;
+    font-size:10px;
+    padding:5px 12px;
+    border-radius:5px 5px 0 0;
+    margin-top:8px;
+  }
+  table.p2-offer{
+    width:100%;
+    border-collapse:collapse;
+    font-size:8.9px;
+    border:1px solid var(--p2-purple-border);
+    border-top:none;
+  }
+  table.p2-offer th{
+    background:#EFEAF6;
+    padding:4px 5px;
+    font-weight:700;
+    border:1px solid var(--p2-purple-border);
+    text-align:center;
+  }
+  table.p2-offer td{
+    padding:3.2px 5px;
+    border:1px solid var(--p2-purple-border);
+    text-align:center;
+  }
+  table.p2-offer td.desc{ text-align:left; }
+  table.p2-offer td.nil{ color:var(--p2-purple-deep); font-weight:800; }
+
+  .p2-opt-note-row{ display:flex; gap:14px; margin-top:7px; align-items:flex-start; }
+  .p2-opt-col{ flex:1.4; }
+  .p2-note-col{ flex:1; }
+  .p2-note-box{
+    border:1.4px dashed var(--p2-purple-border);
+    border-radius:6px;
+    padding:7px 11px;
+    font-size:8.7px;
+    line-height:1.45;
+  }
+  .p2-note-box .nhd{ display:flex; align-items:center; gap:6px; font-weight:800; color:var(--p2-purple-deep); font-size:9.6px; margin-bottom:4px; }
+  .p2-note-box ul{ margin:0; padding-left:14px; }
+
+  .p2-closing-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    padding:5px 8mm 0 8mm;
+  }
+  .p2-thankyou-text{ font-size:9.6px; line-height:1.45; width:55%; }
+  .p2-sig-block{ text-align:right; font-size:9.6px; }
+  .p2-sig-block b{ display:block; color:var(--p2-purple-deep); margin-bottom:2px; }
+  .p2-sig-script{ font-family:'Brush Script MT', cursive; font-size:16px; color:#333; margin:1px 0; }
+
+  .p2-footer-bar{
+    background:var(--p2-purple-deep);
+    color:#fff;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:6px 8mm;
+    font-size:9px;
+    margin-top:8px;
+    flex-shrink:0;
+  }
+  .p2-footer-bar .item{ display:flex; align-items:center; gap:6px; }
+
+  .p2-terms3col{
+    display:flex;
+    gap:12px;
+    margin-top:5px;
+    align-items:flex-start;
+  }
+  .p2-tcol3{ flex:1; display:flex; flex-direction:column; gap:5px; }
+  .p2-tblock{
+    border:1px solid var(--p2-purple-border);
+    border-radius:6px;
+    padding:6px 9px;
+    font-size:8.4px;
+    line-height:1.35;
+  }
+  .p2-tblock-hd{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-weight:800;
+    color:var(--p2-purple-deep);
+    font-size:9.6px;
+    margin-bottom:4px;
+  }
+  .p2-tblock ul, .p2-tblock ol{ margin:0; padding-left:15px; }
+  .p2-tblock li{ margin-bottom:2px; }
+  .p2-tblock li:last-child{ margin-bottom:0; }
+
+  .p2-bottom2col{
+    display:flex;
+    gap:14px;
+    margin-top:8px;
+  }
+  .p2-bcol{
+    flex:1;
+    border:1px solid var(--p2-purple-border);
+    border-radius:6px;
+    padding:8px 11px;
+    font-size:8.7px;
+    line-height:1.42;
+  }
+  .p2-bcol ul{ margin:6px 0 0 0; padding-left:15px; }
+  .p2-bcol li{ margin-bottom:3px; }
+  .p2-decl-sig-line{ border-top:1px solid #999; width:160px; margin-left:auto; }
 </style>
 </head>
 <body>
 
+<!-- ============ PAGE 1 ============ -->
 <div class="sheet pdf-page print-host">
 
   <!-- HEADER -->
@@ -531,7 +775,7 @@ export const buildQuotationHtml = (data, profileInput) => {
     <div class="intro-text">
       <p>Dear Sir/Madam,</p>
       <p>With reference to your enquiry, we are pleased to submit our offer for Micronization Services as per the details mentioned below. UMA MICRON, Vadodara is a Gujarat based company that offers <b>CONTRACT MICRONIZATION SERVICES</b> dedicated to comply the needs of the pharmaceutical industry. Our facility at Ranoli – Vadodara operates as per cGMP standards with more than 500 sq.ft. processing area and large warehouse facility.</p>
-      ${descriptionHtml ? \`<p>\${descriptionHtml}</p>\` : ''}
+      ${descriptionHtml ? `<p>${descriptionHtml}</p>` : ''}
       <p>We trust our offer will be in line with your requirement.</p>
       <p>For any techno-commercial queries, please feel free to contact us.</p>
     </div>
@@ -546,14 +790,14 @@ export const buildQuotationHtml = (data, profileInput) => {
       </div>
       <table class="offer">
         <tr><th style="width:6%;">Sr. No.</th><th style="width:32%;">Description</th><th style="width:18%;">PSD Requirement</th><th style="width:12%;">Unit</th><th style="width:14%;">Rate (₹)</th><th style="width:12%;">Remarks</th></tr>
-        ${mainCharges.length > 0 ? mainCharges.map((c, i) => \`
-        <tr><td>\${i + 1}</td><td class="desc">\${escHtml(c.description)}</td><td>\${c.psdRequirement ? escHtml(c.psdRequirement) : '&mdash;'}</td><td>\${extractUnit(c.rate)}</td><td>\${extractRate(c.rate)}</td><td>&mdash;</td></tr>
-        \`).join('') : \`
+        ${mainCharges.length > 0 ? mainCharges.map((c, i) => `
+        <tr><td>${i + 1}</td><td class="desc">${escHtml(c.description)}</td><td>${c.psdRequirement ? escHtml(c.psdRequirement) : '&mdash;'}</td><td>${extractUnit(c.rate)}</td><td>${extractRate(c.rate)}</td><td>&mdash;</td></tr>
+        `).join('') : `
         <tr><td>1</td><td class="desc">Minimum Cleaning Charges for every single process</td><td>—</td><td>Per Process</td><td>3,500.00</td><td>—</td></tr>
         <tr><td>2</td><td class="desc">Processing of your product (By our Dry Method)</td><td>d(0.9) &lt; 10 Micron</td><td>Per Kg</td><td>70.00</td><td>—</td></tr>
         <tr><td>3</td><td class="desc">Malvern Particle Sizing Report (Dry Method)</td><td>—</td><td>Each</td><td>1,350.00</td><td>—</td></tr>
         <tr><td>4</td><td class="desc">Filter Bag Charges (One time for one product)</td><td>—</td><td>—</td><td class="nil">NIL</td><td>—</td></tr>
-        \`}
+        `}
       </table>
     </div>
     <div class="table-col opt">
@@ -563,14 +807,14 @@ export const buildQuotationHtml = (data, profileInput) => {
       </div>
       <table class="offer">
         <tr><th style="width:10%;">Sr. No.</th><th style="width:62%;">Description</th><th style="width:28%;">Rate (₹)</th></tr>
-        ${optionalCharges.length > 0 ? optionalCharges.map((c, i) => \`
-        <tr><td>\${i + 1}</td><td class="desc">\${escHtml(c.description)}</td><td>\${extractRate(c.rate)} / \${extractUnit(c.rate)}</td></tr>
-        \`).join('') : \`
+        ${optionalCharges.length > 0 ? optionalCharges.map((c, i) => `
+        <tr><td>${i + 1}</td><td class="desc">${escHtml(c.description)}</td><td>${extractRate(c.rate)} / ${extractUnit(c.rate)}</td></tr>
+        `).join('') : `
         <tr><td>1</td><td class="desc">Malvern Particle Sizing Report (Wet Method)</td><td>1,500.00 / Each</td></tr>
         <tr><td>2</td><td class="desc">Sieving Charges (If Applicable)</td><td>5.00 / Kg</td></tr>
         <tr><td>3</td><td class="desc">HDPE Drum 60 LTR (If Required)</td><td>550.00 / No</td></tr>
         <tr><td>4</td><td class="desc">Liner (If Required)</td><td>35.00 / No</td></tr>
-        \`}
+        `}
       </table>
     </div>
   </div>
@@ -626,12 +870,12 @@ export const buildQuotationHtml = (data, profileInput) => {
     <div class="note-box">
       <b>Note:</b>
       <ul>
-        ${savedNotes.length > 0 ? savedNotes.map(line => \`<li>\${escHtml(line)}</li>\`).join('') : \`
+        ${savedNotes.length > 0 ? savedNotes.map(line => `<li>${escHtml(line)}</li>`).join('') : `
         <li>All above rates are in Indian Rupees (₹).</li>
         <li>GST will be charged extra as applicable.</li>
         <li>This is a quotation and not an invoice.</li>
         <li>Please send your Purchase Order along with material &amp; specification.</li>
-        \`}
+        `}
       </ul>
     </div>
     <div class="qr-box">
@@ -723,6 +967,291 @@ export const buildQuotationHtml = (data, profileInput) => {
       <svg width="12" height="12" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M12 8v4l3 2" stroke="#fff" stroke-width="1.5" fill="none"/></svg>
       Performance You Can Rely On
     </span>
+  </div>
+
+</div>
+
+
+<!-- ============ PAGE 2 ============ -->
+<div class="sheet pdf-page print-host">
+
+  <!-- HEADER -->
+  <div class="p2-header">
+    <div class="p2-logo-block">
+      <svg class="p2-logo-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20 30 A35 20 0 1 1 19 71" fill="none" stroke="#1a9e6a" stroke-width="4" stroke-linecap="round"/>
+        <path d="M80 70 A35 20 0 1 1 81 29" fill="none" stroke="#1a9e6a" stroke-width="4" stroke-linecap="round"/>
+        <polygon points="18,66 12,78 26,76" fill="#1a9e6a"/>
+        <polygon points="82,34 88,22 74,24" fill="#1a9e6a"/>
+        <text x="28" y="63" font-family="Arial" font-weight="800" font-size="38" fill="#e8781e">U</text>
+        <text x="46" y="63" font-family="Arial" font-weight="800" font-size="38" fill="#2d3a8c">M</text>
+        <text x="66" y="63" font-family="Arial" font-weight="800" font-size="38" fill="#7a2f8c">J</text>
+      </svg>
+      <div>
+        <div class="p2-company-name">${escHtml(profile.companyName || 'UMA MICRON')}</div>
+        <div class="p2-company-tagline">${escHtml(profile.tagline || "Micronization of API's")}</div>
+      </div>
+    </div>
+    <div class="p2-quote-title-block">
+      <div class="p2-quote-title">QUOTATION</div>
+      <div class="p2-quote-sub">COMMERCIAL OFFER</div>
+    </div>
+  </div>
+
+  <!-- CONTACT + QUOTATION DETAILS -->
+  <div class="p2-top-row">
+    <div class="p2-contact-col">
+      <div class="p2-contact-line">
+        <svg width="13" height="13" viewBox="0 0 24 24"><path d="M12 2C7.6 2 4 5.6 4 10c0 5.5 8 12 8 12s8-6.5 8-12c0-4.4-3.6-8-8-8z" fill="#6C4FA1"/><circle cx="12" cy="10" r="3" fill="#fff"/></svg>
+        <span>${escHtml(profile.addressLine1 || 'Plot No. 1116, G.I.D.C., Ranoli, N.H. No. 8, Vadodara – 391350, Gujarat, India')}</span>
+      </div>
+      <div class="p2-contact-line">
+        <svg width="13" height="13" viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.2c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.2 1l-2 2.2z" fill="#6C4FA1"/></svg>
+        <span>${escHtml(profile.phone || '+91 97120 00297')}</span>
+      </div>
+      <div class="p2-contact-line">
+        <svg width="13" height="13" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2" fill="#6C4FA1"/><path d="M2 6l10 7 10-7" stroke="#fff" stroke-width="1.6" fill="none"/></svg>
+        <span>${escHtml(profile.email || 'info@umamicron.com')}</span>
+      </div>
+      <div class="p2-contact-line">
+        <svg width="13" height="13" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#6C4FA1"/><path d="M2 12h20M12 2c2.5 2.7 4 6.2 4 10s-1.5 7.3-4 10c-2.5-2.7-4-6.2-4-10s1.5-7.3 4-10z" stroke="#fff" stroke-width="1.2" fill="none"/></svg>
+        <span>${escHtml(profile.website || 'www.umamicron.com')}</span>
+      </div>
+    </div>
+    <div class="p2-qd-box">
+      <div class="p2-qd-row">
+        <svg width="13" height="13" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z" fill="#6C4FA1"/><path d="M15 2v5h5" fill="#9a82c9"/></svg>
+        <span class="lbl">Quotation No.</span><span>:</span>&nbsp;<span class="val">${qtnNo}</span>
+      </div>
+      <div class="p2-qd-row">
+        <svg width="13" height="13" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2" fill="#6C4FA1"/><rect x="3" y="4" width="18" height="4" fill="#4a3577"/><rect x="6" y="2" width="2" height="4" fill="#4a3577"/><rect x="16" y="2" width="2" height="4" fill="#4a3577"/></svg>
+        <span class="lbl">Quotation Date</span><span>:</span>&nbsp;<span class="val">${qtnDate}</span>
+      </div>
+      <div class="p2-qd-row">
+        <svg width="13" height="13" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2" fill="#6C4FA1"/><rect x="3" y="4" width="18" height="4" fill="#4a3577"/><rect x="6" y="2" width="2" height="4" fill="#4a3577"/><rect x="16" y="2" width="2" height="4" fill="#4a3577"/></svg>
+        <span class="lbl">Validity</span><span>:</span>&nbsp;<span class="val">${validityDate}</span>
+      </div>
+      <div class="p2-qd-row">
+        <svg width="13" height="13" viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4" fill="#6C4FA1"/><path d="M5 19c1.2-3.2 4-5 7-5s5.8 1.8 7 5" fill="none" stroke="#6C4FA1" stroke-width="1.6"/></svg>
+        <span class="lbl">Prepared By</span><span>:</span>&nbsp;<span class="val">${escHtml(data.signatoryName || 'Amit Patel')}</span>
+      </div>
+      <div class="p2-qd-row">
+        <svg width="13" height="13" viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.2c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.2 1l-2 2.2z" fill="#6C4FA1"/></svg>
+        <span class="lbl">Contact No.</span><span>:</span>&nbsp;<span class="val">${escHtml(profile.phone || '+91 97120 00297')}</span>
+      </div>
+      <div class="p2-qd-row">
+        <svg width="13" height="13" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2" fill="#6C4FA1"/><path d="M2 6l10 7 10-7" stroke="#fff" stroke-width="1.6" fill="none"/></svg>
+        <span class="lbl">Email ID</span><span>:</span>&nbsp;<span class="val">${escHtml(profile.email || 'info@umamicron.com')}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREPARED FOR + SUBJECT / INTRO -->
+  <div class="p2-mid-row">
+    <div class="p2-left-col">
+      <div>
+        <div class="p2-box-hd">
+          <svg width="12" height="12" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#fff"/><circle cx="12" cy="9" r="3.4" fill="#6C4FA1"/><path d="M5 19c1.2-3.2 4-5 7-5s5.8 1.8 7 5c-1.9 1.6-4.4 2.6-7 2.6s-5.1-1-7-2.6z" fill="#6C4FA1"/></svg>
+          PREPARED FOR
+        </div>
+        <div class="p2-box">
+          <div class="p2-prep-body">
+            <div class="p2-cname">M/s ${escHtml(data.partyName)}</div>
+            <div class="p2-addr-line">
+              <svg width="11" height="11" viewBox="0 0 24 24"><path d="M12 2C7.6 2 4 5.6 4 10c0 5.5 8 12 8 12s8-6.5 8-12c0-4.4-3.6-8-8-8z" fill="#6C4FA1"/><circle cx="12" cy="10" r="3" fill="#fff"/></svg>
+              <span>${splitAddress(data.partyAddress)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p2-why-box">
+        <div class="p2-why-title">WHY UMA MICRON?</div>
+        <div class="p2-why-item"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.4 9-8 11-4.6-2-8-6-8-11V5z" fill="#6C4FA1"/><path d="M9 12l2 2 4-4" stroke="#fff" stroke-width="1.8" fill="none"/></svg>cGMP Compliant Facility</div>
+        <div class="p2-why-item"><svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.2" fill="#6C4FA1"/><ellipse cx="12" cy="12" rx="9" ry="3.6" fill="none" stroke="#6C4FA1" stroke-width="1.4"/><ellipse cx="12" cy="12" rx="9" ry="3.6" fill="none" stroke="#6C4FA1" stroke-width="1.4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="3.6" fill="none" stroke="#6C4FA1" stroke-width="1.4" transform="rotate(120 12 12)"/></svg>Contract Micronization</div>
+        <div class="p2-why-item"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v7M22 20V13" stroke="#6C4FA1" stroke-width="2" stroke-linecap="round" fill="none"/></svg>PSD Development</div>
+        <div class="p2-why-item"><svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="#6C4FA1" stroke-width="1.6"/><path d="M19.4 13a7.4 7.4 0 000-2l2-1.6-2-3.4-2.4.8a7.6 7.6 0 00-1.8-1l-.4-2.5h-4l-.4 2.5a7.6 7.6 0 00-1.8 1l-2.4-.8-2 3.4L6.2 11a7.4 7.4 0 000 2l-2 1.6 2 3.4 2.4-.8a7.6 7.6 0 001.8 1l.4 2.5h4l.4-2.5a7.6 7.6 0 001.8-1l2.4.8 2-3.4z" fill="none" stroke="#6C4FA1" stroke-width="1.3"/></svg>Jet Milling Technology</div>
+        <div class="p2-why-item"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 2l3 6 6.5 1-4.7 4.6L18 20l-6-3.2L6 20l1.2-6.4L2.5 9l6.5-1z" fill="none" stroke="#6C4FA1" stroke-width="1.4"/></svg>Quality Assurance</div>
+        <div class="p2-why-item"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M3 21V9l9-5 9 5v12" fill="none" stroke="#6C4FA1" stroke-width="1.6"/><path d="M8 21v-6h8v6" fill="none" stroke="#6C4FA1" stroke-width="1.6"/></svg>Spacious Warehouse</div>
+        <div class="p2-stamp">UMA MICRON<br>VADODARA</div>
+      </div>
+    </div>
+
+    <div class="p2-right-col">
+      <div class="p2-subject-line"><b>SUBJECT:</b> ${escHtml(data.subject || 'Quotation for Micronization Services')}</div>
+      <div class="p2-intro-text">
+        <p>Dear Sir / Madam,</p>
+        <p>With reference to the above mentioned subject, please find our offer along with relevant terms and conditions for your ready reference.</p>
+        ${descriptionHtml ? \`<p>\${descriptionHtml}</p>\` : ''}
+        <p>Uma Micron, Vadodara is a Gujarat based company that offers <b>CONTRACT MICRONIZATION SERVICES</b> dedicated to comply the needs of the pharmaceutical industry. The facility is at Ranoli – Vadodara, operates according to cGMP standards with more than 500 sq.ft processing area and big warehouse facility.</p>
+        <p><b>Micronization:</b> Jet micronization is used to mill particles below 10-20 microns. Particle to particle impact facilitated by air flow allows for producing particles less than 10-20 microns in size.</p>
+        <p>We trust our offer will be in line with your requirement and if you have any techno-commercial queries, please feel free to contact us.</p>
+      </div>
+
+      <!-- COMMERCIAL OFFER TABLE -->
+      <div class="p2-table-hd">
+        <svg width="14" height="14" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="18" cy="8" r="2.4" fill="none" stroke="#fff" stroke-width="1.4"/><path d="M14.5 20c.3-2.6 2.2-4.6 4.7-4.9" fill="none" stroke="#fff" stroke-width="1.4"/></svg>
+        COMMERCIAL OFFER – MICRONIZATION CHARGES
+      </div>
+      <table class="p2-offer">
+        <tr><th style="width:6%;">Sr. No.</th><th style="width:28%;">Description</th><th style="width:16%;">PSD Requirement</th><th style="width:14%;">Unit</th><th style="width:14%;">Rate (₹)</th><th style="width:16%;">Remarks</th></tr>
+        ${mainCharges.length > 0 ? mainCharges.map((c, i) => \`
+        <tr><td>\${i + 1}</td><td class="desc">\${escHtml(c.description)}</td><td>\${c.psdRequirement ? escHtml(c.psdRequirement) : '–'}</td><td>\${extractUnit(c.rate)}</td><td>\${extractRate(c.rate)}</td><td>–</td></tr>
+        \`).join('') : \`
+        <tr><td>1</td><td class="desc">Minimum cleaning charges for every single process</td><td>–</td><td>Per Process</td><td>3,500.00</td><td>Mandatory</td></tr>
+        <tr><td>2</td><td class="desc">Processing of your product – Fenofibrate (By our Dry Method)</td><td>d(0.9 &lt; 10 Micron)</td><td>Per Kg</td><td>70.00</td><td>Dry Method</td></tr>
+        <tr><td>3</td><td class="desc">Malvern particle sizing report (Dry Method)</td><td>–</td><td>Per Report</td><td>1,350.00</td><td>Per Each</td></tr>
+        <tr><td>4</td><td class="desc">Filter bag charges (One time for one product)</td><td>–</td><td>Lump Sum</td><td class="nil">Nil</td><td>One time</td></tr>
+        \`}
+      </table>
+
+      <!-- OPTIONAL SERVICES + NOTE -->
+      <div class="p2-opt-note-row">
+        <div class="p2-opt-col">
+          <div class="p2-table-hd" style="margin-top:0;">
+            <svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M19.4 13a7.4 7.4 0 000-2l2-1.6-2-3.4-2.4.8a7.6 7.6 0 00-1.8-1l-.4-2.5h-4l-.4 2.5a7.6 7.6 0 00-1.8 1l-2.4-.8-2 3.4L6.2 11a7.4 7.4 0 000 2l-2 1.6 2 3.4 2.4-.8a7.6 7.6 0 001.8 1l.4 2.5h4l.4-2.5a7.6 7.6 0 001.8-1l2.4.8 2-3.4z" fill="none" stroke="#fff" stroke-width="1.2"/></svg>
+            OPTIONAL SERVICES (IF REQUIRED)
+          </div>
+          <table class="p2-offer">
+            <tr><th style="width:10%;">Sr. No.</th><th style="width:58%;">Description</th><th style="width:16%;">Unit</th><th style="width:16%;">Rate (₹)</th></tr>
+            ${optionalCharges.length > 0 ? optionalCharges.map((c, i) => \`
+            <tr><td>\${i + 1}</td><td class="desc">\${escHtml(c.description)}</td><td>\${extractUnit(c.rate)}</td><td>\${extractRate(c.rate)}</td></tr>
+            \`).join('') : \`
+            <tr><td>1</td><td class="desc">Malvern particle sizing report (Wet Method)</td><td>Per Report</td><td>1,500.00</td></tr>
+            <tr><td>2</td><td class="desc">Sieving Charges (If applicable)</td><td>Per Kg</td><td>5.00</td></tr>
+            <tr><td>3</td><td class="desc">HDPE Drum 60 LTR (If Required)</td><td>Per No.</td><td>550.00</td></tr>
+            <tr><td>4</td><td class="desc">Liner (If Required)</td><td>Per No.</td><td>35.00</td></tr>
+            \`}
+          </table>
+        </div>
+        <div class="p2-note-col">
+          <div class="p2-note-box">
+            <div class="p2-nhd">
+              <svg width="14" height="14" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2" fill="none" stroke="#6C4FA1" stroke-width="1.5"/><path d="M8 7h8M8 11h8M8 15h5" stroke="#6C4FA1" stroke-width="1.3"/></svg>
+              NOTE
+            </div>
+            <ul>
+              <li>Prices mentioned are exclusive of GST.</li>
+              <li>GST will be charged extra as applicable.</li>
+              <li>Transportation, Insurance &amp; Packing Charges will be extra.</li>
+              <li>Rates are subject to change without prior notice.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLOSING -->
+  <div class="p2-closing-row">
+    <div class="p2-thankyou-text">
+      Thank you for considering Uma Micron for your micronization requirements.<br>
+      We look forward to a long term business association.
+    </div>
+    <div class="p2-sig-block">
+      <b>For ${escHtml(profile.companyName || 'UMA MICRON')}</b>
+      <div class="p2-sig-script">${escHtml(data.signatoryName || 'Amit Patel')}</div>
+      <b style="color:#2b2b2b;">${escHtml(data.signatoryName || 'Amit Patel')}</b>
+      Authorised Signatory
+    </div>
+  </div>
+
+  <!-- TERMS & CONDITIONS -->
+  <div class="p2-table-hd" style="margin:10px 8mm 0 8mm; border-radius:6px; width:fit-content; padding:6px 18px;">
+    <svg width="15" height="15" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2" fill="#fff"/><path d="M7 8h10M7 12h10M7 16h6" stroke="#33176F" stroke-width="1.4"/></svg>
+    TERMS &amp; CONDITIONS
+  </div>
+
+  <div class="p2-terms3col p2-pad">
+    <div class="p2-tcol3">
+      <div class="p2-tblock">
+        <div class="p2-tblock-hd">
+          <svg width="15" height="15" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2" fill="none" stroke="#6C4FA1" stroke-width="1.5"/><path d="M8 7h8M8 11h8M8 15h5" stroke="#6C4FA1" stroke-width="1.3"/></svg>
+        </div>
+        <ul>
+          <li>This is only processing charges, all other charges like Transportation, Insurance, Repacking material charges will be extra.</li>
+          <li>GST will be charged extra as applicable.</li>
+        </ul>
+      </div>
+      <div class="p2-tblock">
+        <div class="p2-tblock-hd">
+          <svg width="15" height="15" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="14" rx="2" fill="none" stroke="#6C4FA1" stroke-width="1.6"/><path d="M2 10h20" stroke="#6C4FA1" stroke-width="1.6"/><path d="M6 15h4" stroke="#6C4FA1" stroke-width="1.6"/></svg>
+          PAYMENT TERMS
+        </div>
+        <ul>
+          <li>100% Advance against Proforma Invoice.</li>
+          <li>No process will be started without advance payment.</li>
+        </ul>
+      </div>
+      <div class="p2-tblock">
+        <div class="p2-tblock-hd">
+          <svg width="15" height="15" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2" fill="none" stroke="#6C4FA1" stroke-width="1.6"/><path d="M3 9h18M7 2v4M17 2v4" stroke="#6C4FA1" stroke-width="1.6"/></svg>
+          VALIDITY
+        </div>
+        <ul>
+          <li>This quotation is valid till ${validityDate || '10-08-2026'}.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="p2-tcol3">
+      <div class="p2-tblock">
+        <div class="p2-tblock-hd">
+          <svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="#6C4FA1" stroke-width="1.6"/><path d="M19.4 13a7.4 7.4 0 000-2l2-1.6-2-3.4-2.4.8a7.6 7.6 0 00-1.8-1l-.4-2.5h-4l-.4 2.5a7.6 7.6 0 00-1.8 1l-2.4-.8-2 3.4L6.2 11a7.4 7.4 0 000 2l-2 1.6 2 3.4 2.4-.8a7.6 7.6 0 001.8 1l.4 2.5h4l.4-2.5a7.6 7.6 0 001.8-1l2.4.8 2-3.4z" fill="none" stroke="#6C4FA1" stroke-width="1.2"/></svg>
+          MATERIAL &amp; PROCESS CONDITIONS
+        </div>
+        <ul>
+          <li>Loss occurs during processing is on your account.</li>
+          <li>Same materials requirement of micronization separately batch wise of different specification of same materials then change over charge @ Rs. 500/- batch or per specification will be applicable.</li>
+          <li>Material must be non-hazardous, uniform, dry and free flow powder form.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="p2-tcol3">
+      <div class="p2-tblock">
+        <div class="p2-tblock-hd">
+          <svg width="15" height="15" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3" fill="none" stroke="#6C4FA1" stroke-width="1.4"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" fill="none" stroke="#6C4FA1" stroke-width="1.4"/><circle cx="18" cy="8" r="2.4" fill="none" stroke="#6C4FA1" stroke-width="1.4"/><path d="M14.5 20c.3-2.6 2.2-4.6 4.7-4.9" fill="none" stroke="#6C4FA1" stroke-width="1.4"/></svg>
+          CUSTOMER RESPONSIBILITIES
+        </div>
+        <ol>
+          <li>Please send Purchase Order and specification letter regarding particle size requirement, material dispatch destination with preferred transporter / courier along with material.</li>
+          <li>Please send extra drums and other repacking materials considering increase of volume after micronization &amp; micronized materials to be repacked in fresh bags.</li>
+          <li>Declaration of non-hazardous property of material is mandatory.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <div class="p2-bottom2col p2-pad">
+    <div class="p2-bcol">
+      <div class="p2-tblock-hd">
+        <svg width="15" height="15" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2" fill="none" stroke="#6C4FA1" stroke-width="1.5"/><path d="M8 7h8M8 11h8M8 15h5" stroke="#6C4FA1" stroke-width="1.3"/></svg>
+        IMPORTANT NOTES
+      </div>
+      <ul>
+        ${savedNotes.length > 0 ? savedNotes.map(line => \`<li>\${escHtml(line)}</li>\`).join('') : \`
+        <li>If properties of material change then rate will be change and PSD will change then rate will be change.</li>
+        <li>Any changes in taxes will be applicable as per actual.</li>
+        <li>Disputes are subject to Vadodara Jurisdiction only.</li>
+        \`}
+      </ul>
+    </div>
+    <div class="p2-bcol">
+      <div class="p2-tblock-hd">
+        <svg width="15" height="15" viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.4 9-8 11-4.6-2-8-6-8-11V5z" fill="none" stroke="#6C4FA1" stroke-width="1.6"/><path d="M9 12l2 2 4-4" stroke="#6C4FA1" stroke-width="1.6" fill="none"/></svg>
+        DECLARATION
+      </div>
+      <p style="margin:4px 0 18px 0;">We hereby declare that the above quotation is true and correct to the best of our knowledge.</p>
+      <div class="p2-decl-sig-line"></div>
+      <div style="text-align:right; font-size:9px;">Authorised Signatory</div>
+    </div>
+  </div>
+
+  <div class="p2-footer-bar" style="margin-top:10px;">
+    <span class="thankyou" style="font-style:italic;">Thank you for your business!</span>
+    <span>E. &amp; O.E.</span>
+    <span>Page 2 of 2</span>
   </div>
 
 </div>
