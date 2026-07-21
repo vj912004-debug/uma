@@ -178,6 +178,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
     align-items:stretch;
     gap:14px;
     margin-bottom:14px;
+    padding-bottom:14px; border-bottom:1px solid var(--purple); margin-left:-18px; margin-right:-18px; padding-left:18px; padding-right:18px;
   }
   .brand{
     display:flex;
@@ -221,7 +222,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
     flex-direction:column;
     justify-content:center;
     align-items:center;
-    min-width:230px;
+    min-width:230px; border-radius:6px;
   }
   .tax-invoice-box .ti-title{
     font-size:30px;
@@ -278,7 +279,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
 
   .invoice-meta{
     flex:1;
-    border:1px solid var(--purple);
+    border:1px solid var(--purple); border-radius:6px; overflow:hidden;
   }
   .invoice-meta .block{
     padding:8px 12px;
@@ -305,7 +306,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
   }
   .party{
     flex:1;
-    border:1px solid var(--lav-border);
+    border:1px solid var(--purple); border-radius:6px; overflow:hidden;
   }
   .party-head{
     background:var(--lav-bg);
@@ -316,7 +317,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
     padding:7px 12px;
     display:flex;
     align-items:center;
-    gap:8px;
+    gap:8px; border-bottom:1px solid var(--purple);
     border-bottom:1px solid var(--lav-border);
   }
   .party-head svg, .box-head svg{flex-shrink:0;}
@@ -346,16 +347,8 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
   table.items{
     width:100%;
     border-collapse:collapse;
-    margin-bottom:14px;
-    font-size:12px;
-  }
-  table.items thead th{
-    background:var(--purple);
-    color:#fff;
-    font-weight:700;
-    padding:8px 6px;
-    text-align:left;
-    border:1px solid var(--purple);
+    font-size:12.5px;
+    border:none;
   }
   table.items thead th.num{text-align:right;padding-right:10px;}
   table.items tbody td{
@@ -383,7 +376,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
   }
   .bank{
     flex:1;
-    border:1px solid var(--lav-border);
+    border:1px solid var(--purple); border-radius:6px; overflow:hidden;
   }
   .box-head{
     background:var(--lav-bg);
@@ -394,7 +387,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
     display:flex;
     align-items:center;
     gap:8px;
-    border-bottom:1px solid var(--lav-border);
+    border-bottom:1px solid var(--purple);
   }
   .bank-body{
     padding:10px 12px;
@@ -410,8 +403,8 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
     flex-direction:column;
   }
   .totals-body{
-    border:1px solid var(--lav-border);
-    border-bottom:none;
+    border:1px solid var(--purple);
+    border-bottom:none; border-radius:6px 6px 0 0;
     padding:10px 14px;
     font-size:12.5px;
     flex:1;
@@ -426,7 +419,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
     display:flex;
     justify-content:space-between;
     align-items:center;
-    padding:10px 14px;
+    padding:10px 14px; border-radius:0 0 6px 6px;
     font-size:17px;
     font-weight:800;
   }
