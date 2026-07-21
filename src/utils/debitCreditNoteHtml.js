@@ -437,6 +437,7 @@ const getCommonStyle = () => `
     color:var(--purple);
     padding:10px 12px 0;
     font-size:12.5px;
+      text-align:center;
   }
   .sig-col .sig-line{
     margin:30px 12px 10px;
