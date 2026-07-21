@@ -200,7 +200,8 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   .brand-text h1{
     margin:0;
     font-family:'Times New Roman',Times,serif;
-    font-size:46px;
+    font-size:42px;
+    white-space: nowrap;
     letter-spacing:1px;
     color:#123282;
     line-height:1;
