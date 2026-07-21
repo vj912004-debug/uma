@@ -21,7 +21,7 @@ export const fmtQty = (n) => {
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
 };
 
-export const buildPerformaInvoiceHtml = (data, profileInput) => {
+export const buildPurchaseOrderHtml = (data, profileInput) => {
   const profile = mergeCompanyProfile(profileInput);
 
   const chargeAmounts = buildTiChargeAmounts(data);
@@ -39,10 +39,12 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
   const pushRow = (desc, qty, rate, amt, sgstPercent, cgstPercent) => {
     const sgstAmt = amt * (sgstPercent / 100);
     const cgstAmt = amt * (cgstPercent / 100);
-    const rowTotal = amt + sgstAmt + cgstAmt;
+    const igstAmt = 0; // Purchase orders in pdfExport default to 0 IGST for now, or calculate if out of state
+    const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
     totalAmt += amt;
     totalSgst += sgstAmt;
     totalCgst += cgstAmt;
+    totalIgst += igstAmt;
     totalAll += rowTotal;
     totalQty += parseFloat(qty) || 0;
 
@@ -65,15 +67,29 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
         <td>${fmtMoney(amt)}</td>
         <td>${fmtMoney(cgstAmt)}</td>
         <td>${fmtMoney(sgstAmt)}</td>
-        <td>${fmtMoney(0)}</td>
+        <td>${fmtMoney(igstAmt)}</td>
         <td>${fmtMoney(rowTotal)}</td>
       </tr>`);
   };
 
+  const taxRate = parseFloat(data.taxRate) || 18;
+  const cgstRate = taxRate / 2;
+  const sgstRate = taxRate / 2;
+
+  if (data.productName) {
+    const qty = parseFloat(data.qty) || 0;
+    const rate = parseFloat(data.rate) || 0;
+    const amt = qty * rate > 0 ? (qty * rate) : (data.amount || 0);
+    const specs = (data.productDescription || '').trim();
+    const desc = specs ? `${data.productName} - ${specs}` : data.productName;
+    
+    pushRow(desc, qty, rate, amt, sgstRate, cgstRate);
+  }
+
   TI_CHARGES_LIST.forEach((charge) => {
     const line = chargeAmounts[charge.key];
     if (!line) return;
-    pushRow(charge.label, line.qty, line.rate, line.amt || 0, charge.sgst, charge.cgst);
+    pushRow(charge.label, line.qty, line.rate, line.amt || 0, sgstRate, cgstRate);
   });
 
   (data.customCharges || []).forEach((cc) => {
@@ -82,7 +98,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
     const rate = parseFloat(cc.rate) || 0;
     const amt = ccQty * rate;
     if (amt <= 0) return;
-    pushRow(cc.name || '', ccQty, rate, amt, 9, 9);
+    pushRow(cc.name || '', ccQty, rate, amt, sgstRate, cgstRate);
   });
 
   const MIN_ROWS = 5;
@@ -111,9 +127,9 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
       <td>${fmtMoney(totalAll)}</td>
     </tr>`);
 
-  const docNo = escHtml(data.invoiceNo || 'N/A');
+  const docNo = escHtml(data.poNo || 'N/A');
   const docDate = escHtml(formatPdfDateDmy(data.date) || 'N/A');
-  const poNo = escHtml(data.partyDocNo || 'Verbal');
+  const poNo = escHtml(data.partyDocNo || '');
   const poDate = escHtml(formatPdfDateDmy(data.partyDocDate) || '');
   const dcNo = escHtml(data.dcNo || '');
   const dcDate = escHtml(formatPdfDateDmy(data.dcDate) || '');
@@ -142,7 +158,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>UMA MICRON - Performa Invoice</title>
+<title>UMA MICRON - Purchase Order</title>
 <style>
   :root{
     --purple:#3d2b7d;
@@ -496,7 +512,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
       </div>
     </div>
     <div class="tax-invoice-box">
-      <div class="ti-title">PERFORMA INVOICE</div>
+      <div class="ti-title">PURCHASE ORDER</div>
     </div>
   </div>
 
@@ -517,12 +533,12 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
 
     <div class="invoice-meta">
       <div class="block">
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">PI No.</span><span class="m-colon">:</span><span class="m-value">${docNo}</span></div>
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="m-label">PI Date</span><span class="m-colon">:</span><span class="m-value">${docDate}</span></div>
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">PO No.</span><span class="m-colon">:</span><span class="m-value">${docNo}</span></div>
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="m-label">PO Date</span><span class="m-colon">:</span><span class="m-value">${docDate}</span></div>
       </div>
       <div class="block">
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span class="m-label">PO No.</span><span class="m-colon">:</span><span class="m-value">${poNo}</span></div>
-        <div class="meta-row sub"><span class="m-label">PO Date</span><span class="m-colon">:</span><span class="m-value">${poDate}</span></div>
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span class="m-label">Ref No.</span><span class="m-colon">:</span><span class="m-value">${poNo}</span></div>
+        <div class="meta-row sub"><span class="m-label">Ref Date</span><span class="m-colon">:</span><span class="m-value">${poDate}</span></div>
         <div class="meta-row sub"><span class="m-label">Delivery Challan No.</span><span class="m-colon">:</span><span class="m-value">${dcNo}</span></div>
         <div class="meta-row sub"><span class="m-label">DC Date</span><span class="m-colon">:</span><span class="m-value">${dcDate}</span></div>
       </div>
@@ -558,36 +574,36 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
   <!-- ITEMS TABLE -->
   <div class="table-container">
     <table class="items">
-      <thead>
-        <tr>
-          <th style="width:5%;">Sr. No.</th>
-          <th style="width:22%;">Description</th>
-          <th style="width:9%;">HSN / SAC</th>
-          <th class="num" style="width:6%;">Qty.</th>
-          <th class="num" style="width:9%;">Rate (&#8377;)</th>
-          <th class="num" style="width:10%;">Amount (&#8377;)</th>
-          <th class="num" style="width:8%;">CGST (&#8377;)</th>
-          <th class="num" style="width:8%;">SGST (&#8377;)</th>
-          <th class="num" style="width:8%;">IGST (&#8377;)</th>
-          <th class="num" style="width:11%;">Total Amount (&#8377;)</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows.join('')}
-      </tbody>
-      <tfoot>
-        <tr>
-          <td colspan="3" style="text-align:center;">TOTAL</td>
-          <td class="num">${fmtQty(totalQty) || '0.00'}</td>
-          <td></td>
-          <td class="num">${fmtMoney(totalAmt)}</td>
-          <td class="num">${fmtMoney(totalCgst)}</td>
-          <td class="num">${fmtMoney(totalSgst)}</td>
-          <td class="num">${fmtMoney(totalIgst)}</td>
-          <td class="num">${fmtMoney(totalAll)}</td>
-        </tr>
-      </tfoot>
-    </table>
+    <thead>
+      <tr>
+        <th style="width:5%;">Sr. No.</th>
+        <th style="width:22%;">Description</th>
+        <th style="width:9%;">HSN / SAC</th>
+        <th class="num" style="width:6%;">Qty.</th>
+        <th class="num" style="width:9%;">Rate (&#8377;)</th>
+        <th class="num" style="width:10%;">Amount (&#8377;)</th>
+        <th class="num" style="width:8%;">CGST (&#8377;)</th>
+        <th class="num" style="width:8%;">SGST (&#8377;)</th>
+        <th class="num" style="width:8%;">IGST (&#8377;)</th>
+        <th class="num" style="width:11%;">Total Amount (&#8377;)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.join('')}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3" style="text-align:center;">TOTAL</td>
+        <td class="num">${fmtQty(totalQty) || '0.00'}</td>
+        <td></td>
+        <td class="num">${fmtMoney(totalAmt)}</td>
+        <td class="num">${fmtMoney(totalCgst)}</td>
+        <td class="num">${fmtMoney(totalSgst)}</td>
+        <td class="num">${fmtMoney(totalIgst)}</td>
+        <td class="num">${fmtMoney(totalAll)}</td>
+      </tr>
+    </tfoot>
+  </table>
   </div>
 
       </td>
@@ -629,9 +645,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
       <div class="box-head"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg> TERMS &amp; CONDITIONS</div>
       <div class="f3-body">
         <ol>
-          <li>Subject to Vadodara Jurisdiction.</li>
-          <li>Payment terms as per our agreed terms.</li>
-          <li>Interest will be charged @ 24% p.a. if the amount remains unpaid from the due date.</li>
+          ${(data.terms || '1. Delivery 10 days from the date of Purchase Order.\n2. Transportation Extra As Actual.\n3. 10 Years Warranty').split('\\n').map(line => '<li>' + escHtml(line.replace(/^\\d+\\.\\s*/, '')) + '</li>').join('')}
         </ol>
       </div>
     </div>
@@ -663,8 +677,8 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
 </html>`;
 };
 
-export const renderPerformaInvoicePdf = async (data, { mode = 'save' } = {}) => {
-  const html = buildPerformaInvoiceHtml(data, data.companyProfile);
+export const renderPurchaseOrderPdf = async (data, { mode = 'save' } = {}) => {
+  const html = buildPurchaseOrderHtml(data, data.companyProfile);
   const { jsPDF } = await import('jspdf');
   const html2canvas = (await import('html2canvas')).default;
   const host = document.createElement('div');
@@ -705,9 +719,9 @@ export const renderPerformaInvoicePdf = async (data, { mode = 'save' } = {}) => 
     if (mode === 'view') {
       const url = pdf.output('bloburl');
       const win = window.open(url, '_blank');
-      if (win) win.document.title = `PI_${data.invoiceNo || 'N/A'}`;
+      if (win) win.document.title = `PO_${data.poNo || 'N/A'}`;
     } else {
-      pdf.save(`PI_${data.invoiceNo || 'N/A'}.pdf`);
+      pdf.save(`PO_${data.poNo || 'N/A'}.pdf`);
     }
   } finally {
     document.body.removeChild(host);

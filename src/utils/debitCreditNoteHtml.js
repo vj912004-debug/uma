@@ -7,13 +7,11 @@ import {
 import {
   escHtml,
   fmtMoney,
-  fmtQty,
-  PRINT_PAGE_W,
-  renderHtmlToPdf
+  fmtQty
 } from './printTheme';
 
 const NOTE_CHARGES = [...STANDARD_CHARGES_LIST, OTHER_CHARGE_ITEM];
-const NOTE_MIN_ROWS = 10;
+const NOTE_MIN_ROWS = 8;
 
 const calcNoteLines = (data) => {
   const taxRate = parseFloat(data.taxRate) || 18;
@@ -86,7 +84,386 @@ const calcNoteLines = (data) => {
   return { rows, totalAmt, totalSgst, totalCgst, totalIgst: 0, totalAll, totalQty };
 };
 
-const buildDebitNoteHtml = (data, profileInput) => {
+const getCommonStyle = () => `
+  :root{
+    --purple:#3d2b7d;
+    --purple-dark:#2f2263;
+    --lav-bg:#efeaf7;
+    --lav-border:#c9bce8;
+    --orange:#f47920;
+    --green:#2fa84f;
+    --text:#231f20;
+    --grey-line:#d9d9d9;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding: 4px;background:#fff;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:var(--text);}
+  
+  /* A4 scaling */
+  .page {
+    width: 794px;
+    min-height: 1123px;
+    padding: 4px;
+    margin: 0;
+    background: #fff;
+    border: none;
+    display: block;
+  }
+
+  /* Outline for the whole content */
+  .content-wrapper { width: 100%; min-height: 1115px; height: 1115px; border-collapse: collapse; border: 2px solid var(--purple); box-sizing: border-box; }
+  .content-wrapper td { padding: 0; }
+
+  /* ===== HEADER ===== */
+  .header{
+    display:flex;
+    justify-content:space-between;
+    align-items:stretch;
+    gap:14px;
+    margin-bottom:14px;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+  .logo{
+    width:78px;
+    height:78px;
+    position:relative;
+    flex-shrink:0;
+  }
+  .logo svg{width:100%;height:100%;}
+  .brand-text h1{
+    margin:0;
+    font-family:Georgia,'Times New Roman',serif;
+    font-size:38px;
+    letter-spacing:1px;
+    color:var(--purple);
+    line-height:1;
+  }
+  .brand-text .tagline{
+    color:var(--green);
+    font-weight:700;
+    font-size:16px;
+    margin-top:2px;
+  }
+  .tax-invoice-box{
+    background:var(--purple);
+    color:#fff;
+    text-align:center;
+    padding:10px 22px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    min-width:230px;
+  }
+  .tax-invoice-box .ti-title{
+    font-size:30px;
+    font-weight:800;
+    letter-spacing:1px;
+    margin-bottom:6px;
+  }
+  .tax-invoice-box .ti-sub{
+    background:#fff;
+    color:var(--purple);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.5px;
+    padding:3px 10px;
+  }
+
+  /* ===== COMPANY / INVOICE INFO ROW ===== */
+  .info-row{
+    display:flex;
+    gap:14px;
+    margin-bottom:14px;
+  }
+  .company-info{
+    flex:1.15;
+    font-size:12.5px;
+    line-height:1.55;
+  }
+  .company-info .line{
+    display:flex;
+    gap:8px;
+    align-items:flex-start;
+    margin-bottom:4px;
+  }
+  .icon{
+    color:var(--purple);
+    flex-shrink:0;
+    width:16px;
+    height:16px;
+    text-align:center;
+    margin-top:1px;
+  }
+  .icon svg{width:16px;height:16px;display:block;fill:none;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .m-icon svg{width:15px;height:15px;display:block;fill:none;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .party-head svg, .box-head svg{width:16px;height:16px;display:block;fill:none;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .reg-details{
+    margin-top:10px;
+    font-size:12.5px;
+    line-height:1.7;
+  }
+  .reg-details b{color:var(--purple);}
+  .reg-row{display:flex;}
+  .reg-row .label{width:62px;font-weight:700;color:var(--purple);}
+  .reg-row .colon{width:14px;}
+
+  .invoice-meta{
+    flex:1;
+    border:1px solid var(--purple);
+  }
+  .invoice-meta .block{
+    padding:8px 12px;
+    font-size:12.5px;
+  }
+  .invoice-meta .block + .block{
+    border-top:1px solid var(--purple);
+  }
+  .meta-row{
+    display:flex;
+    margin-bottom:3px;
+  }
+  .meta-row .m-icon{color:var(--purple);width:18px;flex-shrink:0;display:flex;align-items:center;}
+  .meta-row .m-label{width:110px;flex-shrink:0;color:#333;}
+  .meta-row .m-colon{width:12px;flex-shrink:0;}
+  .meta-row .m-value{font-weight:600;}
+  .meta-row.sub .m-label{width:110px;padding-left:18px;box-sizing:border-box;}
+
+  /* ===== BILL TO / SHIP TO ===== */
+  .parties{
+    display:flex;
+    gap:14px;
+    margin-bottom:14px;
+  }
+  .party{
+    flex:1;
+    border:1px solid var(--lav-border);
+  }
+  .party-head{
+    background:var(--lav-bg);
+    color:var(--purple);
+    font-weight:800;
+    font-size:13px;
+    letter-spacing:.5px;
+    padding:7px 12px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    border-bottom:1px solid var(--lav-border);
+  }
+  .party-head svg, .box-head svg{flex-shrink:0;}
+  .party-body{
+    padding:10px 12px;
+    font-size:12.5px;
+    line-height:1.55;
+    min-height: 80px;
+  }
+  .party-body .cname{
+    color:var(--purple);
+    font-weight:800;
+    font-size:14px;
+    margin-bottom:4px;
+  }
+  .party-foot{
+    border-top:1px solid var(--lav-border);
+    padding:8px 12px;
+    font-size:12.5px;
+  }
+  .party-foot .frow{display:flex;margin-bottom:2px;}
+  .party-foot .flabel{width:50px;font-weight:700;}
+  .party-foot .fcolon{width:12px;}
+
+  /* ===== REASON BAR ===== */
+  .reason-bar{
+    border:1px solid var(--lav-border);
+    padding:7px 12px;
+    font-size:11px;
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:14px;
+    background:var(--lav-bg);
+    margin-bottom:14px;
+  }
+  .reason-bar .label{
+    font-weight:800;
+    color:var(--purple);
+    margin-right:2px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .reason-bar .opt{
+    display:flex;align-items:center;gap:4px;
+  }
+  .checkbox{
+    width:12px;height:12px;
+    border:1px solid var(--purple);
+    background:#fff;
+    display:inline-block;
+    position:relative;
+  }
+  .checkbox.checked::after{
+    content:"✓";
+    position:absolute;
+    top:-2px;left:1px;
+    font-size:12px;
+    font-weight:900;
+    color:var(--purple);
+  }
+
+  /* ===== TABLE ===== */
+  .table-container { }
+  table.items{
+    width:100%;
+    border-collapse:collapse;
+    margin-bottom:14px;
+    font-size:12px;
+  }
+  table.items thead th{
+    background:var(--purple);
+    color:#fff;
+    font-weight:700;
+    padding:8px 6px;
+    text-align:left;
+    border:1px solid var(--purple);
+  }
+  table.items thead th.num{text-align:right;padding-right:10px;}
+  table.items tbody td{
+    border:1px solid var(--lav-border);
+    padding:6px 6px;
+    height:20px;
+  }
+  table.items tbody td.num{text-align:right;padding-right:10px;}
+  table.items tbody tr.empty td{height:22px;}
+  table.items tfoot td{
+    border:1px solid var(--purple);
+    background:var(--lav-bg);
+    font-weight:800;
+    padding:8px 6px;
+    color:var(--purple-dark);
+  }
+  table.items tfoot td.num{text-align:right;padding-right:10px;}
+
+  /* ===== BOTTOM SECTION: bank + totals ===== */
+  .bottom{
+    display:flex;
+    gap:14px;
+    margin-bottom:14px;
+    align-items:stretch;
+  }
+  .bank{
+    flex:1;
+    border:1px solid var(--lav-border);
+  }
+  .box-head{
+    background:var(--lav-bg);
+    color:var(--purple);
+    font-weight:800;
+    font-size:13px;
+    padding:7px 12px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    border-bottom:1px solid var(--lav-border);
+  }
+  .bank-body{
+    padding:10px 12px;
+    font-size:12.5px;
+  }
+  .bank-row{display:flex;margin-bottom:5px;}
+  .bank-row .blabel{width:120px;font-weight:700;}
+  .bank-row .bcolon{width:12px;}
+
+  .totals{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+  }
+  .totals-body{
+    border:1px solid var(--lav-border);
+    border-bottom:none;
+    padding:10px 14px;
+    font-size:12.5px;
+    flex:1;
+  }
+  .trow{display:flex;justify-content:space-between;padding:2px 0;}
+  .trow .tlabel{}
+  .trow .tval{font-variant-numeric:tabular-nums;min-width:90px;text-align:right;}
+  .trow.rule{border-top:1px solid var(--grey-line);margin-top:4px;padding-top:5px;}
+  .grand{
+    background:var(--purple);
+    color:#fff;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px 14px;
+    font-size:17px;
+    font-weight:800;
+  }
+
+  /* ===== TERMS / DECLARATION / SIGNATORY ===== */
+  .footer3{
+    display:flex;
+    gap:14px;
+    margin-bottom:0;
+  }
+  .f3col{
+    flex:1;
+    border:1px solid var(--lav-border);
+  }
+  .f3-body{
+    padding:10px 12px;
+    font-size:11.5px;
+    line-height:1.6;
+  }
+  .f3-body ol{margin:0;padding-left:16px;}
+  .sig-col{
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+  }
+  .sig-col .for-company{
+    font-weight:800;
+    color:var(--purple);
+    padding:10px 12px 0;
+    font-size:12.5px;
+  }
+  .sig-col .sig-line{
+    margin:30px 12px 10px;
+    border-top:1px solid #333;
+    text-align:center;
+    padding-top:4px;
+    font-size:11.5px;
+  }
+
+  /* ===== BAR FOOTER ===== */
+  .barfoot{
+    background:var(--purple);
+    color:#fff;
+    margin-top:14px;
+    padding:8px 16px;
+    display:flex;
+    justify-content:space-between;
+    font-size:11.5px;
+  }
+
+  @media print{
+    body{background:#fff;}
+    .page {margin:0;padding: 4px;width:794px;min-height: 1123px;}
+    .content-wrapper { width: 100%; min-height: 1115px; height: 1115px; border-collapse: collapse; border: 2px solid var(--purple); box-sizing: border-box; }
+  .content-wrapper td { padding: 0; }
+  }
+`;
+
+const getLogoSvg = () => `
+  <img src="data:image/png;base64,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" style="width:100%;height:100%;object-fit:contain;" alt="Logo" />
+`;
+
+const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
   const profile = mergeCompanyProfile(profileInput);
   const docNo = escHtml(data.noteNo || 'N/A');
   const docDate = escHtml(formatPdfDateDmy(data.date) || 'N/A');
@@ -99,14 +476,14 @@ const buildDebitNoteHtml = (data, profileInput) => {
 
   // Bill To
   const billName = escHtml(data.partyName || '');
-  const billAddrHtml = splitPartyAddressLines(data.billAddress || data.address || '', 42).map(escHtml).join('<br>');
+  const billAddr = splitPartyAddressLines(data.billAddress || data.address || '', 42);
   const billState = escHtml(data.billState || data.state || '');
   const billStateCode = escHtml(data.billStateCode || data.stateCode || '');
   const billGstin = escHtml(data.gstinBill || data.gstin || '');
 
   // Ship To
   const shipName = escHtml(data.shipName || data.partyName || '');
-  const shipAddrHtml = splitPartyAddressLines(data.shipAddress || data.address || '', 42).map(escHtml).join('<br>');
+  const shipAddr = splitPartyAddressLines(data.shipAddress || data.address || '', 42);
   const shipState = escHtml(data.shipState || data.state || '');
   const shipStateCode = escHtml(data.shipStateCode || data.stateCode || '');
   const shipGstin = escHtml(data.gstinShip || data.gstin || '');
@@ -116,7 +493,6 @@ const buildDebitNoteHtml = (data, profileInput) => {
     companyPan = escHtml(profile.gstNumber.substring(2, 12));
   }
   const companyState = escHtml(profile.state || 'Gujarat');
-  const companyGstin = escHtml(profile.gstNumber || '24AABCA7339N1Z8');
   
   const extractDescAndHsn = (label) => {
     const match = label.match(/(.*?)\s*\((\d+)\)$/);
@@ -135,547 +511,222 @@ const buildDebitNoteHtml = (data, profileInput) => {
     
     return `
       <tr>
-        <td>${r.sr}</td><td class="desc">${escHtml(desc)}</td><td>${escHtml(hsn)}</td><td>${fmtQty(r.qty)}</td>
-        <td>${fmtMoney(r.rate)}</td><td>${fmtMoney(r.amt)}</td><td>${isIgst ? '-' : fmtMoney(cgstAmt)}</td><td>${isIgst ? '-' : fmtMoney(sgstAmt)}</td><td>${fmtMoney(r.rowTotal)}</td>
+        <td class="center">${r.sr}</td>
+        <td class="left">${escHtml(desc)}</td>
+        <td class="center">${escHtml(hsn)}</td>
+        <td class="num">${fmtQty(r.qty)}</td>
+        <td class="num">${fmtMoney(r.rate)}</td>
+        <td class="num">${fmtMoney(r.amt)}</td>
+        <td class="num">${isIgst ? '-' : fmtMoney(cgstAmt)}</td>
+        <td class="num">${isIgst ? '-' : fmtMoney(sgstAmt)}</td>
+        <td class="num">${!isIgst ? '-' : fmtMoney(r.sgstAmt + r.cgstAmt)}</td>
+        <td class="num">${fmtMoney(r.rowTotal)}</td>
       </tr>`;
   }).join('');
 
   const blanksCount = Math.max(0, NOTE_MIN_ROWS - rows.length);
   const blanks = Array.from({ length: blanksCount }, () => `
-      <tr class="filler-row"><td colspan="9"></td></tr>
+      <tr class="filler-row">
+        <td></td><td></td><td></td><td></td><td></td>
+        <td></td><td></td><td></td><td></td><td></td>
+      </tr>
   `).join('');
 
   const roundedTotal = Math.round(totalAll);
   const roundOff = roundedTotal - totalAll;
   
   const totalTaxAmount = isIgst ? (totalSgst + totalCgst) : (totalCgst + totalSgst);
+  
+  let reasonBar = '';
+  if (reasonsArray && reasonsArray.length) {
+    const otherMatched = !reasonsArray.includes(data.reason) && data.reason;
+    const optsHtml = reasonsArray.map(r => `
+      <span class="opt"><span class="checkbox ${data.reason === r ? 'checked' : ''}"></span> ${r}</span>
+    `).join('');
+    
+    reasonBar = `
+    <div class="reason-bar">
+      <span class="label">
+        <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 12l3 3 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        REASON FOR ${noteType.toUpperCase()}
+      </span>
+      ${optsHtml}
+      <span class="opt"><span class="checkbox ${otherMatched ? 'checked' : ''}"></span> Other ${otherMatched ? escHtml(data.reason) : '_______'}</span>
+    </div>`;
+  }
 
-  const html = `
-<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Debit Note - ${escHtml(profile.companyName)}</title>
-<style>
-  :root{
-    --purple: #6C4FA1;
-    --purple-dark: #5B3E92;
-    --purple-light: #F1EDF9;
-    --purple-border: #C9BEE0;
-    --grey-border: #B8B8B8;
-    --text-dark: #2b2b2b;
-  }
-  *{box-sizing:border-box;}
-  html,body{
-    margin:0;
-    padding:0;
-    background:#e9e9ec;
-    font-family: Arial, Helvetica, sans-serif;
-    color: var(--text-dark);
-  }
-
-  /* ===== A4 PAGE ===== */
-  .sheet{
-    width:210mm;
-    min-height:297mm;
-    margin:10px auto;
-    background:#fff;
-    border:1px solid var(--grey-border);
-    padding:10mm 10mm 6mm 10mm;
-    position:relative;
-    display:flex;
-    flex-direction:column;
-  }
-  @media print{
-    body{background:#fff;}
-    .sheet{margin:0;border:none;box-shadow:none;}
-    @page{ size:A4; margin:0; }
-  }
-
-  svg.ic{ vertical-align:middle; flex-shrink:0; }
-
-  /* ===== HEADER ===== */
-  .header{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    border-bottom:2px solid var(--purple);
-    padding-bottom:10px;
-  }
-  .logo-block{
-    display:flex;
-    align-items:center;
-    gap:10px;
-  }
-  .logo-icon{
-    width:56px;height:56px;
-  }
-  .company-name{
-    font-size:24px;font-weight:800;letter-spacing:0.5px;
-  }
-  .company-name .um{color:#1a9e8f;}
-  .company-name .icron{color:#2d3a8c;}
-  .company-tagline{
-    font-size:10.5px;color:#555;letter-spacing:2px;font-weight:600;
-  }
-  .debit-badge{
-    background:var(--purple);
-    color:#fff;
-    text-align:center;
-    padding:9px 28px;
-    border-radius:4px;
-    font-weight:800;
-    font-size:16px;
-    letter-spacing:0.5px;
-  }
-  .debit-badge .sub{
-    font-size:9.5px;font-weight:600;letter-spacing:1px;display:block;margin-top:3px;
-  }
-
-  /* ===== COMPANY INFO + REFERENCE ===== */
-  .info-row{
-    display:flex;
-    justify-content:space-between;
-    gap:16px;
-    padding:10px 0;
-    border-bottom:1px solid var(--purple-border);
-  }
-  .company-info{
-    font-size:10.5px;
-    line-height:1.65;
-    width:52%;
-  }
-  .info-line{
-    display:flex;
-    align-items:flex-start;
-    gap:7px;
-    margin-bottom:2px;
-  }
-  .info-line svg{ margin-top:2px; }
-  .gst-line{ margin-top:5px; }
-  .ref-table{
-    width:46%;
-    border:1px solid var(--purple-border);
-    border-collapse:collapse;
-    font-size:10.5px;
-    height:fit-content;
-  }
-  .ref-table th{
-    background:var(--purple);
-    color:#fff;
-    text-align:left;
-    padding:5px 8px;
-    font-size:10.5px;
-    letter-spacing:0.5px;
-  }
-  .ref-table td{
-    padding:4px 8px;
-    border-top:1px solid var(--purple-border);
-  }
-  .ref-table td.label{
-    width:58%;color:#444;
-  }
-  .ref-table td.label .lbl-inner{
-    display:flex; align-items:center; gap:6px;
-  }
-  .ref-table td.value{
-    font-weight:700;text-align:right;
-  }
-
-  /* ===== BILL TO / SHIP TO ===== */
-  .parties{
-    display:flex;
-    border:1px solid var(--purple-border);
-    margin-top:10px;
-  }
-  .party{
-    width:50%;
-    font-size:10.5px;
-  }
-  .party:first-child{
-    border-right:1px solid var(--purple-border);
-  }
-  .party-header{
-    background:var(--purple-light);
-    color:var(--purple-dark);
-    font-weight:700;
-    padding:5px 10px;
-    font-size:11px;
-    display:flex;
-    align-items:center;
-    gap:7px;
-  }
-  .party-body{
-    padding:7px 10px;
-    line-height:1.7;
-  }
-  .party-body .name{
-    font-weight:700;
-    color:var(--purple-dark);
-  }
-
-  /* ===== REASON BAR ===== */
-  .reason-bar{
-    border:1px solid var(--purple-border);
-    border-top:none;
-    padding:7px 10px;
-    font-size:10.5px;
-    display:flex;
-    align-items:center;
-    flex-wrap:wrap;
-    gap:14px;
-    background:#fbfbfb;
-  }
-  .reason-bar .label{
-    font-weight:700;
-    color:var(--purple-dark);
-    margin-right:2px;
-    display:flex;
-    align-items:center;
-    gap:6px;
-  }
-  .reason-bar .opt{
-    display:flex;align-items:center;gap:4px;
-  }
-  .checkbox{
-    width:11px;height:11px;
-    border:1.4px solid #333;
-    display:inline-block;
-    position:relative;
-  }
-  .checkbox.checked::after{
-    content:"✓";
-    position:absolute;
-    top:-4px;left:0.5px;
-    font-size:10px;
-    font-weight:900;
-    color:#1a1a1a;
-  }
-
-  /* ===== ITEMS TABLE ===== */
-  table.items{
-    width:100%;
-    border-collapse:collapse;
-    margin-top:8px;
-    font-size:10px;
-  }
-  table.items th{
-    background:var(--purple-light);
-    border:1px solid var(--purple-border);
-    padding:6px 4px;
-    text-align:center;
-    font-size:9.5px;
-    font-weight:700;
-    color:var(--purple-dark);
-  }
-  table.items td{
-    border:1px solid var(--purple-border);
-    padding:6px 4px;
-    text-align:center;
-  }
-  table.items td.desc{
-    text-align:left;
-  }
-  table.items tbody tr:nth-child(even){ background:#fbfaff; }
-  table.items tr.total-row td{
-    font-weight:800;
-    background:#fff;
-    border-top:2px solid var(--purple);
-  }
-
-  .filler-row td{ height:20px; }
-
-  /* ===== BANK DETAILS + TAX SUMMARY ===== */
-  .bottom-row{
-    display:flex;
-    gap:0;
-    margin-top:8px;
-    border:1px solid var(--purple-border);
-  }
-  .bank-box{
-    width:55%;
-    border-right:1px solid var(--purple-border);
-    font-size:10px;
-  }
-  .box-header{
-    background:var(--purple);
-    color:#fff;
-    font-weight:700;
-    padding:5px 10px;
-    font-size:10.5px;
-    display:flex;
-    align-items:center;
-    gap:7px;
-  }
-  .box-body{
-    padding:9px 10px;
-    line-height:1.9;
-  }
-  .bank-table{
-    width:100%;
-    font-size:10px;
-    border-collapse:collapse;
-  }
-  .bank-table td{
-    padding:2px 0;
-  }
-  .bank-table td.blabel{
-    width:38%;color:#444;
-  }
-  .bank-table td.bvalue{
-    font-weight:700;
-  }
-  .tax-summary{
-    width:45%;
-    font-size:10px;
-  }
-  .tax-table{
-    width:100%;
-    border-collapse:collapse;
-  }
-  .tax-table td{
-    padding:4px 10px;
-  }
-  .tax-table tr.line td{
-    border-top:1px solid var(--purple-border);
-  }
-  .tax-table td.val{
-    text-align:right;
-    font-weight:600;
-  }
-  .tax-table tr.roundoff td{
-    font-style:italic;
-    color:#555;
-  }
-
-  /* ===== TERMS + DECLARATION ===== */
-  .terms-row{
-    display:flex;
-    border:1px solid var(--purple-border);
-    border-top:none;
-    flex:1;
-  }
-  .terms-box, .decl-box{
-    width:50%;
-    font-size:9.5px;
-  }
-  .terms-box{
-    border-right:1px solid var(--purple-border);
-  }
-  .decl-box .box-body{
-    padding-top:11px;
-    padding-bottom:26px;
-  }
-  .terms-box ol{
-    margin:7px 10px;
-    padding-left:15px;
-    line-height:1.75;
-  }
-
-  /* ===== DEBIT AMOUNT ===== */
-  .debit-amount{
-    background:var(--purple);
-    color:#fff;
-    font-weight:800;
-    font-size:14px;
-    padding:9px 12px;
-    display:flex;
-    justify-content:space-between;
-    margin-top:8px;
-  }
-  .signature{
-    text-align:right;
-    font-size:10px;
-    padding:22px 12px 4px 0;
-  }
-  .sig-line{
-    border-top:1px solid #999;
-    width:150px;
-    margin-left:auto;
-    margin-bottom:4px;
-  }
-
-  .footer{
-    display:flex;
-    justify-content:space-between;
-    font-size:8.5px;
-    color:#777;
-    margin-top:auto;
-    padding-top:8px;
-  }
-</style>
+<title>${noteType} - ${escHtml(profile.companyName)}</title>
+<style>${getCommonStyle()}</style>
 </head>
 <body>
-<div class="sheet pdf-page print-host">
+<div class="page">
+<table class="content-wrapper">
+  <tr>
+    <td valign="top" style="padding: 18px; padding-bottom: 0;">
 
   <!-- HEADER -->
   <div class="header">
-    <div class="logo-block">
-      <svg class="logo-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20 30 A35 20 0 1 1 19 71" fill="none" stroke="#1a9e6a" stroke-width="4" stroke-linecap="round"/>
-        <path d="M80 70 A35 20 0 1 1 81 29" fill="none" stroke="#1a9e6a" stroke-width="4" stroke-linecap="round"/>
-        <polygon points="18,66 12,78 26,76" fill="#1a9e6a"/>
-        <polygon points="82,34 88,22 74,24" fill="#1a9e6a"/>
-        <text x="28" y="63" font-family="Arial" font-weight="800" font-size="38" fill="#e8781e">U</text>
-        <text x="46" y="63" font-family="Arial" font-weight="800" font-size="38" fill="#2d3a8c">M</text>
-        <text x="66" y="63" font-family="Arial" font-weight="800" font-size="38" fill="#7a2f8c">J</text>
-      </svg>
-      <div>
-        <div class="company-name"><span class="um">UMA </span><span class="icron">MICRON</span></div>
-        <div class="company-tagline">Micronization of API's</div>
+    <div class="brand">
+      <div class="logo">${getLogoSvg()}</div>
+      <div class="brand-text">
+        <h1>UMA MICRON</h1>
+        <div class="tagline">Micronization of API&rsquo;s</div>
       </div>
     </div>
-    <div class="debit-badge">DEBIT NOTE<span class="sub">AGAINST TAX INVOICE</span></div>
+    <div class="tax-invoice-box">
+      <div class="ti-title">${noteType.toUpperCase()}</div>
+      <div class="ti-sub">AGAINST TAX INVOICE</div>
+    </div>
   </div>
 
-  <!-- COMPANY INFO + REFERENCE -->
+  <!-- COMPANY INFO + INVOICE META -->
   <div class="info-row">
     <div class="company-info">
-      <div class="info-line">
-        <svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2C7.6 2 4 5.6 4 10c0 5.5 8 12 8 12s8-6.5 8-12c0-4.4-3.6-8-8-8z" fill="#6C4FA1"/><circle cx="12" cy="10" r="3" fill="#fff"/></svg>
-        <span>Plot No. 118, G.I.D.C., Ranoli,<br>N.H. No. 8, Vadodara – 391350,<br>Gujarat, India</span>
-      </div>
-      <div class="info-line">
-        <svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.2c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.2 1l-2 2.2z" fill="#6C4FA1"/></svg>
-        <span>+91 97120 00297</span>
-      </div>
-      <div class="info-line">
-        <svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="16" rx="2" fill="#6C4FA1"/><path d="M2 6l10 7 10-7" stroke="#fff" stroke-width="1.6" fill="none"/></svg>
-        <span>umamicron@gmail.com</span>
-      </div>
-      <div class="info-line">
-        <svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#6C4FA1"/><path d="M2 12h20M12 2c2.5 2.7 4 6.2 4 10s-1.5 7.3-4 10c-2.5-2.7-4-6.2-4-10s1.5-7.3 4-10z" stroke="#fff" stroke-width="1.2" fill="none"/></svg>
-        <span>www.umamicron.com</span>
-      </div>
-      <div class="gst-line">
-        <b>GSTIN</b> : ${companyGstin} &nbsp;&nbsp; <b>PAN</b> : ${companyPan}<br>
-        <b>State</b> : ${companyState}
+      <div class="line"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></span><span>Plot No. 1116, G.I.D.C., Ranoli,<br>N.H. No. 8, Vadodara - 391350,<br>Gujarat, India</span></div>
+      <div class="line"><span class="icon"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 2.9c0-.5.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg></span><span>+91 97120 00297</span></div>
+      <div class="line"><span class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 6.5l9 7 9-7"/></svg></span><span>umamicron@gmail.com</span></div>
+      <div class="line"><span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.4 3.6 5.7 3.6 9s-1.2 6.6-3.6 9c-2.4-2.4-3.6-5.7-3.6-9S9.6 5.4 12 3z"/></svg></span><span>www.umamicron.com</span></div>
+
+      <div class="reg-details">
+        <div class="reg-row"><span class="label">GSTIN</span><span class="colon">:</span><span>24AABCA7339N1ZB</span></div>
+        <div class="reg-row"><span class="label">PAN</span><span class="colon">:</span><span>AABCA7339N</span></div>
+        <div class="reg-row"><span class="label">State</span><span class="colon">:</span><span>Gujarat (24)</span></div>
       </div>
     </div>
-    <table class="ref-table">
-      <tr><th colspan="2">REFERENCE DETAILS</th></tr>
-      <tr><td class="label"><span class="lbl-inner">
-        <svg width="11" height="11" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z" fill="#6C4FA1"/><path d="M15 2v5h5" fill="#9a82c9"/></svg>
-        Debit Note No.</span></td><td class="value">${docNo}</td></tr>
-      <tr><td class="label"><span class="lbl-inner">
-        <svg width="11" height="11" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2" fill="#6C4FA1"/><rect x="3" y="4" width="18" height="4" fill="#4a3577"/><rect x="6" y="2" width="2" height="4" fill="#4a3577"/><rect x="16" y="2" width="2" height="4" fill="#4a3577"/></svg>
-        Debit Note Date</span></td><td class="value">${docDate}</td></tr>
-      <tr><td class="label"><span class="lbl-inner">
-        <svg width="11" height="11" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z" fill="#6C4FA1"/><path d="M15 2v5h5" fill="#9a82c9"/></svg>
-        Original Invoice No.</span></td><td class="value">${refInvoice}</td></tr>
-      <tr><td class="label"><span class="lbl-inner">
-        <svg width="11" height="11" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2" fill="#6C4FA1"/><rect x="3" y="4" width="18" height="4" fill="#4a3577"/><rect x="6" y="2" width="2" height="4" fill="#4a3577"/><rect x="16" y="2" width="2" height="4" fill="#4a3577"/></svg>
-        Original Invoice Date</span></td><td class="value">${refDate}</td></tr>
-      <tr><td class="label"><span class="lbl-inner">
-        <svg width="11" height="11" viewBox="0 0 24 24"><path d="M21 15.5c-1.2 0-2.4-.2-3.5-.6-.3-.1-.7 0-1 .3l-2.2 2.2c-2.8-1.4-5.2-3.8-6.6-6.6l2.2-2.2c.3-.3.4-.7.2-1-.4-1.1-.6-2.3-.6-3.5 0-.6-.4-1-1-1H4.5c-.6 0-1 .4-1 1C3.5 12.5 11.5 20.5 20.5 20.5c.6 0 1-.4 1-1V16.5c0-.6-.4-1-1-1z" fill="#6C4FA1"/></svg>
-        Customer PO No.</span></td><td class="value">${poNo}</td></tr>
-      <tr><td class="label"><span class="lbl-inner">
-        <svg width="11" height="11" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z" fill="#6C4FA1"/><path d="M15 2v5h5" fill="#9a82c9"/></svg>
-        Reference</span></td><td class="value">${ref}</td></tr>
-    </table>
+
+    <div class="invoice-meta">
+      <div class="block">
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">Note No.</span><span class="m-colon">:</span><span class="m-value">${docNo}</span></div>
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="m-label">Note Date</span><span class="m-colon">:</span><span class="m-value">${docDate}</span></div>
+      </div>
+      <div class="block">
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">Original Inv No.</span><span class="m-colon">:</span><span class="m-value">${refInvoice}</span></div>
+        <div class="meta-row sub"><span class="m-label">Original Inv Date</span><span class="m-colon">:</span><span class="m-value">${refDate}</span></div>
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span class="m-label">Customer PO No.</span><span class="m-colon">:</span><span class="m-value">${poNo}</span></div>
+        <div class="meta-row sub"><span class="m-label">Reference</span><span class="m-colon">:</span><span class="m-value">${ref}</span></div>
+      </div>
+    </div>
   </div>
 
   <!-- BILL TO / SHIP TO -->
   <div class="parties">
     <div class="party">
-      <div class="party-header">
-        <svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#6C4FA1"/><circle cx="12" cy="9" r="3.4" fill="#fff"/><path d="M5 19c1.2-3.2 4-5 7-5s5.8 1.8 7 5c-1.9 1.6-4.4 2.6-7 2.6s-5.1-1-7-2.6z" fill="#fff"/></svg>
-        BILL TO
-      </div>
+      <div class="party-head"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg> BILL TO</div>
       <div class="party-body">
-        <div class="name">${billName}</div>
-        ${billAddrHtml}<br>
-        GSTIN : ${billGstin} &nbsp; State : ${billState} ${billStateCode ? '(' + billStateCode + ')' : ''}
+        <div class="cname">${billName}</div>
+        ${billAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
+      </div>
+      <div class="party-foot">
+        <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>${billGstin}</span></div>
+        <div class="frow"><span class="flabel">State</span><span class="fcolon">:</span><span>${billState} ${billStateCode ? '(' + escHtml(billStateCode) + ')' : ''}</span></div>
       </div>
     </div>
     <div class="party">
-      <div class="party-header">
-        <svg width="16" height="14" viewBox="0 0 24 24"><rect x="1" y="6" width="13" height="9" fill="#6C4FA1"/><path d="M14 9h5l4 4v2h-9z" fill="#6C4FA1"/><circle cx="6" cy="18" r="2.3" fill="#4a3577"/><circle cx="18" cy="18" r="2.3" fill="#4a3577"/></svg>
-        SHIP TO
-      </div>
+      <div class="party-head"><svg viewBox="0 0 24 24"><path d="M3 16V7h9v9"/><path d="M12 10h5l3 3v3h-8z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg> SHIP TO</div>
       <div class="party-body">
-        <div class="name">${shipName}</div>
-        ${shipAddrHtml}<br>
-        GSTIN : ${shipGstin} &nbsp; State : ${shipState} ${shipStateCode ? '(' + shipStateCode + ')' : ''}
+        <div class="cname">${shipName}</div>
+        ${shipAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
+      </div>
+      <div class="party-foot">
+        <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>${shipGstin}</span></div>
+        <div class="frow"><span class="flabel">State</span><span class="fcolon">:</span><span>${shipState} ${shipStateCode ? '(' + escHtml(shipStateCode) + ')' : ''}</span></div>
       </div>
     </div>
   </div>
 
-  <!-- REASON BAR -->
-  <div class="reason-bar">
-    <span class="label">
-      <svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#6C4FA1"/><path d="M8 3.5h6l4 4v11.5H8z" fill="#fff" transform="translate(1,1) scale(0.7)"/></svg>
-      REASON FOR DEBIT NOTE
-    </span>
-    <span class="opt"><span class="checkbox ${data.reason === 'Additional Charges' ? 'checked' : ''}"></span> Additional Charges</span>
-    <span class="opt"><span class="checkbox ${data.reason === 'Rate Revision' ? 'checked' : ''}"></span> Rate Revision</span>
-    <span class="opt"><span class="checkbox ${data.reason === 'Packing Charges' ? 'checked' : ''}"></span> Packing Charges</span>
-    <span class="opt"><span class="checkbox ${data.reason === 'Freight Charges' ? 'checked' : ''}"></span> Freight Charges</span>
-    <span class="opt"><span class="checkbox ${data.reason === 'Material Shortage' ? 'checked' : ''}"></span> Material Shortage</span>
-    <span class="opt"><span class="checkbox ${!['Additional Charges', 'Rate Revision', 'Packing Charges', 'Freight Charges', 'Material Shortage'].includes(data.reason) && data.reason ? 'checked' : ''}"></span> Other ${!['Additional Charges', 'Rate Revision', 'Packing Charges', 'Freight Charges', 'Material Shortage'].includes(data.reason) && data.reason ? escHtml(data.reason) : '_______'}</span>
-  </div>
+  ${reasonBar}
 
   <!-- ITEMS TABLE -->
-  <table class="items">
+  <div class="table-container">
+    <table class="items">
     <thead>
       <tr>
         <th style="width:5%;">Sr. No.</th>
         <th style="width:24%;">Description</th>
-        <th style="width:9%;">HSN / SAC</th>
-        <th style="width:6%;">Qty.</th>
-        <th style="width:10%;">Rate (₹)</th>
-        <th style="width:11%;">Amount (₹)</th>
-        <th style="width:9%;">CGST (₹)</th>
-        <th style="width:9%;">SGST (₹)</th>
-        <th style="width:11%;">Total Amount (₹)</th>
+        <th style="width:8%;">HSN/SAC</th>
+        <th class="num" style="width:6%;">Qty.</th>
+        <th class="num" style="width:9%;">Rate (&#8377;)</th>
+        <th class="num" style="width:10%;">Amount (&#8377;)</th>
+        <th class="num" style="width:8%;">CGST (&#8377;)</th>
+        <th class="num" style="width:8%;">SGST (&#8377;)</th>
+        <th class="num" style="width:8%;">IGST (&#8377;)</th>
+        <th class="num" style="width:14%;">Total Amount (&#8377;)</th>
       </tr>
     </thead>
     <tbody>
       ${bodyRows}
       ${blanks}
-      <tr class="total-row">
-        <td colspan="3">TOTAL</td><td>${fmtQty(totalQty) || '0.00'}</td><td></td><td>${fmtMoney(totalAmt)}</td><td>${isIgst ? '-' : fmtMoney(totalCgst)}</td><td>${isIgst ? '-' : fmtMoney(totalSgst)}</td><td>${fmtMoney(totalAll)}</td>
-      </tr>
     </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3" style="text-align:center;">TOTAL</td>
+        <td class="num">${fmtQty(totalQty) || '0.00'}</td>
+        <td></td>
+        <td class="num">${fmtMoney(totalAmt)}</td>
+        <td class="num">${isIgst ? '-' : fmtMoney(totalCgst)}</td>
+        <td class="num">${isIgst ? '-' : fmtMoney(totalSgst)}</td>
+        <td class="num">${!isIgst ? '-' : fmtMoney(totalCgst + totalSgst)}</td>
+        <td class="num">${fmtMoney(totalAll)}</td>
+      </tr>
+    </tfoot>
   </table>
+  </div>
 
-  <!-- BOTTOM: BANK DETAILS + TAX SUMMARY -->
-  <div class="bottom-row">
-    <div class="bank-box">
-      <div class="box-header">
-        <svg width="13" height="13" viewBox="0 0 24 24"><path d="M12 2l10 6H2z" fill="#fff"/><rect x="4" y="10" width="2" height="8" fill="#fff"/><rect x="8" y="10" width="2" height="8" fill="#fff"/><rect x="14" y="10" width="2" height="8" fill="#fff"/><rect x="18" y="10" width="2" height="8" fill="#fff"/><rect x="2" y="19" width="20" height="2" fill="#fff"/></svg>
-        OUR BANK DETAILS
-      </div>
-      <div class="box-body">
-        <table class="bank-table">
-          <tr><td class="blabel">Bank Name</td><td>:</td><td class="bvalue">${escHtml(profile.bankName || 'AXIS BANK LTD')}</td></tr>
-          <tr><td class="blabel">A/c Name</td><td>:</td><td class="bvalue">${escHtml(profile.bankAccountName || profile.companyName || 'UMA MICRON')}</td></tr>
-          <tr><td class="blabel">Current A/c No.</td><td>:</td><td class="bvalue">${escHtml(profile.bankAccountNumber || '916020016060821')}</td></tr>
-          <tr><td class="blabel">IFS Code</td><td>:</td><td class="bvalue">${escHtml(profile.bankIfsc || 'UTIB0000383')}</td></tr>
-          <tr><td class="blabel">Branch</td><td>:</td><td class="bvalue">${escHtml(profile.bankBranch || 'Nizampura, Vadodara - 390002')}</td></tr>
-        </table>
+      </td>
+  </tr>
+  <tr>
+    <td valign="bottom" style="padding: 18px; padding-top: 0; height: 1px;">
+  <!-- BANK DETAILS + TOTALS -->
+  <div class="bottom">
+    ${noteType === 'Debit Note' ? `
+    <div class="bank">
+      <div class="box-head"><svg viewBox="0 0 24 24"><path d="M3 10l9-6 9 6"/><path d="M4 10h16v9H4z"/><path d="M4 19h16M8 10v9M12 10v9M16 10v9"/></svg> OUR BANK DETAILS</div>
+      <div class="bank-body">
+        <div class="bank-row"><span class="blabel">Bank Name</span><span class="bcolon">:</span><span>AXIS BANK LTD</span></div>
+        <div class="bank-row"><span class="blabel">A/c Name</span><span class="bcolon">:</span><span>UMA MICRON</span></div>
+        <div class="bank-row"><span class="blabel">Current A/c No.</span><span class="bcolon">:</span><span>916020061629671</span></div>
+        <div class="bank-row"><span class="blabel">IFS CODE</span><span class="bcolon">:</span><span>UTIB0000383</span></div>
+        <div class="bank-row"><span class="blabel">Branch</span><span class="bcolon">:</span><span>Nizampura, Vadodara - 390002</span></div>
       </div>
     </div>
-    <div class="tax-summary">
-      <table class="tax-table">
-        <tr><td>Taxable Amount Before Tax</td><td class="val">${fmtMoney(totalAmt)}</td></tr>
-        <tr class="line"><td>Add : CGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</td><td class="val">${isIgst ? '-' : fmtMoney(totalCgst)}</td></tr>
-        <tr><td>Add : SGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</td><td class="val">${isIgst ? '-' : fmtMoney(totalSgst)}</td></tr>
-        <tr class="line"><td>Add : IGST @ 18%</td><td class="val">${isIgst ? fmtMoney(totalCgst + totalSgst) : '-'}</td></tr>
-        <tr class="line"><td><b>Total Tax Amount</b></td><td class="val"><b>${fmtMoney(totalTaxAmount)}</b></td></tr>
-        <tr class="roundoff"><td>Round Off</td><td class="val">${fmtMoney(roundOff)}</td></tr>
-      </table>
+    ` : `
+    <div class="bank">
+      <div class="box-head"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> NOTES</div>
+      <div class="bank-body" style="min-height: 80px; font-size: 11px; line-height: 1.5;">
+        <ol style="margin-top: 0; padding-left: 20px; margin-bottom: 8px;">
+          <li>Amount will be adjusted against the next invoice.</li>
+          <li>Please quote the credit note number for future reference.</li>
+        </ol>
+        <div>${data.notes ? escHtml(data.notes).replace(/\n/g, '<br>') : ''}</div>
+      </div>
+    </div>
+    `}
+
+    <div class="totals">
+      <div class="totals-body">
+        <div class="trow"><span class="tlabel">Taxable Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>
+        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;CGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span class="tval">${isIgst ? '-' : '&#8377; ' + fmtMoney(totalCgst)}</span></div>
+        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;SGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span class="tval">${isIgst ? '-' : '&#8377; ' + fmtMoney(totalSgst)}</span></div>
+        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;IGST @ 18%</span><span class="tval">${isIgst ? '&#8377; ' + fmtMoney(totalCgst + totalSgst) : '-'}</span></div>
+        <div class="trow rule"><span class="tlabel">Total Tax Amount</span><span class="tval">&#8377; ${fmtMoney(totalTaxAmount)}</span></div>
+        <div class="trow"><span class="tlabel">Round Off</span><span class="tval">&#8377; ${fmtMoney(roundOff)}</span></div>
+      </div>
+      <div class="grand">
+        <span>${noteType.toUpperCase()} AMOUNT</span>
+        <span>&#8377; ${fmtMoney(roundedTotal)}</span>
+      </div>
     </div>
   </div>
 
-  <!-- TERMS + DECLARATION -->
-  <div class="terms-row">
-    <div class="terms-box">
-      <div class="box-header">
-        <svg width="13" height="13" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="12" rx="2" fill="#fff"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2" fill="none" stroke="#fff" stroke-width="1.8"/></svg>
-        TERMS &amp; CONDITIONS
-      </div>
-      <div class="box-body">
+  <!-- TERMS / DECLARATION / SIGNATORY -->
+  <div class="footer3">
+    <div class="f3col">
+      <div class="box-head"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg> TERMS &amp; CONDITIONS</div>
+      <div class="f3-body">
         <ol>
           <li>Subject to Vadodara Jurisdiction.</li>
           <li>Payment terms as per our agreed terms.</li>
@@ -683,668 +734,100 @@ const buildDebitNoteHtml = (data, profileInput) => {
         </ol>
       </div>
     </div>
-    <div class="decl-box">
-      <div class="box-header">
-        <svg width="13" height="13" viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.4 9-8 11-4.6-2-8-6-8-11V5z" fill="#fff"/><path d="M9 12l2 2 4-4" stroke="#6C4FA1" stroke-width="1.8" fill="none"/></svg>
-        DECLARATION
+    <div class="f3col">
+      <div class="box-head"><svg viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5z"/><path d="M9 12l2 2 4-4"/></svg> DECLARATION</div>
+      <div class="f3-body">
+        This ${noteType} is issued against the above tax invoice and forms an integral part of the original transaction.
       </div>
-      <div class="box-body">
-        This Debit Note is issued against the above tax invoice for the additional amount receivable.
-        <div class="signature">
-          <div>For ${escHtml(profile.companyName)}</div>
-          <div style="height:38px;"></div>
-          <div class="sig-line"></div>
-          Authorised Signatory
-        </div>
-      </div>
+    </div>
+    <div class="f3col sig-col">
+      <div class="for-company">For UMA MICRON</div>
+      <div class="sig-line">Authorised Signatory</div>
     </div>
   </div>
 
-  <!-- DEBIT AMOUNT -->
-  <div class="debit-amount">
-    <span>DEBIT AMOUNT</span>
-    <span>₹ ${fmtMoney(roundedTotal)}</span>
-  </div>
-
-  <!-- FOOTER -->
-  <div class="footer">
+  <!-- BAR FOOTER -->
+  <div class="barfoot">
     <span>Thank you for your business!</span>
-    <span>E.&amp;O.E.</span>
-    <span>This is a computer generated debit note</span>
+    <span>E. &amp; O.E.</span>
+    <span>This is a computer generated ${noteType.toLowerCase()}.</span>
     <span>Page 1 of 1</span>
   </div>
 
+    </td>
+  </tr>
+</table>
 </div>
 </body>
 </html>`;
 
   return { html, docNo };
+};
+
+const buildDebitNoteHtml = (data, profileInput) => {
+  return buildNoteHtmlCommon(data, profileInput, 'Debit Note', ['Additional Charges', 'Rate Revision', 'Packing Charges', 'Freight Charges', 'Material Shortage']);
 };
 
 const buildCreditNoteHtml = (data, profileInput) => {
-  const profile = mergeCompanyProfile(profileInput);
-  const docNo = escHtml(data.noteNo || 'N/A');
-  const docDate = escHtml(formatPdfDateDmy(data.date) || 'N/A');
-  const refInvoice = escHtml(data.refInvoice || '-');
-  const refDate = escHtml(formatPdfDateDmy(data.refInvoiceDate) || '-');
-  const poNo = escHtml(data.poNo || '-');
-  const ref = escHtml(data.reference || '-');
-
-  const { rows, totalAmt, totalSgst, totalCgst, totalAll, totalQty } = calcNoteLines(data);
-
-  // Bill To
-  const billName = escHtml(data.partyName || '');
-  const billAddrHtml = splitPartyAddressLines(data.billAddress || data.address || '', 42).map(escHtml).join('<br>');
-  const billState = escHtml(data.billState || data.state || '');
-  const billStateCode = escHtml(data.billStateCode || data.stateCode || '');
-  const billGstin = escHtml(data.gstinBill || data.gstin || '');
-
-  // Ship To
-  const shipName = escHtml(data.shipName || data.partyName || '');
-  const shipAddrHtml = splitPartyAddressLines(data.shipAddress || data.address || '', 42).map(escHtml).join('<br>');
-  const shipState = escHtml(data.shipState || data.state || '');
-  const shipStateCode = escHtml(data.shipStateCode || data.stateCode || '');
-  const shipGstin = escHtml(data.gstinShip || data.gstin || '');
-
-  let companyPan = escHtml(profile.panNumber || '');
-  if (!companyPan && profile.gstNumber && profile.gstNumber.length >= 15) {
-    companyPan = escHtml(profile.gstNumber.substring(2, 12));
-  }
-  const companyState = escHtml(profile.state || 'Gujarat');
-  const companyGstin = escHtml(profile.gstNumber || '24AABCA7339N1Z8');
-  
-  const extractDescAndHsn = (label) => {
-    const match = label.match(/(.*?)\s*\((\d+)\)$/);
-    if (match) {
-      return { desc: match[1].trim(), hsn: match[2] };
-    }
-    return { desc: label, hsn: '' };
-  };
-
-  const isIgst = (billState.toLowerCase() !== companyState.toLowerCase()) && billState !== '';
-
-  const bodyRows = rows.map((r) => {
-    const { desc, hsn } = extractDescAndHsn(r.label);
-    const sgstAmt = isIgst ? 0 : r.sgstAmt;
-    const cgstAmt = isIgst ? 0 : r.cgstAmt;
-    
-    return `
-      <tr>
-        <td>${r.sr}</td><td class="desc">${escHtml(desc)}</td><td>${escHtml(hsn)}</td><td>${fmtQty(r.qty)}</td>
-        <td>${fmtMoney(r.rate)}</td><td>${fmtMoney(r.amt)}</td><td>${isIgst ? '-' : fmtMoney(cgstAmt)}</td><td>${isIgst ? '-' : fmtMoney(sgstAmt)}</td><td>${fmtMoney(r.rowTotal)}</td>
-      </tr>`;
-  }).join('');
-
-  const blanksCount = Math.max(0, NOTE_MIN_ROWS - rows.length);
-  const blanks = Array.from({ length: blanksCount }, () => `
-      <tr class="filler-row"><td colspan="9"></td></tr>
-  `).join('');
-
-  const roundedTotal = Math.round(totalAll);
-  const roundOff = roundedTotal - totalAll;
-  
-  const totalTaxAmount = isIgst ? (totalSgst + totalCgst) : (totalCgst + totalSgst);
-
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Credit Note - ${escHtml(profile.companyName)}</title>
-<style>
-  :root{
-    --purple: #6C4FA1;
-    --purple-dark: #5B3E92;
-    --purple-light: #F1EDF9;
-    --purple-border: #C9BEE0;
-    --grey-border: #B8B8B8;
-    --text-dark: #2b2b2b;
-  }
-  *{box-sizing:border-box;}
-  html,body{
-    margin:0;
-    padding:0;
-    background:#e9e9ec;
-    font-family: Arial, Helvetica, sans-serif;
-    color: var(--text-dark);
-  }
-
-  /* ===== A4 PAGE ===== */
-  .sheet{
-    width:210mm;
-    min-height:297mm;
-    margin:10px auto;
-    background:#fff;
-    border:1px solid var(--grey-border);
-    padding:10mm 10mm 6mm 10mm;
-    position:relative;
-    display:flex;
-    flex-direction:column;
-  }
-  @media print{
-    body{background:#fff;}
-    .sheet{margin:0;border:none;box-shadow:none;}
-    @page{ size:A4; margin:0; }
-  }
-
-  svg.ic{ vertical-align:middle; flex-shrink:0; }
-
-  /* ===== HEADER ===== */
-  .header{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    border-bottom:2px solid var(--purple);
-    padding-bottom:10px;
-  }
-  .logo-block{
-    display:flex;
-    align-items:center;
-    gap:10px;
-  }
-  .logo-icon{
-    width:56px;height:56px;
-  }
-  .company-name{
-    font-size:24px;font-weight:800;letter-spacing:0.5px;
-  }
-  .company-name .um{color:#1a9e8f;}
-  .company-name .icron{color:#2d3a8c;}
-  .company-tagline{
-    font-size:10.5px;color:#555;letter-spacing:2px;font-weight:600;
-  }
-  .credit-badge{
-    background:var(--purple);
-    color:#fff;
-    text-align:center;
-    padding:9px 28px;
-    border-radius:4px;
-    font-weight:800;
-    font-size:16px;
-    letter-spacing:0.5px;
-  }
-  .credit-badge .sub{
-    font-size:9.5px;font-weight:600;letter-spacing:1px;display:block;margin-top:3px;
-  }
-
-  /* ===== COMPANY INFO + REFERENCE ===== */
-  .info-row{
-    display:flex;
-    justify-content:space-between;
-    gap:16px;
-    padding:10px 0;
-    border-bottom:1px solid var(--purple-border);
-  }
-  .company-info{
-    font-size:10.5px;
-    line-height:1.65;
-    width:52%;
-  }
-  .info-line{
-    display:flex;
-    align-items:flex-start;
-    gap:7px;
-    margin-bottom:2px;
-  }
-  .info-line svg{ margin-top:2px; }
-  .gst-line{ margin-top:5px; }
-  .ref-table{
-    width:46%;
-    border:1px solid var(--purple-border);
-    border-collapse:collapse;
-    font-size:10.5px;
-    height:fit-content;
-  }
-  .ref-table th{
-    background:var(--purple);
-    color:#fff;
-    text-align:left;
-    padding:5px 8px;
-    font-size:10.5px;
-    letter-spacing:0.5px;
-  }
-  .ref-table td{
-    padding:4px 8px;
-    border-top:1px solid var(--purple-border);
-  }
-  .ref-table td.label{
-    width:58%;color:#444;
-  }
-  .ref-table td.label .lbl-inner{
-    display:flex; align-items:center; gap:6px;
-  }
-  .ref-table td.value{
-    font-weight:700;text-align:right;
-  }
-
-  /* ===== BILL TO / SHIP TO ===== */
-  .parties{
-    display:flex;
-    border:1px solid var(--purple-border);
-    margin-top:10px;
-  }
-  .party{
-    width:50%;
-    font-size:10.5px;
-  }
-  .party:first-child{
-    border-right:1px solid var(--purple-border);
-  }
-  .party-header{
-    background:var(--purple-light);
-    color:var(--purple-dark);
-    font-weight:700;
-    padding:5px 10px;
-    font-size:11px;
-    display:flex;
-    align-items:center;
-    gap:7px;
-  }
-  .party-body{
-    padding:7px 10px;
-    line-height:1.7;
-  }
-  .party-body .name{
-    font-weight:700;
-    color:var(--purple-dark);
-  }
-
-  /* ===== REASON BAR ===== */
-  .reason-bar{
-    border:1px solid var(--purple-border);
-    border-top:none;
-    padding:7px 10px;
-    font-size:10.5px;
-    display:flex;
-    align-items:center;
-    flex-wrap:wrap;
-    gap:14px;
-    background:#fbfbfb;
-  }
-  .reason-bar .label{
-    font-weight:700;
-    color:var(--purple-dark);
-    margin-right:2px;
-    display:flex;
-    align-items:center;
-    gap:6px;
-  }
-  .reason-bar .opt{
-    display:flex;align-items:center;gap:4px;
-  }
-  .checkbox{
-    width:11px;height:11px;
-    border:1.4px solid #333;
-    display:inline-block;
-    position:relative;
-  }
-  .checkbox.checked::after{
-    content:"✓";
-    position:absolute;
-    top:-4px;left:0.5px;
-    font-size:10px;
-    font-weight:900;
-    color:#1a1a1a;
-  }
-
-  /* ===== ITEMS TABLE ===== */
-  table.items{
-    width:100%;
-    border-collapse:collapse;
-    margin-top:8px;
-    font-size:10px;
-  }
-  table.items th{
-    background:var(--purple-light);
-    border:1px solid var(--purple-border);
-    padding:6px 4px;
-    text-align:center;
-    font-size:9.5px;
-    font-weight:700;
-    color:var(--purple-dark);
-  }
-  table.items td{
-    border:1px solid var(--purple-border);
-    padding:6px 4px;
-    text-align:center;
-  }
-  table.items td.desc{
-    text-align:left;
-  }
-  table.items tbody tr:nth-child(even){ background:#fbfaff; }
-  table.items tr.total-row td{
-    font-weight:800;
-    background:#fff;
-    border-top:2px solid var(--purple);
-  }
-
-  .filler-row td{ height:20px; }
-
-  /* ===== NOTES + TAX SUMMARY ===== */
-  .bottom-row{
-    display:flex;
-    gap:0;
-    margin-top:8px;
-    border:1px solid var(--purple-border);
-  }
-  .notes-box{
-    width:55%;
-    border-right:1px solid var(--purple-border);
-    font-size:10px;
-  }
-  .box-header{
-    background:var(--purple);
-    color:#fff;
-    font-weight:700;
-    padding:5px 10px;
-    font-size:10.5px;
-    display:flex;
-    align-items:center;
-    gap:7px;
-  }
-  .box-body{
-    padding:9px 10px;
-    line-height:1.9;
-  }
-  .tax-summary{
-    width:45%;
-    font-size:10px;
-  }
-  .tax-table{
-    width:100%;
-    border-collapse:collapse;
-  }
-  .tax-table td{
-    padding:4px 10px;
-  }
-  .tax-table tr.line td{
-    border-top:1px solid var(--purple-border);
-  }
-  .tax-table td.val{
-    text-align:right;
-    font-weight:600;
-  }
-  .tax-table tr.roundoff td{
-    font-style:italic;
-    color:#555;
-  }
-
-  /* ===== TERMS + DECLARATION ===== */
-  .terms-row{
-    display:flex;
-    border:1px solid var(--purple-border);
-    border-top:none;
-    flex:1;
-  }
-  .terms-box, .decl-box{
-    width:50%;
-    font-size:9.5px;
-  }
-  .terms-box{
-    border-right:1px solid var(--purple-border);
-  }
-  .decl-box .box-body{
-    padding-top:11px;
-    padding-bottom:26px;
-  }
-  .terms-box ol{
-    margin:7px 10px;
-    padding-left:15px;
-    line-height:1.75;
-  }
-
-  /* ===== CREDIT AMOUNT ===== */
-  .credit-amount{
-    background:var(--purple);
-    color:#fff;
-    font-weight:800;
-    font-size:14px;
-    padding:9px 12px;
-    display:flex;
-    justify-content:space-between;
-    margin-top:8px;
-  }
-  .signature{
-    text-align:right;
-    font-size:10px;
-    padding:22px 12px 4px 0;
-  }
-  .sig-line{
-    border-top:1px solid #999;
-    width:150px;
-    margin-left:auto;
-    margin-bottom:4px;
-  }
-
-  .footer{
-    display:flex;
-    justify-content:space-between;
-    font-size:8.5px;
-    color:#777;
-    margin-top:auto;
-    padding-top:8px;
-  }
-</style>
-</head>
-<body>
-<div class="sheet pdf-page print-host">
-
-  <!-- HEADER -->
-  <div class="header">
-    <div class="logo-block">
-      <svg class="logo-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20 30 A35 20 0 1 1 19 71" fill="none" stroke="#1a9e6a" stroke-width="4" stroke-linecap="round"/>
-        <path d="M80 70 A35 20 0 1 1 81 29" fill="none" stroke="#1a9e6a" stroke-width="4" stroke-linecap="round"/>
-        <polygon points="18,66 12,78 26,76" fill="#1a9e6a"/>
-        <polygon points="82,34 88,22 74,24" fill="#1a9e6a"/>
-        <text x="28" y="63" font-family="Arial" font-weight="800" font-size="38" fill="#e8781e">U</text>
-        <text x="46" y="63" font-family="Arial" font-weight="800" font-size="38" fill="#2d3a8c">M</text>
-        <text x="66" y="63" font-family="Arial" font-weight="800" font-size="38" fill="#7a2f8c">J</text>
-      </svg>
-      <div>
-        <div class="company-name"><span class="um">UMA </span><span class="icron">MICRON</span></div>
-        <div class="company-tagline">Micronization of API's</div>
-      </div>
-    </div>
-    <div class="credit-badge">CREDIT NOTE<span class="sub">AGAINST TAX INVOICE</span></div>
-  </div>
-
-  <!-- COMPANY INFO + REFERENCE -->
-  <div class="info-row">
-    <div class="company-info">
-      <div class="info-line">
-        <svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2C7.6 2 4 5.6 4 10c0 5.5 8 12 8 12s8-6.5 8-12c0-4.4-3.6-8-8-8z" fill="#6C4FA1"/><circle cx="12" cy="10" r="3" fill="#fff"/></svg>
-        <span>Plot No. 118, G.I.D.C., Ranoli,<br>N.H. No. 8, Vadodara – 391350,<br>Gujarat, India</span>
-      </div>
-      <div class="info-line">
-        <svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.2c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.2 1l-2 2.2z" fill="#6C4FA1"/></svg>
-        <span>+91 97120 00297</span>
-      </div>
-      <div class="info-line">
-        <svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="16" rx="2" fill="#6C4FA1"/><path d="M2 6l10 7 10-7" stroke="#fff" stroke-width="1.6" fill="none"/></svg>
-        <span>umamicron@gmail.com</span>
-      </div>
-      <div class="info-line">
-        <svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#6C4FA1"/><path d="M2 12h20M12 2c2.5 2.7 4 6.2 4 10s-1.5 7.3-4 10c-2.5-2.7-4-6.2-4-10s1.5-7.3 4-10z" stroke="#fff" stroke-width="1.2" fill="none"/></svg>
-        <span>www.umamicron.com</span>
-      </div>
-      <div class="gst-line">
-        <b>GSTIN</b> : ${companyGstin} &nbsp;&nbsp; <b>PAN</b> : ${companyPan}<br>
-        <b>State</b> : ${companyState}
-      </div>
-    </div>
-    <table class="ref-table">
-      <tr><th colspan="2">REFERENCE DETAILS</th></tr>
-      <tr><td class="label"><span class="lbl-inner">
-        <svg width="11" height="11" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z" fill="#6C4FA1"/><path d="M15 2v5h5" fill="#9a82c9"/></svg>
-        Credit Note No.</span></td><td class="value">${docNo}</td></tr>
-      <tr><td class="label"><span class="lbl-inner">
-        <svg width="11" height="11" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2" fill="#6C4FA1"/><rect x="3" y="4" width="18" height="4" fill="#4a3577"/><rect x="6" y="2" width="2" height="4" fill="#4a3577"/><rect x="16" y="2" width="2" height="4" fill="#4a3577"/></svg>
-        Credit Note Date</span></td><td class="value">${docDate}</td></tr>
-      <tr><td class="label"><span class="lbl-inner">
-        <svg width="11" height="11" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z" fill="#6C4FA1"/><path d="M15 2v5h5" fill="#9a82c9"/></svg>
-        Original Invoice No.</span></td><td class="value">${refInvoice}</td></tr>
-      <tr><td class="label"><span class="lbl-inner">
-        <svg width="11" height="11" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2" fill="#6C4FA1"/><rect x="3" y="4" width="18" height="4" fill="#4a3577"/><rect x="6" y="2" width="2" height="4" fill="#4a3577"/><rect x="16" y="2" width="2" height="4" fill="#4a3577"/></svg>
-        Original Invoice Date</span></td><td class="value">${refDate}</td></tr>
-      <tr><td class="label"><span class="lbl-inner">
-        <svg width="11" height="11" viewBox="0 0 24 24"><path d="M21 15.5c-1.2 0-2.4-.2-3.5-.6-.3-.1-.7 0-1 .3l-2.2 2.2c-2.8-1.4-5.2-3.8-6.6-6.6l2.2-2.2c.3-.3.4-.7.2-1-.4-1.1-.6-2.3-.6-3.5 0-.6-.4-1-1-1H4.5c-.6 0-1 .4-1 1C3.5 12.5 11.5 20.5 20.5 20.5c.6 0 1-.4 1-1V16.5c0-.6-.4-1-1-1z" fill="#6C4FA1"/></svg>
-        Customer PO No.</span></td><td class="value">${poNo}</td></tr>
-      <tr><td class="label"><span class="lbl-inner">
-        <svg width="11" height="11" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z" fill="#6C4FA1"/><path d="M15 2v5h5" fill="#9a82c9"/></svg>
-        Reference</span></td><td class="value">${ref}</td></tr>
-    </table>
-  </div>
-
-  <!-- BILL TO / SHIP TO -->
-  <div class="parties">
-    <div class="party">
-      <div class="party-header">
-        <svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#6C4FA1"/><circle cx="12" cy="9" r="3.4" fill="#fff"/><path d="M5 19c1.2-3.2 4-5 7-5s5.8 1.8 7 5c-1.9 1.6-4.4 2.6-7 2.6s-5.1-1-7-2.6z" fill="#fff"/></svg>
-        BILL TO
-      </div>
-      <div class="party-body">
-        <div class="name">${billName}</div>
-        ${billAddrHtml}<br>
-        GSTIN : ${billGstin} &nbsp; State : ${billState} ${billStateCode ? '(' + billStateCode + ')' : ''}
-      </div>
-    </div>
-    <div class="party">
-      <div class="party-header">
-        <svg width="16" height="14" viewBox="0 0 24 24"><rect x="1" y="6" width="13" height="9" fill="#6C4FA1"/><path d="M14 9h5l4 4v2h-9z" fill="#6C4FA1"/><circle cx="6" cy="18" r="2.3" fill="#4a3577"/><circle cx="18" cy="18" r="2.3" fill="#4a3577"/></svg>
-        SHIP TO
-      </div>
-      <div class="party-body">
-        <div class="name">${shipName}</div>
-        ${shipAddrHtml}<br>
-        GSTIN : ${shipGstin} &nbsp; State : ${shipState} ${shipStateCode ? '(' + shipStateCode + ')' : ''}
-      </div>
-    </div>
-  </div>
-
-  <!-- REASON BAR -->
-  <div class="reason-bar">
-    <span class="label">
-      <svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#6C4FA1"/><path d="M8 3.5h6l4 4v11.5H8z" fill="#fff" transform="translate(1,1) scale(0.7)"/></svg>
-      REASON FOR CREDIT NOTE
-    </span>
-    <span class="opt"><span class="checkbox ${data.reason === 'Sales Return' ? 'checked' : ''}"></span> Sales Return</span>
-    <span class="opt"><span class="checkbox ${data.reason === 'Rate Difference' ? 'checked' : ''}"></span> Rate Difference</span>
-    <span class="opt"><span class="checkbox ${data.reason === 'Discount' ? 'checked' : ''}"></span> Discount</span>
-    <span class="opt"><span class="checkbox ${data.reason === 'Excess Billing' ? 'checked' : ''}"></span> Excess Billing</span>
-    <span class="opt"><span class="checkbox ${data.reason === 'Material Rejection' ? 'checked' : ''}"></span> Material Rejection</span>
-    <span class="opt"><span class="checkbox ${!['Sales Return', 'Rate Difference', 'Discount', 'Excess Billing', 'Material Rejection'].includes(data.reason) && data.reason ? 'checked' : ''}"></span> Other ${!['Sales Return', 'Rate Difference', 'Discount', 'Excess Billing', 'Material Rejection'].includes(data.reason) && data.reason ? escHtml(data.reason) : '_______'}</span>
-  </div>
-
-  <!-- ITEMS TABLE -->
-  <table class="items">
-    <thead>
-      <tr>
-        <th style="width:5%;">Sr. No.</th>
-        <th style="width:24%;">Description</th>
-        <th style="width:9%;">HSN / SAC</th>
-        <th style="width:6%;">Qty.</th>
-        <th style="width:10%;">Rate (₹)</th>
-        <th style="width:11%;">Amount (₹)</th>
-        <th style="width:9%;">CGST (₹)</th>
-        <th style="width:9%;">SGST (₹)</th>
-        <th style="width:11%;">Total Amount (₹)</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${bodyRows}
-      ${blanks}
-      <tr class="total-row">
-        <td colspan="3">TOTAL</td><td>${fmtQty(totalQty) || '0.00'}</td><td></td><td>${fmtMoney(totalAmt)}</td><td>${isIgst ? '-' : fmtMoney(totalCgst)}</td><td>${isIgst ? '-' : fmtMoney(totalSgst)}</td><td>${fmtMoney(totalAll)}</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <!-- BOTTOM: NOTES + TAX SUMMARY -->
-  <div class="bottom-row">
-    <div class="notes-box">
-      <div class="box-header">
-        <svg width="13" height="13" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z" fill="#fff"/><path d="M15 2v5h5" fill="#c9bee0"/></svg>
-        NOTES
-      </div>
-      <div class="box-body">
-        • Amount will be adjusted against the next invoice.<br>
-        • Please quote the Credit Note Number for future reference.
-        ${data.particulars ? '<br><br><b>Particulars:</b> ' + escHtml(data.particulars) : ''}
-      </div>
-    </div>
-    <div class="tax-summary">
-      <table class="tax-table">
-        <tr><td>Taxable Amount Before Tax</td><td class="val">${fmtMoney(totalAmt)}</td></tr>
-        <tr class="line"><td>Add : CGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</td><td class="val">${isIgst ? '-' : fmtMoney(totalCgst)}</td></tr>
-        <tr><td>Add : SGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</td><td class="val">${isIgst ? '-' : fmtMoney(totalSgst)}</td></tr>
-        <tr class="line"><td>Add : IGST @ 18%</td><td class="val">${isIgst ? fmtMoney(totalCgst + totalSgst) : '-'}</td></tr>
-        <tr class="line"><td><b>Total Tax Amount</b></td><td class="val"><b>${fmtMoney(totalTaxAmount)}</b></td></tr>
-        <tr class="roundoff"><td>Round Off</td><td class="val">${fmtMoney(roundOff)}</td></tr>
-      </table>
-    </div>
-  </div>
-
-  <!-- TERMS + DECLARATION -->
-  <div class="terms-row">
-    <div class="terms-box">
-      <div class="box-header">
-        <svg width="13" height="13" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="12" rx="2" fill="#fff"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2" fill="none" stroke="#fff" stroke-width="1.8"/><rect x="2" y="8" width="20" height="12" rx="2" fill="none" stroke="#fff" stroke-width="0"/></svg>
-        TERMS &amp; CONDITIONS
-      </div>
-      <div class="box-body">
-        <ol>
-          <li>Subject to Vadodara Jurisdiction.</li>
-          <li>Payment terms as per our agreed terms.</li>
-          <li>Interest will be charged @ 24% p.a. if the amount remains unpaid from the due date.</li>
-        </ol>
-      </div>
-    </div>
-    <div class="decl-box">
-      <div class="box-header">
-        <svg width="13" height="13" viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.4 9-8 11-4.6-2-8-6-8-11V5z" fill="#fff"/><path d="M9 12l2 2 4-4" stroke="#6C4FA1" stroke-width="1.8" fill="none"/></svg>
-        DECLARATION
-      </div>
-      <div class="box-body">
-        This Credit Note is issued against the above tax invoice and forms an integral part of the original transaction.
-        <div class="signature">
-          <div>For ${escHtml(profile.companyName)}</div>
-          <div style="height:38px;"></div>
-          <div class="sig-line"></div>
-          Authorised Signatory
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- CREDIT AMOUNT -->
-  <div class="credit-amount">
-    <span>CREDIT AMOUNT</span>
-    <span>₹ ${fmtMoney(roundedTotal)}</span>
-  </div>
-
-  <!-- FOOTER -->
-  <div class="footer">
-    <span>Thank you for your business!</span>
-    <span>E.&amp;O.E.</span>
-    <span>This is a computer generated credit note</span>
-    <span>Page 1 of 1</span>
-  </div>
-
-</div>
-</body>
-</html>`;
-
-  return { html, docNo };
+  return buildNoteHtmlCommon(data, profileInput, 'Credit Note', ['Sales Return', 'Rate Difference', 'Discount', 'Excess Billing', 'Material Rejection']);
 };
 
+const renderPdfCommon = async (html, docNo, prefix, mode) => {
+  const { jsPDF } = await import('jspdf');
+  const html2canvas = (await import('html2canvas')).default;
+  const host = document.createElement('div');
+  host.style.cssText = 'position:absolute;left:-12000px;top:0;z-index:-1;background:#fff;';
+  host.innerHTML = html;
+  document.body.appendChild(host);
+  try {
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 0;
+    const usableW = pageW - margin * 2;
+    const usableH = pageH - margin * 2;
+
+    const target = host.querySelector('.page') || host.firstElementChild;
+    const canvas = await html2canvas(target, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      width: 794,
+      windowWidth: 794,
+      height: target.scrollHeight,
+      windowheight: target.scrollHeight,
+      logging: false
+    });
+
+    const naturalW = usableW;
+    const naturalH = (canvas.height * naturalW) / canvas.width;
+    const scale = Math.min(usableW / naturalW, usableH / naturalH, 1);
+    const drawW = naturalW * scale;
+    const drawH = naturalH * scale;
+    const x = margin + (usableW - drawW) / 2;
+    const y = margin;
+    
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297);
+
+    if (mode === 'view') {
+      const url = pdf.output('bloburl');
+      const win = window.open(url, '_blank');
+      if (win) win.document.title = `${prefix}_${docNo}`;
+    } else {
+      pdf.save(`${prefix}_${docNo}.pdf`);
+    }
+  } finally {
+    document.body.removeChild(host);
+  }
+};
 
 export const renderDebitNotePdf = async (data, { mode = 'save' } = {}) => {
   const { html, docNo } = buildDebitNoteHtml(data, data.companyProfile);
-  await renderHtmlToPdf(html, { mode, filePrefix: 'DN', docNo, width: PRINT_PAGE_W, fitPage: true });
+  await renderPdfCommon(html, docNo, 'DN', mode);
 };
 
 export const renderCreditNotePdf = async (data, { mode = 'save' } = {}) => {
   const { html, docNo } = buildCreditNoteHtml(data, data.companyProfile);
-  await renderHtmlToPdf(html, { mode, filePrefix: 'CN', docNo, width: PRINT_PAGE_W, fitPage: true });
+  await renderPdfCommon(html, docNo, 'CN', mode);
 };

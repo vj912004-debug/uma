@@ -12,6 +12,7 @@ import {
 
 import { renderTaxInvoicePdf } from './taxInvoiceHtml';
 import { renderPerformaInvoicePdf } from './performaInvoiceHtml';
+import { renderPurchaseOrderPdf } from './purchaseOrderHtml';
 import { renderDebitNotePdf, renderCreditNotePdf } from './debitCreditNoteHtml';
 import { renderDeliveryChallanPdf } from './deliveryChallanHtml';
 import { renderBprPdf } from './bprHtml';
@@ -2116,6 +2117,10 @@ export const exportToPDF = (docType, data) => {
     renderPerformaInvoicePdf(enriched, { mode: 'save' }).catch((err) => console.error('PI PDF export failed:', err));
     return;
   }
+  if (docType === 'PO') {
+    renderPurchaseOrderPdf(enriched, { mode: 'save' }).catch((err) => console.error('PO PDF export failed:', err));
+    return;
+  }
   if (docType === 'DN') {
     renderDebitNotePdf(enriched, { mode: 'save' }).catch((err) => console.error('DN PDF export failed:', err));
     return;
@@ -2152,6 +2157,10 @@ export const viewPDF = (docType, data) => {
   }
   if (docType === 'PI') {
     renderPerformaInvoicePdf(enriched, { mode: 'view' }).catch((err) => console.error('PI PDF view failed:', err));
+    return;
+  }
+  if (docType === 'PO') {
+    renderPurchaseOrderPdf(enriched, { mode: 'view' }).catch((err) => console.error('PO PDF view failed:', err));
     return;
   }
   if (docType === 'DN') {
