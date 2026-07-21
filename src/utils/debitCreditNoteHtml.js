@@ -133,16 +133,22 @@ const getCommonStyle = () => `
     flex-shrink:0;
   }
   .logo svg{width:100%;height:100%;}
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
   .brand-text h1{
     margin:0;
-    font-family:Georgia,'Times New Roman',serif;
-    font-size:38px;
+    font-family:'Times New Roman',Times,serif;
+    font-size:46px;
     letter-spacing:1px;
-    color:var(--purple);
+    color:#123282;
     line-height:1;
   }
   .brand-text .tagline{
-    color:var(--green);
+    color:#1d9444;
+    font-family: Arial, Helvetica, sans-serif;
     font-weight:700;
     font-size:16px;
     margin-top:2px;
