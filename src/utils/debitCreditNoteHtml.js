@@ -709,9 +709,9 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
     <div class="totals">
       <div class="totals-body">
         <div class="trow"><span class="tlabel">Taxable Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>
-        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;CGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span class="tval">${isIgst ? '-' : '&#8377; ' + fmtMoney(totalCgst)}</span></div>
-        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;SGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span class="tval">${isIgst ? '-' : '&#8377; ' + fmtMoney(totalSgst)}</span></div>
-        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;IGST @ 18%</span><span class="tval">${isIgst ? '&#8377; ' + fmtMoney(totalCgst + totalSgst) : '-'}</span></div>
+        <div class="trow"><span class="tlabel">CGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span class="tval">${isIgst ? '-' : '&#8377; ' + fmtMoney(totalCgst)}</span></div>
+        <div class="trow"><span class="tlabel">SGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span class="tval">${isIgst ? '-' : '&#8377; ' + fmtMoney(totalSgst)}</span></div>
+        <div class="trow"><span class="tlabel">IGST @ 18%</span><span class="tval">${isIgst ? '&#8377; ' + fmtMoney(totalCgst + totalSgst) : '-'}</span></div>
         <div class="trow rule"><span class="tlabel">Total Tax Amount</span><span class="tval">&#8377; ${fmtMoney(totalTaxAmount)}</span></div>
         <div class="trow"><span class="tlabel">Round Off</span><span class="tval">&#8377; ${fmtMoney(roundOff)}</span></div>
       </div>

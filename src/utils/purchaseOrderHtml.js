@@ -626,9 +626,9 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
     <div class="totals">
       <div class="totals-body">
         <div class="trow"><span class="tlabel">Total Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>
-        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;CGST @ 9%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
-        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;SGST @ 9%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
-        <div class="trow"><span class="tlabel">Add&nbsp; : &nbsp;IGST @ 18%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
+        <div class="trow"><span class="tlabel">CGST @ 9%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
+        <div class="trow"><span class="tlabel">SGST @ 9%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
+        <div class="trow"><span class="tlabel">IGST @ 18%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
         <div class="trow rule"><span class="tlabel">Total Tax Amount</span><span class="tval">&#8377; ${fmtMoney(totalCgst + totalSgst + totalIgst)}</span></div>
         <div class="trow"><span class="tlabel">Round Off</span><span class="tval">&#8377; ${fmtMoney(roundOff)}</span></div>
       </div>
