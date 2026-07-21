@@ -531,7 +531,9 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
       <div class="block">
         <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span class="m-label">PO No.</span><span class="m-colon">:</span><span class="m-value">${poNo}</span></div>
         <div class="meta-row sub"><span class="m-label">PO Date</span><span class="m-colon">:</span><span class="m-value">${poDate}</span></div>
-        </div>
+        <div class="meta-row sub"><span class="m-label">Delivery Challan No.</span><span class="m-colon">:</span><span class="m-value">${dcNo}</span></div>
+        <div class="meta-row sub"><span class="m-label">DC Date</span><span class="m-colon">:</span><span class="m-value">${dcDate}</span></div>
+      </div>
     </div>
   </div>
 
