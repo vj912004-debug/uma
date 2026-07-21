@@ -293,10 +293,10 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     margin-bottom:3px;
   }
   .meta-row .m-icon{color:var(--purple);width:18px;flex-shrink:0;display:flex;align-items:center;}
-  .meta-row .m-label{width:110px;flex-shrink:0;color:#333;}
+  .meta-row .m-label{width:145px;flex-shrink:0;color:#333;}
   .meta-row .m-colon{width:12px;flex-shrink:0;}
   .meta-row .m-value{font-weight:600;}
-  .meta-row.sub .m-label{width:110px;padding-left:18px;box-sizing:border-box;}
+  .meta-row.sub .m-label{width:145px;padding-left:18px;box-sizing:border-box;}
 
   /* ===== BILL TO / SHIP TO ===== */
   .parties{
