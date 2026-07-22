@@ -43,7 +43,7 @@ export const createBaseState = () => ({
   currentUser: null,
   settings: {
     userRole: 'Admin',
-    theme: 'dark',
+    theme: 'light',
     serials: { MR: 1, BPR: 1, PL: 1, PI: 1, DC: 1, MI: 1, VC: 1, PSD: 1, TI: 1, EWDC: 1, EWTI: 1, QT: 1, DN: 1, CN: 1, PO: 1 }
   },
   companyProfile: { ...DEFAULT_COMPANY_PROFILE }

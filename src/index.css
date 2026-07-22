@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --bg-dark: #0f1117;
   --bg-card: #171b22;
   --bg-sidebar: #12151c;
@@ -30,14 +30,14 @@
 }
 
 :root[data-theme="light"] {
-  --bg-dark: #f1f5f9;
+  --bg-dark: #f8fafc;
   --bg-card: #ffffff;
   --bg-sidebar: #ffffff;
-  --accent-primary: #059669;
-  --accent-secondary: #2563eb;
-  --text-main: #1e293b;
+  --accent-primary: #5b1c85; /* brand purple */
+  --accent-secondary: #3b82f6;
+  --text-main: #0f172a;
   --text-muted: #64748b;
-  --border-color: rgba(0, 0, 0, 0.08);
+  --border-color: rgba(15, 23, 42, 0.06);
   --glass-bg: rgba(0, 0, 0, 0.02);
   --scrollbar-thumb: rgba(0, 0, 0, 0.12);
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.2);
@@ -51,12 +51,12 @@
   --btn-hover-bg: rgba(0, 0, 0, 0.07);
   --btn-hover-border: rgba(0, 0, 0, 0.12);
   --modal-overlay: rgba(15, 23, 42, 0.35);
-  --status-done-bg: rgba(37, 99, 235, 0.08);
-  --status-done-border: rgba(37, 99, 235, 0.2);
+  --status-done-bg: rgba(59, 130, 246, 0.08);
+  --status-done-border: rgba(59, 130, 246, 0.18);
   --status-done-text: #2563eb;
-  --status-pending-bg: rgba(217, 119, 6, 0.08);
-  --status-pending-border: rgba(217, 119, 6, 0.2);
-  --status-pending-text: #d97706;
+  --status-pending-bg: rgba(249, 115, 22, 0.08);
+  --status-pending-border: rgba(249, 115, 22, 0.18);
+  --status-pending-text: #ea580c;
 }
 
 * {
@@ -119,13 +119,15 @@ body {
 .premium-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 1.25rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
   transition: var(--transition-smooth);
 }
 
 .premium-card:hover {
-  border-color: rgba(16, 185, 129, 0.2);
+  border-color: rgba(91, 28, 133, 0.15);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
 }
 
 /* Form Styling */
@@ -262,42 +264,129 @@ td {
   padding: 1.25rem 0.85rem;
   position: sticky;
   top: 0;
-  border-right: 1px solid var(--border-color);
+  background: #5b1c85; /* Brand Deep Purple */
+  color: #ffffff;
+  border-right: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   flex-shrink: 0;
+  box-shadow: 4px 0 15px rgba(91, 28, 133, 0.05);
+}
+
+.sidebar-brand-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  color: #5b1c85; /* Brand purple letter */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.05rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .sidebar-brand h1 {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  color: var(--text-main);
+  color: #ffffff;
   margin: 0;
 }
 
 .sidebar-brand p {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  margin: 0.15rem 0 0;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0.1rem 0 0;
+}
+
+.sidebar-close-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0.2rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.sidebar-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.4rem;
   flex: 1;
   overflow-y: auto;
   padding: 0.25rem 0.15rem 1rem 0;
 }
 
-.nav-group-title {
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  padding: 0 0.5rem;
-  margin-bottom: 0.15rem;
-  opacity: 0.85;
+/* Custom Scrollbar for Sidebar nav */
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.2rem;
+}
+
+.sidebar-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition-smooth);
+}
+
+.sidebar-group-header:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-group-header-content {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sidebar-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-left: 0.75rem;
+  margin-top: 0.1rem;
 }
 
 .nav-link {
@@ -307,7 +396,7 @@ td {
   padding: 0.45rem 0.6rem;
   border-radius: 8px;
   text-decoration: none;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.7);
   font-size: 0.82rem;
   font-weight: 500;
   border: 1px solid transparent;
@@ -315,30 +404,29 @@ td {
 }
 
 .nav-link:hover {
-  color: var(--text-main);
-  background: var(--glass-bg);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .nav-link.active {
-  color: var(--text-main);
-  background: rgba(16, 185, 129, 0.1);
-  border-color: rgba(16, 185, 129, 0.22);
+  color: #ffffff;
+  background: #9333ea; /* Vibrant purple active state */
+  border-color: transparent;
 }
 
 .nav-link.highlight {
-  color: #f87171;
+  color: #fecaca;
   font-weight: 600;
 }
 
 .nav-link.highlight.active {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.2);
 }
 
 .sidebar-footer {
   margin-top: auto;
   padding-top: 0.85rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
@@ -354,21 +442,21 @@ td {
   align-items: center;
   gap: 0.65rem;
   padding: 0.6rem;
-  background: var(--glass-bg);
+  background: rgba(255, 255, 255, 0.06);
   border-radius: 8px;
-  border: 1px solid var(--border-color);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-avatar {
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  background: var(--accent-primary);
+  background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  color: white;
+  color: #5b1c85; /* Purple letter */
   font-size: 0.68rem;
   flex-shrink: 0;
 }
@@ -426,6 +514,12 @@ td {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.82rem;
+  table-layout: auto;
+}
+
+.workflow-table th,
+.workflow-table td {
+  white-space: nowrap; /* Prevent ugly wrapping */
 }
 
 .workflow-table th {
@@ -444,25 +538,39 @@ td {
 /* Document status buttons */
 .doc-done,
 .doc-pending {
-  border-radius: 6px;
-  padding: 0.3rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: 999px; /* Pill shape */
+  padding: 0.25rem 0.75rem;
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
   transition: var(--transition-smooth);
-  min-width: 72px;
+  min-width: 82px;
 }
 
 .doc-done {
-  background: var(--status-done-bg);
-  color: var(--status-done-text);
-  border: 1px solid var(--status-done-border);
+  background: rgba(16, 185, 129, 0.08);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.18);
+}
+
+.doc-done:hover {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
 }
 
 .doc-pending {
-  background: var(--status-pending-bg);
-  color: var(--status-pending-text);
-  border: 1px solid var(--status-pending-border);
+  background: rgba(249, 115, 22, 0.08);
+  color: #ea580c;
+  border: 1px solid rgba(249, 115, 22, 0.18);
+}
+
+.doc-pending:hover {
+  background: rgba(249, 115, 22, 0.15);
+  border-color: rgba(249, 115, 22, 0.3);
 }
 
 .doc-pending:disabled {
@@ -480,11 +588,31 @@ td {
 .doc-icon-btn {
   background: transparent;
   border: none;
-  color: var(--status-done-text);
+  color: var(--accent-primary);
   cursor: pointer;
   padding: 0.2rem;
   display: inline-flex;
   align-items: center;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.doc-icon-btn:hover {
+  background: rgba(91, 28, 133, 0.08);
+}
+
+/* Custom Scrollbar for data table container */
+.data-table-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.data-table-container::-webkit-scrollbar-thumb {
+  background: rgba(91, 28, 133, 0.2); /* brand purple thumb */
+  border-radius: 10px;
+}
+
+.data-table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(91, 28, 133, 0.4);
 }
 
 .legend {

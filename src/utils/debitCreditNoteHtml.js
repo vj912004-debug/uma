@@ -228,7 +228,7 @@ const getCommonStyle = () => `
     font-size:12.5px;
   }
   .invoice-meta .block + .block{
-    border-top:1px solid var(--purple);
+    border-top:1px solid var(--lav-border);
   }
   .meta-row{
     display:flex;
@@ -611,15 +611,16 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
     </div>
 
     <div class="invoice-meta">
-      <div class="block">
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">Note No.</span><span class="m-colon">:</span><span class="m-value">${docNo}</span></div>
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="m-label">Note Date</span><span class="m-colon">:</span><span class="m-value">${docDate}</span></div>
+      <div style="text-align:center; padding:6px 0 2px; font-weight:800; color:var(--purple); font-size:11px; letter-spacing:0.5px;">REFERENCE DETAILS</div>
+      <div class="block" style="padding-top:4px;">
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">${noteType} No.</span><span class="m-colon">:</span><span class="m-value">${docNo}</span></div>
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="m-label">${noteType} Date</span><span class="m-colon">:</span><span class="m-value">${docDate}</span></div>
       </div>
       <div class="block">
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">Original Inv No.</span><span class="m-colon">:</span><span class="m-value">${refInvoice}</span></div>
-        <div class="meta-row sub"><span class="m-label">Original Inv Date</span><span class="m-colon">:</span><span class="m-value">${refDate}</span></div>
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span class="m-label">Customer PO No.</span><span class="m-colon">:</span><span class="m-value">${poNo}</span></div>
-        <div class="meta-row sub"><span class="m-label">Reference</span><span class="m-colon">:</span><span class="m-value">${ref}</span></div>
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">Original Invoice No.</span><span class="m-colon">:</span><span class="m-value">${refInvoice}</span></div>
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">Original Invoice Date</span><span class="m-colon">:</span><span class="m-value">${refDate}</span></div>
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 2.9c0-.5.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg></span><span class="m-label">Customer PO No.</span><span class="m-colon">:</span><span class="m-value">${poNo}</span></div>
+        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">Reference</span><span class="m-colon">:</span><span class="m-value">${ref}</span></div>
       </div>
     </div>
   </div>

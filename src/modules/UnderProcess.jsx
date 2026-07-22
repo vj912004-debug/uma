@@ -423,7 +423,7 @@ const UnderProcess = () => {
     <div>
       <header className="page-header">
         <h1 className="page-title">Under Process</h1>
-        <p className="page-subtitle">Track material receipts and generate documents step by step.</p>
+        <p className="page-subtitle">Track document generation status for materials in process</p>
       </header>
 
       <div className="tab-bar">
@@ -449,18 +449,22 @@ const UnderProcess = () => {
         ))}
       </div>
 
-      <div className="premium-card data-table-container" style={{ padding: '0.75rem' }}>
+      <div className="premium-card data-table-container" style={{ padding: '1.5rem', background: '#ffffff' }}>
+        <div style={{ marginBottom: '1.25rem' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#5b1c85', margin: 0 }}>Material Processing Status</h2>
+          <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: '0.25rem 0 0' }}>View and manage document generation for each material</p>
+        </div>
         <table className="workflow-table">
           <thead>
             <tr>
-              <th>M.R. Date</th>
-              <th>Customer</th>
+              <th>Material Received Date</th>
+              <th>Party Name</th>
               <th>Product</th>
-              <th>Qty (Kg)</th>
+              <th>Qty (kg)</th>
               <th className="center">PI</th>
               <th className="center">BPR</th>
               <th className="center">PSD</th>
-              <th className="center">PL</th>
+              <th className="center">Packing List</th>
               <th className="center">DC</th>
               <th className="center">E-Way DC</th>
               <th className="center">Tax Inv</th>
@@ -527,11 +531,13 @@ const UnderProcess = () => {
                             <FileText size={14} />
                           </button>
                           <button onClick={(e) => handleBlueClick(mr.id, 'PI', pi, productName, e)} className="doc-done">
-                            {pi.invoiceNo.split('/').slice(-1)[0]}
+                            <CheckCircle size={12} /> Done
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'PI', productName)} className="doc-pending">Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'PI', productName)} className="doc-pending">
+                          <Clock size={12} /> Pending
+                        </button>
                       )}
                     </td>
 
@@ -542,11 +548,13 @@ const UnderProcess = () => {
                             <FileText size={14} />
                           </button>
                           <button onClick={(e) => handleBlueClick(mr.id, 'BPR', bpr, productName, e)} className="doc-done">
-                            {bpr.bprNo.split('/').slice(-1)[0]}
+                            <CheckCircle size={12} /> Done
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'BPR', productName)} className="doc-pending">Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'BPR', productName)} className="doc-pending">
+                          <Clock size={12} /> Pending
+                        </button>
                       )}
                     </td>
 
@@ -557,11 +565,13 @@ const UnderProcess = () => {
                             <FileText size={14} />
                           </button>
                           <button onClick={(e) => handleBlueClick(mr.id, 'PSD', psd, productName, e)} className="doc-done">
-                            {psd.psdNo.split('/').slice(-1)[0]}
+                            <CheckCircle size={12} /> Done
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'PSD', productName)} className="doc-pending">Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'PSD', productName)} className="doc-pending">
+                          <Clock size={12} /> Pending
+                        </button>
                       )}
                     </td>
 
@@ -572,11 +582,13 @@ const UnderProcess = () => {
                             <FileText size={14} />
                           </button>
                           <button onClick={(e) => handleBlueClick(mr.id, 'PL', pl, productName, e)} className="doc-done">
-                            {pl.plNo.split('/').slice(-1)[0]}
+                            <CheckCircle size={12} /> Done
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'PL', productName)} className="doc-pending" disabled={!bpr}>Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'PL', productName)} className="doc-pending" disabled={!bpr}>
+                          <Clock size={12} /> Pending
+                        </button>
                       )}
                     </td>
 
@@ -587,21 +599,25 @@ const UnderProcess = () => {
                             <FileText size={14} />
                           </button>
                           <button onClick={(e) => handleBlueClick(mr.id, 'DC', dc, productName, e)} className="doc-done">
-                            {dc.dcNo.split('/').slice(-1)[0]}
+                            <CheckCircle size={12} /> Done
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'DC', productName)} className="doc-pending" disabled={!pl}>Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'DC', productName)} className="doc-pending" disabled={!pl}>
+                          <Clock size={12} /> Pending
+                        </button>
                       )}
                     </td>
 
                     <td className="center">
                       {dc && dc.ewayBillNo ? (
                         <button onClick={(e) => handleBlueClick(mr.id, 'EWDC', dc, productName, e)} className="doc-done">
-                          {dc.ewayBillNo}
+                          <CheckCircle size={12} /> Done
                         </button>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'EWDC', productName)} className="doc-pending" disabled={!dc}>Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'EWDC', productName)} className="doc-pending" disabled={!dc}>
+                          <Clock size={12} /> Pending
+                        </button>
                       )}
                     </td>
 
@@ -612,21 +628,25 @@ const UnderProcess = () => {
                             <FileText size={14} />
                           </button>
                           <button onClick={(e) => handleBlueClick(mr.id, 'TI', ti, productName, e)} className="doc-done">
-                            {ti.invoiceNo.split('/').slice(-1)[0]}
+                            <CheckCircle size={12} /> Done
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'TI', productName)} className="doc-pending" disabled={!pl}>Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'TI', productName)} className="doc-pending" disabled={!pl}>
+                          <Clock size={12} /> Pending
+                        </button>
                       )}
                     </td>
 
                     <td className="center">
                       {ti && ti.ewayBillNo ? (
                         <button onClick={(e) => handleBlueClick(mr.id, 'EWTI', ti, productName, e)} className="doc-done">
-                          {ti.ewayBillNo}
+                          <CheckCircle size={12} /> Done
                         </button>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'EWTI', productName)} className="doc-pending" disabled={!ti}>Pending</button>
+                        <button onClick={() => handlePendingClick(mr, 'EWTI', productName)} className="doc-pending" disabled={!ti}>
+                          <Clock size={12} /> Pending
+                        </button>
                       )}
                     </td>
                   </tr>

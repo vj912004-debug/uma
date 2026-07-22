@@ -43,7 +43,6 @@ export const buildPackingListHtml = (data, profileInput) => {
     return `
       <tr>
         <td class="num">${index + 1}</td>
-        <td class="left">${escHtml(batch.productName || data.productName || '')}</td>
         <td class="num">${escHtml(batch.batchNo || '')}</td>
         <td class="num">${escHtml(batch.drumNo ?? '')}</td>
         <td class="num">${displayWeight(batch.gross)}</td>
@@ -55,7 +54,7 @@ export const buildPackingListHtml = (data, profileInput) => {
   for (let i = batches.length; i < PL_MIN_ROWS; i += 1) {
     rows.push(`
       <tr class="empty">
-        <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        <td></td><td></td><td></td><td></td><td></td><td></td>
       </tr>`);
   }
 
@@ -392,7 +391,6 @@ export const buildPackingListHtml = (data, profileInput) => {
           <thead>
             <tr>
               <th class="num" style="width:6%;">Sr. No.</th>
-              <th style="width:28%;">Product Name</th>
               <th class="num" style="width:15%;">Batch No.</th>
               <th class="num" style="width:10%;">Drum No.</th>
               <th class="num" style="width:14%;">Gross Wt. (Kg)</th>
@@ -405,7 +403,7 @@ export const buildPackingListHtml = (data, profileInput) => {
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="4" class="num">TOTAL</td>
+              <td colspan="3" class="num">TOTAL</td>
               <td class="num">${fmtMoney(totalGross)}</td>
               <td class="num">${fmtMoney(totalTare)}</td>
               <td class="num">${fmtMoney(finalNet)}</td>
