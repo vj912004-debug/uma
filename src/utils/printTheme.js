@@ -535,7 +535,7 @@ export const buildFooterTerms = (companyName, termsHtml, declarationHtml) => `
     </div>
   </div>`;
 
-export const buildStatusBar = (pageText = 'Page 1 of 1', customText = 'This is a computer generated document.') => `
+export const buildStatusBar = (pageText = 'Page 1 of 1', customText = 'This is a computer-generated document and does not require a physical signature.') => `
   <div class="barfoot">
     <span>Thank you for your business!</span>
     <span>E. &amp; O.E.</span>

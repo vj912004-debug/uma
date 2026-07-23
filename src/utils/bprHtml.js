@@ -389,7 +389,7 @@ export const buildBprHtml = (data, profileInput) => {
       <div class="barfoot">
         <span>Thank you for your business!</span>
         <span>E. &amp; O.E.</span>
-        <span>This is a computer generated document.</span>
+        <span>This is a computer-generated document and does not require a physical signature.</span>
         <span>Page 1 of 2</span>
       </div>
 
@@ -457,7 +457,7 @@ export const buildBprHtml = (data, profileInput) => {
       <div class="barfoot">
         <span>Thank you for your business!</span>
         <span>E. &amp; O.E.</span>
-        <span>This is a computer generated document.</span>
+        <span>This is a computer-generated document and does not require a physical signature.</span>
         <span>Page 2 of 2</span>
           </td>
   </tr>

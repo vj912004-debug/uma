@@ -36,37 +36,38 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
   const rows = [];
   let sr = 1;
 
-  const pushRow = (desc, qty, rate, amt, sgstPercent, cgstPercent) => {
+  const pushRow = (desc, qty, rate, amt, sgstPercent, cgstPercent, igstPercent = 0) => {
     const sgstAmt = amt * (sgstPercent / 100);
     const cgstAmt = amt * (cgstPercent / 100);
-    const rowTotal = amt + sgstAmt + cgstAmt;
+    const igstAmt = amt * (igstPercent / 100);
+    const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
     totalAmt += amt;
     totalSgst += sgstAmt;
     totalCgst += cgstAmt;
+    totalIgst += igstAmt;
     totalAll += rowTotal;
     totalQty += parseFloat(qty) || 0;
 
-    // Extract HSN from description if present e.g. "Minimum Cleaning Charges(998842)"
-    let hsn = '';
     let cleanDesc = desc;
-    const match = desc.match(/(.*?)\((\d+)\)$/);
+    const match = desc.match(/(.*?)\(\d+\)$/);
     if (match) {
       cleanDesc = match[1].trim();
-      hsn = match[2];
     }
 
     rows.push(`
       <tr>
         <td class="center">${sr++}</td>
         <td class="left">${escHtml(cleanDesc)}</td>
-        <td class="center">${escHtml(hsn)}</td>
-        <td>${fmtQty(qty)}</td>
-        <td>${rate ? escHtml(parseFloat(rate).toFixed(2)) : ''}</td>
-        <td>${fmtMoney(amt)}</td>
-        <td>${fmtMoney(cgstAmt)}</td>
-        <td>${fmtMoney(sgstAmt)}</td>
-        <td>${fmtMoney(0)}</td>
-        <td>${fmtMoney(rowTotal)}</td>
+        <td class="center">${fmtQty(qty)}</td>
+        <td class="num">${rate ? escHtml(parseFloat(rate).toFixed(2)) : ''}</td>
+        <td class="num">${fmtMoney(amt)}</td>
+        <td class="num">${sgstPercent || ''}</td>
+        <td class="num">${fmtMoney(sgstAmt)}</td>
+        <td class="num">${cgstPercent || ''}</td>
+        <td class="num">${fmtMoney(cgstAmt)}</td>
+        <td class="num">${igstPercent || ''}</td>
+        <td class="num">${fmtMoney(igstAmt)}</td>
+        <td class="num">${fmtMoney(rowTotal)}</td>
       </tr>`);
   };
 
@@ -90,8 +91,10 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
   for (let i = 0; i < blanksCount; i++) {
     rows.push(`
       <tr class="filler-row">
-        <td></td><td></td><td></td><td></td><td></td>
-        <td></td><td></td><td></td><td></td><td></td>
+        <td></td><td></td><td></td><td></td>
+        <td class="num">0.00</td><td></td><td class="num">0.00</td>
+        <td></td><td class="num">0.00</td><td></td><td class="num">0.00</td>
+        <td class="num">0.00</td>
       </tr>`);
   }
 
@@ -100,15 +103,17 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
 
   rows.push(`
     <tr class="total-row">
-      <td colspan="2" class="center">TOTAL</td>
+      <td colspan="2" class="center" style="text-align:center;">TOTAL</td>
+      <td class="center">${fmtQty(totalQty) || '0.00'}</td>
       <td></td>
-      <td>${fmtQty(totalQty) || '0.00'}</td>
+      <td class="num">${fmtMoney(totalAmt)}</td>
       <td></td>
-      <td>${fmtMoney(totalAmt)}</td>
-      <td>${fmtMoney(totalCgst)}</td>
-      <td>${fmtMoney(totalSgst)}</td>
-      <td>${fmtMoney(totalIgst)}</td>
-      <td>${fmtMoney(totalAll)}</td>
+      <td class="num">${fmtMoney(totalSgst)}</td>
+      <td></td>
+      <td class="num">${fmtMoney(totalCgst)}</td>
+      <td></td>
+      <td class="num">${fmtMoney(totalIgst)}</td>
+      <td class="num">${fmtMoney(totalAll)}</td>
     </tr>`);
 
   const docNo = escHtml(data.invoiceNo || 'N/A');
@@ -346,35 +351,39 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
   .table-container { }
   table.items{
     width:100%;
+    table-layout:fixed;
     border-collapse:collapse;
     margin-bottom:14px;
-    font-size:12px;
-    border:none;
+    font-size:9px;
+    color: var(--text);
   }
   table.items thead th{
     background:var(--purple);
     color:#fff;
     font-weight:700;
-    padding:8px 6px;
-    text-align:left;
+    padding:3px 2px;
+    text-align:center;
+    vertical-align:middle;
     border:1px solid var(--purple);
   }
-  table.items thead th.num{text-align:right;padding-right:10px;}
   table.items tbody td{
     border:1px solid var(--lav-border);
-    padding:6px 6px;
-    height:20px;
+    padding:3px 3px;
+    height:18px;
+    vertical-align:middle;
   }
-  table.items tbody td.num{text-align:right;padding-right:10px;}
-  table.items tbody tr.empty td{height:22px;}
+  table.items tbody td.num{text-align:right;padding-right:3px;}
+  table.items tbody td.center{text-align:center;}
+  table.items tbody td.left{text-align:left;padding-left:3px;}
+  table.items tbody tr.filler-row td{height:18px;}
   table.items tfoot td{
     border:1px solid var(--purple);
     background:var(--lav-bg);
     font-weight:800;
-    padding:8px 6px;
+    padding:3px 2px;
     color:var(--purple-dark);
   }
-  table.items tfoot td.num{text-align:right;padding-right:10px;}
+  table.items tfoot td.num{text-align:right;padding-right:3px;}
 
   /* ===== BOTTOM SECTION: bank + totals ===== */
   .bottom{
@@ -568,18 +577,39 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
   <!-- ITEMS TABLE -->
   <div class="table-container">
     <table class="items">
+      <colgroup>
+        <col style="width: 3%;">
+        <col style="width: 22%;">
+        <col style="width: 8%;">
+        <col style="width: 8%;">
+        <col style="width: 9%;">
+        <col style="width: 4%;">
+        <col style="width: 9%;">
+        <col style="width: 4%;">
+        <col style="width: 9%;">
+        <col style="width: 4%;">
+        <col style="width: 9%;">
+        <col style="width: 11%;">
+      </colgroup>
       <thead>
         <tr>
-          <th style="width:5%;">Sr. No.</th>
-          <th style="width:22%;">Description</th>
-          <th style="width:9%;">HSN / SAC</th>
-          <th class="num" style="width:6%;">Qty.</th>
-          <th class="num" style="width:9%;">Rate (&#8377;)</th>
-          <th class="num" style="width:10%;">Amount (&#8377;)</th>
-          <th class="num" style="width:8%;">CGST (&#8377;)</th>
-          <th class="num" style="width:8%;">SGST (&#8377;)</th>
-          <th class="num" style="width:8%;">IGST (&#8377;)</th>
-          <th class="num" style="width:11%;">Total Amount (&#8377;)</th>
+          <th rowspan="2" style="text-align:center;">S.<br>No.</th>
+          <th rowspan="2" style="text-align:center;">Description</th>
+          <th rowspan="2" style="text-align:center;">Qty</th>
+          <th rowspan="2" style="text-align:center;">Rate</th>
+          <th rowspan="2" style="text-align:center;">Amount</th>
+          <th colspan="2" style="text-align:center;">SGST</th>
+          <th colspan="2" style="text-align:center;">CGST</th>
+          <th colspan="2" style="text-align:center;">IGST</th>
+          <th rowspan="2" style="text-align:center;">Total</th>
+        </tr>
+        <tr>
+          <th style="text-align:center;">Rate</th>
+          <th style="text-align:center;">Amount</th>
+          <th style="text-align:center;">Rate</th>
+          <th style="text-align:center;">Amount</th>
+          <th style="text-align:center;">Rate</th>
+          <th style="text-align:center;">Amount</th>
         </tr>
       </thead>
       <tbody>
@@ -587,12 +617,15 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="3" style="text-align:center;">TOTAL</td>
-          <td class="num">${fmtQty(totalQty) || '0.00'}</td>
+          <td colspan="2" style="text-align:center;">TOTAL</td>
+          <td class="center">${fmtQty(totalQty) || '0.00'}</td>
           <td></td>
           <td class="num">${fmtMoney(totalAmt)}</td>
-          <td class="num">${fmtMoney(totalCgst)}</td>
+          <td></td>
           <td class="num">${fmtMoney(totalSgst)}</td>
+          <td></td>
+          <td class="num">${fmtMoney(totalCgst)}</td>
+          <td></td>
           <td class="num">${fmtMoney(totalIgst)}</td>
           <td class="num">${fmtMoney(totalAll)}</td>
         </tr>
@@ -661,7 +694,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
   <div class="barfoot">
     <span>Thank you for your business!</span>
     <span>E. &amp; O.E.</span>
-    <span>This is a computer generated invoice.</span>
+    <span>This is a computer-generated invoice and does not require a physical signature.</span>
     <span>Page 1 of 1</span>
   </div>
 

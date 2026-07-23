@@ -327,35 +327,39 @@ const getCommonStyle = () => `
   .table-container { }
   table.items{
     width:100%;
+    table-layout:fixed;
     border-collapse:collapse;
     margin-bottom:14px;
-    font-size:12px;
-    border:none;
+    font-size:9px;
+    color: var(--text);
   }
   table.items thead th{
     background:var(--purple);
     color:#fff;
     font-weight:700;
-    padding:8px 6px;
-    text-align:left;
+    padding:3px 2px;
+    text-align:center;
+    vertical-align:middle;
     border:1px solid var(--purple);
   }
-  table.items thead th.num{text-align:right;padding-right:10px;}
   table.items tbody td{
     border:1px solid var(--lav-border);
-    padding:6px 6px;
-    height:20px;
+    padding:3px 3px;
+    height:18px;
+    vertical-align:middle;
   }
-  table.items tbody td.num{text-align:right;padding-right:10px;}
-  table.items tbody tr.empty td{height:22px;}
+  table.items tbody td.num{text-align:right;padding-right:3px;}
+  table.items tbody td.center{text-align:center;}
+  table.items tbody td.left{text-align:left;padding-left:3px;}
+  table.items tbody tr.filler-row td{height:18px;}
   table.items tfoot td{
     border:1px solid var(--purple);
     background:var(--lav-bg);
     font-weight:800;
-    padding:8px 6px;
+    padding:3px 2px;
     color:var(--purple-dark);
   }
-  table.items tfoot td.num{text-align:right;padding-right:10px;}
+  table.items tfoot td.num{text-align:right;padding-right:3px;}
 
   /* ===== BOTTOM SECTION: bank + totals ===== */
   .bottom{
@@ -515,21 +519,31 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
   const isIgst = (billState.toLowerCase() !== companyState.toLowerCase()) && billState !== '';
 
   const bodyRows = rows.map((r) => {
-    const { desc, hsn } = extractDescAndHsn(r.label);
+    let desc = r.label;
+    const match = r.label.match(/(.*?)\s*\(\d+\)$/);
+    if (match) {
+      desc = match[1].trim();
+    }
     const sgstAmt = isIgst ? 0 : r.sgstAmt;
     const cgstAmt = isIgst ? 0 : r.cgstAmt;
+    const igstAmt = isIgst ? (r.sgstAmt + r.cgstAmt) : 0;
+    const sgstRate = r.sgstRate || 0;
+    const cgstRate = r.cgstRate || 0;
+    const igstRate = sgstRate + cgstRate;
     
     return `
       <tr>
         <td class="center">${r.sr}</td>
         <td class="left">${escHtml(desc)}</td>
-        <td class="center">${escHtml(hsn)}</td>
-        <td class="num">${fmtQty(r.qty)}</td>
+        <td class="center">${fmtQty(r.qty)}</td>
         <td class="num">${fmtMoney(r.rate)}</td>
         <td class="num">${fmtMoney(r.amt)}</td>
-        <td class="num">${isIgst ? '-' : fmtMoney(cgstAmt)}</td>
-        <td class="num">${isIgst ? '-' : fmtMoney(sgstAmt)}</td>
-        <td class="num">${!isIgst ? '-' : fmtMoney(r.sgstAmt + r.cgstAmt)}</td>
+        <td class="num">${isIgst ? '' : sgstRate}</td>
+        <td class="num">${isIgst ? '0.00' : fmtMoney(sgstAmt)}</td>
+        <td class="num">${isIgst ? '' : cgstRate}</td>
+        <td class="num">${isIgst ? '0.00' : fmtMoney(cgstAmt)}</td>
+        <td class="num">${!isIgst ? '' : igstRate}</td>
+        <td class="num">${!isIgst ? '0.00' : fmtMoney(igstAmt)}</td>
         <td class="num">${fmtMoney(r.rowTotal)}</td>
       </tr>`;
   }).join('');
@@ -537,8 +551,10 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
   const blanksCount = Math.max(0, NOTE_MIN_ROWS - rows.length);
   const blanks = Array.from({ length: blanksCount }, () => `
       <tr class="filler-row">
-        <td></td><td></td><td></td><td></td><td></td>
-        <td></td><td></td><td></td><td></td><td></td>
+        <td></td><td></td><td></td><td></td>
+        <td class="num">0.00</td><td></td><td class="num">0.00</td>
+        <td></td><td class="num">0.00</td><td></td><td class="num">0.00</td>
+        <td class="num">0.00</td>
       </tr>
   `).join('');
 
@@ -656,36 +672,60 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
   <!-- ITEMS TABLE -->
   <div class="table-container">
     <table class="items">
-    <thead>
-      <tr>
-        <th style="width:5%;">Sr. No.</th>
-        <th style="width:24%;">Description</th>
-        <th style="width:8%;">HSN/SAC</th>
-        <th class="num" style="width:6%;">Qty.</th>
-        <th class="num" style="width:9%;">Rate (&#8377;)</th>
-        <th class="num" style="width:10%;">Amount (&#8377;)</th>
-        <th class="num" style="width:8%;">CGST (&#8377;)</th>
-        <th class="num" style="width:8%;">SGST (&#8377;)</th>
-        <th class="num" style="width:8%;">IGST (&#8377;)</th>
-        <th class="num" style="width:14%;">Total Amount (&#8377;)</th>
-      </tr>
-    </thead>
+    <colgroup>
+        <col style="width: 3%;">
+        <col style="width: 22%;">
+        <col style="width: 8%;">
+        <col style="width: 8%;">
+        <col style="width: 9%;">
+        <col style="width: 4%;">
+        <col style="width: 9%;">
+        <col style="width: 4%;">
+        <col style="width: 9%;">
+        <col style="width: 4%;">
+        <col style="width: 9%;">
+        <col style="width: 11%;">
+      </colgroup>
+      <thead>
+        <tr>
+          <th rowspan="2" style="text-align:center;">S.<br>No.</th>
+          <th rowspan="2" style="text-align:center;">Description</th>
+          <th rowspan="2" style="text-align:center;">Qty</th>
+          <th rowspan="2" style="text-align:center;">Rate</th>
+          <th rowspan="2" style="text-align:center;">Amount</th>
+          <th colspan="2" style="text-align:center;">SGST</th>
+          <th colspan="2" style="text-align:center;">CGST</th>
+          <th colspan="2" style="text-align:center;">IGST</th>
+          <th rowspan="2" style="text-align:center;">Total</th>
+        </tr>
+        <tr>
+          <th style="text-align:center;">Rate</th>
+          <th style="text-align:center;">Amount</th>
+          <th style="text-align:center;">Rate</th>
+          <th style="text-align:center;">Amount</th>
+          <th style="text-align:center;">Rate</th>
+          <th style="text-align:center;">Amount</th>
+        </tr>
+      </thead>
     <tbody>
       ${bodyRows}
       ${blanks}
     </tbody>
     <tfoot>
-      <tr>
-        <td colspan="3" style="text-align:center;">TOTAL</td>
-        <td class="num">${fmtQty(totalQty) || '0.00'}</td>
-        <td></td>
-        <td class="num">${fmtMoney(totalAmt)}</td>
-        <td class="num">${isIgst ? '-' : fmtMoney(totalCgst)}</td>
-        <td class="num">${isIgst ? '-' : fmtMoney(totalSgst)}</td>
-        <td class="num">${!isIgst ? '-' : fmtMoney(totalCgst + totalSgst)}</td>
-        <td class="num">${fmtMoney(totalAll)}</td>
-      </tr>
-    </tfoot>
+        <tr>
+          <td colspan="2" style="text-align:center;">TOTAL</td>
+          <td class="center">${fmtQty(totalQty) || '0.00'}</td>
+          <td></td>
+          <td class="num">${fmtMoney(totalAmt)}</td>
+          <td></td>
+          <td class="num">${fmtMoney(totalSgst)}</td>
+          <td></td>
+          <td class="num">${fmtMoney(totalCgst)}</td>
+          <td></td>
+          <td class="num">${fmtMoney(totalIgst)}</td>
+          <td class="num">${fmtMoney(totalAll)}</td>
+        </tr>
+      </tfoot>
   </table>
   </div>
 
@@ -763,7 +803,7 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
   <div class="barfoot">
     <span>Thank you for your business!</span>
     <span>E. &amp; O.E.</span>
-    <span>This is a computer generated ${noteType.toLowerCase()}.</span>
+    <span>This is a computer-generated ${noteType.toLowerCase()} and does not require a physical signature.</span>
     <span>Page 1 of 1</span>
   </div>
 
