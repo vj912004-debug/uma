@@ -4,9 +4,11 @@ import { Search, Plus, CreditCard } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 import { formatDate } from '../utils/dateUtils';
 import { getReceiptPaymentTotal, hasSheetOverride } from '../utils/paymentTotals';
+import { useNavigate } from 'react-router-dom';
 
 const PartyDue = () => {
   const { data, updateData, setData, updateItem } = useAppContext();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [columnFilters, setColumnFilters] = useState({});
@@ -122,7 +124,8 @@ const PartyDue = () => {
         const fy = getFYOfDate(ti.date);
         const paymentsTotal = getReceiptPaymentTotal(data.payments, mr.id);
         
-        const invoiceOutstanding = Math.max(0, (parseFloat(ti.total) || 0) - paymentsTotal);
+        let invoiceOutstanding = (parseFloat(ti.total) || 0) - paymentsTotal;
+        if (invoiceOutstanding < 0.01) invoiceOutstanding = 0;
         
         // Add to aging bucket
         if (invoiceDuesByFY.hasOwnProperty(fy)) {
@@ -269,7 +272,15 @@ const PartyDue = () => {
               ) : (
                 filteredDues.map(party => (
                   <tr key={party.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>{party.name}</td>
+                    <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                      <button 
+                        onClick={() => navigate('/processing-sheet', { state: { partyName: party.name } })}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                        title={`View ${party.name} in Processing Sheet`}
+                      >
+                        {party.name}
+                      </button>
+                    </td>
                     <td style={{ padding: '0.5rem', color: party['21-22'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['21-22'] > 0 ? 600 : 400 }}>
                       {renderInput(party.id, '21-22', party['21-22'])}
                     </td>
@@ -330,7 +341,8 @@ const PartyDue = () => {
                     {selectedPartyReceipts.map(mr => {
                       const ti = (data.invoices || []).find(inv => inv.receiptId === mr.id && inv.invoiceNo?.includes('/IN/'));
                       const paidTotal = getReceiptPaymentTotal(data.payments, mr.id);
-                      const due = Math.max(0, (parseFloat(ti?.total) || 0) - paidTotal);
+                      let due = (parseFloat(ti?.total) || 0) - paidTotal;
+                      if (due < 0.01) due = 0;
                       return (
                         <option key={mr.id} value={mr.id}>
                           {mr.receiptNo} - {mr.productName} ({formatDate(mr.date)}) - Balance Due: ₹{due.toFixed(2)}

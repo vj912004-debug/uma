@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download } from 'lucide-react';
+import { FileSpreadsheet, FileText, FileDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
@@ -95,15 +95,15 @@ const ExportButton = ({ data, columns, filename, title }) => {
   };
 
   return (
-    <div className="export-buttons" style={{ display: 'flex', gap: '0.5rem' }}>
-      <button onClick={exportToExcel} className="btn-secondary" title="Export Excel">
-        <Download size={16} /> Excel
+    <div className="export-buttons" style={{ display: 'flex', gap: '1rem' }}>
+      <button onClick={exportToExcel} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fff', border: '1px solid var(--border-color)', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500, color: '#334155' }} title="Export Excel">
+        <FileSpreadsheet size={18} color="#10b981" /> Export Excel
       </button>
-      <button onClick={exportToPDF} className="btn-secondary" title="Export PDF">
-        <Download size={16} /> PDF
+      <button onClick={exportToPDF} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fff', border: '1px solid var(--border-color)', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500, color: '#334155' }} title="Export PDF">
+        <FileText size={18} color="#ef4444" /> Export PDF
       </button>
-      <button onClick={exportToWord} className="btn-secondary" title="Export Word">
-        <Download size={16} /> Word
+      <button onClick={exportToWord} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fff', border: '1px solid var(--border-color)', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500, color: '#334155' }} title="Export Word">
+        <FileDown size={18} color="#3b82f6" /> Export Word
       </button>
     </div>
   );

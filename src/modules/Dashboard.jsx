@@ -97,7 +97,8 @@ const Dashboard = () => {
           const fy = getFYOfDate(ti.date);
           if (fy === '24-25') {
             const paymentsTotal = getReceiptPaymentTotal(data.payments, mr.id);
-            const invoiceOutstanding = Math.max(0, (parseFloat(ti.total) || 0) - paymentsTotal);
+            let invoiceOutstanding = (parseFloat(ti.total) || 0) - paymentsTotal;
+            if (invoiceOutstanding < 0.01) invoiceOutstanding = 0;
             partyDues2425 += invoiceOutstanding;
           }
         }

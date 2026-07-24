@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Search, Edit2, Trash2, ShieldAlert } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
+import { useNavigate } from 'react-router-dom';
 
 const displayChargeRate = (v) => (v == null || v === '' || v === 0) ? '' : v;
 const parseChargeRateInput = (val) => (val === '' ? 0 : (parseFloat(val) || 0));
 
 const Parties = () => {
   const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -247,7 +249,15 @@ const Parties = () => {
                 filteredParties.map(party => (
                   <tr key={party.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{party.vendorCode || 'N/A'}</td>
-                    <td style={{ padding: '1rem', fontWeight: 600 }}>{party.name}</td>
+                    <td style={{ padding: '1rem', fontWeight: 600 }}>
+                      <button 
+                        onClick={() => navigate('/processing-sheet', { state: { partyName: party.name } })}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                        title={`View ${party.name} in Processing Sheet`}
+                      >
+                        {party.name}
+                      </button>
+                    </td>
                     <td style={{ padding: '1rem' }}>
                       <span style={{ 
                         padding: '0.25rem 0.75rem', 
