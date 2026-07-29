@@ -28,7 +28,9 @@ const Invoices = () => {
   const handleCreateInvoice = (pl) => {
     const typeKey = formData.type === 'Tax Invoice' ? 'TI' : 'PI';
     const nextSerial = data.settings.serials[typeKey] || 1;
-    
+    const mr = (data.materialReceipts || []).find((r) => r.id === pl.receiptId);
+    const receivedQty = parseFloat(mr?.totalQty) || parseFloat(pl.totalWeight) || 0;
+
     setSelectedPL(pl);
     setFormData({
       ...formData,
@@ -40,7 +42,7 @@ const Invoices = () => {
         { 
           description: pl.productName, 
           hsn: '2827', // Example chemical HSN
-          qty: pl.totalWeight, 
+          qty: receivedQty, 
           rate: 0, 
           amount: 0 
         }

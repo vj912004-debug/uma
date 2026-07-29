@@ -738,7 +738,7 @@ const MaterialReceipt = () => {
                           padding: '0.25rem 0.75rem', 
                           borderRadius: '20px', 
                           fontSize: '0.75rem',
-                          background: mr.status === 'Completed' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                          background: mr.status === 'Completed' ? 'rgba(91, 28, 133, 0.1)' : 'rgba(245, 158, 11, 0.1)',
                           color: mr.status === 'Completed' ? '#10b981' : '#f59e0b',
                           fontWeight: 600
                         }}>
@@ -1036,7 +1036,7 @@ const MaterialReceipt = () => {
               )}
 
               {formData.partyId && partyProducts.length > 0 && (
-                <div style={{ padding: '1rem', background: 'rgba(16,185,129,0.06)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.2)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ padding: '1rem', background: 'rgba(91, 28, 133, 0.06)', borderRadius: '8px', border: '1px solid rgba(91, 28, 133, 0.2)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>Receipt Grand Total</span>
                   <span style={{ fontWeight: 600 }}>{activeProductCount} Product{activeProductCount !== 1 ? 's' : ''} · {activeBatchCount} Active Batch{activeBatchCount !== 1 ? 'es' : ''} · {formData.totalDrums || 0} Drums · {(formData.totalQty || 0).toFixed(2)} Kg</span>
                 </div>

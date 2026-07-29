@@ -23,6 +23,7 @@ import {
   getBPRDispatchedRowsForPL,
   getPLDisplayProductLabel,
   buildPLProductSummaries,
+  getMRReceivedQty,
   alignDrumRowsToProducts,
   buildUnderProcessRows,
   buildDCFieldsFromProducts,
@@ -1175,7 +1176,8 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         ? [...new Set(psdNotes)].join(' | ')
         : (scopedProdConfig?.psdNote || '');
       const paddedReceived = padBPRBatchRows(receivedRows);
-      const paddedDispatched = padBPRBatchRows(receivedRows.map(r => ({ ...r })));
+      // Keep dispatch blank until filled — avoids mirroring received batch/drum on print
+      const paddedDispatched = padBPRBatchRows([]);
 
       setForm(prev => ({
         ...prev,
@@ -2111,11 +2113,14 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
 
   useEffect(() => {
     if (editing) {
+      const selected = editing.selectedProducts?.length
+        ? editing.selectedProducts
+        : (editing.productSummaries || []).map(p => p.prodName).filter(Boolean);
+      const computed = buildDCFieldsFromProducts(mr, pl, prodOpts, selected);
       setForm({
         ...editing,
-        selectedProducts: editing.selectedProducts?.length
-          ? editing.selectedProducts
-          : (editing.productSummaries || []).map(p => p.prodName).filter(Boolean)
+        selectedProducts: selected,
+        ...computed
       });
       return;
     }
@@ -2224,7 +2229,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           <input type="text" className="input-field" readOnly value={form.productName} />
         </div>
         <div>
-          <label>Micronised Qty (Kg)</label>
+          <label>Received Qty (Kg)</label>
           <input type="number" className="input-field" required value={form.qty} onChange={e => setForm({...form, qty: parseFloat(e.target.value) || 0})} />
         </div>
         <div>
@@ -2334,14 +2339,7 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
   const productNames = getReceiptProductNames(mr, prodOpts);
   const formInitKey = `${mr.id}-${editing?.id || 'new'}`;
 
-  const resolveProductQty = (prodName) => {
-    const prodRows = (pl?.batches || []).filter(r => {
-      const rowProd = r.productName || productNames[0];
-      return (rowProd || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase();
-    });
-    if (prodRows.length) return prodRows.reduce((s, r) => s + (parseFloat(r.net) || 0), 0);
-    return getProductQty(mr, prodName, prodOpts);
-  };
+  const resolveProductQty = (prodName) => getProductQty(mr, prodName, prodOpts);
 
   const [form, setForm] = useState({
     invoiceNo: '',
@@ -2466,10 +2464,7 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
     const legacyCharges = sanitizedCharges[firstProd]?.charges || emptyChargeFlags();
     const legacyRates = sanitizedCharges[firstProd]?.rates || emptyChargeRates();
     const legacyQtys = sanitizedCharges[firstProd]?.qtys || emptyChargeQtys();
-    const totalQty = pl?.totalWeight
-      || productNames.reduce((sum, name) => sum + resolveProductQty(name), 0)
-      || mr.totalQty
-      || 0;
+    const totalQty = getMRReceivedQty(mr, prodOpts) || 0;
 
     const finalDoc = {
       ...form,
@@ -2504,10 +2499,7 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
   };
 
   const chargeProductNames = productNames.length ? productNames : [mr.productName].filter(Boolean);
-  const scopedMicronisedQty = pl?.totalWeight
-    || productNames.reduce((sum, name) => sum + resolveProductQty(name), 0)
-    || mr.totalQty
-    || 0;
+  const scopedReceivedQty = getMRReceivedQty(mr, prodOpts) || 0;
 
   return (
     <form onSubmit={handleSubmit}>
@@ -2541,8 +2533,8 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
           <input type="text" className="input-field" readOnly value={mr.gstinBill} />
         </div>
         <div>
-          <label>Material Micronised Qty</label>
-          <input type="text" className="input-field" readOnly value={`${scopedMicronisedQty.toFixed(2)} Kg`} />
+          <label>Received Qty (Kg)</label>
+          <input type="text" className="input-field" readOnly value={`${scopedReceivedQty.toFixed(2)} Kg`} />
         </div>
         <div style={{ gridColumn: 'span 2' }}>
           <label>Product(s)</label>
@@ -2602,11 +2594,11 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
           </div>
           <div className="summary-row">
             <span>CGST @{(form.taxRate / 2)}%</span>
-            <span>₹{((Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100)) / 2).toFixed(2)}</span>
+            <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
           </div>
           <div className="summary-row">
             <span>SGST @{(form.taxRate / 2)}%</span>
-            <span>₹{((Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100)) / 2).toFixed(2)}</span>
+            <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
           </div>
           <div className="summary-row total">
             <span>Grand Total</span>

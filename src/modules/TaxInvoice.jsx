@@ -25,8 +25,8 @@ import {
   getReceiptProductNames,
   getProductQty,
   getProductDisplayIndex,
-  getPLProductNetQty,
   buildPLProductSummaries,
+  getMRReceivedQty,
   getDocProductLabel,
   findAnyPackingList,
   receiptProductOptions
@@ -78,10 +78,7 @@ const TaxInvoice = () => {
     ? getReceiptProductNames(activeMR, prodOpts)
     : Object.keys(form.productCharges || {});
 
-  const resolveProductQty = (prodName) => {
-    if (activePL) return getPLProductNetQty(activePL, prodName, activeMR, prodOpts);
-    return getProductQty(activeMR, prodName, prodOpts);
-  };
+  const resolveProductQty = (prodName) => getProductQty(activeMR, prodName, prodOpts);
 
   const getProductChargeBlock = (prodName) =>
     form.productCharges?.[prodName]
@@ -96,7 +93,7 @@ const TaxInvoice = () => {
     const opts = receiptProductOptions(freshMR, data);
     const mrParty = opts.party || data.parties.find(p => p.id === freshMR.partyId);
     const linkedDC = data.deliveryChallans.find(d => d.receiptId === freshMR.id);
-    const plWeight = pl.totalWeight || 0;
+    const receivedQty = getMRReceivedQty(freshMR, opts);
     const productSummaries = buildPLProductSummaries(pl, freshMR, opts);
     const productLabel = getReceiptProductLabel(freshMR, opts);
     const productCharges = resolveTIProductChargesForDoc(freshMR, mrParty, data.invoices, opts);
@@ -118,7 +115,7 @@ const TaxInvoice = () => {
       productSummaries,
       productCharges,
       hsnCode: prod?.hsn || '',
-      qty: plWeight,
+      qty: receivedQty,
       charges: defaultChargeFlags(),
       rates: defaultChargeRates(),
       qtys: emptyChargeQtys(),
@@ -139,13 +136,15 @@ const TaxInvoice = () => {
       const productSummaries = mr
         ? buildPLProductSummaries(pl, mr, opts)
         : (editingDoc.productSummaries || []);
-      const merged = mergeSavedDocCharges(editingDoc, parseFloat(editingDoc.qty) || 0);
+      const receivedQty = mr ? getMRReceivedQty(mr, opts) : (parseFloat(editingDoc.qty) || 0);
+      const merged = mergeSavedDocCharges(editingDoc, receivedQty);
       const productCharges = mr
         ? normalizeProductChargesFromDoc(editingDoc.productCharges, editingDoc, mr, opts, opts.party)
         : (editingDoc.productCharges || {});
       setForm(prev => ({
         ...editingDoc,
         ...merged,
+        qty: receivedQty,
         productName: mr ? getReceiptProductLabel(mr, opts) : (editingDoc.productName || ''),
         productSummaries: productSummaries.length ? productSummaries : (editingDoc.productSummaries || []),
         productCharges,
@@ -160,10 +159,10 @@ const TaxInvoice = () => {
       if (!freshMR) return;
       const opts = receiptProductOptions(freshMR, data);
       const mrParty = opts.party || data.parties.find(p => p.id === freshMR.partyId);
-      const plWeight = selectedPL.totalWeight || 0;
+      const receivedQty = getMRReceivedQty(freshMR, opts);
       setForm(prev => ({
         ...prev,
-        qty: plWeight,
+        qty: receivedQty,
         productName: getReceiptProductLabel(freshMR, opts),
         productSummaries: buildPLProductSummaries(selectedPL, freshMR, opts),
         productCharges: resolveTIProductChargesForDoc(freshMR, mrParty, data.invoices, opts)
@@ -390,7 +389,7 @@ const TaxInvoice = () => {
       charges: legacyBlock.charges || form.charges,
       rates: legacyBlock.rates || form.rates,
       qtys: legacyBlock.qtys || form.qtys,
-      qty: form.qty,
+      qty: activeMR ? (getMRReceivedQty(activeMR, opts) || form.qty) : form.qty,
       subtotal,
       taxAmount,
       total,
@@ -598,7 +597,7 @@ const TaxInvoice = () => {
                   <input type="text" className="input-field" value={form.gstinShip} onChange={e => setForm({...form, gstinShip: e.target.value})} />
                 </div>
                 <div>
-                  <label>Material Micronised Qty (Kg)</label>
+                  <label>Received Qty (Kg)</label>
                   <input type="number" step="any" className="input-field" value={form.qty} onChange={e => handleMaterialQtyChange(e.target.value)} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
@@ -734,11 +733,11 @@ const TaxInvoice = () => {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <span>CGST @{(form.taxRate / 2)}%:</span>
-                    <span>₹{((Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100)) / 2).toFixed(2)}</span>
+                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <span>SGST @{(form.taxRate / 2)}%:</span>
-                    <span>₹{((Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100)) / 2).toFixed(2)}</span>
+                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
                     <span>Grand Total:</span>

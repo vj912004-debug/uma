@@ -306,7 +306,7 @@ const PSD = () => {
                       <label>Upload PDF</label>
                       <input type="file" accept=".pdf" onChange={(e) => handleFileUpload(e, idx)} style={{ marginTop: '0.5rem', fontSize: '0.8rem', display: 'block' }} />
                       {rep.fileName && (
-                        <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '6px', display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: 'rgba(91, 28, 133, 0.08)', border: '1px solid rgba(91, 28, 133, 0.2)', borderRadius: '6px', display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
                           <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{rep.fileName}</span>
                           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({rep.fileSize})</span>
                         </div>

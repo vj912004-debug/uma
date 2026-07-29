@@ -57,13 +57,13 @@ const Inventory = () => {
       </header>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-        <button className="btn" onClick={() => setActiveTab('Register')} style={{ background: activeTab === 'Register' ? 'rgba(16, 185, 129, 0.1)' : 'transparent', color: activeTab === 'Register' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+        <button className="btn" onClick={() => setActiveTab('Register')} style={{ background: activeTab === 'Register' ? 'rgba(91, 28, 133, 0.1)' : 'transparent', color: activeTab === 'Register' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
           <Package size={18} /> Stock Register
         </button>
-        <button className="btn" onClick={() => setActiveTab('Adjust')} style={{ background: activeTab === 'Adjust' ? 'rgba(16, 185, 129, 0.1)' : 'transparent', color: activeTab === 'Adjust' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+        <button className="btn" onClick={() => setActiveTab('Adjust')} style={{ background: activeTab === 'Adjust' ? 'rgba(91, 28, 133, 0.1)' : 'transparent', color: activeTab === 'Adjust' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
           <SlidersHorizontal size={18} /> Stock Adjustment
         </button>
-        <button className="btn" onClick={() => setActiveTab('History')} style={{ background: activeTab === 'History' ? 'rgba(16, 185, 129, 0.1)' : 'transparent', color: activeTab === 'History' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+        <button className="btn" onClick={() => setActiveTab('History')} style={{ background: activeTab === 'History' ? 'rgba(91, 28, 133, 0.1)' : 'transparent', color: activeTab === 'History' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
           <History size={18} /> Adjustment History
         </button>
       </div>
@@ -89,7 +89,7 @@ const Inventory = () => {
                         padding: '0.25rem 0.75rem', 
                         borderRadius: '20px', 
                         fontSize: '0.75rem',
-                        background: qty > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                        background: qty > 0 ? 'rgba(91, 28, 133, 0.1)' : 'rgba(239, 68, 68, 0.1)',
                         color: qty > 0 ? '#10b981' : '#ef4444'
                       }}>
                         {qty > 0 ? 'In Stock' : 'Out of Stock'}

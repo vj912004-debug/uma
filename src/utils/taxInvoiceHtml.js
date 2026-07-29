@@ -4,7 +4,8 @@ import {
   TI_EMPTY_ROWS,
   splitPartyAddressLines,
   formatPdfDateDmy,
-  buildTiChargeAmounts
+  buildTiChargeAmounts,
+  getSplitGstRates
 } from './taxInvoiceLayout';
 
 export const escHtml = (v) => String(v ?? '')
@@ -25,6 +26,9 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   const profile = mergeCompanyProfile(profileInput);
 
   const chargeAmounts = buildTiChargeAmounts(data);
+  const { taxRate, displayRate, sgst: sgstCalc, cgst: cgstCalc, igst: igstCalc } = getSplitGstRates(data);
+  // Print RATE + tax amounts both use full form GST (e.g. 18).
+  const printGstRate = displayRate;
 
   let totalAmt = 0;
   let totalSgst = 0;
@@ -36,10 +40,10 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   const rows = [];
   let sr = 1;
 
-  const pushRow = (desc, qty, rate, amt, sgstPercent, cgstPercent, igstPercent = 0) => {
-    const sgstAmt = amt * (sgstPercent / 100);
-    const cgstAmt = amt * (cgstPercent / 100);
-    const igstAmt = amt * (igstPercent / 100);
+  const pushRow = (desc, qty, rate, amt) => {
+    const sgstAmt = amt * (sgstCalc / 100);
+    const cgstAmt = amt * (cgstCalc / 100);
+    const igstAmt = amt * (igstCalc / 100);
     const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
     totalAmt += amt;
     totalSgst += sgstAmt;
@@ -54,6 +58,9 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
       cleanDesc = match[1].trim();
     }
 
+    const rateCell = amt > 0 ? printGstRate : '';
+    const igstRateCell = amt > 0 && igstCalc ? printGstRate : '';
+
     rows.push(`
       <tr>
         <td class="center">${sr++}</td>
@@ -61,11 +68,11 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <td class="center">${fmtQty(qty)}</td>
         <td class="num">${rate ? escHtml(parseFloat(rate).toFixed(2)) : ''}</td>
         <td class="num">${fmtMoney(amt)}</td>
-        <td class="num">${sgstPercent || ''}</td>
+        <td class="num">${rateCell}</td>
         <td class="num">${fmtMoney(sgstAmt)}</td>
-        <td class="num">${cgstPercent || ''}</td>
+        <td class="num">${rateCell}</td>
         <td class="num">${fmtMoney(cgstAmt)}</td>
-        <td class="num">${igstPercent || ''}</td>
+        <td class="num">${igstRateCell}</td>
         <td class="num">${fmtMoney(igstAmt)}</td>
         <td class="num">${fmtMoney(rowTotal)}</td>
       </tr>`);
@@ -74,7 +81,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   TI_CHARGES_LIST.forEach((charge) => {
     const line = chargeAmounts[charge.key];
     if (!line) return;
-    pushRow(charge.label, line.qty, line.rate, line.amt || 0, charge.sgst, charge.cgst);
+    pushRow(charge.label, line.qty, line.rate, line.amt || 0);
   });
 
   (data.customCharges || []).forEach((cc) => {
@@ -83,7 +90,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     const rate = parseFloat(cc.rate) || 0;
     const amt = ccQty * rate;
     if (amt <= 0) return;
-    pushRow(cc.name || '', ccQty, rate, amt, 9, 9);
+    pushRow(cc.name || '', ccQty, rate, amt);
   });
 
   const MIN_ROWS = 5;
@@ -362,10 +369,16 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     background:var(--purple);
     color:#fff;
     font-weight:700;
-    padding:3px 2px;
+    padding:6px 3px;
     text-align:center;
     vertical-align:middle;
     border:1px solid var(--purple);
+    line-height:1.15;
+    white-space:normal;
+    word-break:break-word;
+    overflow:visible;
+    font-size:8.5px;
+    letter-spacing:0;
   }
   table.items tbody td{
     border:1px solid var(--lav-border);
@@ -583,17 +596,17 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     <table class="items">
       <colgroup>
         <col style="width: 3%;">
-        <col style="width: 22%;">
+        <col style="width: 20%;">
+        <col style="width: 7%;">
+        <col style="width: 7%;">
         <col style="width: 8%;">
+        <col style="width: 6%;">
         <col style="width: 8%;">
-        <col style="width: 9%;">
-        <col style="width: 4%;">
-        <col style="width: 9%;">
-        <col style="width: 4%;">
-        <col style="width: 9%;">
-        <col style="width: 4%;">
-        <col style="width: 9%;">
-        <col style="width: 11%;">
+        <col style="width: 6%;">
+        <col style="width: 8%;">
+        <col style="width: 6%;">
+        <col style="width: 8%;">
+        <col style="width: 13%;">
       </colgroup>
       <thead>
         <tr>
@@ -657,9 +670,9 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     <div class="totals">
       <div class="totals-body">
         <div class="trow"><span class="tlabel">Total Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>
-        <div class="trow"><span class="tlabel">CGST @ 9%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
-        <div class="trow"><span class="tlabel">SGST @ 9%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
-        <div class="trow"><span class="tlabel">IGST @ 18%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
+        <div class="trow"><span class="tlabel">CGST @ ${displayRate}%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
+        <div class="trow"><span class="tlabel">SGST @ ${displayRate}%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
+        <div class="trow"><span class="tlabel">IGST @ ${taxRate}%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
         <div class="trow rule"><span class="tlabel">Total Tax Amount</span><span class="tval">&#8377; ${fmtMoney(totalCgst + totalSgst + totalIgst)}</span></div>
         <div class="trow"><span class="tlabel">Round Off</span><span class="tval">&#8377; ${fmtMoney(roundOff)}</span></div>
       </div>

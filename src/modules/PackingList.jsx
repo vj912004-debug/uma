@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { numberInputValue, parseOptionalNumber } from '../utils/numberInput';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import { Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
@@ -41,6 +42,12 @@ const PackingList = () => {
 
   const parseWt = (v) => (v === '' || v === undefined || v === null ? 0 : parseFloat(v) || 0);
   const normProd = (s) => (s || '').trim().toLowerCase();
+  const isFilledPlRow = (r) => {
+    if (!r) return false;
+    const hasWeight = parseWt(r.gross) > 0 || parseWt(r.tare) > 0 || parseWt(r.net) > 0;
+    const hasId = String(r.batchNo || '').trim() || String(r.drumNo ?? '').trim();
+    return hasWeight || !!hasId;
+  };
 
   const displayProducts = useMemo(() => {
     const fromRows = [...new Set((form.batches || []).map(r => r.productName).filter(Boolean))];
@@ -76,7 +83,7 @@ const PackingList = () => {
         ...editingPL,
         productName: mr ? getReceiptProductLabel(mr, opts) : (editingPL.productName || ''),
         productSummaries: summaries.length ? summaries : (editingPL.productSummaries || []),
-        batches: mergedBatches
+        batches: (mergedBatches || []).filter(isFilledPlRow)
       });
       return;
     }
@@ -85,7 +92,7 @@ const PackingList = () => {
       const plSerial = data.settings?.serials?.PL || 1;
       const docNo = generateDocNumber('PL', plSerial, new Date());
       const summaries = getReceiptProductSummaries(activeMR, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
-      const plRows = getBPRDispatchedRowsForPL(data, activeMR, prodOpts);
+      const plRows = getBPRDispatchedRowsForPL(data, activeMR, prodOpts).filter(isFilledPlRow);
 
       setForm({
         plNo: docNo,
@@ -122,7 +129,7 @@ const PackingList = () => {
       if (field === 'batchNo' || field === 'drumNo' || field === 'productName') {
         item[field] = val;
       } else {
-        item[field] = val === '' ? '' : (parseFloat(val) || '');
+        item[field] = parseOptionalNumber(val);
         if (field === 'gross' || field === 'tare') {
           const g = parseWt(item.gross);
           const t = parseWt(item.tare);
@@ -469,30 +476,20 @@ const PackingList = () => {
                                       <input type="text" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem', width: '60px' }} value={r.drumNo || ''} onChange={e => handleCellChange(r.idx, 'drumNo', e.target.value)} />
                                     </td>
                                     <td style={{ padding: '0.25rem' }}>
-                                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={r.gross === 0 ? '' : r.gross} onChange={e => handleCellChange(r.idx, 'gross', e.target.value)} />
+                                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={numberInputValue(r.gross)} onChange={e => handleCellChange(r.idx, 'gross', e.target.value)} />
                                     </td>
                                     <td style={{ padding: '0.25rem' }}>
-                                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={r.tare === 0 ? '' : r.tare} onChange={e => handleCellChange(r.idx, 'tare', e.target.value)} />
+                                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={numberInputValue(r.tare)} onChange={e => handleCellChange(r.idx, 'tare', e.target.value)} />
                                     </td>
                                     <td style={{ padding: '0.25rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
                                       {r.netVal > 0 ? r.netVal.toFixed(2) : ''}
                                     </td>
                                   </tr>
                                 ))}
-                                {group.rows.length > 0 && (
-                                <tr style={{ background: 'rgba(16, 185, 129, 0.06)', borderBottom: '2px solid var(--border-color)' }}>
-                                  <td colSpan={3} style={{ padding: '0.5rem', fontWeight: 700, fontSize: '0.8rem', color: 'var(--accent-primary)' }}>
-                                    Batch {group.batchNo} Total ({group.drums} Drums)
-                                  </td>
-                                  <td style={{ padding: '0.5rem', fontWeight: 600 }}>{group.gross > 0 ? group.gross.toFixed(2) : '—'}</td>
-                                  <td style={{ padding: '0.5rem', fontWeight: 600 }}>{group.tare > 0 ? group.tare.toFixed(2) : '—'}</td>
-                                  <td style={{ padding: '0.5rem', fontWeight: 700, color: 'var(--accent-primary)' }}>{group.net > 0 ? group.net.toFixed(2) : '—'}</td>
-                                </tr>
-                                )}
                               </React.Fragment>
                             ))}
                           </tbody>
-                          {prodRows.length > 0 && (
+                          {prodRows.length > 0 && displayProducts.length > 1 && (
                           <tfoot>
                             <tr style={{ fontWeight: 'bold', borderTop: '1px solid var(--border-color)' }}>
                               <td colSpan="5" style={{ padding: '0.35rem', textAlign: 'right' }}>Product Subtotal:</td>
@@ -513,10 +510,20 @@ const PackingList = () => {
                 )}
 
                 {form.batches.length > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem', marginTop: '0.5rem' }}>
-                    <span>Grand Total ({grandTotal.drums} Drums):</span>
-                    <span style={{ color: 'var(--accent-primary)' }}>{grandTotal.net.toFixed(2)} Kg</span>
-                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                    <tbody>
+                      <tr style={{ background: 'rgba(91, 28, 133, 0.1)', borderTop: '2px solid var(--accent-primary)' }}>
+                        <td style={{ padding: '0.65rem 0.5rem', fontWeight: 800, color: 'var(--accent-primary)' }}>
+                          Grand Total ({grandTotal.drums} Drums)
+                        </td>
+                        <td style={{ padding: '0.65rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>{grandTotal.gross > 0 ? grandTotal.gross.toFixed(2) : '—'}</td>
+                        <td style={{ padding: '0.65rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>{grandTotal.tare > 0 ? grandTotal.tare.toFixed(2) : '—'}</td>
+                        <td style={{ padding: '0.65rem 0.5rem', fontWeight: 800, color: 'var(--accent-primary)', textAlign: 'right', minWidth: '90px' }}>
+                          {grandTotal.net.toFixed(2)} Kg
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 )}
               </div>
 

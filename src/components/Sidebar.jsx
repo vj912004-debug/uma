@@ -126,7 +126,7 @@ const Sidebar = () => {
           <div className="sidebar-brand-logo">M</div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <h1 style={{ color: '#ffffff', fontSize: '1.05rem', fontWeight: 700, margin: 0, lineHeight: 1.2 }}>UMA MICRON</h1>
-            <p style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.68rem', margin: 0, whiteSpace: 'nowrap' }}>Micronization of API's</p>
+            <p style={{ color: '#86efac', fontSize: '0.68rem', margin: 0, whiteSpace: 'nowrap', fontWeight: 600 }}>Micronization of API's</p>
           </div>
         </div>
         <button className="sidebar-close-btn" aria-label="Close Sidebar">
@@ -233,20 +233,7 @@ const Sidebar = () => {
             </p>
           </div>
         </div>
-        <button
-          onClick={logout}
-          className="btn"
-          style={{
-            width: '100%',
-            fontSize: '0.78rem',
-            padding: '0.5rem',
-            color: '#ffffff',
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            justifyContent: 'center',
-            borderRadius: '8px'
-          }}
-        >
+        <button onClick={logout} className="btn sidebar-logout">
           <LogOut size={13} /> Logout
         </button>
       </div>

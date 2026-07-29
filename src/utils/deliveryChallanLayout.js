@@ -1,12 +1,11 @@
 /** Shared Delivery Challan print line building. */
 
 import {
-  findAnyPackingList,
   getProductBatches,
+  getProductQty,
+  getProductDrums,
   receiptProductOptions
 } from './receiptProducts';
-
-const norm = (s) => (s || '').trim().toLowerCase();
 
 export const formatDcDateSlash = (d) => {
   if (!d || d === 'N/A') return d === 'N/A' ? 'N/A' : '';
@@ -24,28 +23,10 @@ export const formatDcDateSlash = (d) => {
 
 const fmtMoney = (n) => (parseFloat(n) || 0).toFixed(2);
 
-const groupPlBatchesByBatchNo = (pl, prodName) => {
-  const groups = [];
-  const map = new Map();
-  (pl?.batches || [])
-    .filter((r) => norm(r.productName) === norm(prodName))
-    .forEach((r) => {
-      const key = (r.batchNo || 'Unknown').trim();
-      if (!map.has(key)) {
-        map.set(key, { batchNo: key, drums: 0, qty: 0 });
-        groups.push(map.get(key));
-      }
-      const g = map.get(key);
-      g.drums += 1;
-      g.qty += parseFloat(r.net) || 0;
-    });
-  return groups;
-};
-
-/** Build aligned description / drums / qty lines for DC PDF. */
+/** Build aligned description / drums / qty lines for DC PDF.
+ * Quantities always come from Material Receipt (received qty), never packing list. */
 export const buildDcPrintLines = (dc, appData = {}) => {
   const mr = (appData.materialReceipts || []).find((r) => r.id === dc.receiptId) || null;
-  const pl = findAnyPackingList(appData.packingLists, dc.receiptId);
   const prodOpts = mr ? receiptProductOptions(mr, appData) : {};
 
   const selected = dc.selectedProducts?.length
@@ -57,31 +38,58 @@ export const buildDcPrintLines = (dc, appData = {}) => {
     : (dc.productName ? dc.productName.split(',').map((s) => s.trim()).filter(Boolean) : []);
 
   const lines = [];
+  let receivedQtyTotal = 0;
+  let receivedDrumsTotal = 0;
 
   products.forEach((prodName) => {
     if (prodName) {
       lines.push({ kind: 'product', text: prodName, drums: '', qty: '' });
     }
 
-    const plGroups = groupPlBatchesByBatchNo(pl, prodName);
-    if (plGroups.length) {
-      plGroups.forEach((g) => {
-        lines.push({
-          kind: 'batch',
-          text: `BATCH NO:${g.batchNo}`,
-          drums: g.drums || '',
-          qty: g.qty > 0 ? g.qty.toFixed(2) : ''
-        });
-      });
-    } else if (mr && prodName) {
-      getProductBatches(mr, prodName, prodOpts).forEach((b) => {
+    if (!mr || !prodName) return;
+
+    const batches = getProductBatches(mr, prodName, prodOpts);
+    const prodQty = getProductQty(mr, prodName, prodOpts);
+    const prodDrums = getProductDrums(mr, prodName, prodOpts);
+    receivedQtyTotal += prodQty || 0;
+    receivedDrumsTotal += prodDrums || 0;
+
+    if (batches.length) {
+      const batchQtySum = batches.reduce((s, b) => s + (parseFloat(b.qty) || 0), 0);
+      // Prefer MR totalQty when this DC has a single product (authoritative received qty)
+      const displayProdQty = (products.length === 1 && (parseFloat(mr.totalQty) || 0) > 0)
+        ? parseFloat(mr.totalQty)
+        : (prodQty > 0 ? prodQty : batchQtySum);
+
+      batches.forEach((b) => {
         const d = parseInt(b.drums, 10) || 0;
+        let q = parseFloat(b.qty) || 0;
+        if (batches.length === 1 && displayProdQty > 0) q = displayProdQty;
+        else if (q <= 0 && batches.length === 1 && prodQty > 0) q = prodQty;
         lines.push({
           kind: 'batch',
           text: `BATCH NO:${b.batchNo || ''}`,
           drums: d > 0 ? d : '',
-          qty: parseFloat(b.qty) > 0 ? (parseFloat(b.qty) || 0).toFixed(2) : ''
+          qty: q > 0 ? q.toFixed(2) : ''
         });
+      });
+      if (batchQtySum <= 0 && displayProdQty > 0 && batches.length > 1) {
+        lines.push({
+          kind: 'batch',
+          text: 'Received Qty',
+          drums: prodDrums > 0 ? prodDrums : '',
+          qty: displayProdQty.toFixed(2)
+        });
+      }
+    } else if (prodQty > 0 || prodDrums > 0 || ((parseFloat(mr.totalQty) || 0) > 0 && products.length === 1)) {
+      const q = (products.length === 1 && (parseFloat(mr.totalQty) || 0) > 0)
+        ? parseFloat(mr.totalQty)
+        : prodQty;
+      lines.push({
+        kind: 'batch',
+        text: 'Received Qty',
+        drums: prodDrums > 0 ? prodDrums : '',
+        qty: q > 0 ? q.toFixed(2) : ''
       });
     }
   });
@@ -110,10 +118,18 @@ export const buildDcPrintLines = (dc, appData = {}) => {
     });
   }
 
-  const totalDrums = parseInt(dc.totalDrums, 10)
-    || lines.reduce((s, l) => s + (parseInt(l.drums, 10) || 0), 0);
-  const totalQty = parseFloat(dc.qty)
-    || lines.reduce((s, l) => s + (parseFloat(l.qty) || 0), 0);
+  // Prefer MR received totalQty (e.g. 50) over packing-list / stale dc.qty (e.g. 49.57)
+  const mrTotalQty = parseFloat(mr?.totalQty) || 0;
+  const mrTotalDrums = parseInt(mr?.totalDrums, 10) || 0;
+  const linesQty = lines.reduce((s, l) => s + (parseFloat(l.qty) || 0), 0);
+  const linesDrums = lines.reduce((s, l) => s + (parseInt(l.drums, 10) || 0), 0);
+
+  const totalQty = mrTotalQty > 0
+    ? mrTotalQty
+    : (receivedQtyTotal > 0 ? receivedQtyTotal : (linesQty > 0 ? linesQty : (parseFloat(dc.qty) || 0)));
+  const totalDrums = mrTotalDrums > 0
+    ? mrTotalDrums
+    : (receivedDrumsTotal > 0 ? receivedDrumsTotal : (linesDrums > 0 ? linesDrums : (parseInt(dc.totalDrums, 10) || 0)));
 
   return { lines, totalDrums, totalQty };
 };

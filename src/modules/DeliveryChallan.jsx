@@ -29,7 +29,9 @@ const emptyDCForm = (docNo = '') => ({
   totalDrums: 0,
   value: '',
   vehicleNo: '',
+  transporterName: '',
   driverName: '',
+  driverContact: '',
   termsAndConditions: DEFAULT_TERMS
 });
 
@@ -55,11 +57,16 @@ const DeliveryChallan = () => {
     if (!isModalOpen) return;
 
     if (editingDoc) {
+      const selected = editingDoc.selectedProducts?.length
+        ? editingDoc.selectedProducts
+        : (editingDoc.productSummaries || []).map(p => p.prodName).filter(Boolean);
+      const computed = activeMR
+        ? buildDCFieldsFromProducts(activeMR, activePL, prodOpts, selected)
+        : {};
       setForm({
         ...editingDoc,
-        selectedProducts: editingDoc.selectedProducts?.length
-          ? editingDoc.selectedProducts
-          : (editingDoc.productSummaries || []).map(p => p.prodName).filter(Boolean)
+        selectedProducts: selected,
+        ...computed
       });
       return;
     }
@@ -291,7 +298,7 @@ const DeliveryChallan = () => {
                             key={p.prodName}
                             style={{
                               display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.85rem',
-                              background: checked ? 'rgba(16, 185, 129, 0.08)' : 'var(--input-bg)',
+                              background: checked ? 'rgba(91, 28, 133, 0.08)' : 'var(--input-bg)',
                               border: `1px solid ${checked ? 'var(--accent-primary)' : 'var(--border-color)'}`,
                               borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem'
                             }}
@@ -322,7 +329,7 @@ const DeliveryChallan = () => {
                   <input type="text" className="input-field" readOnly={!!activeMR} value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
                 </div>
                 <div>
-                  <label>Micronised Qty (Kg)</label>
+                  <label>Received Qty (Kg)</label>
                   <input type="number" className="input-field" required value={form.qty} onChange={e => setForm({...form, qty: parseFloat(e.target.value) || 0})} />
                 </div>
                 <div>
@@ -334,13 +341,21 @@ const DeliveryChallan = () => {
                   <input type="number" className="input-field" min="0" step="0.01" placeholder="Leave blank if not required on print" value={form.value} onChange={e => setForm({...form, value: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0)})} />
                 </div>
 
-                <div style={{ gridColumn: 'span 2' }}>
+                <div>
                   <label>Vehicle No *</label>
                   <input type="text" className="input-field" required placeholder="e.g. GJ-01-XX-0000" value={form.vehicleNo} onChange={e => setForm({...form, vehicleNo: e.target.value})} />
                 </div>
-                <div style={{ gridColumn: 'span 2' }}>
+                <div>
+                  <label>Transporter Name</label>
+                  <input type="text" className="input-field" placeholder="e.g. ABC Logistics" value={form.transporterName || ''} onChange={e => setForm({...form, transporterName: e.target.value})} />
+                </div>
+                <div>
                   <label>Driver Name</label>
-                  <input type="text" className="input-field" placeholder="e.g. Ramesh Kumar" value={form.driverName} onChange={e => setForm({...form, driverName: e.target.value})} />
+                  <input type="text" className="input-field" placeholder="e.g. Ramesh Kumar" value={form.driverName || ''} onChange={e => setForm({...form, driverName: e.target.value})} />
+                </div>
+                <div>
+                  <label>Driver's Contact</label>
+                  <input type="text" className="input-field" placeholder="e.g. 98765 43210" value={form.driverContact || ''} onChange={e => setForm({...form, driverContact: e.target.value})} />
                 </div>
 
                 <div style={{ gridColumn: 'span 4' }}>

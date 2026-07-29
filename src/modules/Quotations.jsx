@@ -5,6 +5,27 @@ import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF } from '../utils/pdfExport';
 import { formatDate } from '../utils/dateUtils';
 
+const defaultValidityDate = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  return d.toISOString().split('T')[0];
+};
+
+const formatValidityLabel = (isoDate) => {
+  if (!isoDate) return '';
+  const [y, m, day] = isoDate.split('-');
+  return `${day}/${m}/${y}`;
+};
+
+const syncValidityInTerms = (terms, isoDate) => {
+  const label = formatValidityLabel(isoDate);
+  if (!label) return terms || '';
+  if (/Validity:\s*[^\n]*/i.test(terms || '')) {
+    return (terms || '').replace(/Validity:\s*[^\n]*/i, `Validity: ${label}`);
+  }
+  return `${terms || ''}\nValidity: ${label}`.trim();
+};
+
 const MATERIAL_CHARGES = [
   { key: 'cleaning', label: 'Minimum Cleaning Charges (998842)', isQtyRate: true },
   { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
@@ -48,9 +69,9 @@ const getDefaultForm = () => ({
   mainCharges: [{ description: '', psdRequirement: '', rate: '' }],
   optionalCharges: [{ description: '', rate: '' }],
   productSettings: {},
-  validityDate: '2026-06-21',
-  terms: 'Tax: GST will charge extra.\nLoss: Loss occurs during Processing is on your account.\nSame Batch: Same materials requirement of micronization separately batch wise of different specification of same materials then change over charge @ Rs. 500/- batch or per specification will be applicable.\nCharges: This is only processing charges, all other charges like Transportation, Insurance, Repacking material charges will be extra.\nPayment: 100% Advance against PI\nValidity: 21/06/2026\nNote: If properties of material change then rate will be change and PSD will change then rate will be change.',
-  notes: '1) ABC\n\n2) ABC\n\n3) ABC',
+  validityDate: defaultValidityDate(),
+  terms: 'Tax: GST will charge extra.\nLoss: Loss occurs during Processing is on your account.\nSame Batch: Same materials requirement of micronization separately batch wise of different specification of same materials then change over charge @ Rs. 500/- batch or per specification will be applicable.\nCharges: This is only processing charges, all other charges like Transportation, Insurance, Repacking material charges will be extra.\nPayment: 100% Advance against PI\nValidity: ' + formatValidityLabel(defaultValidityDate()) + '\nNote: If properties of material change then rate will be change and PSD will change then rate will be change.',
+  notes: '',
   signatoryName: 'Amit Patel'
 });
 
@@ -403,7 +424,7 @@ const Quotations = () => {
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       padding: '0.85rem 1rem',
-                      background: isCurrent ? 'rgba(16,185,129,0.06)' : 'var(--input-bg)',
+                      background: isCurrent ? 'rgba(91, 28, 133, 0.06)' : 'var(--input-bg)',
                       border: isCurrent ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
                       borderRadius: '8px',
                       textAlign: 'left',
@@ -518,7 +539,7 @@ const Quotations = () => {
                               key={idx}
                               style={{
                                 borderBottom: '1px solid var(--border-color)',
-                                background: isSelected ? 'rgba(16,185,129,0.06)' : isConfigured ? 'rgba(16,185,129,0.02)' : 'transparent'
+                                background: isSelected ? 'rgba(91, 28, 133, 0.06)' : isConfigured ? 'rgba(91, 28, 133, 0.03)' : 'transparent'
                               }}
                             >
                               <td style={{ padding: '0.5rem', fontWeight: 600 }}>{prod.name}</td>
@@ -554,7 +575,7 @@ const Quotations = () => {
               {formData.productName ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 {partyProducts.length > 1 && (
-                  <div style={{ gridColumn: 'span 2', padding: '0.85rem 1rem', background: 'rgba(16,185,129,0.06)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                  <div style={{ gridColumn: 'span 2', padding: '0.85rem 1rem', background: 'rgba(91, 28, 133, 0.06)', borderRadius: '8px', border: '1px solid rgba(91, 28, 133, 0.2)' }}>
                     <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem' }}>
                       Which product do you want to edit?
                     </label>
@@ -583,7 +604,10 @@ const Quotations = () => {
                 </div>
                 <div>
                   <label>Validity Date</label>
-                  <input type="date" className="input-field" value={formData.validityDate} onChange={e => setFormData({...formData, validityDate: e.target.value})} />
+                  <input type="date" className="input-field" value={formData.validityDate} onChange={e => {
+                    const validityDate = e.target.value;
+                    setFormData({ ...formData, validityDate, terms: syncValidityInTerms(formData.terms, validityDate) });
+                  }} />
                 </div>
                 <div>
                   <label>Signatory Name</label>
@@ -610,7 +634,10 @@ const Quotations = () => {
                 </div>
                 <div>
                   <label>Validity Date</label>
-                  <input type="date" className="input-field" value={formData.validityDate} onChange={e => setFormData({...formData, validityDate: e.target.value})} />
+                  <input type="date" className="input-field" value={formData.validityDate} onChange={e => {
+                    const validityDate = e.target.value;
+                    setFormData({ ...formData, validityDate, terms: syncValidityInTerms(formData.terms, validityDate) });
+                  }} />
                 </div>
                 <div>
                   <label>Signatory Name</label>

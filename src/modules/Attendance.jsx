@@ -396,7 +396,7 @@ const Attendance = () => {
               </div>
 
               {['P', 'HD'].includes(form.statusCode) && (
-                <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(91, 28, 133, 0.05)', borderRadius: '8px', border: '1px solid rgba(91, 28, 133, 0.2)' }}>
                   <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent-primary)', fontSize: '0.9rem' }}>Auto-Calculation Preview:</h4>
                   {(() => {
                     const calc = calculateTimes(form.inTime, form.outTime, form.shift);

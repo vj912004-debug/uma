@@ -15,7 +15,7 @@ const NOTE_MIN_ROWS = 8;
 
 const calcNoteLines = (data) => {
   const taxRate = parseFloat(data.taxRate) || 18;
-  const half = taxRate / 2;
+  const halfRate = taxRate / 2;
   const rows = [];
   let totalAmt = 0;
   let totalSgst = 0;
@@ -29,8 +29,8 @@ const calcNoteLines = (data) => {
     const rate = parseFloat(data.rates?.[c.key]) || 0;
     const amt = qty * rate;
     if (amt <= 0 && !rate) return;
-    const sgstAmt = amt * (half / 100);
-    const cgstAmt = amt * (half / 100);
+    const sgstAmt = amt * (halfRate / 100);
+    const cgstAmt = amt * (halfRate / 100);
     sr += 1;
     rows.push({
       sr,
@@ -38,8 +38,8 @@ const calcNoteLines = (data) => {
       qty,
       rate,
       amt,
-      sgstRate: half,
-      cgstRate: half,
+      sgstRate: halfRate,
+      cgstRate: halfRate,
       sgstAmt,
       cgstAmt,
       rowTotal: amt + sgstAmt + cgstAmt
@@ -52,16 +52,16 @@ const calcNoteLines = (data) => {
 
   if (!rows.length && (data.particulars || data.amount)) {
     const amt = parseFloat(data.subtotal) || parseFloat(data.amount) || 0;
-    const sgstAmt = amt * (half / 100);
-    const cgstAmt = amt * (half / 100);
+    const sgstAmt = amt * (halfRate / 100);
+    const cgstAmt = amt * (halfRate / 100);
     rows.push({
       sr: 1,
       label: data.particulars || 'Adjustment',
       qty: 1,
       rate: amt,
       amt,
-      sgstRate: half,
-      cgstRate: half,
+      sgstRate: halfRate,
+      cgstRate: halfRate,
       sgstAmt,
       cgstAmt,
       rowTotal: amt + sgstAmt + cgstAmt
@@ -486,7 +486,7 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
   const poNo = escHtml(data.poNo || '-');
   const ref = escHtml(data.reference || '-');
 
-  const { rows, totalAmt, totalSgst, totalCgst, totalAll, totalQty } = calcNoteLines(data);
+  const { rows, totalAmt, totalSgst, totalCgst, totalIgst, totalQty } = calcNoteLines(data);
 
   // Bill To
   const billName = escHtml(data.partyName || '');
@@ -508,15 +508,11 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
   }
   const companyState = escHtml(profile.state || 'Gujarat');
   
-  const extractDescAndHsn = (label) => {
-    const match = label.match(/(.*?)\s*\((\d+)\)$/);
-    if (match) {
-      return { desc: match[1].trim(), hsn: match[2] };
-    }
-    return { desc: label, hsn: '' };
-  };
-
   const isIgst = (billState.toLowerCase() !== companyState.toLowerCase()) && billState !== '';
+  const displayIgst = isIgst ? (totalSgst + totalCgst) : (totalIgst || 0);
+  const displaySgst = isIgst ? 0 : totalSgst;
+  const displayCgst = isIgst ? 0 : totalCgst;
+  const displayTotalAll = totalAmt + displaySgst + displayCgst + displayIgst;
 
   const bodyRows = rows.map((r) => {
     let desc = r.label;
@@ -558,10 +554,11 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
       </tr>
   `).join('');
 
-  const roundedTotal = Math.round(totalAll);
-  const roundOff = roundedTotal - totalAll;
-  
-  const totalTaxAmount = isIgst ? (totalSgst + totalCgst) : (totalCgst + totalSgst);
+  const roundedTotal = Math.round(displayTotalAll);
+  const roundOff = roundedTotal - displayTotalAll;
+  const totalTaxAmount = displaySgst + displayCgst + displayIgst;
+  const taxHalf = (parseFloat(data.taxRate) || 18) / 2;
+  const taxFull = parseFloat(data.taxRate) || 18;
   
   let reasonBar = '';
   if (reasonsArray && reasonsArray.length) {
@@ -718,12 +715,12 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
           <td></td>
           <td class="num">${fmtMoney(totalAmt)}</td>
           <td></td>
-          <td class="num">${fmtMoney(totalSgst)}</td>
+          <td class="num">${fmtMoney(displaySgst)}</td>
           <td></td>
-          <td class="num">${fmtMoney(totalCgst)}</td>
+          <td class="num">${fmtMoney(displayCgst)}</td>
           <td></td>
-          <td class="num">${fmtMoney(totalIgst)}</td>
-          <td class="num">${fmtMoney(totalAll)}</td>
+          <td class="num">${fmtMoney(displayIgst)}</td>
+          <td class="num">${fmtMoney(displayTotalAll)}</td>
         </tr>
       </tfoot>
   </table>
@@ -762,9 +759,9 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
     <div class="totals">
       <div class="totals-body">
         <div class="trow"><span class="tlabel">Taxable Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>
-        <div class="trow"><span class="tlabel">CGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span class="tval">${isIgst ? '-' : '&#8377; ' + fmtMoney(totalCgst)}</span></div>
-        <div class="trow"><span class="tlabel">SGST @ ${(parseFloat(data.taxRate) || 18) / 2}%</span><span class="tval">${isIgst ? '-' : '&#8377; ' + fmtMoney(totalSgst)}</span></div>
-        <div class="trow"><span class="tlabel">IGST @ 18%</span><span class="tval">${isIgst ? '&#8377; ' + fmtMoney(totalCgst + totalSgst) : '-'}</span></div>
+        <div class="trow"><span class="tlabel">CGST @ ${taxHalf}%</span><span class="tval">${isIgst ? '-' : '&#8377; ' + fmtMoney(displayCgst)}</span></div>
+        <div class="trow"><span class="tlabel">SGST @ ${taxHalf}%</span><span class="tval">${isIgst ? '-' : '&#8377; ' + fmtMoney(displaySgst)}</span></div>
+        <div class="trow"><span class="tlabel">IGST @ ${taxFull}%</span><span class="tval">${isIgst ? '&#8377; ' + fmtMoney(displayIgst) : '-'}</span></div>
         <div class="trow rule"><span class="tlabel">Total Tax Amount</span><span class="tval">&#8377; ${fmtMoney(totalTaxAmount)}</span></div>
         <div class="trow"><span class="tlabel">Round Off</span><span class="tval">&#8377; ${fmtMoney(roundOff)}</span></div>
       </div>
@@ -849,7 +846,7 @@ const renderPdfCommon = async (html, docNo, prefix, mode) => {
       width: 794,
       windowWidth: 794,
       height: target.scrollHeight,
-      windowheight: target.scrollHeight,
+      windowHeight: target.scrollHeight,
       logging: false
     });
 

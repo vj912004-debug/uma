@@ -70,7 +70,7 @@ export const AppProvider = ({ children }) => {
   }, [data, isReady, apiMode]);
 
   useEffect(() => {
-    const theme = data.settings?.theme || 'dark';
+    const theme = data.settings?.theme || 'light';
     document.documentElement.setAttribute('data-theme', theme);
   }, [data.settings?.theme]);
 

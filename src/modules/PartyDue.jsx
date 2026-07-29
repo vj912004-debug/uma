@@ -1,17 +1,20 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Search, Plus, CreditCard } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 import { formatDate } from '../utils/dateUtils';
-import { getReceiptPaymentTotal, hasSheetOverride } from '../utils/paymentTotals';
+import { getReceiptOutstanding, hasSheetOverride } from '../utils/paymentTotals';
+import { getCurrentFYKey, getFYKeysThroughCurrent, getFYOfDate } from '../utils/financialYear';
 import { useNavigate } from 'react-router-dom';
 
 const PartyDue = () => {
-  const { data, updateData, setData, updateItem } = useAppContext();
+  const { data, updateData, updateItem } = useAppContext();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [columnFilters, setColumnFilters] = useState({});
+  const fyKeys = useMemo(() => getFYKeysThroughCurrent('21-22'), []);
+  const currentFY = useMemo(() => getCurrentFYKey(), []);
 
   // Payment Form State
   const [paymentForm, setPaymentForm] = useState({
@@ -30,34 +33,15 @@ const PartyDue = () => {
     (data.invoices || []).some(inv => inv.receiptId === mr.id && inv.invoiceNo?.includes('/IN/'))
   );
 
-  // Helper to determine the Financial Year (FY) string based on a date string
-  const getFYOfDate = (dateStr) => {
-    try {
-      const date = new Date(dateStr);
-      const year = date.getFullYear();
-      const month = date.getMonth(); // 0-indexed, 3 = April
-      
-      let fyStart, fyEnd;
-      if (month >= 3) {
-        fyStart = year;
-        fyEnd = year + 1;
-      } else {
-        fyStart = year - 1;
-        fyEnd = year;
-      }
-      return `${fyStart.toString().slice(-2)}-${fyEnd.toString().slice(-2)}`;
-    } catch {
-      return '24-25';
-    }
-  };
-
   const handleCellChange = (partyId, fy, value) => {
     const party = data.parties.find(p => p.id === partyId);
     if (!party) return;
     const currentOverrides = party.dueOverrides || {};
+    // Empty input = explicit 0 so clearing a cell does not snap back to invoice-calculated dues
+    const nextVal = value === '' || value === null || value === undefined ? '0' : value;
     updateItem('parties', partyId, {
       ...party,
-      dueOverrides: { ...currentOverrides, [fy]: value }
+      dueOverrides: { ...currentOverrides, [fy]: nextVal }
     });
   };
 
@@ -110,49 +94,39 @@ const PartyDue = () => {
   // Compile Aging Data by Party
   const partyRows = data.parties.map(party => {
     const partyReceipts = data.materialReceipts.filter(r => r.partyId === party.id);
-    const invoiceDuesByFY = {
-      '21-22': 0,
-      '22-23': 0,
-      '23-24': 0,
-      '24-25': 0
-    };
+    const invoiceDuesByFY = Object.fromEntries(fyKeys.map((k) => [k, 0]));
 
     partyReceipts.forEach(mr => {
       // Find TI for this receipt
       const ti = (data.invoices || []).find(inv => inv.receiptId === mr.id && inv.invoiceNo?.includes('/IN/'));
-      if (ti) {
-        const fy = getFYOfDate(ti.date);
-        const paymentsTotal = getReceiptPaymentTotal(data.payments, mr.id);
-        
-        let invoiceOutstanding = (parseFloat(ti.total) || 0) - paymentsTotal;
-        if (invoiceOutstanding < 0.01) invoiceOutstanding = 0;
-        
-        // Add to aging bucket
-        if (invoiceDuesByFY.hasOwnProperty(fy)) {
-          invoiceDuesByFY[fy] += invoiceOutstanding;
-        } else {
-          // Default to latest if outside these years
-          invoiceDuesByFY['24-25'] += invoiceOutstanding;
-        }
+      const hasBillOverride = hasSheetOverride(mr.sheetOverrides || {}, 'totalBill');
+      if (!ti && !hasBillOverride) return;
+
+      // Processing Sheet "Total Recd (Manual)" / Outstanding feed Party Due automatically
+      const invoiceOutstanding = getReceiptOutstanding(mr, ti, data.payments);
+      const fy = getFYOfDate(ti?.date || mr.date || mr.sheetOverrides?.invoiceDate);
+
+      // Add to aging bucket (overflow → current FY)
+      if (Object.prototype.hasOwnProperty.call(invoiceDuesByFY, fy)) {
+        invoiceDuesByFY[fy] += invoiceOutstanding;
+      } else {
+        invoiceDuesByFY[currentFY] += invoiceOutstanding;
       }
     });
 
     const o = party.dueOverrides || {};
-    
-    const final21 = hasSheetOverride(o, '21-22') ? parseFloat(o['21-22']) || 0 : invoiceDuesByFY['21-22'];
-    const final22 = hasSheetOverride(o, '22-23') ? parseFloat(o['22-23']) || 0 : invoiceDuesByFY['22-23'];
-    const final23 = hasSheetOverride(o, '23-24') ? parseFloat(o['23-24']) || 0 : invoiceDuesByFY['23-24'];
-    const final24 = hasSheetOverride(o, '24-25') ? parseFloat(o['24-25']) || 0 : invoiceDuesByFY['24-25'];
-
-    const totalDue = final21 + final22 + final23 + final24;
+    const finals = {};
+    let totalDue = 0;
+    fyKeys.forEach((fy) => {
+      const amount = hasSheetOverride(o, fy) ? (parseFloat(o[fy]) || 0) : invoiceDuesByFY[fy];
+      finals[fy] = amount;
+      totalDue += amount;
+    });
 
     return {
       id: party.id,
       name: party.name,
-      '21-22': final21,
-      '22-23': final22,
-      '23-24': final23,
-      '24-25': final24,
+      ...finals,
       totalDue
     };
   });
@@ -177,10 +151,7 @@ const PartyDue = () => {
 
   const tableCols = [
     { key: 'name', label: 'Party Name' },
-    { key: '21-22', label: 'Dues FY 21-22' },
-    { key: '22-23', label: 'Dues FY 22-23' },
-    { key: '23-24', label: 'Dues FY 23-24' },
-    { key: '24-25', label: 'Dues FY 24-25' },
+    ...fyKeys.map((fy) => ({ key: fy, label: `Dues FY ${fy}` })),
     { key: 'totalDue', label: 'Total Outstanding Dues' }
   ];
 
@@ -189,7 +160,9 @@ const PartyDue = () => {
     return (
       <input
         type="number"
-        value={value === 0 ? '' : value}
+        min="0"
+        step="0.01"
+        value={Number.isFinite(Number(value)) ? value : 0}
         placeholder="0.00"
         onChange={(e) => handleCellChange(partyId, fy, e.target.value)}
         style={{
@@ -281,19 +254,19 @@ const PartyDue = () => {
                         {party.name}
                       </button>
                     </td>
-                    <td style={{ padding: '0.5rem', color: party['21-22'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['21-22'] > 0 ? 600 : 400 }}>
-                      {renderInput(party.id, '21-22', party['21-22'])}
-                    </td>
-                    <td style={{ padding: '0.5rem', color: party['22-23'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['22-23'] > 0 ? 600 : 400 }}>
-                      {renderInput(party.id, '22-23', party['22-23'])}
-                    </td>
-                    <td style={{ padding: '0.5rem', color: party['23-24'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['23-24'] > 0 ? 600 : 400 }}>
-                      {renderInput(party.id, '23-24', party['23-24'])}
-                    </td>
-                    <td style={{ padding: '0.5rem', color: party['24-25'] > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: party['24-25'] > 0 ? 600 : 400 }}>
-                      {renderInput(party.id, '24-25', party['24-25'])}
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'right', color: party.totalDue > 0 ? '#ef4444' : '#10b981', fontWeight: 700, fontSize: '0.95rem' }}>
+                    {fyKeys.map((fy) => (
+                      <td
+                        key={fy}
+                        style={{
+                          padding: '0.5rem',
+                          color: party[fy] > 0 ? '#ef4444' : 'var(--text-muted)',
+                          fontWeight: party[fy] > 0 ? 600 : 400
+                        }}
+                      >
+                        {renderInput(party.id, fy, party[fy])}
+                      </td>
+                    ))}
+                    <td style={{ padding: '1rem', textAlign: 'right', color: party.totalDue > 0 ? '#ef4444' : 'var(--status-done-text)', fontWeight: 700, fontSize: '0.95rem' }}>
                       {renderInput(party.id, 'totalDue', party.totalDue, true)}
                     </td>
                   </tr>

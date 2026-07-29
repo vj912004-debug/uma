@@ -43,7 +43,7 @@ const OperationsHub = () => {
       onClick={() => setActiveTab(name)}
       style={{
         padding: '0.75rem 1.5rem',
-        background: activeTab === name ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
+        background: activeTab === name ? 'rgba(91, 28, 133, 0.1)' : 'transparent',
         color: activeTab === name ? 'var(--accent-primary)' : 'var(--text-muted)',
         border: 'none',
         borderBottom: activeTab === name ? '2px solid var(--accent-primary)' : '2px solid transparent',
@@ -123,7 +123,7 @@ const OperationsHub = () => {
                         <span style={{ color: 'var(--text-muted)' }}>/</span>
                         <span style={{ color: item.plNo !== '-' ? '#8b5cf6' : 'var(--border-color)' }}>{item.plNo}</span>
                         <span style={{ color: 'var(--text-muted)' }}>/</span>
-                        <span style={{ color: item.invNo !== '-' ? '#10b981' : 'var(--border-color)' }}>{item.invNo}</span>
+                        <span style={{ color: item.invNo !== '-' ? 'var(--accent-primary)' : 'var(--border-color)' }}>{item.invNo}</span>
                       </div>
                     </td>
                     <td style={{ padding: '1rem' }}>
@@ -132,7 +132,7 @@ const OperationsHub = () => {
                           padding: '0.25rem 0.75rem', 
                           borderRadius: '20px', 
                           fontSize: '0.75rem',
-                          background: item.status === 'Invoiced' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.05)',
+                          background: item.status === 'Invoiced' ? 'rgba(91, 28, 133, 0.1)' : 'rgba(255,255,255,0.05)',
                           color: item.status === 'Invoiced' ? '#10b981' : 'var(--text-main)'
                         }}>
                           {item.status}

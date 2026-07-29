@@ -37,22 +37,27 @@ const Login = () => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'radial-gradient(circle at top right, rgba(16, 185, 129, 0.08), transparent 50%), var(--bg-dark)',
+      background: 'radial-gradient(circle at top right, rgba(91, 28, 133, 0.14), transparent 55%), radial-gradient(circle at bottom left, rgba(147, 51, 234, 0.1), transparent 45%), #F4F5F7',
       padding: '1.5rem'
     }}>
       <div className="premium-card" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: '50%', margin: '0 auto 0.85rem',
+            background: '#5b1c85', color: '#fff', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontWeight: 800, fontSize: '1.35rem',
+            boxShadow: '0 6px 18px rgba(91, 28, 133, 0.3)'
+          }}>M</div>
           <h1 style={{
             fontSize: '1.75rem',
             fontWeight: 800,
             letterSpacing: '1px',
-            background: 'linear-gradient(to right, #10b981, #3b82f6)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            marginBottom: '0.5rem'
+            color: '#5b1c85',
+            marginBottom: '0.35rem'
           }}>
             UMA MICRON
           </h1>
+          <p style={{ color: '#059669', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem' }}>Micronization of API's</p>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Sign in to your account</p>
         </div>
 

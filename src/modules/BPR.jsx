@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
+import { buildBlankBprPayload } from '../utils/bprHtml';
+import { getStoredCompanyProfile } from '../utils/companyProfile';
 import ExportButton from '../components/ExportButton';
-import { Plus, Search, Edit2, Trash2, ClipboardList, FileDown, Printer } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, ClipboardList, FileDown, Printer, FileText } from 'lucide-react';
+import { numberInputValue, parseOptionalNumber } from '../utils/numberInput';
 import {
   getPartyProductForMR,
   getReceiptProductNames,
@@ -12,6 +15,33 @@ import {
 } from '../utils/receiptProducts';
 
 const emptyRow = (batchNo, drumNo) => ({ batchNo, drumNo, gross: '', tare: '', net: '' });
+const emptyMetrics = () => ({ volBefore: '', volAfter: '', bd: '', td: '', micron: '' });
+const emptyPreviousBulkDensity = () => ({
+  asSuch: emptyMetrics(),
+  finalPass: emptyMetrics(),
+  ap: emptyMetrics(),
+  fp: emptyMetrics(),
+  fr: emptyMetrics(),
+  clearance: emptyMetrics(),
+  totalPassNeed: emptyMetrics()
+});
+const emptyBulkDensity = () => ({
+  asSuch: emptyMetrics(),
+  sp: emptyMetrics(),
+  dp: emptyMetrics(),
+  tp: emptyMetrics(),
+  fp: emptyMetrics(),
+  fip: emptyMetrics(),
+  sip: emptyMetrics(),
+  sep: emptyMetrics(),
+  ep: emptyMetrics(),
+  np: emptyMetrics()
+});
+const emptyMachineParams = () => ({
+  micUsed: '', nm: '', tona: '', jetUsed: '', oil: '', venturyUsed: '',
+  nv: '', dsv: '', mvd: '', mbd: '',
+  compressor: '', compressorPressure: '', clearance: '', feedingPressure: '', millingPressure: ''
+});
 
 const calcNet = (gross, tare) => {
   if (gross === '' || gross === undefined || tare === '' || tare === undefined) return '';
@@ -28,9 +58,9 @@ const sumNet = (rows) => rows.reduce((s, r) => {
 
 const normalizeRow = (r) => ({
   ...r,
-  gross: r.gross === 0 ? '' : (r.gross ?? ''),
-  tare: r.tare === 0 ? '' : (r.tare ?? ''),
-  net: r.net === 0 ? '' : (r.net ?? '')
+  gross: numberInputValue(r.gross ?? ''),
+  tare: numberInputValue(r.tare ?? ''),
+  net: numberInputValue(r.net ?? '')
 });
 
 const displayNet = (net, gross, tare) => {
@@ -63,6 +93,9 @@ const BPR = () => {
     cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false, bagClean: false },
     pressureMetrics: { grindingPressure: '', injectionPressure: '', feedingSP: '', feedingDP: '', feedingTP: '', millingFP: '', millingFiP: '' },
     packingConsumables: { fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '' },
+    machineParams: emptyMachineParams(),
+    previousBulkDensity: emptyPreviousBulkDensity(),
+    bulkDensity: emptyBulkDensity(),
     processingSupervisor: '',
     materialReceivedDate: '',
     materialReceivedTime: '',
@@ -102,6 +135,9 @@ const BPR = () => {
     cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false, bagClean: false },
     pressureMetrics: { grindingPressure: '', injectionPressure: '', feedingSP: '', feedingDP: '', feedingTP: '', millingFP: '', millingFiP: '' },
     packingConsumables: { fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '' },
+    machineParams: emptyMachineParams(),
+    previousBulkDensity: emptyPreviousBulkDensity(),
+    bulkDensity: emptyBulkDensity(),
     processingSupervisor: '',
     materialReceivedDate: '',
     materialReceivedTime: '',
@@ -162,7 +198,8 @@ const BPR = () => {
       ? [...new Set(psdNotes)].join(' | ')
       : (prodConfig?.psdNote || '');
     const paddedReceived = padBPRBatchRows(receivedRows);
-    const paddedDispatched = padBPRBatchRows(receivedRows.map(r => ({ ...r })));
+    // Keep dispatch blank until filled — avoids mirroring received batch/drum on print
+    const paddedDispatched = padBPRBatchRows([]);
 
     setForm({
       bprNo: docNo,
@@ -179,6 +216,9 @@ const BPR = () => {
       cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false, bagClean: false },
       pressureMetrics: { grindingPressure: '', injectionPressure: '', feedingSP: '', feedingDP: '', feedingTP: '', millingFP: '', millingFiP: '' },
       packingConsumables: { fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '' },
+      machineParams: emptyMachineParams(),
+      previousBulkDensity: emptyPreviousBulkDensity(),
+      bulkDensity: emptyBulkDensity(),
       processingSupervisor: '',
       materialReceivedDate: mr.date || '',
       materialReceivedTime: mr.time || '',
@@ -218,7 +258,10 @@ const BPR = () => {
       packingConsumables: {
         fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '',
         ...(bpr.packingConsumables || {})
-      }
+      },
+      machineParams: { ...emptyMachineParams(), ...(bpr.machineParams || {}) },
+      previousBulkDensity: { ...emptyPreviousBulkDensity(), ...(bpr.previousBulkDensity || {}) },
+      bulkDensity: { ...emptyBulkDensity(), ...(bpr.bulkDensity || {}) }
     });
     setIsModalOpen(true);
   };
@@ -248,7 +291,7 @@ const BPR = () => {
     setForm(prev => {
       const list = [...prev[tableKey]];
       const item = { ...list[idx] };
-      item[field] = val === '' ? '' : (parseFloat(val) || '');
+      item[field] = parseOptionalNumber(val);
       if (field === 'gross' || field === 'tare') {
         item.net = calcNet(item.gross, item.tare);
       }
@@ -287,10 +330,10 @@ const BPR = () => {
                 <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
                 <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
                 <td style={{ padding: '0.25rem' }}>
-                  <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={r.gross === 0 ? '' : r.gross} onChange={e => handleCellChange(tableKey, idx, 'gross', e.target.value)} />
+                  <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={numberInputValue(r.gross)} onChange={e => handleCellChange(tableKey, idx, 'gross', e.target.value)} />
                 </td>
                 <td style={{ padding: '0.25rem' }}>
-                  <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={r.tare === 0 ? '' : r.tare} onChange={e => handleCellChange(tableKey, idx, 'tare', e.target.value)} />
+                  <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={numberInputValue(r.tare)} onChange={e => handleCellChange(tableKey, idx, 'tare', e.target.value)} />
                 </td>
                 <td style={{ padding: '0.25rem', fontWeight: 600 }}>{displayNet(r.net, r.gross, r.tare)}</td>
               </tr>
@@ -351,7 +394,7 @@ const BPR = () => {
   ];
 
   const pageTabBtn = (id, label) => ({
-    background: (listView === id ? 'rgba(16, 185, 129, 0.12)' : 'transparent'),
+    background: (listView === id ? 'rgba(91, 28, 133, 0.12)' : 'transparent'),
     color: (listView === id ? 'var(--accent-primary)' : 'var(--text-muted)'),
     border: (listView === id ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)'),
     padding: '0.45rem 1rem',
@@ -360,6 +403,15 @@ const BPR = () => {
     fontWeight: 600,
     cursor: 'pointer'
   });
+
+  const handleDownloadBlankBpr = () => {
+    const payload = buildBlankBprPayload({
+      partyName: '',
+      productName: '',
+      companyProfile: data.companyProfile || getStoredCompanyProfile()
+    });
+    exportToPDF('BPR', payload);
+  };
 
   return (
     <div>
@@ -378,6 +430,15 @@ const BPR = () => {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn"
+              style={{ border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', background: 'rgba(91, 28, 133, 0.08)' }}
+              onClick={handleDownloadBlankBpr}
+              title="Download blank Batch Processing + Packing Record (2 pages)"
+            >
+              <FileText size={18} /> Blank BPR Sheet
+            </button>
             <button
               type="button"
               className="btn btn-primary"
@@ -568,7 +629,7 @@ const BPR = () => {
                 className="btn"
                 onClick={() => setActiveTab('page1')}
                 style={{
-                  background: activeTab === 'page1' ? 'rgba(16, 185, 129, 0.12)' : 'transparent',
+                  background: activeTab === 'page1' ? 'rgba(91, 28, 133, 0.12)' : 'transparent',
                   color: activeTab === 'page1' ? 'var(--accent-primary)' : 'var(--text-muted)',
                   border: activeTab === 'page1' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)'
                 }}
@@ -580,7 +641,7 @@ const BPR = () => {
                 className="btn"
                 onClick={() => setActiveTab('page2')}
                 style={{
-                  background: activeTab === 'page2' ? 'rgba(16, 185, 129, 0.12)' : 'transparent',
+                  background: activeTab === 'page2' ? 'rgba(91, 28, 133, 0.12)' : 'transparent',
                   color: activeTab === 'page2' ? 'var(--accent-primary)' : 'var(--text-muted)',
                   border: activeTab === 'page2' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)'
                 }}
@@ -683,6 +744,30 @@ const BPR = () => {
                         <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.processingSupervisor || ''} onChange={e => setForm({...form, processingSupervisor: e.target.value})} />
                       </div>
                     </div>
+
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Machine Parameters (Page 1 Print)</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
+                        {[
+                          ['micUsed', 'Mic Used'], ['nm', 'NM'], ['tona', 'Tona'], ['jetUsed', 'Jet Used'], ['oil', 'Oil'],
+                          ['venturyUsed', 'Ventury Used'], ['nv', 'NV'], ['dsv', 'DSV'], ['mvd', 'MVD'], ['mbd', 'MBD'],
+                          ['compressor', 'Compressor'], ['compressorPressure', 'Compressor Pressure'], ['clearance', 'Clearance'],
+                          ['feedingPressure', 'Feeding Pressure'], ['millingPressure', 'Milling Pressure']
+                        ].map(([key, label]) => (
+                          <div key={key}>
+                            <label style={{ fontSize: '0.72rem' }}>{label}</label>
+                            <input
+                              type="text"
+                              className="input-field"
+                              style={{ padding: '0.25rem', fontSize: '0.8rem' }}
+                              value={form.machineParams?.[key] || ''}
+                              onChange={e => setForm({ ...form, machineParams: { ...form.machineParams, [key]: e.target.value } })}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     <div>
                       <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Packing Consumables</h4>
                       <div style={{ marginBottom: '0.5rem' }}>

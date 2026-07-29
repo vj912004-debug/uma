@@ -423,6 +423,10 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
           <span>${escHtml(profile.addressLine1 || 'Plot No. 1116, G.I.D.C., Ranoli,')} ${escHtml(profile.city || 'Vadodara')} - ${escHtml(profile.pincode || '391350')}, ${companyState}, India</span>
         </div>
         <div class="line nowrap">
+          <span class="icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
+          <span><strong>GSTIN:</strong> ${escHtml(profile.gstNumber || '')}</span>
+        </div>
+        <div class="line nowrap">
           <span class="icon"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 2.9c0-.5.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg></span>
           <span>${escHtml(profile.phone || '+91 97120 00297')}</span>
         </div>
@@ -467,14 +471,6 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
             <div class="meta-row">
               <span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
               <span class="m-label">PO Date</span><span class="m-colon">:</span><span class="m-value">&nbsp;${poDate}</span>
-            </div>
-            <div class="meta-row" style="margin-top:8px;">
-              <span class="m-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
-              <span class="m-label">E-Way Bill No.</span><span class="m-colon">:</span><span class="m-value">&nbsp;${escHtml(data.ewayBillNo || '')}</span>
-            </div>
-            <div class="meta-row">
-              <span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
-              <span class="m-label">E-Way Bill Date</span><span class="m-colon">:</span><span class="m-value">&nbsp;${escHtml(data.ewayBillDate || '')}</span>
             </div>
           </div>
         </div>

@@ -97,7 +97,7 @@ const ExportButton = ({ data, columns, filename, title }) => {
   return (
     <div className="export-buttons" style={{ display: 'flex', gap: '1rem' }}>
       <button onClick={exportToExcel} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fff', border: '1px solid var(--border-color)', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500, color: '#334155' }} title="Export Excel">
-        <FileSpreadsheet size={18} color="#10b981" /> Export Excel
+        <FileSpreadsheet size={18} color="#5b1c85" /> Export Excel
       </button>
       <button onClick={exportToPDF} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fff', border: '1px solid var(--border-color)', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500, color: '#334155' }} title="Export PDF">
         <FileText size={18} color="#ef4444" /> Export PDF

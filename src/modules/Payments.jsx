@@ -149,7 +149,7 @@ const Payments = () => {
               <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>No payments recorded.</p>
             ) : (
               paymentHistory.slice(0, 12).map(pay => (
-                <div key={pay.id} style={{ padding: '1rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '12px', borderLeft: '4px solid var(--accent-primary)' }}>
+                <div key={pay.id} style={{ padding: '1rem', background: 'rgba(91, 28, 133, 0.05)', borderRadius: '12px', borderLeft: '4px solid var(--accent-primary)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <p style={{ fontWeight: 600 }}>{pay.partyName}</p>
                     <p style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>

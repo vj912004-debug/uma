@@ -9,7 +9,12 @@ const parseWeight = (value) => {
 
 export const buildPackingListHtml = (data, profileInput) => {
   const profile = mergeCompanyProfile(profileInput);
-  const batches = data.batches || [];
+  // Drop blank filler rows (no weights and no identifiers) so Grand Total sits under real data
+  const batches = (data.batches || []).filter((batch) => {
+    const hasWeight = parseWeight(batch.gross) > 0 || parseWeight(batch.tare) > 0 || parseWeight(batch.net) > 0;
+    const hasId = String(batch.batchNo || '').trim() || String(batch.drumNo ?? '').trim();
+    return hasWeight || hasId;
+  });
   const plNo = escHtml(data.plNo || '');
   const plDate = escHtml(formatPdfDateDmy(data.date) || '');
 
@@ -36,7 +41,7 @@ export const buildPackingListHtml = (data, profileInput) => {
     batchGroupMap[key].totalNet += net;
   });
 
-  // ── Build table rows with batch subtotals ──
+  // ── Build table rows (data only — no empty spacer rows) ──
   let grandGross = 0;
   let grandTare = 0;
   let grandNet = 0;
@@ -46,7 +51,7 @@ export const buildPackingListHtml = (data, profileInput) => {
     grandTare += group.totalTare;
     grandNet += group.totalNet;
 
-    const dataRows = group.rows.map((r) => `
+    return group.rows.map((r) => `
       <tr>
         <td class="num">${r.sr}</td>
         <td class="num">${escHtml(r.batchNo || '')}</td>
@@ -55,22 +60,7 @@ export const buildPackingListHtml = (data, profileInput) => {
         <td class="num">${r.tare > 0 ? fmtMoney(r.tare) : ''}</td>
         <td class="num">${r.net > 0 ? fmtMoney(r.net) : ''}</td>
       </tr>`).join('');
-
-    return dataRows;
   }).join('');
-
-  // Calculate how many rows we have (data rows only)
-  const totalContentRows = batches.length;
-  // Target ~35 visible rows total to fill the A4 page properly
-  const PL_TARGET_ROWS = 35;
-  const emptyRowCount = Math.max(0, PL_TARGET_ROWS - totalContentRows);
-  let emptyRows = '';
-  for (let i = 0; i < emptyRowCount; i++) {
-    emptyRows += `
-      <tr class="empty">
-        <td></td><td></td><td></td><td></td><td></td><td></td>
-      </tr>`;
-  }
 
   const declaredNet = parseFloat(data.totalWeight);
   const finalNet = Number.isFinite(declaredNet) && declaredNet > 0 ? declaredNet : grandNet;
@@ -300,13 +290,12 @@ export const buildPackingListHtml = (data, profileInput) => {
             </thead>
             <tbody>
               ${tableRowsHtml}
-              ${emptyRows}
             </tbody>
             <tfoot>
               <tr>
                 <td colspan="3">GRAND TOTAL</td>
-                <td></td>
-                <td></td>
+                <td>${grandGross > 0 ? fmtMoney(grandGross) : ''}</td>
+                <td>${grandTare > 0 ? fmtMoney(grandTare) : ''}</td>
                 <td>${fmtMoney(finalNet)}</td>
               </tr>
             </tfoot>

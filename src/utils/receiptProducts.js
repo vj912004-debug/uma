@@ -1,3 +1,4 @@
+import { numberInputValue } from './numberInput';
 /** Shared helpers for multi-product Material Receipt data. */
 
 const norm = (s) => (s || '').trim().toLowerCase();
@@ -242,9 +243,9 @@ const formatPlDrumRow = (row, productName) => ({
   batchNo: row?.batchNo || '',
   drumNo: row?.drumNo != null ? String(row.drumNo) : '',
   productName,
-  gross: row?.gross === 0 ? '' : (row?.gross ?? ''),
-  tare: row?.tare === 0 ? '' : (row?.tare ?? ''),
-  net: row?.net === 0 ? '' : (row?.net ?? '')
+  gross: numberInputValue(row?.gross ?? ''),
+  tare: numberInputValue(row?.tare ?? ''),
+  net: numberInputValue(row?.net ?? '')
 });
 
 /** Map BPR/PL weight rows onto MR product drum slots (fixes multi-product PL). */
@@ -322,10 +323,11 @@ export const getMRMaterialValue = (mr) => {
   return Number.isFinite(v) ? v : 0;
 };
 
-/** Build DC qty/drums/value/labels from MR + PL for selected products. */
+/** Build DC qty/drums/value/labels from Material Receipt for selected products.
+ * Always uses received (MR) qty — not packing-list net weight. */
 export const buildDCFieldsFromProducts = (mr, pl, prodOpts, selectedProductNames = []) => {
   if (!mr) {
-    return { productSummaries: [], productName: '', qty: 0, totalDrums: 0 };
+    return { productSummaries: [], productName: '', qty: 0, totalDrums: 0, value: 0 };
   }
   const allSummaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
   const selectedSet = new Set((selectedProductNames || []).map(n => norm(n)));
@@ -333,29 +335,64 @@ export const buildDCFieldsFromProducts = (mr, pl, prodOpts, selectedProductNames
     ? allSummaries.filter(p => selectedSet.has(norm(p.prodName)))
     : allSummaries;
 
-  const productSummaries = selected.map(p => {
-    const plQty = pl ? getPLProductNetQty(pl, p.prodName, mr, prodOpts) : 0;
-    const plDrums = pl ? getPLProductDrums(pl, p.prodName) : 0;
-    return {
-      ...p,
-      qty: plQty > 0 ? plQty : p.qty,
-      drums: plDrums > 0 ? plDrums : p.drums
-    };
-  });
+  const productSummaries = selected.map((p) => ({
+    ...p,
+    qty: getProductQty(mr, p.prodName, prodOpts) || p.qty || 0,
+    drums: getProductDrums(mr, p.prodName, prodOpts) || p.drums || 0
+  }));
 
-  const qty = productSummaries.reduce((s, p) => s + (parseFloat(p.qty) || 0), 0);
-  const totalDrums = productSummaries.reduce((s, p) => s + (parseInt(p.drums, 10) || 0), 0);
-  const productName = productSummaries.map(p => p.prodName).filter(Boolean).join(', ');
+  const qtyFromProducts = productSummaries.reduce((s, p) => s + (parseFloat(p.qty) || 0), 0);
+  const drumsFromProducts = productSummaries.reduce((s, p) => s + (parseInt(p.drums, 10) || 0), 0);
+  const mrTotalQty = parseFloat(mr.totalQty) || 0;
+  const mrTotalDrums = parseInt(mr.totalDrums, 10) || 0;
 
-  return { productSummaries, productName, qty, totalDrums };
+  // When all MR products are selected (or none specified), use authoritative MR totalQty
+  const selectingAll = !selectedProductNames?.length
+    || (allSummaries.length > 0 && selected.length === allSummaries.length)
+    || (allSummaries.length <= 1);
+
+  const qty = selectingAll && mrTotalQty > 0
+    ? mrTotalQty
+    : (qtyFromProducts > 0 ? qtyFromProducts : mrTotalQty);
+  const totalDrums = selectingAll && mrTotalDrums > 0
+    ? mrTotalDrums
+    : (drumsFromProducts > 0 ? drumsFromProducts : mrTotalDrums);
+
+  const productName = productSummaries.map(p => p.prodName).filter(Boolean).join(', ')
+    || (mr.productName || '');
+
+  return {
+    productSummaries,
+    productName,
+    qty,
+    totalDrums,
+    value: getMRMaterialValue(mr)
+  };
+};
+
+/** Authoritative Material Receipt quantity (received), not packing-list net. */
+export const getMRReceivedQty = (mr, prodOpts = {}, selectedProductNames = null) => {
+  if (!mr) return 0;
+  const mrTotal = parseFloat(mr.totalQty) || 0;
+  if (!selectedProductNames?.length) return mrTotal || getReceiptProductSummaries(mr, prodOpts)
+    .reduce((s, p) => s + (parseFloat(p.qty) || 0), 0);
+
+  const selectedSet = new Set(selectedProductNames.map((n) => norm(n)));
+  const summaries = getReceiptProductSummaries(mr, prodOpts)
+    .filter((p) => selectedSet.has(norm(p.prodName)));
+  const fromProducts = summaries.reduce((s, p) => s + (parseFloat(p.qty) || 0), 0);
+  const allSummaries = getReceiptProductSummaries(mr, prodOpts).filter((p) => p.batchCount > 0 || p.qty > 0);
+  if (summaries.length === allSummaries.length && mrTotal > 0) return mrTotal;
+  return fromProducts > 0 ? fromProducts : mrTotal;
 };
 
 export const buildPLProductSummaries = (pl, mr, prodOpts = {}) => {
+  // Billing docs (TI/DC) use Material Receipt qty — ignore packing-list net weight
   const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
   if (!summaries.length) return [];
   return summaries.map(p => ({
     ...p,
-    qty: pl ? getPLProductNetQty(pl, p.prodName, mr, prodOpts) : p.qty
+    qty: getProductQty(mr, p.prodName, prodOpts) || p.qty || 0
   }));
 };
 

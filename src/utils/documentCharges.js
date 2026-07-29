@@ -1,4 +1,4 @@
-import { findDedicatedReceiptDoc, findReceiptDoc, getProductBatches, getProductQty, getReceiptProductNames, getReceiptProductSummaries, getReceiptProductLabel, receiptProductOptions, resolveReceiptProductName, findAnyPackingList, buildPLProductSummaries } from './receiptProducts';
+import { findDedicatedReceiptDoc, findReceiptDoc, getProductBatches, getProductQty, getReceiptProductNames, getReceiptProductSummaries, getReceiptProductLabel, receiptProductOptions, resolveReceiptProductName, findAnyPackingList, buildPLProductSummaries, getMRReceivedQty } from './receiptProducts';
 
 const normProdKey = (s) => (s || '').trim().toLowerCase();
 
@@ -556,7 +556,7 @@ export const enrichPIForPrint = (pi, appData = {}) => {
     };
   });
 
-  const totalQty = summaries.reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0);
+  const totalQty = getMRReceivedQty(mr, prodOpts);
 
   return {
     ...pi,
@@ -565,7 +565,7 @@ export const enrichPIForPrint = (pi, appData = {}) => {
     productName: summaries.length ? getReceiptProductLabel(mr, prodOpts) : pi.productName,
     productSummaries: summaries.length ? summaries : (pi.productSummaries || []),
     productCharges: mergedCharges,
-    qty: totalQty || pi.qty
+    qty: totalQty > 0 ? totalQty : pi.qty
   };
 };
 
@@ -599,13 +599,13 @@ export const enrichTIForPrint = (ti, appData = {}) => {
     };
   });
 
-  const plWeight = pl?.totalWeight || ti.qty;
+  const plWeight = getMRReceivedQty(mr, prodOpts);
 
   return {
     ...ti,
     productName: summaries.length ? getReceiptProductLabel(mr, prodOpts) : ti.productName,
     productSummaries: summaries.length ? summaries : (ti.productSummaries || []),
     productCharges: mergedCharges,
-    qty: plWeight || ti.qty
+    qty: plWeight > 0 ? plWeight : (ti.qty || 0)
   };
 };

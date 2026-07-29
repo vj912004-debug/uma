@@ -1,19 +1,36 @@
 /** Shared Tax Invoice charge rows and amount calculations. */
 
 export const TI_CHARGES_LIST = [
-  { key: 'cleaning', label: 'Minimum Cleaning Charges(998842)', sgst: 6, cgst: 6 },
-  { key: 'processing', label: 'Processing Charges(998842)', sgst: 6, cgst: 6 },
-  { key: 'psdReport', label: 'PSD Report Charges(998346)', sgst: 9, cgst: 9 },
-  { key: 'filterBag', label: 'Filter Bag Charges(591190)', sgst: 6, cgst: 6 },
-  { key: 'sieving', label: 'Sieving Charges(998842)', sgst: 6, cgst: 6 },
-  { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', sgst: 9, cgst: 9 },
-  { key: 'liner', label: 'Liner (39233090)', sgst: 9, cgst: 9 },
-  { key: 'courier', label: 'Courier Charges(996812)', sgst: 9, cgst: 9 },
-  { key: 'transportation', label: 'Transportation (996511)', sgst: 9, cgst: 9 },
-  { key: 'batchChangeover', label: 'Batch change over charges(998842)', sgst: 6, cgst: 6 }
+  { key: 'cleaning', label: 'Minimum Cleaning Charges(998842)' },
+  { key: 'processing', label: 'Processing Charges(998842)' },
+  { key: 'psdReport', label: 'PSD Report Charges(998346)' },
+  { key: 'filterBag', label: 'Filter Bag Charges(591190)' },
+  { key: 'sieving', label: 'Sieving Charges(998842)' },
+  { key: 'hdpeDrum', label: 'HDPE Drum (39233090)' },
+  { key: 'liner', label: 'Liner (39233090)' },
+  { key: 'courier', label: 'Courier Charges(996812)' },
+  { key: 'transportation', label: 'Transportation (996511)' },
+  { key: 'batchChangeover', label: 'Batch change over charges(998842)' }
 ];
 
 export const TI_EMPTY_ROWS = 2;
+
+/**
+ * Resolve invoice GST from form taxRate (e.g. 18).
+ * CGST/SGST Rate columns and amounts each use half (e.g. 9% + 9% = 18% total).
+ */
+export const getSplitGstRates = (data) => {
+  const parsed = parseFloat(data?.taxRate);
+  const taxRate = Number.isFinite(parsed) && parsed >= 0 ? parsed : 18;
+  const half = taxRate / 2;
+  return {
+    taxRate,
+    displayRate: half,
+    sgst: half,
+    cgst: half,
+    igst: 0
+  };
+};
 
 /** Split party address into display lines (explicit newlines or word-wrap). */
 export const splitPartyAddressLines = (address, charsPerLine = 48) => {
@@ -191,6 +208,7 @@ export const formatPdfDateDmy = (d) => {
 
 export const calcTiTotals = (data) => {
   const chargeAmounts = buildTiChargeAmounts(data);
+  const { sgst: sgstRate, cgst: cgstRate } = getSplitGstRates(data);
   let totalAmt = 0;
   let totalSgst = 0;
   let totalCgst = 0;
@@ -201,8 +219,8 @@ export const calcTiTotals = (data) => {
   TI_CHARGES_LIST.forEach((charge) => {
     const line = chargeAmounts[charge.key] || { qty: 0, rate: 0, amt: 0 };
     const amt = line.amt || 0;
-    const sgstAmt = amt * (charge.sgst / 100);
-    const cgstAmt = amt * (charge.cgst / 100);
+    const sgstAmt = amt * (sgstRate / 100);
+    const cgstAmt = amt * (cgstRate / 100);
     const rowTotal = amt + sgstAmt + cgstAmt;
     totalAmt += amt;
     totalSgst += sgstAmt;
@@ -218,8 +236,8 @@ export const calcTiTotals = (data) => {
       const rate = parseFloat(cc.rate) || 0;
       const amt = ccQty * rate;
       if (amt <= 0) return;
-      const sgstAmt = amt * 0.09;
-      const cgstAmt = amt * 0.09;
+      const sgstAmt = amt * (sgstRate / 100);
+      const cgstAmt = amt * (cgstRate / 100);
       totalAmt += amt;
       totalSgst += sgstAmt;
       totalCgst += cgstAmt;
@@ -237,5 +255,5 @@ export const calcTiTotals = (data) => {
     totalAll = totalAmt + totalSgst + totalCgst + totalIgst;
   }
 
-  return { chargeAmounts, totalAmt, totalSgst, totalCgst, totalIgst, totalAll, totalQty };
+  return { chargeAmounts, totalAmt, totalSgst, totalCgst, totalIgst, totalAll, totalQty, sgstRate, cgstRate };
 };

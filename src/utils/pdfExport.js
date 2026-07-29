@@ -502,16 +502,16 @@ const formatPdfDateDmy = (d) => {
 };
 
 const TI_CHARGES_LIST = [
-  { key: 'cleaning', label: 'Minimum Cleaning Charges(998842)', sgst: 6, cgst: 6 },
-  { key: 'processing', label: 'Processing Charges(998842)', sgst: 6, cgst: 6 },
+  { key: 'cleaning', label: 'Minimum Cleaning Charges(998842)', sgst: 9, cgst: 9 },
+  { key: 'processing', label: 'Processing Charges(998842)', sgst: 9, cgst: 9 },
   { key: 'psdReport', label: 'PSD Report Charges(998346)', sgst: 9, cgst: 9 },
-  { key: 'filterBag', label: 'Filter Bag Charges(591190)', sgst: 6, cgst: 6 },
-  { key: 'sieving', label: 'Sieving Charges(998842)', sgst: 6, cgst: 6 },
+  { key: 'filterBag', label: 'Filter Bag Charges(591190)', sgst: 9, cgst: 9 },
+  { key: 'sieving', label: 'Sieving Charges(998842)', sgst: 9, cgst: 9 },
   { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', sgst: 9, cgst: 9 },
   { key: 'liner', label: 'Liner (39233090)', sgst: 9, cgst: 9 },
   { key: 'courier', label: 'Courier Charges(996812)', sgst: 9, cgst: 9 },
   { key: 'transportation', label: 'Transportation (996511)', sgst: 9, cgst: 9 },
-  { key: 'batchChangeover', label: 'Batch change over charges(998842)', sgst: 6, cgst: 6 }
+  { key: 'batchChangeover', label: 'Batch change over charges(998842)', sgst: 9, cgst: 9 }
 ];
 
 const MATERIAL_QTY_CHARGE_KEYS = ['cleaning', 'processing', 'sieving', 'other'];
@@ -782,10 +782,11 @@ const buildTaxInvoicePDF = (doc, data) => {
       const rate = parseFloat(cc.rate) || 0;
       const amt = ccQty * rate;
       if (amt <= 0) return;
-      const sgstRate = 9;
-      const cgstRate = 9;
-      const sgstAmt = amt * 0.09;
-      const cgstAmt = amt * 0.09;
+      const gstPct = (parseFloat(data.taxRate) || 18) / 2;
+      const sgstRate = gstPct;
+      const cgstRate = gstPct;
+      const sgstAmt = amt * (gstPct / 100);
+      const cgstAmt = amt * (gstPct / 100);
       const rowTotal = amt + sgstAmt + cgstAmt;
       extraRows.push([
         '',
@@ -1379,8 +1380,9 @@ const buildPerformaInvoicePDF = (doc, data) => {
       const rate = parseFloat(cc.rate) || 0;
       const amt = ccQty * rate;
       if (amt <= 0) return;
-      const sgstAmt = amt * 0.09;
-      const cgstAmt = amt * 0.09;
+      const gstPct = (parseFloat(data.taxRate) || 18) / 2;
+      const sgstAmt = amt * (gstPct / 100);
+      const cgstAmt = amt * (gstPct / 100);
       const rowTotal = amt + sgstAmt + cgstAmt;
       extraRows.push([
         extraRows.length + PI_CHARGES_LIST.length + 1,
@@ -1388,9 +1390,9 @@ const buildPerformaInvoicePDF = (doc, data) => {
         ccQty,
         rate.toFixed(2),
         amt.toFixed(2),
-        9,
+        gstPct,
         sgstAmt.toFixed(2),
-        9,
+        gstPct,
         cgstAmt.toFixed(2),
         '',
         '0.00',

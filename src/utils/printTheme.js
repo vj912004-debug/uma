@@ -596,12 +596,20 @@ export const renderHtmlToPdf = async (html, {
 
       if (pageNodes.length || fitPage) {
         if (i > 0) pdf.addPage();
-        const scale = Math.min(usableW / naturalW, usableH / naturalH, 1);
-        const drawW = naturalW * scale;
-        const drawH = naturalH * scale;
-        const x = margin + (usableW - drawW) / 2;
-        const y = margin;
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, y, drawW, drawH);
+        // Always fill full A4 width (no side gaps). If content is taller, also fill height.
+        let drawW = usableW;
+        let drawH = (canvas.height * usableW) / canvas.width;
+        if (fitPage && drawH > usableH) {
+          drawH = usableH;
+        } else if (!fitPage && drawH > usableH) {
+          const scale = usableH / drawH;
+          drawW = usableW * scale;
+          drawH = usableH;
+          const x = margin + (usableW - drawW) / 2;
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, margin, drawW, drawH);
+          continue;
+        }
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, drawW, drawH);
         continue;
       }
 

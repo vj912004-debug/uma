@@ -174,7 +174,7 @@ const TaskManager = () => {
                     <button onClick={() => handleEdit(task)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} title="Edit Task">
                       <Edit2 size={16} />
                     </button>
-                    <button onClick={() => toggleTaskStatus(task)} style={{ background: 'transparent', border: 'none', color: 'rgba(16, 185, 129, 0.6)', cursor: 'pointer' }} title="Complete Task">
+                    <button onClick={() => toggleTaskStatus(task)} style={{ background: 'transparent', border: 'none', color: 'rgba(91, 28, 133, 0.65)', cursor: 'pointer' }} title="Complete Task">
                       <CheckCircle size={18} />
                     </button>
                     <button onClick={() => deleteTask(task.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }} title="Delete Task">
