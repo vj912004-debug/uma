@@ -214,13 +214,13 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     border-bottom: 2px solid var(--purple);
     padding-bottom: 8px;
     margin-bottom: 14px;
-    font-size: 11px;
-    gap: 12px;
+    font-size: 9.5px;
+    gap: 4px;
   }
   .company-strip .line {
     display: flex;
     align-items: flex-start;
-    gap: 6px;
+    gap: 4px;
   }
   .company-strip .line.nowrap {
     white-space: nowrap;
@@ -331,6 +331,17 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     border-right: 1px solid var(--lav-border);
   }
   
+  table.items td {
+    padding: 6px 4px;
+    border: 1px solid var(--purple-border);
+    border-top: none;
+    font-size: 11px;
+    font-weight: 500;
+    word-break: break-all;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+  }
+  
   table.items tfoot td {
     border: 1px solid var(--purple);
     background: var(--lav-bg);
@@ -384,7 +395,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   .barfoot {
     background: var(--purple);
     color: #fff;
-    margin-top: 14px;
+    margin: 14px -18px -18px -18px;
     padding: 8px 16px;
     display: flex;
     justify-content: space-between;
@@ -420,7 +431,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
       <div class="company-strip">
         <div class="line" style="flex: 1;">
           <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></span>
-          <span>${escHtml(profile.addressLine1 || 'Plot No. 1116, G.I.D.C., Ranoli,')} ${escHtml(profile.city || 'Vadodara')} - ${escHtml(profile.pincode || '391350')}, ${companyState}, India</span>
+          <span style="white-space: nowrap;">${escHtml(profile.addressLine1 || 'Plot No. 1116, G.I.D.C., Ranoli,')}<br>${escHtml(profile.city || 'Vadodara')} - ${escHtml(profile.pincode || '391350')}, ${companyState}, India</span>
         </div>
         <div class="line nowrap">
           <span class="icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
@@ -507,7 +518,6 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
           <div class="dc-meta-row"><div class="dc-meta-label">Drivers name</div><div class="data-value">: &nbsp;${escHtml(data.driverName || '')}</div></div>
           <div class="dc-meta-row"><div class="dc-meta-label">Driver's Contact</div><div class="data-value">: &nbsp;${escHtml(data.driverContact || data.driverPhone || '')}</div></div>
           <div class="dc-meta-row"><div class="dc-meta-label">Transporter's Name</div><div class="data-value">: &nbsp;${escHtml(data.transporterName || data.transporter || '')}</div></div>
-          <div class="dc-meta-row"><div class="dc-meta-label">GSTIN</div><div class="data-value">: &nbsp;${escHtml(profile.gstNumber || '')}</div></div>
         </div>
         <div class="dc-sign-stack">
           <div class="dc-sign-card">
@@ -526,9 +536,10 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
       <div class="barfoot">
         <span>Thank you for your business!</span>
         <span>E. &amp; O.E.</span>
-        <span>This is a computer-generated document and does not require a physical signature.</span>
+        <span>This is a computer-generated document.</span>
         <span>Page 1 of 1</span>
-          </td>
+      </div>
+    </td>
   </tr>
 </table>
 </div>

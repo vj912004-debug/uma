@@ -899,52 +899,47 @@ const MaterialReceipt = () => {
                       ))}
                     </div>
 
-                    <div style={{ marginBottom: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+                    <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginBottom: '1.25rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                        <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--accent-primary)', margin: 0 }}>Custom / Extra Charges</h4>
-                        <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} onClick={() => patchProductSettings(prod.name, s => ({ ...s, customCharges: [...(s.customCharges || []), { name: '', hsn: '', rate: 0, qty: 1, checked: true }] }))}>
-                          + Add Custom Charge
+                        <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.9rem', fontWeight: 600 }}>Manual Custom Charges</label>
+                        <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => patchProductSettings(prod.name, s => ({ ...s, customCharges: [...(s.customCharges || []), { id: Date.now() + Math.random(), name: '', hsn: '', rate: 0, qty: 1, checked: true }] }))}>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Row
                         </button>
                       </div>
-                      {(settings.customCharges || []).length === 0 ? (
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No custom charges added.</p>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          {(settings.customCharges || []).map((charge, cIdx) => (
-                            <div key={cIdx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--glass-bg)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                              <input type="checkbox" checked={charge.checked} onChange={e => patchProductSettings(prod.name, s => {
-                                const customCharges = [...(s.customCharges || [])];
-                                customCharges[cIdx] = { ...customCharges[cIdx], checked: e.target.checked };
-                                return { ...s, customCharges };
-                              })} />
-                              <input type="text" className="input-field" style={{ flex: 2, padding: '0.2rem', fontSize: '0.8rem' }} placeholder="Charge Name" value={charge.name} onChange={e => patchProductSettings(prod.name, s => {
-                                const customCharges = [...(s.customCharges || [])];
-                                customCharges[cIdx] = { ...customCharges[cIdx], name: e.target.value };
-                                return { ...s, customCharges };
-                              })} />
-                              <input type="text" className="input-field" style={{ flex: 1, padding: '0.2rem', fontSize: '0.8rem' }} placeholder="HSN" value={charge.hsn} onChange={e => patchProductSettings(prod.name, s => {
-                                const customCharges = [...(s.customCharges || [])];
-                                customCharges[cIdx] = { ...customCharges[cIdx], hsn: e.target.value };
-                                return { ...s, customCharges };
-                              })} />
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Qty:</span>
-                              <input type="number" className="input-field" style={{ width: '60px', padding: '0.2rem', fontSize: '0.8rem' }} value={charge.qty} onChange={e => patchProductSettings(prod.name, s => {
-                                const customCharges = [...(s.customCharges || [])];
-                                customCharges[cIdx] = { ...customCharges[cIdx], qty: parseFloat(e.target.value) || 0 };
-                                return { ...s, customCharges };
-                              })} />
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate: ₹</span>
-                              <input type="number" className="input-field" style={{ width: '80px', padding: '0.2rem', fontSize: '0.8rem' }} value={charge.rate} onChange={e => patchProductSettings(prod.name, s => {
-                                const customCharges = [...(s.customCharges || [])];
-                                customCharges[cIdx] = { ...customCharges[cIdx], rate: parseFloat(e.target.value) || 0 };
-                                return { ...s, customCharges };
-                              })} />
-                              <button type="button" className="btn" style={{ padding: '0.3rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none' }} onClick={() => patchProductSettings(prod.name, s => ({ ...s, customCharges: (s.customCharges || []).filter((_, i) => i !== cIdx) }))}>
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          ))}
+                      {(settings.customCharges || []).map((charge, cIdx) => (
+                        <div key={charge.id || cIdx} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 100px 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                          <input type="checkbox" checked={charge.checked !== false} onChange={e => patchProductSettings(prod.name, s => {
+                            const newC = [...(s.customCharges || [])];
+                            newC[cIdx] = { ...newC[cIdx], checked: e.target.checked };
+                            return { ...s, customCharges: newC };
+                          })} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-primary)' }} />
+                          <input type="text" className="input-field" placeholder="Description" value={charge.name} onChange={e => patchProductSettings(prod.name, s => {
+                            const newC = [...(s.customCharges || [])];
+                            newC[cIdx] = { ...newC[cIdx], name: e.target.value };
+                            return { ...s, customCharges: newC };
+                          })} />
+                          <input type="text" className="input-field" placeholder="HSN" value={charge.hsn} onChange={e => patchProductSettings(prod.name, s => {
+                            const newC = [...(s.customCharges || [])];
+                            newC[cIdx] = { ...newC[cIdx], hsn: e.target.value };
+                            return { ...s, customCharges: newC };
+                          })} />
+                          <input type="number" className="input-field" placeholder="Qty" value={charge.qty} onChange={e => patchProductSettings(prod.name, s => {
+                            const newC = [...(s.customCharges || [])];
+                            newC[cIdx] = { ...newC[cIdx], qty: e.target.value };
+                            return { ...s, customCharges: newC };
+                          })} min="0" step="any" />
+                          <input type="number" className="input-field" placeholder="Rate" value={charge.rate} onChange={e => patchProductSettings(prod.name, s => {
+                            const newC = [...(s.customCharges || [])];
+                            newC[cIdx] = { ...newC[cIdx], rate: e.target.value };
+                            return { ...s, customCharges: newC };
+                          })} min="0" step="any" />
+                          <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => patchProductSettings(prod.name, s => ({ ...s, customCharges: (s.customCharges || []).filter((_, i) => i !== cIdx) }))}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                          </button>
                         </div>
+                      ))}
+                      {(settings.customCharges || []).length === 0 && (
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No manual charges added.</div>
                       )}
                     </div>
 

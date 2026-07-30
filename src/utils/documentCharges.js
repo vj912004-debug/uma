@@ -562,6 +562,10 @@ export const enrichPIForPrint = (pi, appData = {}) => {
     ...pi,
     partyDocNo: pi.partyDocNo || mr.partyDocNo || '',
     partyDocDate: pi.partyDocDate || mr.partyDocDate || '',
+    billAddress: pi.billAddress || mr.billAddress || prodOpts.party?.billAddress || '',
+    shipAddress: pi.shipAddress || mr.shipAddress || prodOpts.party?.shipAddress || '',
+    gstinBill: pi.gstinBill || mr.gstinBill || prodOpts.party?.gstinBill || '',
+    gstinShip: pi.gstinShip || mr.gstinShip || prodOpts.party?.gstinShip || '',
     productName: summaries.length ? getReceiptProductLabel(mr, prodOpts) : pi.productName,
     productSummaries: summaries.length ? summaries : (pi.productSummaries || []),
     productCharges: mergedCharges,
@@ -603,6 +607,10 @@ export const enrichTIForPrint = (ti, appData = {}) => {
 
   return {
     ...ti,
+    billAddress: ti.billAddress || mr.billAddress || prodOpts.party?.billAddress || '',
+    shipAddress: ti.shipAddress || mr.shipAddress || prodOpts.party?.shipAddress || '',
+    gstinBill: ti.gstinBill || mr.gstinBill || prodOpts.party?.gstinBill || '',
+    gstinShip: ti.gstinShip || mr.gstinShip || prodOpts.party?.gstinShip || '',
     productName: summaries.length ? getReceiptProductLabel(mr, prodOpts) : ti.productName,
     productSummaries: summaries.length ? summaries : (ti.productSummaries || []),
     productCharges: mergedCharges,

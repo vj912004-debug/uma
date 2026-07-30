@@ -106,9 +106,36 @@ const PurchaseOrders = () => {
     setForm(prev => ({ ...prev, qtys: { ...(prev.qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) } }));
   };
 
+  const addCustomCharge = () => {
+    setForm(prev => ({
+      ...prev,
+      customCharges: [...(prev.customCharges || []), { id: Date.now(), name: '', qty: 1, rate: 0, checked: true }]
+    }));
+  };
+
+  const updateCustomCharge = (id, field, value) => {
+    setForm(prev => ({
+      ...prev,
+      customCharges: prev.customCharges.map(c => c.id === id ? { ...c, [field]: value } : c)
+    }));
+  };
+
+  const removeCustomCharge = (id) => {
+    setForm(prev => ({
+      ...prev,
+      customCharges: prev.customCharges.filter(c => c.id !== id)
+    }));
+  };
+
   const getSubtotal = () => {
+    const customSum = (form.customCharges || []).reduce((sum, charge) => {
+      if (charge.checked) {
+        return sum + ((parseFloat(charge.qty) || 0) * (parseFloat(charge.rate) || 0));
+      }
+      return sum;
+    }, 0);
     const materialQty = parseFloat(form.qty) || 0;
-    return calcStandardChargesSubtotal(form.charges, form.rates, form.qtys, materialQty);
+    return calcStandardChargesSubtotal(form.charges, form.rates, form.qtys, materialQty) + customSum;
   };
 
   const handleCreate = (mr) => {
@@ -413,6 +440,29 @@ const PurchaseOrders = () => {
                         onRateChange={handleRateChange}
                       />
                     ))}
+                  </div>
+
+                  <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.9rem', fontWeight: 600 }}>Manual Custom Charges</label>
+                      <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={addCustomCharge}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Row
+                      </button>
+                    </div>
+                    {(form.customCharges || []).map(c => (
+                      <div key={c.id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                        <input type="checkbox" checked={c.checked !== false} onChange={e => updateCustomCharge(c.id, 'checked', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-primary)' }} />
+                        <input type="text" className="input-field" placeholder="Description" value={c.name} onChange={e => updateCustomCharge(c.id, 'name', e.target.value)} />
+                        <input type="number" className="input-field" placeholder="Qty" value={c.qty} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
+                        <input type="number" className="input-field" placeholder="Rate" value={c.rate} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
+                        <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeCustomCharge(c.id)}>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        </button>
+                      </div>
+                    ))}
+                    {(form.customCharges || []).length === 0 && (
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No manual charges added.</div>
+                    )}
                   </div>
                 </div>
 

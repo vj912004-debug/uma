@@ -91,10 +91,10 @@ const InvoicesPI = () => {
       partyName: freshMR.partyName,
       productName: productLabel,
       productSummaries,
-      billAddress: freshMR.billAddress || '',
-      shipAddress: freshMR.shipAddress || '',
-      gstinBill: freshMR.gstinBill || '',
-      gstinShip: freshMR.gstinShip || '',
+      billAddress: freshMR.billAddress || mrParty?.billAddress || '',
+      shipAddress: freshMR.shipAddress || mrParty?.shipAddress || '',
+      gstinBill: freshMR.gstinBill || mrParty?.gstinBill || '',
+      gstinShip: freshMR.gstinShip || mrParty?.gstinShip || '',
       dcNo: 'Verbal',
       dcDate: docDate,
       qty: materialQty,
@@ -150,10 +150,10 @@ const InvoicesPI = () => {
         partyDocNo: freshMR.partyDocNo || '',
         partyDocDate: freshMR.partyDocDate || '',
         partyName: freshMR.partyName || '',
-        billAddress: freshMR.billAddress || '',
-        shipAddress: freshMR.shipAddress || '',
-        gstinBill: freshMR.gstinBill || '',
-        gstinShip: freshMR.gstinShip || '',
+        billAddress: freshMR.billAddress || mrParty?.billAddress || '',
+        shipAddress: freshMR.shipAddress || mrParty?.shipAddress || '',
+        gstinBill: freshMR.gstinBill || mrParty?.gstinBill || '',
+        gstinShip: freshMR.gstinShip || mrParty?.gstinShip || '',
         productName: productLabel,
         productSummaries,
         qty: materialQty,
@@ -271,6 +271,27 @@ const InvoicesPI = () => {
     setForm(prev => ({
       ...prev,
       qtys: { ...(prev.qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) }
+    }));
+  };
+
+  const addCustomCharge = () => {
+    setForm(prev => ({
+      ...prev,
+      customCharges: [...(prev.customCharges || []), { id: Date.now(), name: '', qty: 1, rate: 0, checked: true }]
+    }));
+  };
+
+  const updateCustomCharge = (id, field, value) => {
+    setForm(prev => ({
+      ...prev,
+      customCharges: prev.customCharges.map(c => c.id === id ? { ...c, [field]: value } : c)
+    }));
+  };
+
+  const removeCustomCharge = (id) => {
+    setForm(prev => ({
+      ...prev,
+      customCharges: prev.customCharges.filter(c => c.id !== id)
     }));
   };
 
@@ -665,7 +686,7 @@ const InvoicesPI = () => {
                           charges={form.charges}
                           rates={form.rates}
                           qtys={form.qtys}
-                          materialQty={materialQty}
+                          materialQty={parseFloat(form.qty) || 1}
                           onToggle={toggleCharge}
                           onQtyChange={handleQtyChange}
                           onRateChange={handleRateChange}
@@ -674,53 +695,26 @@ const InvoicesPI = () => {
                     </div>
                   )}
 
-                  <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                      <h4 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--accent-primary)', margin: 0 }}>Custom / Extra Charges</h4>
-                      <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setForm(prev => ({ ...prev, customCharges: [...(prev.customCharges || []), { name: '', hsn: '', rate: 0, qty: 1, checked: true }] }))}>
-                        + Add Custom Charge
+                  <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.9rem', fontWeight: 600 }}>Manual Custom Charges</label>
+                      <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={addCustomCharge}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Row
                       </button>
                     </div>
-                    {(form.customCharges || []).length === 0 ? (
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No custom charges applied.</p>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {(form.customCharges || []).map((charge, idx) => (
-                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--glass-bg)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                            <input type="checkbox" checked={charge.checked} onChange={e => {
-                              const newCharges = [...form.customCharges];
-                              newCharges[idx].checked = e.target.checked;
-                              setForm({...form, customCharges: newCharges});
-                            }} />
-                            <input type="text" className="input-field" style={{ flex: 2, padding: '0.2rem', fontSize: '0.8rem' }} placeholder="Charge Name" value={charge.name} onChange={e => {
-                              const newCharges = [...form.customCharges];
-                              newCharges[idx].name = e.target.value;
-                              setForm({...form, customCharges: newCharges});
-                            }} />
-                            <input type="text" className="input-field" style={{ flex: 1, padding: '0.2rem', fontSize: '0.8rem' }} placeholder="HSN" value={charge.hsn} onChange={e => {
-                              const newCharges = [...form.customCharges];
-                              newCharges[idx].hsn = e.target.value;
-                              setForm({...form, customCharges: newCharges});
-                            }} />
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Qty:</span>
-                            <input type="number" className="input-field" style={{ width: '60px', padding: '0.2rem', fontSize: '0.8rem' }} value={charge.qty} onChange={e => {
-                              const newCharges = [...form.customCharges];
-                              newCharges[idx].qty = parseFloat(e.target.value) || 0;
-                              setForm({...form, customCharges: newCharges});
-                            }} />
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate: ₹</span>
-                            <input type="number" className="input-field" style={{ width: '80px', padding: '0.2rem', fontSize: '0.8rem' }} value={charge.rate} onChange={e => {
-                              const newCharges = [...form.customCharges];
-                              newCharges[idx].rate = parseFloat(e.target.value) || 0;
-                              setForm({...form, customCharges: newCharges});
-                            }} />
-                            <button type="button" className="btn" style={{ padding: '0.3rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none' }} onClick={() => {
-                              const newCharges = form.customCharges.filter((_, i) => i !== idx);
-                              setForm({...form, customCharges: newCharges});
-                            }}><Trash2 size={14} /></button>
-                          </div>
-                        ))}
+                    {(form.customCharges || []).map(c => (
+                      <div key={c.id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                        <input type="checkbox" checked={c.checked !== false} onChange={e => updateCustomCharge(c.id, 'checked', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-primary)' }} />
+                        <input type="text" className="input-field" placeholder="Description" value={c.name} onChange={e => updateCustomCharge(c.id, 'name', e.target.value)} />
+                        <input type="number" className="input-field" placeholder="Qty" value={c.qty} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
+                        <input type="number" className="input-field" placeholder="Rate" value={c.rate} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
+                        <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeCustomCharge(c.id)}>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        </button>
                       </div>
+                    ))}
+                    {(form.customCharges || []).length === 0 && (
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No manual charges added.</div>
                     )}
                   </div>
                 </div>

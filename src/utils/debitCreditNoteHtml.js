@@ -50,6 +50,32 @@ const calcNoteLines = (data) => {
     totalQty += qty;
   });
 
+  (data.customCharges || []).forEach(c => {
+    const qty = parseFloat(c.qty) || 1;
+    const rate = parseFloat(c.rate) || 0;
+    const amt = qty * rate;
+    if (amt <= 0 && !rate) return;
+    const sgstAmt = amt * (halfRate / 100);
+    const cgstAmt = amt * (halfRate / 100);
+    sr += 1;
+    rows.push({
+      sr,
+      label: c.description || 'Custom Charge',
+      qty,
+      rate,
+      amt,
+      sgstRate: halfRate,
+      cgstRate: halfRate,
+      sgstAmt,
+      cgstAmt,
+      rowTotal: amt + sgstAmt + cgstAmt
+    });
+    totalAmt += amt;
+    totalSgst += sgstAmt;
+    totalCgst += cgstAmt;
+    totalQty += qty;
+  });
+
   if (!rows.length && (data.particulars || data.amount)) {
     const amt = parseFloat(data.subtotal) || parseFloat(data.amount) || 0;
     const sgstAmt = amt * (halfRate / 100);
@@ -458,7 +484,7 @@ const getCommonStyle = () => `
   .barfoot{
     background:var(--purple);
     color:#fff;
-    margin-top:14px;
+    margin:14px -18px -18px -18px;
     padding:8px 16px;
     display:flex;
     justify-content:space-between;
@@ -800,7 +826,7 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
   <div class="barfoot">
     <span>Thank you for your business!</span>
     <span>E. &amp; O.E.</span>
-    <span>This is a computer-generated ${noteType.toLowerCase()} and does not require a physical signature.</span>
+    <span>This is a computer-generated ${noteType.toLowerCase()}.</span>
     <span>Page 1 of 1</span>
   </div>
 

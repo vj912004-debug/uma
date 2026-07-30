@@ -495,7 +495,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
   .barfoot{
     background:var(--purple);
     color:#fff;
-    margin-top:14px;
+    margin:14px -18px -18px -18px;
     padding:8px 16px;
     display:flex;
     justify-content:space-between;
@@ -707,7 +707,7 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
   <div class="barfoot">
     <span>Thank you for your business!</span>
     <span>E. &amp; O.E.</span>
-    <span>This is a computer-generated invoice and does not require a physical signature.</span>
+    <span>This is a computer-generated invoice.</span>
     <span>Page 1 of 1</span>
   </div>
 

@@ -40,6 +40,7 @@ const DebitNotes = () => {
     charges: defaultChargeFlags({ other: true }),
     rates: defaultChargeRates(['other']),
     qtys: emptyChargeQtys(['other']),
+    customCharges: [],
     discount: 0,
     taxRate: 18
   });
@@ -69,6 +70,7 @@ const DebitNotes = () => {
       charges: defaultChargeFlags({ other: true }),
       rates: defaultChargeRates(['other']),
       qtys: emptyChargeQtys(['other']),
+      customCharges: [],
       discount: 0,
       taxRate: 18
     });
@@ -82,7 +84,8 @@ const DebitNotes = () => {
       ...note,
       qtys: note.qtys
         ? { ...emptyChargeQtys(['other']), ...note.qtys }
-        : buildChargeQtys({}, legacyQty, ['other'])
+        : buildChargeQtys({}, legacyQty, ['other']),
+      customCharges: note.customCharges || []
     });
     setIsEditing(note.id);
     setIsModalOpen(true);
@@ -99,6 +102,27 @@ const DebitNotes = () => {
     });
   };
 
+  const addCustomCharge = () => {
+    setForm(prev => ({
+      ...prev,
+      customCharges: [...(prev.customCharges || []), { id: Date.now(), description: '', qty: 1, rate: 0 }]
+    }));
+  };
+
+  const updateCustomCharge = (id, field, value) => {
+    setForm(prev => ({
+      ...prev,
+      customCharges: prev.customCharges.map(c => c.id === id ? { ...c, [field]: value } : c)
+    }));
+  };
+
+  const removeCustomCharge = (id) => {
+    setForm(prev => ({
+      ...prev,
+      customCharges: prev.customCharges.filter(c => c.id !== id)
+    }));
+  };
+
   const handleRateChange = (key, val) => {
     setForm(prev => ({ ...prev, rates: { ...prev.rates, [key]: parseChargeFieldValue(val) } }));
   };
@@ -107,8 +131,18 @@ const DebitNotes = () => {
     setForm(prev => ({ ...prev, qtys: { ...(prev.qtys || emptyChargeQtys(['other'])), [key]: parseChargeFieldValue(val) } }));
   };
 
-  const getSubtotal = () =>
-    calcStandardChargesSubtotal(form.charges, form.rates, form.qtys, 0, DN_CHARGE_KEYS);
+  const getSubtotal = () => {
+    let subtotal = calcStandardChargesSubtotal(form.charges, form.rates, form.qtys, 0, DN_CHARGE_KEYS);
+    
+    (form.customCharges || []).forEach(c => {
+      subtotal += (parseFloat(c.qty) || 0) * (parseFloat(c.rate) || 0);
+    });
+
+    if (subtotal === 0 && (form.particulars || form.amount)) {
+      subtotal = parseFloat(form.amount) || 0;
+    }
+    return subtotal;
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -197,10 +231,10 @@ const DebitNotes = () => {
                           const party = data.parties?.find(p => p.id === note.partyId) || {};
                           exportToPDF('DN', {
                             ...note,
-                            address: party.address,
-                            state: party.state,
-                            stateCode: party.stateCode,
-                            gstin: party.gstin
+                            address: party.billAddress,
+                            state: 'GUJARAT',
+                            stateCode: '24',
+                            gstin: party.gstinBill
                           });
                         }} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={16} /></button>
                         <button onClick={() => handleEdit(note)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={16} /></button>
@@ -290,6 +324,28 @@ const DebitNotes = () => {
                         onRateChange={handleRateChange}
                       />
                     ))}
+                  </div>
+
+                  <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.9rem', fontWeight: 600 }}>Manual Custom Charges</label>
+                      <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={addCustomCharge}>
+                        <Plus size={14} /> Add Row
+                      </button>
+                    </div>
+                    {(form.customCharges || []).map(c => (
+                      <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                        <input type="text" className="input-field" placeholder="Description" value={c.description} onChange={e => updateCustomCharge(c.id, 'description', e.target.value)} />
+                        <input type="number" className="input-field" placeholder="Qty" value={c.qty} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
+                        <input type="number" className="input-field" placeholder="Rate" value={c.rate} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
+                        <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeCustomCharge(c.id)}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    {(form.customCharges || []).length === 0 && (
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No manual charges added.</div>
+                    )}
                   </div>
                 </div>
 

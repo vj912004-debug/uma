@@ -357,11 +357,11 @@ export const buildBprHtml = (data, profileInput) => {
           <td colspan="5" class="left-align">Is Filter Bag Packed in HDPE bag and lable &amp; stored properly after processing ?</td>
           <td>${bprMark(data.filterBagPacked)}</td>
         </tr>
-        <tr class="remark-row">
-          <td class="left-align">Remark</td>
-          <td colspan="5" class="left-align">${escHtml(data.remark || data.dispatchRemark || '')}</td>
-        </tr>
       </table>
+      <div class="remark-box">
+        <div class="remark-label">Remark</div>
+        <div class="remark-content">${escHtml(data.remark || data.dispatchRemark || '')}</div>
+      </div>
 
       <div class="signature-container">
         <div class="signature-box">
@@ -392,7 +392,8 @@ export const buildBprHtml = (data, profileInput) => {
   table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:-1px;}
   table.g th,table.g td{
     border:1px solid #7c12bd;text-align:center;vertical-align:middle;
-    font-size:10px;font-weight:700;color:#4a0080;padding:3px 2px;height:22px;
+    font-size:10px;font-weight:700;color:#4a0080;padding:3px 2px;
+    word-break:break-all;overflow-wrap:break-word;white-space:pre-wrap;
   }
   .purple-header{background:#5a009d;color:#fff !important;}
   .light-purple-header td,.light-purple-header th{background:#e2d3f3;color:#4a0080;}
@@ -415,9 +416,8 @@ export const buildBprHtml = (data, profileInput) => {
     display:inline-block;font-size:10px;font-weight:700;
   }
   .psd-note-box{
-    flex:0 1 auto;
+    flex:1;
     min-height:48px;
-    max-height:72px;
     display:flex;
     flex-direction:column;
     border:1px solid #7c12bd;
@@ -445,11 +445,29 @@ export const buildBprHtml = (data, profileInput) => {
     line-height:1.3;
     overflow:hidden;
   }
-  .remark-row td{
-    height:78px !important;
-    min-height:78px;
-    vertical-align:top !important;
-    padding-top:6px !important;
+  .remark-box {
+    flex: 1;
+    display: flex;
+    border: 1px solid #7c12bd;
+    margin-bottom: -1px;
+    min-height: 48px;
+  }
+  .remark-label {
+    width: 20%;
+    border-right: 1px solid #7c12bd;
+    color: #4a0080;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 6px;
+  }
+  .remark-content {
+    width: 80%;
+    color: #4a0080;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 6px;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
   .page-p1 .sheet{min-height:calc(1123px - 16px);}
   .signature-container{
@@ -470,9 +488,9 @@ export const buildBprHtml = (data, profileInput) => {
   .meta{display:flex;flex-wrap:wrap;border:1.5px solid #5a009d;margin-bottom:6px;border-radius:4px;overflow:hidden;}
   .meta-item{padding:4px 8px;border-right:1px solid #e2d3f3;border-bottom:1px solid #e2d3f3;font-size:10px;width:32%;box-sizing:border-box;color:#4a0080;font-weight:600;}
   .meta-item.label{color:#5a009d;font-weight:700;background:#e2d3f3;width:18%;}
-  table.items{width:100%;border-collapse:collapse;margin-bottom:6px;font-size:10px;flex:1;}
-  table.items thead th{background:#5a009d;color:#fff;font-weight:700;padding:4px 3px;text-align:center;border:1px solid #5a009d;font-size:9px;}
-  table.items tbody td{border:1px solid #7c12bd;padding:2px 3px;height:22px;text-align:center;color:#4a0080;font-weight:600;}
+  table.items{width:100%;border-collapse:collapse;margin-bottom:6px;font-size:8.5px;flex:1;table-layout:auto;}
+  table.items thead th{background:#5a009d;color:#fff;font-weight:700;padding:4px 3px;text-align:center;border:1px solid #5a009d;font-size:8.5px;white-space:nowrap;}
+  table.items tbody td{border:1px solid #7c12bd;padding:2px 3px;text-align:center;color:#4a0080;font-weight:600;font-size:8.5px;white-space:nowrap;}
   table.items tbody tr.total-hl td{background:#e2d3f3;color:#4a0080;font-weight:700;height:24px;}
   .barfoot{background:#5a009d;color:#fff;padding:6px 12px;display:flex;justify-content:space-between;font-size:10px;margin-top:auto;border-radius:4px;}
   .signs{display:flex;border:1px solid #7c12bd;margin-top:4px;margin-bottom:6px;border-radius:4px;overflow:hidden;}
