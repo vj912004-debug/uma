@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Plus, Search, Download, Trash2, Edit2 } from 'lucide-react';
+import {Eye,  Plus, Search, Download, Trash2, Edit2 } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
-import { exportToPDF } from '../utils/pdfExport';
+import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import { formatDate } from '../utils/dateUtils';
 
 const defaultValidityDate = () => {
@@ -387,6 +387,9 @@ const Quotations = () => {
                   <td>{q.subject}</td>
                   <td>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }} onClick={() => viewPDF('QUOTATION', q)} title="Preview PDF">
+                        <Eye size={14} /> Preview
+                      </button>
                       <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }} onClick={() => exportToPDF('QUOTATION', q)}>
                         <Download size={14} /> PDF
                       </button>

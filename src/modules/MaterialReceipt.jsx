@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import ExportButton from '../components/ExportButton';
-import { exportToPDF } from '../utils/pdfExport';
-import { Plus, Search, FileDown, Edit2, Trash2, ShieldAlert } from 'lucide-react';
+import { exportToPDF, viewPDF } from '../utils/pdfExport';
+import {Eye,  Plus, Search, FileDown, Edit2, Trash2, ShieldAlert } from 'lucide-react';
 import {
   getReceiptProductNames,
   getProductBatches,

@@ -2,8 +2,8 @@ import { formatDate } from '../utils/dateUtils';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
-import { exportToPDF } from '../utils/pdfExport';
+import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
+import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import ExportButton from '../components/ExportButton';
 import DocChargeRow from '../components/DocChargeRow';
 import {
@@ -341,6 +341,7 @@ const PurchaseOrders = () => {
                       <td style={{ fontWeight: 600 }}>₹{po.total?.toFixed(2)}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button title="Preview PDF" onClick={() => viewPDF('PO', po)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Eye size={14} /></button>
                           <button onClick={() => exportToPDF('PO', po)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
                           <button onClick={() => handleEdit(po)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={14} /></button>
                           <button onClick={() => deleteItemSoftly('purchaseOrders', po.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }}>

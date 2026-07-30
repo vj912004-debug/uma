@@ -511,6 +511,10 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
         </table>
       </div>
 
+    </td>
+  </tr>
+  <tr>
+    <td valign="bottom" style="padding: 18px; padding-top: 0; height: 1px;">
       <div class="dc-footer-grid">
         <div class="dc-meta-card">
           <div class="box-head"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> TRANSPORT DETAILS</div>

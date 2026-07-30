@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { exportToPDF } from '../utils/pdfExport';
-import { Search, UploadCloud, Trash2, Calendar, ClipboardList, CheckCircle } from 'lucide-react';
+import { exportToPDF, viewPDF } from '../utils/pdfExport';
+import {Eye,  Search, UploadCloud, Trash2, Calendar, ClipboardList, CheckCircle } from 'lucide-react';
 
 const PSD = () => {
   const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
@@ -217,6 +217,7 @@ const PSD = () => {
                       </td>
                       <td style={{ padding: '0.75rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button onClick={() => viewPDF('PSD', psd)} style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer' }} title="Preview PDF"><Eye size={16} /></button>
                           <button onClick={() => exportToPDF('PSD', psd)} style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer' }} title="Download PDF"><ClipboardList size={16} /></button>
                           <button onClick={() => deletePSD(psd.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }} title="Delete"><Trash2 size={16} /></button>
                         </div>

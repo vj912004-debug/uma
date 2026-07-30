@@ -1,9 +1,9 @@
 import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Plus, Search, Edit2, Trash2, FileDown } from 'lucide-react';
+import {Eye,  Plus, Search, Edit2, Trash2, FileDown } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
-import { exportToPDF } from '../utils/pdfExport';
+import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import DocChargeRow from '../components/DocChargeRow';
 import {
   STANDARD_CHARGES_LIST,
@@ -227,7 +227,17 @@ const DebitNotes = () => {
                     <td style={{ fontWeight: 600 }}>₹{parseFloat(note.amount || 0).toFixed(2)}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={() => {
+                        <button title="Preview PDF" onClick={() => {
+                          const party = data.parties?.find(p => p.id === note.partyId) || {};
+                          viewPDF('DN', {
+                            ...note,
+                            address: party.billAddress,
+                            state: 'GUJARAT',
+                            stateCode: '24',
+                            gstin: party.gstinBill
+                          });
+                        }} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Eye size={16} /></button>
+                          <button onClick={() => {
                           const party = data.parties?.find(p => p.id === note.partyId) || {};
                           exportToPDF('DN', {
                             ...note,

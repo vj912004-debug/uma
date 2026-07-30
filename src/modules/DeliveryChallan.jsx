@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
-import { exportToPDF } from '../utils/pdfExport';
+import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
+import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import {
   buildDCFieldsFromProducts,
   getReceiptProductNames,
@@ -247,6 +247,7 @@ const DeliveryChallan = () => {
                       <td style={{ padding: '0.75rem' }}>{dc.vehicleNo}</td>
                       <td style={{ padding: '0.75rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button type="button" title="Preview PDF" onClick={() => viewPDF('DC', dc)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Eye size={14} /></button>
                           <button type="button" onClick={() => exportToPDF('DC', dc)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
                           <button type="button" onClick={() => handleEdit(dc)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={14} /></button>
                           <button type="button" onClick={() => deleteDC(dc.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }}><Trash2 size={14} /></button>
