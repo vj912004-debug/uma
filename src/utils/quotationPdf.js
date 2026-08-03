@@ -357,20 +357,7 @@ export const buildQuotationHtml = (data, profileInput) => {
         ${descriptionHtml ? `<p>${descriptionHtml}</p>` : ''}
       </div>
       <div class="fac-img">
-        <svg viewBox="0 0 300 190" preserveAspectRatio="xMidYMid slice">
-          <rect width="300" height="190" fill="#dfe6ee"/>
-          <rect y="120" width="300" height="70" fill="#c7d0dc"/>
-          <rect x="0" y="0" width="300" height="120" fill="#eef2f6"/>
-          <rect x="20" y="30" width="60" height="90" rx="4" fill="#b9c3d1"/>
-          <ellipse cx="150" cy="90" rx="45" ry="55" fill="#9aa7b8"/>
-          <ellipse cx="150" cy="90" rx="45" ry="55" fill="none" stroke="#6f7c8d" stroke-width="3"/>
-          <rect x="130" y="20" width="40" height="16" fill="#7f8ca0"/>
-          <circle cx="150" cy="150" r="6" fill="#556170"/>
-          <rect x="200" y="55" width="70" height="65" rx="3" fill="#aeb8c6"/>
-          <rect x="210" y="65" width="20" height="45" fill="#8f9aab"/>
-          <rect x="235" y="65" width="20" height="45" fill="#8f9aab"/>
-          <circle cx="65" cy="45" r="8" fill="#6f7c8d"/>
-        </svg>
+        <img src="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMzAwIDE5MCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ieE1pZFlNaWQgc2xpY2UiPg0KICAgICAgICAgIDxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMTkwIiBmaWxsPSIjZGZlNmVlIi8+DQogICAgICAgICAgPHJlY3QgeT0iMTIwIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjcwIiBmaWxsPSIjYzdkMGRjIi8+DQogICAgICAgICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjMwMCIgaGVpZ2h0PSIxMjAiIGZpbGw9IiNlZWYyZjYiLz4NCiAgICAgICAgICA8cmVjdCB4PSIyMCIgeT0iMzAiIHdpZHRoPSI2MCIgaGVpZ2h0PSI5MCIgcng9IjQiIGZpbGw9IiNiOWMzZDEiLz4NCiAgICAgICAgICA8ZWxsaXBzZSBjeD0iMTUwIiBjeT0iOTAiIHJ4PSI0NSIgcnk9IjU1IiBmaWxsPSIjOWFhN2I4Ii8+DQogICAgICAgICAgPGVsbGlwc2UgY3g9IjE1MCIgY3k9IjkwIiByeD0iNDUiIHJ5PSI1NSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNmY3YzhkIiBzdHJva2Utd2lkdGg9IjMiLz4NCiAgICAgICAgICA8cmVjdCB4PSIxMzAiIHk9IjIwIiB3aWR0aD0iNDAiIGhlaWdodD0iMTYiIGZpbGw9IiM3ZjhjYTAiLz4NCiAgICAgICAgICA8Y2lyY2xlIGN4PSIxNTAiIGN5PSIxNTAiIHI9IjYiIGZpbGw9IiM1NTYxNzAiLz4NCiAgICAgICAgICA8cmVjdCB4PSIyMDAiIHk9IjU1IiB3aWR0aD0iNzAiIGhlaWdodD0iNjUiIHJ4PSIzIiBmaWxsPSIjYWViOGM2Ii8+DQogICAgICAgICAgPHJlY3QgeD0iMjEwIiB5PSI2NSIgd2lkdGg9IjIwIiBoZWlnaHQ9IjQ1IiBmaWxsPSIjOGY5YWFiIi8+DQogICAgICAgICAgPHJlY3QgeD0iMjM1IiB5PSI2NSIgd2lkdGg9IjIwIiBoZWlnaHQ9IjQ1IiBmaWxsPSIjOGY5YWFiIi8+DQogICAgICAgICAgPGNpcmNsZSBjeD0iNjUiIGN5PSI0NSIgcj0iOCIgZmlsbD0iIzZmN2M4ZCIvPg0KICAgICAgICA8L3N2Zz4=" style="width:100%; height:100%; object-fit:cover; display:block;" />
       </div>
     </div>
 
@@ -443,27 +430,7 @@ export const buildQuotationHtml = (data, profileInput) => {
       </div>
       <div class="fr-qr">
         <div class="qrbox">
-          <svg viewBox="0 0 100 100" width="64" height="64">
-            <rect width="100" height="100" fill="#fff"/>
-            <rect x="4" y="4" width="26" height="26" fill="none" stroke="#000" stroke-width="5"/>
-            <rect x="12" y="12" width="10" height="10" fill="#000"/>
-            <rect x="70" y="4" width="26" height="26" fill="none" stroke="#000" stroke-width="5"/>
-            <rect x="78" y="12" width="10" height="10" fill="#000"/>
-            <rect x="4" y="70" width="26" height="26" fill="none" stroke="#000" stroke-width="5"/>
-            <rect x="12" y="78" width="10" height="10" fill="#000"/>
-            <rect x="40" y="10" width="8" height="8" fill="#000"/>
-            <rect x="52" y="10" width="8" height="8" fill="#000"/>
-            <rect x="40" y="24" width="8" height="8" fill="#000"/>
-            <rect x="60" y="40" width="8" height="8" fill="#000"/>
-            <rect x="40" y="40" width="8" height="8" fill="#000"/>
-            <rect x="80" y="40" width="8" height="8" fill="#000"/>
-            <rect x="40" y="55" width="8" height="8" fill="#000"/>
-            <rect x="55" y="60" width="8" height="8" fill="#000"/>
-            <rect x="70" y="70" width="8" height="8" fill="#000"/>
-            <rect x="55" y="80" width="8" height="8" fill="#000"/>
-            <rect x="85" y="85" width="8" height="8" fill="#000"/>
-            <rect x="40" y="85" width="8" height="8" fill="#000"/>
-          </svg>
+          <img src="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij4NCiAgICAgICAgICAgIDxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjZmZmIi8+DQogICAgICAgICAgICA8cmVjdCB4PSI0IiB5PSI0IiB3aWR0aD0iMjYiIGhlaWdodD0iMjYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSI1Ii8+DQogICAgICAgICAgICA8cmVjdCB4PSIxMiIgeT0iMTIiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iIzAwMCIvPg0KICAgICAgICAgICAgPHJlY3QgeD0iNzAiIHk9IjQiIHdpZHRoPSIyNiIgaGVpZ2h0PSIyNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjUiLz4NCiAgICAgICAgICAgIDxyZWN0IHg9Ijc4IiB5PSIxMiIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjMDAwIi8+DQogICAgICAgICAgICA8cmVjdCB4PSI0IiB5PSI3MCIgd2lkdGg9IjI2IiBoZWlnaHQ9IjI2IiBmaWxsPSJub25lIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iNSIvPg0KICAgICAgICAgICAgPHJlY3QgeD0iMTIiIHk9Ijc4IiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiMwMDAiLz4NCiAgICAgICAgICAgIDxyZWN0IHg9IjQwIiB5PSIxMCIgd2lkdGg9IjgiIGhlaWdodD0iOCIgZmlsbD0iIzAwMCIvPg0KICAgICAgICAgICAgPHJlY3QgeD0iNTIiIHk9IjEwIiB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMDAwIi8+DQogICAgICAgICAgICA8cmVjdCB4PSI0MCIgeT0iMjQiIHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiMwMDAiLz4NCiAgICAgICAgICAgIDxyZWN0IHg9IjYwIiB5PSI0MCIgd2lkdGg9IjgiIGhlaWdodD0iOCIgZmlsbD0iIzAwMCIvPg0KICAgICAgICAgICAgPHJlY3QgeD0iNDAiIHk9IjQwIiB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMDAwIi8+DQogICAgICAgICAgICA8cmVjdCB4PSI4MCIgeT0iNDAiIHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiMwMDAiLz4NCiAgICAgICAgICAgIDxyZWN0IHg9IjQwIiB5PSI1NSIgd2lkdGg9IjgiIGhlaWdodD0iOCIgZmlsbD0iIzAwMCIvPg0KICAgICAgICAgICAgPHJlY3QgeD0iNTUiIHk9IjYwIiB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMDAwIi8+DQogICAgICAgICAgICA8cmVjdCB4PSI3MCIgeT0iNzAiIHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiMwMDAiLz4NCiAgICAgICAgICAgIDxyZWN0IHg9IjU1IiB5PSI4MCIgd2lkdGg9IjgiIGhlaWdodD0iOCIgZmlsbD0iIzAwMCIvPg0KICAgICAgICAgICAgPHJlY3QgeD0iODUiIHk9Ijg1IiB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMDAwIi8+DQogICAgICAgICAgICA8cmVjdCB4PSI0MCIgeT0iODUiIHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiMwMDAiLz4NCiAgICAgICAgICA8L3N2Zz4=" width="64" height="64" style="margin: 0 auto; display: block;" />
         </div>
         <span>SCAN TO VISIT OUR WEBSITE</span>
       </div>
