@@ -592,15 +592,23 @@ export const renderHtmlToPdf = async (html, {
     const singlePageHeight = Math.round(width * a4Ratio);
     const lockToSinglePage = fitPage || pageNodes.length > 0;
 
+    const captureScale = 2;
     const clipCanvasToA4 = (sourceCanvas) => {
-      const expectedH = Math.round(sourceCanvas.width * a4Ratio);
-      if (sourceCanvas.height <= expectedH + 1) return sourceCanvas;
+      // Exact A4 pixel box at capture scale — keeps right/bottom borders visible
+      const expectedW = Math.round(width * captureScale);
+      const expectedH = Math.round(expectedW * a4Ratio);
+      if (
+        Math.abs(sourceCanvas.width - expectedW) <= 1 &&
+        Math.abs(sourceCanvas.height - expectedH) <= 1
+      ) {
+        return sourceCanvas;
+      }
       const clipped = document.createElement('canvas');
-      clipped.width = sourceCanvas.width;
+      clipped.width = expectedW;
       clipped.height = expectedH;
       const ctx = clipped.getContext('2d');
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, clipped.width, clipped.height);
+      ctx.fillRect(0, 0, expectedW, expectedH);
       ctx.drawImage(sourceCanvas, 0, 0);
       return clipped;
     };
@@ -623,18 +631,34 @@ export const renderHtmlToPdf = async (html, {
       }
 
       const canvasRaw = await html2canvas(target, {
-        scale: 2,
+        scale: captureScale,
         useCORS: true,
         backgroundColor: '#ffffff',
         width,
         windowWidth: width,
         height: lockToSinglePage ? singlePageHeight : target.scrollHeight,
         windowHeight: lockToSinglePage ? singlePageHeight : target.scrollHeight,
+        x: 0,
+        y: 0,
         scrollX: 0,
         scrollY: 0,
         logging: false,
         onclone: (clonedDoc) => {
           if (!lockToSinglePage) return;
+          const htmlEl = clonedDoc.documentElement;
+          const bodyEl = clonedDoc.body;
+          if (htmlEl) {
+            htmlEl.style.width = `${width}px`;
+            htmlEl.style.margin = '0';
+            htmlEl.style.padding = '0';
+            htmlEl.style.overflow = 'hidden';
+          }
+          if (bodyEl) {
+            bodyEl.style.width = `${width}px`;
+            bodyEl.style.margin = '0';
+            bodyEl.style.padding = '0';
+            bodyEl.style.overflow = 'hidden';
+          }
           clonedDoc.querySelectorAll('.pdf-page, .print-host').forEach((el) => {
             el.style.width = `${width}px`;
             el.style.height = `${singlePageHeight}px`;
@@ -644,6 +668,7 @@ export const renderHtmlToPdf = async (html, {
             el.style.transform = 'none';
             el.style.zoom = '1';
             el.style.margin = '0';
+            el.style.boxSizing = 'border-box';
           });
         }
       });

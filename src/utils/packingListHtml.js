@@ -62,6 +62,19 @@ export const buildPackingListHtml = (data, profileInput) => {
       </tr>`).join('');
   }).join('');
 
+  const TARGET_ROW_COUNT = 33;
+  const actualRowsCount = batchGroups.reduce((acc, g) => acc + g.rows.length, 0);
+  const emptyRowsCount = Math.max(0, TARGET_ROW_COUNT - actualRowsCount);
+  const emptyRowsHtml = Array.from({ length: emptyRowsCount }).map(() => `
+      <tr class="empty">
+        <td class="num">&nbsp;</td>
+        <td class="num">&nbsp;</td>
+        <td class="num">&nbsp;</td>
+        <td class="num">&nbsp;</td>
+        <td class="num">&nbsp;</td>
+        <td class="num">&nbsp;</td>
+      </tr>`).join('');
+
   const declaredNet = parseFloat(data.totalWeight);
   const finalNet = Number.isFinite(declaredNet) && declaredNet > 0 ? declaredNet : grandNet;
   const totalDrums = parseInt(data.totalDrums, 10) || batches.length;
@@ -290,6 +303,7 @@ export const buildPackingListHtml = (data, profileInput) => {
             </thead>
             <tbody>
               ${tableRowsHtml}
+              ${emptyRowsHtml}
             </tbody>
             <tfoot>
               <tr>

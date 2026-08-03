@@ -1,7 +1,7 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { buildDcPrintLines, getDcAppData } from './deliveryChallanLayout';
 import { formatPdfDateDmy } from './taxInvoiceLayout';
-import { escHtml, fmtQty, buildPrintLogoHtml } from './printTheme';
+import { escHtml, fmtQty, buildPrintLogoHtml, renderHtmlToPdf } from './printTheme';
 
 export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   const profile = mergeCompanyProfile(profileInput);
@@ -106,7 +106,9 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     }
   });
 
-  const blanksCount = Math.max(0, 15 - bodyRows.length);
+  // Minimum blank rows; middle page row stretches them to fill remaining height
+  const DC_MIN_ROWS = 24;
+  const blanksCount = Math.max(0, DC_MIN_ROWS - bodyRows.length);
   for (let i = 0; i < blanksCount; i++) {
     bodyRows.push(`
       <tr class="empty">
@@ -128,6 +130,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   :root{
     --purple:#3d2b7d;
     --purple-dark:#2f2263;
+    --purple-border:#c9bce8;
     --lav-bg:#efeaf7;
     --lav-border:#c9bce8;
     --orange:#f47920;
@@ -136,22 +139,29 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     --grey-line:#d9d9d9;
   }
   *{box-sizing:border-box;font-family:Cambria,Georgia,serif;}
-  html,body{margin:0;padding: 4px;background:#fff;font-family:Cambria,Georgia,serif;color:var(--text);}
+  html,body{margin:0;padding:0;background:#fff;width:794px;overflow:hidden;font-family:Cambria,Georgia,serif;color:var(--text);}
   
-  /* A4 scaling */
+  /* Outer border lives on .content-wrapper so right edge is never clipped */
   .page {
     width: 794px;
-    min-height: 1123px;
+    height: 1123px;
     padding: 4px;
     margin: 0;
     background: #fff;
-    border: none;
-    display: block;
+    display: flex;
+    flex-direction: column;
   }
 
-  /* Outline for the whole content */
-  .content-wrapper { width: 100%; min-height: 1115px; height: 1115px; border-collapse: collapse; border: 2px solid var(--purple); box-sizing: border-box; }
+  .content-wrapper {
+    width: 100%;
+    flex: 1;
+    border-collapse: collapse;
+    border: 2px solid var(--purple);
+    box-sizing: border-box;
+  }
   .content-wrapper td { padding: 0; vertical-align: top; }
+  .content-wrapper td.pad-bot { vertical-align: bottom; }
+  .content-wrapper td.pad-mid { vertical-align: top; }
 
   /* ===== HEADER ===== */
   .header {
@@ -242,12 +252,16 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     display: flex;
     gap: 14px;
     margin-bottom: 14px;
+    width: 100%;
+    max-width: 100%;
   }
   .party {
     flex: 1;
+    min-width: 0;
     border: 1px solid var(--lav-border);
     display: flex;
     flex-direction: column;
+    box-sizing: border-box;
   }
   .party-head {
     background: var(--lav-bg);
@@ -300,11 +314,18 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   .meta-row .m-colon { width: 14px; flex-shrink: 0; font-weight: 600; }
   .meta-row .m-value { flex-shrink: 0; font-weight: 600; }
 
-  /* ===== TABLE ===== */
+  /* ===== 3-row page: header | stretchable items | footer (never clipped) ===== */
+  .pad-x { padding-left: 12px; padding-right: 12px; }
+  .pad-top { padding-top: 12px; }
+  .pad-mid { padding-top: 0; padding-bottom: 10px; vertical-align: top; }
+  .pad-bot { padding-bottom: 0; vertical-align: bottom; }
+
   table.items {
     width: 100%;
+    max-width: 100%;
     border-collapse: collapse;
-    margin-bottom: 14px;
+    table-layout: fixed;
+    margin: 0;
     font-size:12px;
   }
   table.items thead th {
@@ -317,31 +338,21 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   }
   table.items tbody td {
     border: 1px solid var(--lav-border);
-    padding: 6px 6px;
+    padding: 6px 4px;
     height: 20px;
     vertical-align: middle;
+    font-size:12px;
+    font-weight: 500;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
   }
   table.items tbody td.num { text-align: center; }
   table.items tbody td.left { text-align: left; }
   table.items tbody tr.empty td {
-    height: 22px;
-    border-top: 1px dashed var(--lav-border);
-    border-bottom: 1px dashed var(--lav-border);
-    border-left: 1px solid var(--lav-border);
-    border-right: 1px solid var(--lav-border);
+    height: 20px;
+    border: 1px solid var(--lav-border);
   }
-  
-  table.items td {
-    padding: 6px 4px;
-    border: 1px solid var(--purple-border);
-    border-top: none;
-    font-size:12px;
-    font-weight: 500;
-    word-break: break-all;
-    overflow-wrap: break-word;
-    white-space: pre-wrap;
-  }
-  
   table.items tfoot td {
     border: 1px solid var(--purple);
     background: var(--lav-bg);
@@ -354,14 +365,18 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   .dc-footer-grid {
       display: flex;
       gap: 14px;
-      margin-top: 14px;
+      margin-top: 0;
+      width: 100%;
+      max-width: 100%;
   }
-  .dc-footer-grid > div:nth-child(1) { flex: 1.15; }
-  .dc-footer-grid > div:nth-child(2) { flex: 0.85; }
+  .dc-footer-grid > div:nth-child(1) { flex: 1.15; min-width: 0; }
+  .dc-footer-grid > div:nth-child(2) { flex: 0.85; min-width: 0; }
   .dc-meta-card {
       border: 1px solid var(--lav-border);
       display: flex;
       flex-direction: column;
+      box-sizing: border-box;
+      width: 100%;
   }
   .box-head {
       background: var(--lav-bg);
@@ -379,7 +394,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   .dc-meta-card > div:not(.box-head) { padding: 4px 12px; font-size:12px; }
   .dc-meta-row { display: flex; margin-bottom: 2px; }
   .dc-meta-label { color: var(--text-black); font-weight: bold; width: 130px; flex-shrink: 0; }
-  .dc-sign-stack { display: flex; flex-direction: column; gap: 14px; }
+  .dc-sign-stack { display: flex; flex-direction: column; gap: 14px; width: 100%; box-sizing: border-box; }
   .dc-sign-card {
       flex: 1;
       border: 1px solid var(--lav-border);
@@ -388,28 +403,34 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
       align-items: center;
       justify-content: space-between;
       text-align: center;
+      box-sizing: border-box;
+      width: 100%;
+      padding-bottom: 6px;
   }
-  .dc-sign-space { width: 80%; border-bottom: 1px solid #333; margin-top: 40px; margin-bottom: 5px; }
+  .dc-sign-space { width: 80%; border-bottom: 1px solid #333; margin-top: 28px; margin-bottom: 5px; }
   .dc-sign-title { background: var(--lav-bg); color: var(--purple); font-weight: 800; font-size:12px; padding: 7px 12px; width: 100%; border-bottom: 1px solid var(--lav-border); display: flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; }
 
   .barfoot {
     background: var(--purple);
     color: #fff;
-    margin: 14px -18px -18px -18px;
-    padding: 8px 16px;
+    margin: 12px 0 6px 0;
+    padding: 8px 14px;
     display: flex;
     justify-content: space-between;
     font-size:12px;
+    box-sizing: border-box;
+    border-radius: 6px;
   }
+  .dc-meta-card .dc-meta-row:first-of-type { margin-top: 8px; }
+  .dc-meta-card .dc-meta-row:last-child { margin-bottom: 8px; }
 </style>
 </head>
 <body>
 
-  <div class="page">
+  <div class="page pdf-page print-host">
     <table class="content-wrapper">
   <tr>
-    <td valign="top" style="padding: 18px; padding-bottom: 0;">
-      
+    <td class="pad-x pad-top" valign="top">
       <div class="header">
         <div class="brand">
           <div class="logo">
@@ -486,8 +507,10 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
           </div>
         </div>
       </div>
-
-      <div class="table-container">
+    </td>
+  </tr>
+  <tr class="items-row">
+    <td class="pad-x pad-mid">
         <table class="items">
           <thead>
             <tr>
@@ -509,16 +532,14 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
             </tr>
           </tfoot>
         </table>
-      </div>
-
     </td>
   </tr>
   <tr>
-    <td valign="bottom" style="padding: 18px; padding-top: 0; height: 1px;">
+    <td class="pad-x pad-bot">
       <div class="dc-footer-grid">
         <div class="dc-meta-card">
           <div class="box-head"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> TRANSPORT DETAILS</div>
-          <div class="dc-meta-row" style="margin-top:8px;"><div class="dc-meta-label">Vehicle No.</div><div class="data-value">: &nbsp;${escHtml(data.vehicleNo || '')}</div></div>
+          <div class="dc-meta-row"><div class="dc-meta-label">Vehicle No.</div><div class="data-value">: &nbsp;${escHtml(data.vehicleNo || '')}</div></div>
           <div class="dc-meta-row"><div class="dc-meta-label">Drivers name</div><div class="data-value">: &nbsp;${escHtml(data.driverName || '')}</div></div>
           <div class="dc-meta-row"><div class="dc-meta-label">Driver's Contact</div><div class="data-value">: &nbsp;${escHtml(data.driverContact || data.driverPhone || '')}</div></div>
           <div class="dc-meta-row"><div class="dc-meta-label">Transporter's Name</div><div class="data-value">: &nbsp;${escHtml(data.transporterName || data.transporter || '')}</div></div>
@@ -554,51 +575,11 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
 export const renderDeliveryChallanPdf = async (data, { mode = 'save' } = {}) => {
   const appData = data.appData || getDcAppData();
   const html = buildDeliveryChallanHtml(data, data.companyProfile, appData);
-  const { jsPDF } = await import('jspdf');
-  const html2canvas = (await import('html2canvas')).default;
-  const host = document.createElement('div');
-  host.style.cssText = 'position:absolute;left:-12000px;top:0;z-index:-1;background:#fff;';
-  host.innerHTML = html;
-  document.body.appendChild(host);
-  try {
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const margin = 0;
-    const usableW = pageW - margin * 2;
-    const usableH = pageH - margin * 2;
-
-    const target = host.querySelector('.page') || host.firstElementChild;
-    const canvas = await html2canvas(target, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      width: 794,
-      windowWidth: 794,
-      height: target.scrollHeight,
-      windowheight: target.scrollHeight,
-      logging: false
-    });
-
-    const naturalW = usableW;
-    const naturalH = (canvas.height * naturalW) / canvas.width;
-    const scale = Math.min(usableW / naturalW, usableH / naturalH, 1);
-    const drawW = naturalW * scale;
-    const drawH = naturalH * scale;
-    const x = margin + (usableW - drawW) / 2;
-    const y = margin;
-    
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297);
-
-    if (mode === 'view') {
-      const url = pdf.output('bloburl');
-      const win = window.open(url, '_blank');
-      if (win) win.document.title = `DC_${data.dcNo || 'N/A'}`;
-    } else {
-      pdf.save(`DC_${data.dcNo || 'N/A'}.pdf`);
-    }
-  } finally {
-    document.body.removeChild(host);
-  }
+  await renderHtmlToPdf(html, {
+    mode,
+    filePrefix: 'DC',
+    docNo: data.dcNo || 'N/A',
+    width: 794,
+    fitPage: true
+  });
 };
