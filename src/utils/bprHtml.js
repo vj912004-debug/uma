@@ -86,7 +86,7 @@ const penIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" str
 const emptyBatchRow = () => ({ batchNo: '', drumNo: '', gross: '', tare: '', net: '' });
 
 /** Empty data rows on Batch Packing Record (Page 2) so the grid fills A4. */
-export const BPR_PAGE2_ROW_COUNT = 35;
+export const BPR_PAGE2_ROW_COUNT = 22;
 
 /** Blank BPR print payload — empty Page 1 (Processing) + Page 2 (Packing). */
 export const buildBlankBprPayload = ({ partyName = '', productName = '', companyProfile } = {}) => {
@@ -380,7 +380,7 @@ export const buildBprHtml = (data, profileInput) => {
 <meta charset="UTF-8">
 <title>BPR - ${escHtml(profile.companyName)}</title>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:Cambria,Georgia,serif;}
   html,body{margin:0;padding:0;background:#fff;}
   .page{
     width:794px;min-height:1123px;padding:8px;margin:0;background:#fff;
@@ -392,7 +392,7 @@ export const buildBprHtml = (data, profileInput) => {
   table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:-1px;}
   table.g th,table.g td{
     border:1px solid #7c12bd;text-align:center;vertical-align:middle;
-    font-size:10px;font-weight:700;color:#4a0080;padding:3px 2px;
+    font-size:12px;font-weight:700;color:#4a0080;padding:3px 2px;
     word-break:break-all;overflow-wrap:break-word;white-space:pre-wrap;
   }
   .purple-header{background:#5a009d;color:#fff !important;}
@@ -404,16 +404,16 @@ export const buildBprHtml = (data, profileInput) => {
   .logo-wrap{width:56px;height:44px;display:flex;align-items:center;justify-content:center;}
   .logo-wrap img{width:100%;height:100%;object-fit:contain;display:block;}
   .company-title{font-size:26px;font-weight:900;color:#4a0080;letter-spacing:1px;line-height:1.1;}
-  .company-subtitle{font-size:13px;font-weight:700;color:#008822;margin-top:2px;}
+  .company-subtitle{font-size:12px;font-weight:700;color:#008822;margin-top:2px;}
   .bpr-badge{
     background:#5a009d;color:#fff;border-radius:12px;padding:8px 10px;text-align:center;
   }
-  .bpr-badge .title{font-size:11px;font-weight:700;letter-spacing:.4px;}
+  .bpr-badge .title{font-size:12px;font-weight:700;letter-spacing:.4px;}
   .bpr-badge .code{font-size:12px;font-weight:700;margin-top:3px;}
   .badge-row td{border:none !important;text-align:left;padding:4px 0 2px !important;height:auto;}
   .pill-badge{
     background:#5a009d;color:#fff;border-radius:10px;padding:3px 12px;
-    display:inline-block;font-size:10px;font-weight:700;
+    display:inline-block;font-size:12px;font-weight:700;
   }
   .psd-note-box{
     flex:1;
@@ -426,7 +426,7 @@ export const buildBprHtml = (data, profileInput) => {
   .psd-note-head{
     background:#e2d3f3;
     color:#4a0080;
-    font-size:10px;
+    font-size:12px;
     font-weight:700;
     padding:3px 8px;
     text-align:left;
@@ -437,7 +437,7 @@ export const buildBprHtml = (data, profileInput) => {
     flex:1;
     padding:4px 8px;
     text-align:left;
-    font-size:10px;
+    font-size:12px;
     font-weight:700;
     color:#4a0080;
     white-space:pre-wrap;
@@ -456,14 +456,14 @@ export const buildBprHtml = (data, profileInput) => {
     width: 20%;
     border-right: 1px solid #7c12bd;
     color: #4a0080;
-    font-size: 10px;
+    font-size:12px;
     font-weight: 700;
     padding: 6px;
   }
   .remark-content {
     width: 80%;
     color: #4a0080;
-    font-size: 10px;
+    font-size:12px;
     font-weight: 700;
     padding: 6px;
     white-space: pre-wrap;
@@ -478,7 +478,7 @@ export const buildBprHtml = (data, profileInput) => {
   }
   .signature-box:first-child{border-right:1px solid #7c12bd;}
   .signature-label{
-    font-size:11px;font-weight:700;color:#4a0080;display:flex;align-items:center;gap:6px;
+    font-size:12px;font-weight:700;color:#4a0080;display:flex;align-items:center;gap:6px;
   }
 
   .p2-header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #5a009d;}
@@ -486,15 +486,15 @@ export const buildBprHtml = (data, profileInput) => {
   .p2-logo{width:50px;height:50px;}
   .p2-logo img,.p2-logo > div,.p2-logo .logo-wrap{width:100%;height:100%;object-fit:contain;}
   .meta{display:flex;flex-wrap:wrap;border:1.5px solid #5a009d;margin-bottom:6px;border-radius:4px;overflow:hidden;}
-  .meta-item{padding:4px 8px;border-right:1px solid #e2d3f3;border-bottom:1px solid #e2d3f3;font-size:10px;width:32%;box-sizing:border-box;color:#4a0080;font-weight:600;}
+  .meta-item{padding:4px 8px;border-right:1px solid #e2d3f3;border-bottom:1px solid #e2d3f3;font-size:12px;width:32%;box-sizing:border-box;color:#4a0080;font-weight:600;}
   .meta-item.label{color:#5a009d;font-weight:700;background:#e2d3f3;width:18%;}
-  table.items{width:100%;border-collapse:collapse;margin-bottom:6px;font-size:8.5px;flex:1;table-layout:auto;}
-  table.items thead th{background:#5a009d;color:#fff;font-weight:700;padding:4px 3px;text-align:center;border:1px solid #5a009d;font-size:8.5px;white-space:nowrap;}
-  table.items tbody td{border:1px solid #7c12bd;padding:2px 3px;text-align:center;color:#4a0080;font-weight:600;font-size:8.5px;white-space:nowrap;}
+  table.items{width:100%;border-collapse:collapse;margin-bottom:6px;font-size:12px;flex:1;table-layout:auto;}
+  table.items thead th{background:#5a009d;color:#fff;font-weight:700;padding:4px 3px;text-align:center;border:1px solid #5a009d;font-size:12px;white-space:nowrap;}
+  table.items tbody td{border:1px solid #7c12bd;padding:2px 3px;height:26px;text-align:center;color:#4a0080;font-weight:600;font-size:12px;white-space:nowrap;}
   table.items tbody tr.total-hl td{background:#e2d3f3;color:#4a0080;font-weight:700;height:24px;}
-  .barfoot{background:#5a009d;color:#fff;padding:6px 12px;display:flex;justify-content:space-between;font-size:10px;margin-top:auto;border-radius:4px;}
-  .signs{display:flex;border:1px solid #7c12bd;margin-top:4px;margin-bottom:6px;border-radius:4px;overflow:hidden;}
-  .sign{flex:1;padding:6px 10px;min-height:40px;display:flex;align-items:flex-end;gap:6px;font-size:10px;font-weight:700;color:#4a0080;}
+  .barfoot{background:#5a009d;color:#fff;padding:6px 12px;display:flex;justify-content:space-between;font-size:12px;margin-top:auto;border-radius:4px;}
+  .signs{display:flex;border:1px solid #7c12bd;margin-top:12px;margin-bottom:12px;border-radius:4px;overflow:hidden;}
+  .sign{flex:1;padding:10px 14px;min-height:50px;display:flex;align-items:flex-end;gap:6px;font-size:12px;font-weight:700;color:#4a0080;}
   .sign + .sign{border-left:1px solid #7c12bd;}
   .sign .line{flex:1;border-bottom:1px solid #777;margin-left:6px;min-height:16px;}
   .page-p2 .sheet{min-height:calc(1123px - 16px);}
@@ -530,12 +530,12 @@ export const buildBprHtml = (data, profileInput) => {
       <table class="items">
         <thead>
           <tr>
-            <th colspan="5">Received Materials Weight</th>
-            <th colspan="5">Dispatched (micronized) Materials Weight</th>
+            <th colspan="5">RECEIVED MATERIALS WEIGHT</th>
+            <th colspan="5">DISPATCHED (MICRONIZED) MATERIALS WEIGHT</th>
           </tr>
           <tr>
-            <th>Batch No.</th><th>Drum No</th><th>Gross</th><th>Tare</th><th>Net</th>
-            <th>Batch No.</th><th>Drum No</th><th>Gross</th><th>Tare</th><th>Net</th>
+            <th style="line-height:1.2;">BATCH NO.<br><span style="font-size:8px;font-weight:500;">(e.g. UMA/BPR/26-27/0001)</span></th><th>DRUM NO</th><th>GROSS</th><th>TARE</th><th>NET</th>
+            <th style="line-height:1.2;">BATCH NO.<br><span style="font-size:8px;font-weight:500;">(e.g. UMA/BPR/26-27/0001)</span></th><th>DRUM NO</th><th>GROSS</th><th>TARE</th><th>NET</th>
           </tr>
         </thead>
         <tbody>
@@ -553,7 +553,7 @@ export const buildBprHtml = (data, profileInput) => {
       </div>
 
       <div class="barfoot">
-        <span>Thank you for your business!</span>
+        <span>Thankyou for your business!</span>
         <span>E. &amp; O.E.</span>
         <span>Page 2 of 2</span>
       </div>

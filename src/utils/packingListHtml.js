@@ -87,8 +87,8 @@ export const buildPackingListHtml = (data, profileInput) => {
     --text:#231f20;
     --grey-line:#d9d9d9;
   }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:#fff;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:var(--text);}
+  *{box-sizing:border-box;font-family:Cambria,Georgia,serif;}
+  html,body{margin:0;padding:0;background:#fff;font-family:Cambria,Georgia,serif;color:var(--text);}
   
   .page {
     width: 794px;
@@ -169,11 +169,11 @@ export const buildPackingListHtml = (data, profileInput) => {
     gap: 20px;
   }
   .pl-meta-left {
-    font-size: 13px;
+    font-size:12px;
     line-height: 2;
   }
   .pl-meta-right {
-    font-size: 13px;
+    font-size:12px;
     line-height: 2;
   }
   .meta-field {
@@ -206,7 +206,7 @@ export const buildPackingListHtml = (data, profileInput) => {
   table.items {
     width: 100%;
     border-collapse: collapse;
-    font-size: 12px;
+    font-size:12px;
   }
   table.items thead th {
     background: var(--purple);

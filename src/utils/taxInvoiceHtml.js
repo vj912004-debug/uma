@@ -166,8 +166,8 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     --text:#231f20;
     --grey-line:#d9d9d9;
   }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding: 4px;background:#fff;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:var(--text);}
+  *{box-sizing:border-box;font-family:Cambria,Georgia,serif;}
+  html,body{margin:0;padding: 4px;background:#fff;font-family:Cambria,Georgia,serif;color:var(--text);}
   
   /* A4 scaling */
   .page {
@@ -221,7 +221,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   }
   .brand-text .tagline{
     color:#1d9444;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family:Cambria,Georgia,serif;
     font-weight:700;
     font-size:16px;
     margin-top:2px;
@@ -246,7 +246,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   .tax-invoice-box .ti-sub{
     background:#fff;
     color:var(--purple);
-    font-size:11px;
+    font-size:12px;
     font-weight:700;
     letter-spacing:.5px;
     padding:3px 10px;
@@ -260,7 +260,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   }
   .company-info{
     flex:1.15;
-    font-size:12.5px;
+    font-size:12px;
     line-height:1.55;
   }
   .company-info .line{
@@ -282,7 +282,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   .party-head svg, .box-head svg{width:16px;height:16px;display:block;fill:none;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
   .reg-details{
     margin-top:10px;
-    font-size:12.5px;
+    font-size:12px;
     line-height:1.7;
   }
   .reg-details b{color:var(--purple);}
@@ -296,7 +296,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   }
   .invoice-meta .block{
     padding:8px 12px;
-    font-size:12.5px;
+    font-size:12px;
   }
   .invoice-meta .block + .block{
     border-top:1px solid var(--purple);
@@ -325,7 +325,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     background:var(--lav-bg);
     color:var(--purple);
     font-weight:800;
-    font-size:13px;
+    font-size:12px;
     letter-spacing:.5px;
     padding:7px 12px;
     display:flex;
@@ -336,20 +336,20 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   .party-head svg, .box-head svg{flex-shrink:0;}
   .party-body{
     padding:10px 12px;
-    font-size:12.5px;
+    font-size:12px;
     line-height:1.55;
     min-height: 80px;
   }
   .party-body .cname{
     color:var(--purple);
     font-weight:800;
-    font-size:14px;
+    font-size:12px;
     margin-bottom:4px;
   }
   .party-foot{
     border-top:1px solid var(--lav-border);
     padding:8px 12px;
-    font-size:12.5px;
+    font-size:12px;
   }
   .party-foot .frow{display:flex;margin-bottom:2px;}
   .party-foot .flabel{width:50px;font-weight:700;}
@@ -362,7 +362,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     table-layout:fixed;
     border-collapse:collapse;
     margin-bottom:14px;
-    font-size:9px;
+    font-size:12px;
     color: var(--text);
   }
   table.items thead th{
@@ -377,7 +377,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     white-space:normal;
     word-break:break-word;
     overflow:visible;
-    font-size:8.5px;
+    font-size:12px;
     letter-spacing:0;
   }
   table.items tbody td{
@@ -414,7 +414,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     background:var(--lav-bg);
     color:var(--purple);
     font-weight:800;
-    font-size:13px;
+    font-size:12px;
     padding:7px 12px;
     display:flex;
     align-items:center;
@@ -423,7 +423,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   }
   .bank-body{
     padding:10px 12px;
-    font-size:12.5px;
+    font-size:12px;
   }
   .bank-row{display:flex;margin-bottom:5px;}
   .bank-row .blabel{width:120px;font-weight:700;}
@@ -438,7 +438,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     border:1px solid var(--purple);
     border-bottom:none; border-radius:6px 6px 0 0;
     padding:10px 14px;
-    font-size:12.5px;
+    font-size:12px;
     flex:1;
   }
   .trow{display:flex;justify-content:space-between;padding:2px 0;}
@@ -468,7 +468,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   }
   .f3-body{
     padding:10px 12px;
-    font-size:11.5px;
+    font-size:12px;
     line-height:1.6;
   }
   .f3-body ol{margin:0;padding-left:16px;}
@@ -481,7 +481,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     font-weight:800;
     color:var(--purple);
     padding:10px 12px 0;
-    font-size:12.5px;
+    font-size:12px;
       text-align:center;
   }
   .sig-col .sig-line{
@@ -489,7 +489,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     border-top:1px solid #333;
     text-align:center;
     padding-top:4px;
-    font-size:11.5px;
+    font-size:12px;
   }
 
   /* ===== BAR FOOTER ===== */
@@ -500,7 +500,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     padding:8px 16px;
     display:flex;
     justify-content:space-between;
-    font-size:11.5px;
+    font-size:12px;
   }
 
   @media print{

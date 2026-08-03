@@ -66,7 +66,7 @@ const getDefaultForm = () => ({
   psdRequirement: '',
   charges: { ...DEFAULT_CHARGES },
   rates: { ...DEFAULT_RATES },
-  mainCharges: [{ description: '', psdRequirement: '', rate: '' }],
+  mainCharges: [{ description: '', psdRequirement: '', rate: '', dryRate: '', wetRate: '' }],
   optionalCharges: [{ description: '', rate: '' }],
   productSettings: {},
   validityDate: defaultValidityDate(),
@@ -690,11 +690,21 @@ const Quotations = () => {
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Main Charge
                   </button>
                 </div>
+                {formData.mainCharges.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                    <div>Charge Description</div>
+                    <div>PSD Requirement</div>
+                    <div>Dry Rate</div>
+                    <div>Wet Rate</div>
+                    <div></div>
+                  </div>
+                )}
                 {formData.mainCharges.map((charge, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                     <input type="text" className="input-field" placeholder="Charge Description (e.g. Processing Charges)" value={charge.description} onChange={e => updateChargeRow('mainCharges', idx, 'description', e.target.value)} />
                     <input type="text" className="input-field" placeholder="PSD Requirement (optional)" value={charge.psdRequirement || ''} onChange={e => updateChargeRow('mainCharges', idx, 'psdRequirement', e.target.value)} />
-                    <input type="text" className="input-field" placeholder="Rate (e.g. ₹ 5 / Kg)" value={charge.rate} onChange={e => updateChargeRow('mainCharges', idx, 'rate', e.target.value)} />
+                    <input type="text" className="input-field" placeholder="Dry Rate (e.g. 5 / Kg)" value={charge.dryRate !== undefined ? charge.dryRate : (charge.rate || '')} onChange={e => updateChargeRow('mainCharges', idx, 'dryRate', e.target.value)} />
+                    <input type="text" className="input-field" placeholder="Wet Rate (e.g. 6 / Kg)" value={charge.wetRate || ''} onChange={e => updateChargeRow('mainCharges', idx, 'wetRate', e.target.value)} />
                     <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeChargeRow('mainCharges', idx)}>
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                     </button>
@@ -712,6 +722,13 @@ const Quotations = () => {
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Optional Charge
                   </button>
                 </div>
+                {formData.optionalCharges.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                    <div>Description</div>
+                    <div>Rate</div>
+                    <div></div>
+                  </div>
+                )}
                 {formData.optionalCharges.map((charge, idx) => (
                   <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                     <input type="text" className="input-field" placeholder="Description (e.g. HDPE Drums)" value={charge.description} onChange={e => updateChargeRow('optionalCharges', idx, 'description', e.target.value)} />

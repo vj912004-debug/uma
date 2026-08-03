@@ -62,13 +62,14 @@ export const buildQuotationHtml = (data, profileInput) => {
               <td>${i + 1}</td>
               <td class="left">${escHtml(c.description)}</td>
               <td>${c.psdRequirement ? escHtml(c.psdRequirement) : '—'}</td>
-              <td>${extractUnit(c.rate)}</td>
-              <td>${extractRate(c.rate)}</td>
+              <td>${extractUnit(c.dryRate || c.rate || c.wetRate)}</td>
+              <td>${extractRate(c.dryRate || c.rate)}</td>
+              <td>${extractRate(c.wetRate)}</td>
               <td>—</td>
             </tr>`
           )
           .join('')
-      : `<tr><td colspan="6" style="text-align:center;color:var(--muted)">No charges applied</td></tr>`;
+      : `<tr><td colspan="7" style="text-align:center;color:var(--muted)">No charges applied</td></tr>`;
 
   const optionalRows =
     optionalCharges.length > 0
@@ -263,7 +264,7 @@ export const buildQuotationHtml = (data, profileInput) => {
   .sign2 .seal{width:52px;height:52px;margin-left:auto;margin-top:2px;}
 
   .bottom-banner{background:var(--purple);color:#fff;display:flex;align-items:center;justify-content:space-between;
-    padding:11px 28px;font-size:10.5px;margin:0 0 0 0;}
+    padding:11px 28px;font-size:10.5px;position:absolute;bottom:0;left:0;right:0;}
   .bottom-banner .thankyou{font-style:italic;font-size:11px;}
   .bottom-banner .items{display:flex;align-items:center;gap:14px;}
   .bottom-banner .items span{display:flex;align-items:center;gap:6px;}
@@ -378,7 +379,7 @@ export const buildQuotationHtml = (data, profileInput) => {
       <div>
         <div class="tbl-title"><svg viewBox="0 0 24 24"><path d="M4 4h16v2H4zM4 11h16v2H4zM4 18h16v2H4z"/></svg>COMMERCIAL OFFER</div>
         <table class="dt">
-          <thead><tr><th>Sr. No.</th><th>Description</th><th>PSD Requirement</th><th>Unit</th><th>Rate (₹)</th><th>Remarks</th></tr></thead>
+          <thead><tr><th>Sr. No.</th><th>Description</th><th>PSD Requirement</th><th>Unit</th><th>Dry Rate (₹)</th><th>Wet Rate (₹)</th><th>Remarks</th></tr></thead>
           <tbody>
             ${mainRows}
           </tbody>

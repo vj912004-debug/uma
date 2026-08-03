@@ -38,7 +38,7 @@ export const getSharedPrintStyles = () => `
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: Cambria, Georgia, serif;
   }
   
   body {
@@ -552,12 +552,30 @@ export const renderHtmlToPdf = async (html, {
 } = {}) => {
   const { jsPDF } = await import('jspdf');
   const html2canvas = (await import('html2canvas')).default;
-  const host = document.createElement('div');
-  host.style.cssText = 'position:absolute;left:-12000px;top:0;z-index:-1;background:#fff;';
-  host.innerHTML = html;
-  document.body.appendChild(host);
+
+  // Render inside an iframe so document <style> (e.g. * { font-size })
+  // cannot leak into the live ERP UI and shrink app fonts on Preview.
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('title', 'pdf-render-host');
+  iframe.style.cssText = `position:fixed;left:-12000px;top:0;width:${width}px;height:1400px;border:0;opacity:0;pointer-events:none;`;
+  document.body.appendChild(iframe);
+
+  const idoc = iframe.contentDocument || iframe.contentWindow.document;
+  idoc.open();
+  idoc.write(html);
+  idoc.close();
+
   try {
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await new Promise((r) => {
+      if (idoc.readyState === 'complete') {
+        requestAnimationFrame(() => requestAnimationFrame(r));
+      } else {
+        iframe.onload = () => requestAnimationFrame(() => requestAnimationFrame(r));
+      }
+    });
+    // Allow images/fonts inside iframe to settle
+    await new Promise((r) => setTimeout(r, 50));
+
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
@@ -565,54 +583,81 @@ export const renderHtmlToPdf = async (html, {
     const usableW = pageW - margin * 2;
     const usableH = pageH - margin * 2;
 
-    const pageNodes = [...host.querySelectorAll('.pdf-page')];
+    const pageNodes = [...idoc.querySelectorAll('.pdf-page')];
     const targets = pageNodes.length
       ? pageNodes
-      : [host.querySelector('.print-host') || host.firstElementChild].filter(Boolean);
+      : [idoc.querySelector('.print-host') || idoc.body?.firstElementChild].filter(Boolean);
+
+    const a4Ratio = 297 / 210;
+    const singlePageHeight = Math.round(width * a4Ratio);
+    const lockToSinglePage = fitPage || pageNodes.length > 0;
+
+    const clipCanvasToA4 = (sourceCanvas) => {
+      const expectedH = Math.round(sourceCanvas.width * a4Ratio);
+      if (sourceCanvas.height <= expectedH + 1) return sourceCanvas;
+      const clipped = document.createElement('canvas');
+      clipped.width = sourceCanvas.width;
+      clipped.height = expectedH;
+      const ctx = clipped.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, clipped.width, clipped.height);
+      ctx.drawImage(sourceCanvas, 0, 0);
+      return clipped;
+    };
 
     for (let i = 0; i < targets.length; i++) {
       const target = targets[i];
-      
-      // Fix for html2canvas blank capture on subsequent pages
       const originalCss = target.style.cssText;
-      target.style.cssText += '; position: absolute; top: 0; left: 0; z-index: 10;';
 
-      const canvas = await html2canvas(target, {
+      if (lockToSinglePage) {
+        target.style.width = `${width}px`;
+        target.style.height = `${singlePageHeight}px`;
+        target.style.minHeight = `${singlePageHeight}px`;
+        target.style.maxHeight = `${singlePageHeight}px`;
+        target.style.overflow = 'hidden';
+        target.style.boxSizing = 'border-box';
+        target.style.margin = '0';
+      } else {
+        const pages = Math.max(1, Math.ceil(target.scrollHeight / singlePageHeight));
+        target.style.minHeight = `${pages * singlePageHeight}px`;
+      }
+
+      const canvasRaw = await html2canvas(target, {
         scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff',
         width,
         windowWidth: width,
-        height: target.scrollHeight,
-        windowheight: target.scrollHeight,
+        height: lockToSinglePage ? singlePageHeight : target.scrollHeight,
+        windowHeight: lockToSinglePage ? singlePageHeight : target.scrollHeight,
+        scrollX: 0,
         scrollY: 0,
-        logging: false
+        logging: false,
+        onclone: (clonedDoc) => {
+          if (!lockToSinglePage) return;
+          clonedDoc.querySelectorAll('.pdf-page, .print-host').forEach((el) => {
+            el.style.width = `${width}px`;
+            el.style.height = `${singlePageHeight}px`;
+            el.style.minHeight = `${singlePageHeight}px`;
+            el.style.maxHeight = `${singlePageHeight}px`;
+            el.style.overflow = 'hidden';
+            el.style.transform = 'none';
+            el.style.zoom = '1';
+            el.style.margin = '0';
+          });
+        }
       });
 
       target.style.cssText = originalCss;
 
-      const naturalW = usableW;
-      const naturalH = (canvas.height * naturalW) / canvas.width;
-
-      if (pageNodes.length || fitPage) {
+      if (lockToSinglePage) {
         if (i > 0) pdf.addPage();
-        // Always fill full A4 width (no side gaps). If content is taller, also fill height.
-        let drawW = usableW;
-        let drawH = (canvas.height * usableW) / canvas.width;
-        if (fitPage && drawH > usableH) {
-          drawH = usableH;
-        } else if (!fitPage && drawH > usableH) {
-          const scale = usableH / drawH;
-          drawW = usableW * scale;
-          drawH = usableH;
-          const x = margin + (usableW - drawW) / 2;
-          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, margin, drawW, drawH);
-          continue;
-        }
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, drawW, drawH);
+        const canvas = clipCanvasToA4(canvasRaw);
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageW, pageH);
         continue;
       }
 
+      const canvas = canvasRaw;
       const imgW = usableW;
       const pxPerMm = canvas.width / imgW;
       const pageHeightPx = usableH * pxPerMm;
@@ -643,6 +688,6 @@ export const renderHtmlToPdf = async (html, {
       pdf.save(`${filePrefix}_${docNo}.pdf`);
     }
   } finally {
-    document.body.removeChild(host);
+    iframe.remove();
   }
 };

@@ -135,8 +135,8 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     --text:#231f20;
     --grey-line:#d9d9d9;
   }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding: 4px;background:#fff;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:var(--text);}
+  *{box-sizing:border-box;font-family:Cambria,Georgia,serif;}
+  html,body{margin:0;padding: 4px;background:#fff;font-family:Cambria,Georgia,serif;color:var(--text);}
   
   /* A4 scaling */
   .page {
@@ -214,7 +214,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     border-bottom: 2px solid var(--purple);
     padding-bottom: 8px;
     margin-bottom: 14px;
-    font-size: 9.5px;
+    font-size:12px;
     gap: 4px;
   }
   .company-strip .line {
@@ -253,7 +253,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     background: var(--lav-bg);
     color: var(--purple);
     font-weight: 800;
-    font-size: 13px;
+    font-size:12px;
     letter-spacing: .5px;
     padding: 7px 12px;
     display: flex;
@@ -264,20 +264,20 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   .party-head svg { width: 16px; height: 16px; display: block; fill: none; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .party-body {
     padding: 10px 12px;
-    font-size: 12.5px;
+    font-size:12px;
     line-height: 1.55;
     flex: 1;
   }
   .party-body .cname {
     color: var(--purple);
     font-weight: 800;
-    font-size: 14px;
+    font-size:12px;
     margin-bottom: 4px;
   }
   .party-foot {
     border-top: 1px solid var(--lav-border);
     padding: 8px 12px;
-    font-size: 12.5px;
+    font-size:12px;
   }
   .party-foot .frow { display: flex; margin-bottom: 2px; }
   .party-foot .flabel { width: 50px; font-weight: 700; color: var(--text); }
@@ -286,7 +286,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   /* Invoice Meta inside right party box */
   .invoice-meta {
     padding: 10px 12px;
-    font-size: 12.5px;
+    font-size:12px;
     flex: 1;
   }
   .meta-row {
@@ -305,7 +305,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 14px;
-    font-size: 12px;
+    font-size:12px;
   }
   table.items thead th {
     background: var(--purple);
@@ -335,7 +335,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     padding: 6px 4px;
     border: 1px solid var(--purple-border);
     border-top: none;
-    font-size: 11px;
+    font-size:12px;
     font-weight: 500;
     word-break: break-all;
     overflow-wrap: break-word;
@@ -367,7 +367,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
       background: var(--lav-bg);
       color: var(--purple);
       font-weight: 800;
-      font-size: 13px;
+      font-size:12px;
       letter-spacing: .5px;
       padding: 7px 12px;
       display: flex;
@@ -376,7 +376,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
       border-bottom: 1px solid var(--lav-border);
   }
   .box-head svg { width: 16px; height: 16px; display: block; fill: none; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  .dc-meta-card > div:not(.box-head) { padding: 4px 12px; font-size: 12.5px; }
+  .dc-meta-card > div:not(.box-head) { padding: 4px 12px; font-size:12px; }
   .dc-meta-row { display: flex; margin-bottom: 2px; }
   .dc-meta-label { color: var(--text-black); font-weight: bold; width: 130px; flex-shrink: 0; }
   .dc-sign-stack { display: flex; flex-direction: column; gap: 14px; }
@@ -390,7 +390,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
       text-align: center;
   }
   .dc-sign-space { width: 80%; border-bottom: 1px solid #333; margin-top: 40px; margin-bottom: 5px; }
-  .dc-sign-title { background: var(--lav-bg); color: var(--purple); font-weight: 800; font-size: 13px; padding: 7px 12px; width: 100%; border-bottom: 1px solid var(--lav-border); display: flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; }
+  .dc-sign-title { background: var(--lav-bg); color: var(--purple); font-weight: 800; font-size:12px; padding: 7px 12px; width: 100%; border-bottom: 1px solid var(--lav-border); display: flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; }
 
   .barfoot {
     background: var(--purple);
@@ -399,7 +399,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     padding: 8px 16px;
     display: flex;
     justify-content: space-between;
-    font-size: 11.5px;
+    font-size:12px;
   }
 </style>
 </head>
@@ -527,12 +527,12 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
           <div class="dc-sign-card">
             <div class="dc-sign-title">For ${escHtml(profile.companyName || 'UMA MICRON')}</div>
             <div class="dc-sign-space"></div>
-            <span style="font-size: 11px; color: #333;">Authorised Signatory</span>
+            <span style="font-size:12px; color: #333;">Authorised Signatory</span>
           </div>
           <div class="dc-sign-card">
             <div class="dc-sign-title">RECEIVED BY</div>
             <div class="dc-sign-space"></div>
-            <span style="font-size: 11px; color: #333;">Authorised Signatory</span>
+            <span style="font-size:12px; color: #333;">Authorised Signatory</span>
           </div>
         </div>
       </div>
