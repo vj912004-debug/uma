@@ -108,20 +108,6 @@ export const buildPerformaInvoiceHtml = (data, profileInput) => {
   const roundedTotal = Math.round(totalAll);
   const roundOff = roundedTotal - totalAll;
 
-  rows.push(`
-    <tr class="total-row">
-      <td colspan="2" class="center" style="text-align:center;">TOTAL</td>
-      <td class="center">${fmtQty(totalQty) || '0.00'}</td>
-      <td></td>
-      <td class="num">${fmtMoney(totalAmt)}</td>
-      <td></td>
-      <td class="num">${fmtMoney(totalSgst)}</td>
-      <td></td>
-      <td class="num">${fmtMoney(totalCgst)}</td>
-      <td></td>
-      <td class="num">${fmtMoney(totalIgst)}</td>
-      <td class="num">${fmtMoney(totalAll)}</td>
-    </tr>`);
 
   const docNo = escHtml(data.invoiceNo || 'N/A');
   const docDate = escHtml(formatPdfDateDmy(data.date) || 'N/A');
