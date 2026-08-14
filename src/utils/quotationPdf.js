@@ -85,10 +85,24 @@ export const buildQuotationHtml = (data, profileInput) => {
           .join('')
       : `<tr><td colspan="3" style="text-align:center;color:var(--muted)">No optional charges applied</td></tr>`;
 
-  const addrStr = escHtml(profile.addressLine1 || 'Plot No. 1116, G.I.D.C., Ranoli, N.H. No. 8, Vadodara – 391350, Gujarat, India');
+  const addr1 = profile.addressLine1 || 'Plot No. 1116, G.I.D.C., Ranoli, N.H. No. 8';
+  const city = profile.city || 'Vadodara';
+  const pincode = profile.pincode || '391350';
+  const state = profile.state || 'Gujarat';
+  const addrStr = escHtml(`${addr1} ${city} - ${pincode}, ${state}, India`);
   const phoneStr = escHtml(profile.phone || '+91 97120 00297');
   const emailStr = escHtml(profile.email || 'info@umamicron.com');
   const webStr = escHtml(profile.website || 'www.umamicron.com');
+  const assetUrl = (path) => {
+    try {
+      if (typeof window !== 'undefined' && window.location?.origin) {
+        return `${window.location.origin}${path.startsWith('/') ? path : `/${path}`}`;
+      }
+    } catch (_) { /* ignore */ }
+    return path;
+  };
+  const factoryImg = assetUrl('/jet_mill.jpeg');
+  const qrImg = assetUrl('/qr.png');
 
   const sigName = escHtml(data.signatoryName || 'Amit Patel');
   const sigFirstName = sigName.split(' ')[0];
@@ -152,10 +166,10 @@ export const buildQuotationHtml = (data, profileInput) => {
     font-weight:700;letter-spacing:.6px;padding:4px 12px;border-radius:3px;}
 
   /* ============ CONTACT BAR ============ */
-  .contact-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;
+  .contact-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:nowrap;
     gap:6px 18px;padding:9px 28px;font-size:10.5px;color:var(--text);border-bottom:1px solid #eee;}
   .contact-bar span{display:flex;align-items:center;gap:6px;white-space:nowrap;}
-  .contact-right{display:flex;align-items:center;flex-wrap:wrap;gap:6px 20px;}
+  .contact-right{display:flex;align-items:center;flex-wrap:nowrap;gap:6px 20px;}
   .ic{width:14px;height:14px;flex-shrink:0;fill:var(--purple);}
 
   .body-pad{padding:0 28px;}
@@ -304,7 +318,12 @@ export const buildQuotationHtml = (data, profileInput) => {
 
   <!-- CONTACT BAR -->
   <div class="contact-bar">
-    <span><svg class="ic" viewBox="0 0 24 24"><path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z"/></svg>${addrStr}</span>
+    <div style="display:flex; align-items:center; gap:6px;">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z"/></svg>
+      <div style="line-height:1.35; white-space:normal;">
+        ${escHtml(addr1)},<br>${escHtml(city)} - ${escHtml(pincode)}, ${escHtml(state)}, India
+      </div>
+    </div>
     <div class="contact-right">
       <span><svg class="ic" viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.4 0 .8-.3 1L6.6 10.8z"/></svg>${phoneStr}</span>
       <span><svg class="ic" viewBox="0 0 24 24"><path d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>${emailStr}</span>
@@ -357,7 +376,7 @@ export const buildQuotationHtml = (data, profileInput) => {
         ${descriptionHtml ? `<p>${descriptionHtml}</p>` : ''}
       </div>
       <div class="fac-img">
-        <img src="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMzAwIDE5MCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ieE1pZFlNaWQgc2xpY2UiPg0KICAgICAgICAgIDxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMTkwIiBmaWxsPSIjZGZlNmVlIi8+DQogICAgICAgICAgPHJlY3QgeT0iMTIwIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjcwIiBmaWxsPSIjYzdkMGRjIi8+DQogICAgICAgICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjMwMCIgaGVpZ2h0PSIxMjAiIGZpbGw9IiNlZWYyZjYiLz4NCiAgICAgICAgICA8cmVjdCB4PSIyMCIgeT0iMzAiIHdpZHRoPSI2MCIgaGVpZ2h0PSI5MCIgcng9IjQiIGZpbGw9IiNiOWMzZDEiLz4NCiAgICAgICAgICA8ZWxsaXBzZSBjeD0iMTUwIiBjeT0iOTAiIHJ4PSI0NSIgcnk9IjU1IiBmaWxsPSIjOWFhN2I4Ii8+DQogICAgICAgICAgPGVsbGlwc2UgY3g9IjE1MCIgY3k9IjkwIiByeD0iNDUiIHJ5PSI1NSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNmY3YzhkIiBzdHJva2Utd2lkdGg9IjMiLz4NCiAgICAgICAgICA8cmVjdCB4PSIxMzAiIHk9IjIwIiB3aWR0aD0iNDAiIGhlaWdodD0iMTYiIGZpbGw9IiM3ZjhjYTAiLz4NCiAgICAgICAgICA8Y2lyY2xlIGN4PSIxNTAiIGN5PSIxNTAiIHI9IjYiIGZpbGw9IiM1NTYxNzAiLz4NCiAgICAgICAgICA8cmVjdCB4PSIyMDAiIHk9IjU1IiB3aWR0aD0iNzAiIGhlaWdodD0iNjUiIHJ4PSIzIiBmaWxsPSIjYWViOGM2Ii8+DQogICAgICAgICAgPHJlY3QgeD0iMjEwIiB5PSI2NSIgd2lkdGg9IjIwIiBoZWlnaHQ9IjQ1IiBmaWxsPSIjOGY5YWFiIi8+DQogICAgICAgICAgPHJlY3QgeD0iMjM1IiB5PSI2NSIgd2lkdGg9IjIwIiBoZWlnaHQ9IjQ1IiBmaWxsPSIjOGY5YWFiIi8+DQogICAgICAgICAgPGNpcmNsZSBjeD0iNjUiIGN5PSI0NSIgcj0iOCIgZmlsbD0iIzZmN2M4ZCIvPg0KICAgICAgICA8L3N2Zz4=" style="width:100%; height:100%; object-fit:cover; display:block;" />
+        <img src="${factoryImg}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Micronizer Diagram" />
       </div>
     </div>
 
@@ -430,7 +449,7 @@ export const buildQuotationHtml = (data, profileInput) => {
       </div>
       <div class="fr-qr">
         <div class="qrbox">
-          <img src="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij4NCiAgICAgICAgICAgIDxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjZmZmIi8+DQogICAgICAgICAgICA8cmVjdCB4PSI0IiB5PSI0IiB3aWR0aD0iMjYiIGhlaWdodD0iMjYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSI1Ii8+DQogICAgICAgICAgICA8cmVjdCB4PSIxMiIgeT0iMTIiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iIzAwMCIvPg0KICAgICAgICAgICAgPHJlY3QgeD0iNzAiIHk9IjQiIHdpZHRoPSIyNiIgaGVpZ2h0PSIyNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjUiLz4NCiAgICAgICAgICAgIDxyZWN0IHg9Ijc4IiB5PSIxMiIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjMDAwIi8+DQogICAgICAgICAgICA8cmVjdCB4PSI0IiB5PSI3MCIgd2lkdGg9IjI2IiBoZWlnaHQ9IjI2IiBmaWxsPSJub25lIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iNSIvPg0KICAgICAgICAgICAgPHJlY3QgeD0iMTIiIHk9Ijc4IiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiMwMDAiLz4NCiAgICAgICAgICAgIDxyZWN0IHg9IjQwIiB5PSIxMCIgd2lkdGg9IjgiIGhlaWdodD0iOCIgZmlsbD0iIzAwMCIvPg0KICAgICAgICAgICAgPHJlY3QgeD0iNTIiIHk9IjEwIiB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMDAwIi8+DQogICAgICAgICAgICA8cmVjdCB4PSI0MCIgeT0iMjQiIHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiMwMDAiLz4NCiAgICAgICAgICAgIDxyZWN0IHg9IjYwIiB5PSI0MCIgd2lkdGg9IjgiIGhlaWdodD0iOCIgZmlsbD0iIzAwMCIvPg0KICAgICAgICAgICAgPHJlY3QgeD0iNDAiIHk9IjQwIiB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMDAwIi8+DQogICAgICAgICAgICA8cmVjdCB4PSI4MCIgeT0iNDAiIHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiMwMDAiLz4NCiAgICAgICAgICAgIDxyZWN0IHg9IjQwIiB5PSI1NSIgd2lkdGg9IjgiIGhlaWdodD0iOCIgZmlsbD0iIzAwMCIvPg0KICAgICAgICAgICAgPHJlY3QgeD0iNTUiIHk9IjYwIiB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMDAwIi8+DQogICAgICAgICAgICA8cmVjdCB4PSI3MCIgeT0iNzAiIHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiMwMDAiLz4NCiAgICAgICAgICAgIDxyZWN0IHg9IjU1IiB5PSI4MCIgd2lkdGg9IjgiIGhlaWdodD0iOCIgZmlsbD0iIzAwMCIvPg0KICAgICAgICAgICAgPHJlY3QgeD0iODUiIHk9Ijg1IiB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMDAwIi8+DQogICAgICAgICAgICA8cmVjdCB4PSI0MCIgeT0iODUiIHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiMwMDAiLz4NCiAgICAgICAgICA8L3N2Zz4=" width="64" height="64" style="margin: 0 auto; display: block;" />
+          <img src="${qrImg}" style="width:100%; height:100%; object-fit:contain; display:block;" alt="QR Code" />
         </div>
         <span>SCAN TO VISIT OUR WEBSITE</span>
       </div>

@@ -2,57 +2,20 @@ import { formatDate } from '../utils/dateUtils';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { Eye, Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
+import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import ExportButton from '../components/ExportButton';
-import { calcPoTotals } from '../utils/purchaseOrderHtml';
-
-const DEFAULT_TERMS = [
-  '1. Material should be supplied strictly as per above size, grade and specification.',
-  '2. Test Certificate / MTC report wherever applicable.',
-  '3. Material should be free from heavy rust, lamination, oil, paint and major surface defects.',
-  '4. Final weight, rate and payment will be as per mutually agreed terms.',
-  '5. Delivery schedule and transport details must be confirmed before dispatch.'
-].join('\n');
-
-const emptyItem = () => ({
-  grade: '',
-  thickness: '',
-  width: '',
-  length: '',
-  nos: '',
-  kg: '',
-  rate: '',
-  amount: ''
-});
-
-const defaultForm = () => ({
-  poNo: '',
-  date: new Date().toISOString().split('T')[0],
-  partyName: '',
-  address: '',
-  gstin: '',
-  mobile: '',
-  email: '',
-  paymentTerms: '',
-  make: '',
-  mtc: '',
-  utLevel: '',
-  inspection: '',
-  deliveryLocation: '',
-  vehicleNo: '',
-  driverMobile: '',
-  transportName: '',
-  transportCharges: '',
-  loadingCharges: '',
-  note: '',
-  remark: '',
-  preparedBy: '',
-  checkedBy: '',
-  taxRate: 18,
-  terms: DEFAULT_TERMS,
-  items: [emptyItem(), emptyItem(), emptyItem(), emptyItem()]
-});
+import DocChargeRow from '../components/DocChargeRow';
+import {
+  STANDARD_CHARGES_LIST,
+  defaultChargeFlags,
+  defaultChargeRates,
+  emptyChargeQtys,
+  buildChargeQtys,
+  calcStandardChargesSubtotal,
+  parseChargeFieldValue,
+  isMaterialQtyCharge
+} from '../utils/documentCharges';
 
 const PurchaseOrders = () => {
   const { data, updateData, updateItem, deleteItemSoftly, incrementSerial } = useAppContext();
@@ -60,65 +23,145 @@ const PurchaseOrders = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
-  const [form, setForm] = useState(defaultForm);
+
+  // PO Form State
+  const [form, setForm] = useState({
+    poNo: '',
+    date: new Date().toISOString().split('T')[0],
+    partyDocNo: '',
+    partyDocDate: '',
+    partyName: '',
+    productName: '',
+    productDescription: '',
+    address: '',
+    state: 'GUJARAT',
+    gstin: '',
+    mobile: '',
+    email: '',
+    qty: 0,
+    charges: defaultChargeFlags(),
+    rates: defaultChargeRates(),
+    qtys: emptyChargeQtys(),
+    discount: 0,
+    taxRate: 18,
+    terms: '1. Delivery 10 days from the date of Purchase Order.\n2. Transportation Extra As Actual.\n3. 10 Years Warranty'
+  });
 
   const activeMR = editingDoc ? data.materialReceipts.find(mr => mr.id === editingDoc.receiptId) : selectedMR;
   const party = data.parties.find(p => p.id === activeMR?.partyId);
+  const prodConfig = (party?.products || []).find(p => p.name === activeMR?.productName);
 
   useEffect(() => {
-    if (editingDoc) return;
-    if (!selectedMR || !activeMR) return;
+    if (editingDoc) {
+      const materialQty = parseFloat(editingDoc.qty) || 0;
+      setForm({
+        ...editingDoc,
+        qtys: editingDoc.qtys ? { ...emptyChargeQtys(), ...editingDoc.qtys } : buildChargeQtys({}, materialQty)
+      });
+    } else if (selectedMR && activeMR) {
+      const poSerial = data.settings?.serials?.PO || 1;
+      const docNo = generateDocNumber('PO', poSerial, new Date(form.date));
+      const defaultRates = prodConfig?.charges || activeMR?.rates || {};
 
-    const poSerial = data.settings?.serials?.PO || 1;
-    const docNo = generateDocNumber('PO', poSerial, new Date(form.date));
+      setForm(prev => ({
+        ...prev,
+        poNo: docNo,
+        partyDocNo: activeMR.partyDocNo,
+        partyDocDate: activeMR.partyDocDate,
+        partyName: activeMR.partyName,
+        productName: activeMR.productName,
+        productDescription: [prodConfig?.psdReq, prodConfig?.psdNote].filter(Boolean).join('\n'),
+        address: activeMR.billAddress || party?.billAddress || '',
+        gstin: activeMR.gstinBill || party?.gstinBill || '',
+        mobile: party?.phone1 || '',
+        email: party?.email1 || '',
+        qty: activeMR.totalQty,
+        charges: activeMR.charges || prev.charges,
+        qtys: buildChargeQtys({ qtys: activeMR.qtys }, activeMR.totalQty || 0),
+        rates: {
+          ...prev.rates,
+          ...defaultRates
+        }
+      }));
+    }
+  }, [form.date, editingDoc, selectedMR, activeMR, prodConfig, data.settings?.serials?.PO]);
+
+  const toggleCharge = (key) => {
+    setForm(prev => {
+      const turningOn = !prev.charges[key];
+      const materialQty = parseFloat(prev.qty) || 0;
+      const qtys = { ...(prev.qtys || emptyChargeQtys()) };
+      if (turningOn && (qtys[key] == null || qtys[key] === '')) {
+        qtys[key] = isMaterialQtyCharge(key) ? materialQty : 1;
+      }
+      return { ...prev, charges: { ...prev.charges, [key]: turningOn }, qtys };
+    });
+  };
+
+  const handleRateChange = (key, val) => {
+    setForm(prev => ({ ...prev, rates: { ...prev.rates, [key]: parseChargeFieldValue(val) } }));
+  };
+
+  const handleQtyChange = (key, val) => {
+    setForm(prev => ({ ...prev, qtys: { ...(prev.qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) } }));
+  };
+
+  const addCustomCharge = () => {
     setForm(prev => ({
       ...prev,
-      poNo: docNo,
-      partyName: activeMR.partyName || '',
-      address: activeMR.billAddress || party?.billAddress || '',
-      gstin: activeMR.gstinBill || party?.gstinBill || '',
-      mobile: party?.phone1 || '',
-      email: party?.email1 || '',
-      items: [{
-        ...emptyItem(),
-        grade: activeMR.productName || '',
-        kg: activeMR.totalQty || '',
-        amount: ''
-      }, emptyItem(), emptyItem(), emptyItem()]
+      customCharges: [...(prev.customCharges || []), { id: Date.now(), name: '', qty: 1, rate: 0, checked: true }]
     }));
-  }, [form.date, editingDoc, selectedMR, activeMR, party, data.settings?.serials?.PO]);
+  };
 
-  const updateItemRow = (index, field, value) => {
-    setForm(prev => {
-      const items = [...(prev.items || [])];
-      const row = { ...items[index], [field]: value };
-      if (field === 'kg' || field === 'rate') {
-        const kg = parseFloat(field === 'kg' ? value : row.kg) || 0;
-        const rate = parseFloat(field === 'rate' ? value : row.rate) || 0;
-        row.amount = kg && rate ? (kg * rate).toFixed(2) : '';
+  const updateCustomCharge = (id, field, value) => {
+    setForm(prev => ({
+      ...prev,
+      customCharges: prev.customCharges.map(c => c.id === id ? { ...c, [field]: value } : c)
+    }));
+  };
+
+  const removeCustomCharge = (id) => {
+    setForm(prev => ({
+      ...prev,
+      customCharges: prev.customCharges.filter(c => c.id !== id)
+    }));
+  };
+
+  const getSubtotal = () => {
+    const customSum = (form.customCharges || []).reduce((sum, charge) => {
+      if (charge.checked) {
+        return sum + ((parseFloat(charge.qty) || 0) * (parseFloat(charge.rate) || 0));
       }
-      items[index] = row;
-      return { ...prev, items };
-    });
+      return sum;
+    }, 0);
+    const materialQty = parseFloat(form.qty) || 0;
+    return calcStandardChargesSubtotal(form.charges, form.rates, form.qtys, materialQty) + customSum;
   };
-
-  const addItemRow = () => {
-    setForm(prev => ({ ...prev, items: [...(prev.items || []), emptyItem()] }));
-  };
-
-  const removeItemRow = (index) => {
-    setForm(prev => {
-      const items = (prev.items || []).filter((_, i) => i !== index);
-      return { ...prev, items: items.length ? items : [emptyItem()] };
-    });
-  };
-
-  const totals = calcPoTotals(form);
 
   const handleCreate = (mr) => {
     setSelectedMR(mr);
     setEditingDoc(null);
-    setForm(defaultForm());
+    setForm({
+      poNo: '',
+      date: new Date().toISOString().split('T')[0],
+      partyDocNo: '',
+      partyDocDate: '',
+      charges: defaultChargeFlags(),
+      rates: defaultChargeRates(),
+      qtys: emptyChargeQtys(),
+      discount: 0,
+      taxRate: 18,
+      terms: '1. Delivery 10 days from the date of Purchase Order.\n2. Transportation Extra As Actual.\n3. 10 Years Warranty',
+      partyName: '',
+      productName: '',
+      productDescription: '',
+      address: '',
+      state: 'GUJARAT',
+      gstin: '',
+      mobile: '',
+      email: '',
+      qty: 0
+    });
     setIsModalOpen(true);
   };
 
@@ -127,38 +170,57 @@ const PurchaseOrders = () => {
     setEditingDoc(null);
     const poSerial = data.settings?.serials?.PO || 1;
     const docNo = generateDocNumber('PO', poSerial, new Date());
-    setForm({ ...defaultForm(), poNo: docNo });
+    setForm({
+      poNo: docNo,
+      date: new Date().toISOString().split('T')[0],
+      partyDocNo: '',
+      partyDocDate: '',
+      charges: defaultChargeFlags(),
+      rates: defaultChargeRates(),
+      qtys: emptyChargeQtys(),
+      discount: 0,
+      taxRate: 18,
+      terms: '1. Delivery 10 days from the date of Purchase Order.\n2. Transportation Extra As Actual.\n3. 10 Years Warranty',
+      partyName: '',
+      productName: '',
+      productDescription: '',
+      address: '',
+      state: 'GUJARAT',
+      gstin: '',
+      mobile: '',
+      email: '',
+      qty: 0
+    });
     setIsModalOpen(true);
   };
 
   const handleEdit = (po) => {
     setEditingDoc(po);
-    setSelectedMR(null);
-    const items = Array.isArray(po.items) && po.items.length
-      ? po.items.map((it) => ({ ...emptyItem(), ...it }))
-      : [{
-          ...emptyItem(),
-          grade: po.productName || '',
-          kg: po.qty || '',
-          rate: po.rate || '',
-          amount: po.subtotal || ''
-        }, emptyItem(), emptyItem(), emptyItem()];
-    setForm({ ...defaultForm(), ...po, items });
+    const materialQty = parseFloat(po.qty) || 0;
+    setForm({
+      ...po,
+      qtys: po.qtys ? { ...emptyChargeQtys(), ...po.qtys } : buildChargeQtys({}, materialQty)
+    });
     setIsModalOpen(true);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const { totalNos, totalKg, basicAmount, gstAmount, grandTotal } = calcPoTotals(form);
+    const subtotal = getSubtotal();
+    const discountAmount = parseFloat(form.discount) || 0;
+    const taxable = Math.max(0, subtotal - discountAmount);
+    const taxAmount = taxable * (form.taxRate / 100);
+    const total = taxable + taxAmount;
 
     const finalDoc = {
       ...form,
-      receiptId: activeMR?.id || editingDoc?.receiptId || '',
-      qty: totalKg,
-      subtotal: basicAmount,
-      taxAmount: gstAmount,
-      total: grandTotal,
-      totalNos,
+      receiptId: activeMR?.id || '',
+      partyName: form.partyName,
+      productName: form.productName,
+      qty: form.qty,
+      subtotal,
+      taxAmount,
+      total,
       type: 'Purchase Order'
     };
 
@@ -171,12 +233,13 @@ const PurchaseOrders = () => {
     setIsModalOpen(false);
   };
 
-  const pendingMRs = data.materialReceipts.filter(mr =>
+  // Find MRs that do not have a PO generated yet
+  const pendingMRs = data.materialReceipts.filter(mr => 
     !(data.purchaseOrders || []).some(po => po.receiptId === mr.id)
   );
 
   const poList = (data.purchaseOrders || []).filter(po => !po.isDeleted);
-  const filtered = poList.filter(po =>
+  const filtered = poList.filter(po => 
     (po.poNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (po.partyName || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -189,134 +252,105 @@ const PurchaseOrders = () => {
     { label: 'Total (₹)', key: 'total' }
   ];
 
-  const field = (key, label, opts = {}) => (
-    <div style={opts.span ? { gridColumn: `span ${opts.span}` } : undefined}>
-      <label>{label}</label>
-      {opts.textarea ? (
-        <textarea
-          className="input-field"
-          rows={opts.rows || 2}
-          value={form[key] || ''}
-          onChange={e => setForm({ ...form, [key]: e.target.value })}
-        />
-      ) : (
-        <input
-          type={opts.type || 'text'}
-          className="input-field"
-          value={form[key] ?? ''}
-          onChange={e => setForm({
-            ...form,
-            [key]: opts.type === 'number' ? (e.target.value === '' ? '' : parseFloat(e.target.value) || 0) : e.target.value
-          })}
-          step={opts.step}
-        />
-      )}
-    </div>
-  );
+  const chargesList = STANDARD_CHARGES_LIST;
+  const materialQty = parseFloat(form.qty) || 0;
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Purchase Orders (PO)</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Jagdamba Profile purchase order format</p>
+          <p style={{ color: 'var(--text-muted)' }}>Generate and manage incoming POs seamlessly from workflows.</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <ExportButton data={filtered} columns={exportColumns} filename="Purchase_Orders" title="Purchase Orders Log" />
-          <button className="btn btn-primary" onClick={handleCreateNew} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Plus size={18} /> New PO
+          <button className="btn btn-primary" onClick={handleCreateNew}>
+            <Plus size={18} /> Create New PO
           </button>
         </div>
-      </div>
+      </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
+        {/* Left Side: Pending MRs scheduler */}
         <div className="premium-card">
-          <h3 style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ClipboardList size={18} /> Pending Material Receipts
+          <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
+            Pending PO Queue
           </h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Select a Material Receipt to generate a Purchase Order.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '420px', overflowY: 'auto' }}>
-            {pendingMRs.map(mr => (
-              <button
-                key={mr.id}
-                type="button"
-                onClick={() => handleCreate(mr)}
-                style={{
-                  textAlign: 'left',
-                  padding: '0.85rem 1rem',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)',
-                  background: 'var(--input-bg)',
-                  cursor: 'pointer',
-                  color: 'var(--text-main)'
-                }}
-              >
-                <div style={{ fontWeight: 600 }}>{mr.partyName}</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  {mr.productName || 'Material'} · {mr.totalQty || 0} Kg · {formatDate(mr.date)}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {pendingMRs.length === 0 ? (
+              <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', fontSize: '0.85rem' }}>No pending receipts awaiting PO.</p>
+            ) : (
+              pendingMRs.map(mr => (
+                <div 
+                  key={mr.id} 
+                  className="glass-panel" 
+                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.15s ease' }} 
+                  onClick={() => handleCreate(mr)}
+                >
+                  <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{mr.receiptNo}</p>
+                  <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.25rem 0' }}>{mr.partyName}</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Weight: {mr.totalQty?.toFixed(1) || 0} Kg</p>
                 </div>
-              </button>
-            ))}
-            {pendingMRs.length === 0 && (
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No pending material receipts.</div>
+              ))
             )}
           </div>
         </div>
 
+        {/* Right Side: PO Log */}
         <div className="premium-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-            <h3 style={{ margin: 0 }}>Purchase Order Log</h3>
-            <div style={{ position: 'relative', width: '240px' }}>
-              <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                className="input-field"
-                style={{ paddingLeft: '2rem' }}
-                placeholder="Search PO / party..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
-            </div>
+          <h3 style={{ marginBottom: '1.5rem' }}>Purchase Order Log</h3>
+          
+          <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+            <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
+            <input 
+              type="text" 
+              className="input-field" 
+              placeholder="Search by PO number or Party Name..." 
+              style={{ paddingLeft: '3rem' }}
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
           </div>
-          <div style={{ overflowX: 'auto' }}>
+
+          <div className="data-table-container">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>PO No</th>
-                  <th>Party</th>
-                  <th>Kg</th>
-                  <th>Total</th>
+                  <th>PO Date</th>
+                  <th>PO Number</th>
+                  <th>Party Name</th>
+                  <th>Product</th>
+                  <th>Qty (Kg)</th>
+                  <th>Total (₹)</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(po => (
-                  <tr key={po.id}>
-                    <td>{formatDate(po.date)}</td>
-                    <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{po.poNo}</td>
-                    <td>{po.partyName}</td>
-                    <td>{po.qty || 0}</td>
-                    <td>₹{(parseFloat(po.total) || 0).toFixed(2)}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.35rem' }}>
-                        <button onClick={() => viewPDF('PO', po)} style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer' }} title="Preview">
-                          <Eye size={16} />
-                        </button>
-                        <button onClick={() => exportToPDF('PO', po)} style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer' }} title="Download">
-                          <FileDown size={16} />
-                        </button>
-                        <button onClick={() => handleEdit(po)} style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer' }} title="Edit">
-                          <Edit2 size={16} />
-                        </button>
-                        <button onClick={() => deleteItemSoftly('purchaseOrders', po.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }} title="Delete">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && (
-                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>No Purchase Orders found.</td></tr>
+                {filtered.length === 0 ? (
+                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>No Purchase Orders found.</td></tr>
+                ) : (
+                  filtered.map(po => (
+                    <tr key={po.id}>
+                      <td>{formatDate(po.date)}</td>
+                      <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{po.poNo}</td>
+                      <td style={{ fontWeight: 600 }}>{po.partyName}</td>
+                      <td>{po.productName}</td>
+                      <td>{po.qty}</td>
+                      <td style={{ fontWeight: 600 }}>₹{po.total?.toFixed(2)}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button title="Preview PDF" onClick={() => viewPDF('PO', po)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Eye size={14} /></button>
+                          <button onClick={() => exportToPDF('PO', po)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
+                          <button onClick={() => handleEdit(po)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={14} /></button>
+                          <button onClick={() => deleteItemSoftly('purchaseOrders', po.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -326,99 +360,146 @@ const PurchaseOrders = () => {
 
       {isModalOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
-          <div className="premium-card" style={{ width: '980px', maxWidth: '96%', maxHeight: '92vh', overflowY: 'auto' }}>
-            <h2 style={{ marginBottom: '1.25rem' }}>{editingDoc ? 'Modify Purchase Order' : 'Create Purchase Order'}</h2>
-
+          <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto' }}>
+            <h2 style={{ marginBottom: '1.5rem' }}>{editingDoc ? 'Modify Purchase Order' : 'Create Purchase Order'}</h2>
+            
             <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.85rem', marginBottom: '1.25rem' }}>
-                {field('poNo', 'PO Number')}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <label>PO Number</label>
+                  <input type="text" className="input-field" value={form.poNo} onChange={e => setForm({...form, poNo: e.target.value})} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
+                </div>
                 <div>
                   <label>PO Date *</label>
-                  <input type="date" className="input-field" required value={form.date || ''} onChange={e => setForm({ ...form, date: e.target.value })} />
+                  <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                 </div>
-                {field('partyName', 'Party Name', { span: 2 })}
-                {field('address', 'Address', { span: 2, textarea: true })}
-                {field('gstin', 'GST Number')}
-                {field('mobile', 'Mobile Number')}
-                {field('email', 'Email ID', { span: 2 })}
-                {field('paymentTerms', 'Payment Terms')}
-                {field('make', 'Make')}
-                {field('mtc', 'MTC')}
-                {field('utLevel', 'UT Level')}
-                {field('inspection', 'Inspection')}
-                {field('deliveryLocation', 'Delivery Location', { span: 3 })}
-                {field('vehicleNo', 'Vehicle Number')}
-                {field('driverMobile', 'Driver Mobile No')}
-                {field('transportName', 'Transport Name', { span: 2 })}
-                {field('transportCharges', 'Transport Charges', { type: 'number', step: 'any' })}
-                {field('loadingCharges', 'Loading Charges', { type: 'number', step: 'any' })}
-                {field('note', 'Note', { span: 2 })}
-                {field('remark', 'Remark', { span: 2 })}
-                {field('preparedBy', 'Prepared By')}
-                {field('checkedBy', 'Checked By')}
                 <div>
-                  <label>GST Rate (%)</label>
-                  <select className="input-field" value={form.taxRate} onChange={e => setForm({ ...form, taxRate: parseInt(e.target.value, 10) || 0 })}>
-                    <option value="18">18%</option>
-                    <option value="12">12%</option>
-                    <option value="5">5%</option>
-                    <option value="0">0%</option>
-                  </select>
+                  <label>Supplier Doc No</label>
+                  <input type="text" className="input-field" value={form.partyDocNo} onChange={e => setForm({...form, partyDocNo: e.target.value})} />
                 </div>
-                {field('terms', 'Terms & Conditions', { span: 4, textarea: true, rows: 4 })}
+                <div>
+                  <label>Supplier Doc Date</label>
+                  <input type="date" className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
+                </div>
+                <div>
+                  <label>Party Name</label>
+                  <input type="text" className="input-field" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
+                </div>
+                <div>
+                  <label>Product Name</label>
+                  <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Product Description / Specifications</label>
+                  <textarea className="input-field" rows="3" placeholder="Additional lines shown under product name on PO PDF" value={form.productDescription || ''} onChange={e => setForm({...form, productDescription: e.target.value})} />
+                </div>
+                <div>
+                  <label>Vendor Address</label>
+                  <textarea className="input-field" rows="2" value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} />
+                </div>
+                <div>
+                  <label>Vendor State</label>
+                  <input type="text" className="input-field" value={form.state || 'GUJARAT'} onChange={e => setForm({...form, state: e.target.value})} />
+                </div>
+                <div>
+                  <label>Vendor GSTIN</label>
+                  <input type="text" className="input-field" value={form.gstin || ''} onChange={e => setForm({...form, gstin: e.target.value})} />
+                </div>
+                <div>
+                  <label>Vendor Mobile</label>
+                  <input type="text" className="input-field" value={form.mobile || ''} onChange={e => setForm({...form, mobile: e.target.value})} />
+                </div>
+                <div>
+                  <label>Vendor Email</label>
+                  <input type="text" className="input-field" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} />
+                </div>
+                <div>
+                  <label>Material Qty (Kg)</label>
+                  <input type="number" step="any" className="input-field" value={form.qty} onChange={e => setForm({...form, qty: parseFloat(e.target.value) || 0})} />
+                </div>
+                <div style={{ gridColumn: 'span 4' }}>
+                  <label>Terms & Conditions</label>
+                  <textarea className="input-field" rows="3" value={form.terms} onChange={e => setForm({...form, terms: e.target.value})} />
+                </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Material Items</h3>
-                <button type="button" className="btn" onClick={addItemRow} style={{ padding: '0.3rem 0.75rem', fontSize: '0.85rem' }}>
-                  + Add Row
-                </button>
-              </div>
-
-              <div style={{ overflowX: 'auto', marginBottom: '1rem' }}>
-                <table className="data-table" style={{ minWidth: '900px' }}>
-                  <thead>
-                    <tr>
-                      <th>Grade</th>
-                      <th>Thickness</th>
-                      <th>Width</th>
-                      <th>Length</th>
-                      <th>Nos</th>
-                      <th>Kg</th>
-                      <th>Rate</th>
-                      <th>Amount</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(form.items || []).map((row, idx) => (
-                      <tr key={idx}>
-                        {['grade', 'thickness', 'width', 'length', 'nos', 'kg', 'rate', 'amount'].map((key) => (
-                          <td key={key}>
-                            <input
-                              className="input-field"
-                              style={{ padding: '0.35rem', minWidth: key === 'grade' ? '110px' : '70px' }}
-                              type={['nos', 'kg', 'rate', 'amount'].includes(key) ? 'number' : 'text'}
-                              step="any"
-                              value={row[key] ?? ''}
-                              onChange={e => updateItemRow(idx, key, e.target.value)}
-                            />
-                          </td>
-                        ))}
-                        <td>
-                          <button type="button" onClick={() => removeItemRow(idx)} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.7)', cursor: 'pointer' }}>×</button>
-                        </td>
-                      </tr>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', pb: '0.5rem' }}>PO Grid</h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {chargesList.map(item => (
+                      <DocChargeRow
+                        key={item.key}
+                        item={item}
+                        charges={form.charges}
+                        rates={form.rates}
+                        qtys={form.qtys}
+                        materialQty={materialQty}
+                        onToggle={toggleCharge}
+                        onQtyChange={handleQtyChange}
+                        onRateChange={handleRateChange}
+                      />
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
 
-              <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Nos</span><div style={{ fontWeight: 700 }}>{totals.totalNos || 0}</div></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Kg</span><div style={{ fontWeight: 700 }}>{totals.totalKg || 0}</div></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Basic Amount</span><div style={{ fontWeight: 700 }}>₹{totals.basicAmount.toFixed(2)}</div></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Grand Total</span><div style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>₹{totals.grandTotal.toFixed(2)}</div></div>
+                  <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.9rem', fontWeight: 600 }}>Manual Custom Charges</label>
+                      <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={addCustomCharge}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Row
+                      </button>
+                    </div>
+                    {(form.customCharges || []).map(c => (
+                      <div key={c.id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                        <input type="checkbox" checked={c.checked !== false} onChange={e => updateCustomCharge(c.id, 'checked', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-primary)' }} />
+                        <input type="text" className="input-field" placeholder="Description" value={c.name} onChange={e => updateCustomCharge(c.id, 'name', e.target.value)} />
+                        <input type="number" className="input-field" placeholder="Qty" value={c.qty} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
+                        <input type="number" className="input-field" placeholder="Rate" value={c.rate} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
+                        <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeCustomCharge(c.id)}>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        </button>
+                      </div>
+                    ))}
+                    {(form.customCharges || []).length === 0 && (
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No manual charges added.</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Calculation Summary */}
+                <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--accent-primary)' }}>GST Calculations</h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span>Subtotal:</span>
+                    <span style={{ fontWeight: 600 }}>₹{getSubtotal().toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                    <span>Discount (₹):</span>
+                    <input type="number" className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.discount} onChange={e => setForm({...form, discount: parseFloat(e.target.value) || 0})} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                    <span>GST Rate (%):</span>
+                    <select className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
+                      <option value="18">18%</option>
+                      <option value="12">12%</option>
+                      <option value="5">5%</option>
+                      <option value="0">0%</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span>CGST @{(form.taxRate / 2)}%:</span>
+                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span>SGST @{(form.taxRate / 2)}%:</span>
+                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
+                    <span>Grand Total:</span>
+                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (1 + form.taxRate / 100)).toFixed(2)}</span>
+                  </div>
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
