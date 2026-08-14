@@ -6,6 +6,7 @@ import {
   formatPdfDateDmy,
   buildTiChargeAmounts
 } from './taxInvoiceLayout';
+import { renderHtmlToPdf } from './printTheme';
 
 export const escHtml = (v) => String(v ?? '')
   .replace(/&/g, '&amp;')
