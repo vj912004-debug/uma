@@ -20,11 +20,10 @@ import {
   receiptProductOptions,
   findReceiptDoc,
   findAnyPackingList,
-  getBPRDispatchedRowsForPL,
   getPLDisplayProductLabel,
   buildPLProductSummaries,
   getMRReceivedQty,
-  alignDrumRowsToProducts,
+  buildPLBatchesFromMR,
   buildUnderProcessRows,
   buildDCFieldsFromProducts,
   getPartyProductForMR,
@@ -1125,12 +1124,49 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   useEffect(() => {
     if (editing) {
       const prodConfig = getPartyProductForMR(mr, data, activeProductName || editing.productName);
+      let receivedBatches = editing.receivedBatches || [];
+      let dispatchedBatches = editing.dispatchedBatches || [];
+      const filledReceived = receivedBatches.filter((r) => r.batchNo || r.drumNo);
+      const filledDispatched = dispatchedBatches.filter((r) => r.batchNo || r.drumNo);
+      if (filledReceived.length && !filledDispatched.length) {
+        receivedBatches = padBPRBatchRows(filledReceived);
+        dispatchedBatches = padBPRBatchRows(
+          filledReceived.map((r) => ({
+            batchNo: r.batchNo,
+            drumNo: r.drumNo,
+            productName: r.productName || '',
+            gross: '',
+            tare: '',
+            net: ''
+          }))
+        );
+      }
+      const drumTotal =
+        editing.totalDrums ||
+        filledDispatched.length ||
+        filledReceived.length ||
+        scopedDrums ||
+        0;
       setForm({
         ...editing,
         psdNote: editing.psdNote || prodConfig?.psdNote || '',
         psdRequirement: editing.psdRequirement || prodConfig?.psdReq || '90% < 10M',
-        receivedBatches: editing.receivedBatches || [],
-        dispatchedBatches: editing.dispatchedBatches || []
+        totalDrums: drumTotal,
+        receivedBatches,
+        dispatchedBatches,
+        packingMaterials: {
+          whiteLdBags: '',
+          blackLdBags: '',
+          brownTapes: '',
+          drumUsed: '',
+          otherDetails: '',
+          ...(editing.packingConsumables || {}),
+          ...(editing.packingMaterials || {}),
+          drumUsed:
+            editing.packingMaterials?.drumUsed ||
+            editing.packingConsumables?.drumUsed ||
+            (drumTotal ? String(drumTotal) : '')
+        }
       });
     } else {
       const bprSerial = data.settings?.serials?.BPR || 1;
@@ -1158,9 +1194,9 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
             batchNo: b.batchNo,
             drumNo: d.toString(),
             productName: pName,
-            gross: 0,
-            tare: 0,
-            net: 0
+            gross: '',
+            tare: '',
+            net: ''
           });
         }
       });
@@ -1175,9 +1211,53 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       const psdNote = psdNotes.length
         ? [...new Set(psdNotes)].join(' | ')
         : (scopedProdConfig?.psdNote || '');
+
+      const drumTotal = receivedRows.length || scopedDrums || 0;
+      let dispatchedRows = receivedRows.map((r) => ({
+        batchNo: r.batchNo,
+        drumNo: r.drumNo,
+        productName: r.productName,
+        gross: '',
+        tare: '',
+        net: ''
+      }));
+
+      const pl = findAnyPackingList(data.packingLists, mr.id);
+      if (pl?.batches?.length) {
+        const pool = [...pl.batches];
+        const used = new Set();
+        dispatchedRows = dispatchedRows.map((slot) => {
+          let pi = pool.findIndex(
+            (r, i) =>
+              !used.has(i) &&
+              String(r.batchNo || '') === String(slot.batchNo || '') &&
+              String(r.drumNo || '') === String(slot.drumNo || '')
+          );
+          if (pi < 0) pi = pool.findIndex((r, i) => !used.has(i));
+          if (pi < 0) return slot;
+          used.add(pi);
+          const src = pool[pi];
+          const gross = src.gross ?? '';
+          const tare = src.tare ?? '';
+          const g = parseFloat(gross);
+          const t = parseFloat(tare);
+          const net =
+            src.net !== '' && src.net != null
+              ? src.net
+              : (!isNaN(g) && !isNaN(t) && gross !== '' && tare !== '' ? Math.max(0, g - t) : '');
+          return {
+            ...slot,
+            batchNo: src.batchNo || slot.batchNo,
+            drumNo: src.drumNo != null && src.drumNo !== '' ? String(src.drumNo) : slot.drumNo,
+            gross,
+            tare,
+            net
+          };
+        });
+      }
+
       const paddedReceived = padBPRBatchRows(receivedRows);
-      // Keep dispatch blank until filled — avoids mirroring received batch/drum on print
-      const paddedDispatched = padBPRBatchRows([]);
+      const paddedDispatched = padBPRBatchRows(dispatchedRows);
 
       setForm(prev => ({
         ...prev,
@@ -1185,11 +1265,15 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         customerName: mr.partyName,
         productName: activeProductName || getReceiptProductLabel(mr, prodOpts),
         totalInputQty: scopedQty,
-        totalDrums: scopedDrums,
+        totalDrums: drumTotal,
         psdRequirement,
         psdNote,
         receivedBatches: paddedReceived,
         dispatchedBatches: paddedDispatched,
+        packingMaterials: {
+          ...(prev.packingMaterials || {}),
+          drumUsed: prev.packingMaterials?.drumUsed || (drumTotal ? String(drumTotal) : '')
+        },
         batchNo: activeMRBatches.map(b => b.batchNo).filter(Boolean).join(', '),
         totalNoBatch: activeMRBatches.length
       }));
@@ -1222,8 +1306,14 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     setForm(prev => {
       const list = [...prev[tableKey]];
       const item = { ...list[idx] };
-      item[field] = parseFloat(val) || 0;
-      item.net = Math.max(0, item.gross - item.tare);
+      item[field] = val === '' ? '' : (parseFloat(val) || 0);
+      const g = parseFloat(item.gross);
+      const t = parseFloat(item.tare);
+      if (item.gross === '' || item.tare === '' || isNaN(g) || isNaN(t)) {
+        item.net = '';
+      } else {
+        item.net = Math.max(0, g - t);
+      }
       list[idx] = item;
       return { ...prev, [tableKey]: list };
     });
@@ -1267,10 +1357,10 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                     <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
                     <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
                     <td style={{ padding: '0.25rem' }}>
-                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross} onChange={e => handleCellChange(tableKey, idx, 'gross', e.target.value)} />
+                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross === 0 || r.gross === '' || r.gross == null ? '' : r.gross} onChange={e => handleCellChange(tableKey, idx, 'gross', e.target.value)} />
                     </td>
                     <td style={{ padding: '0.25rem' }}>
-                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare} onChange={e => handleCellChange(tableKey, idx, 'tare', e.target.value)} />
+                      <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare === 0 || r.tare === '' || r.tare == null ? '' : r.tare} onChange={e => handleCellChange(tableKey, idx, 'tare', e.target.value)} />
                     </td>
                     <td style={{ padding: '0.25rem', fontWeight: 600 }}>{formatNet(r.net)}</td>
                   </tr>
@@ -1302,10 +1392,10 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                           <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
                           <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
                           <td style={{ padding: '0.25rem' }}>
-                            <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross} onChange={e => handleCellChange(tableKey, idx, 'gross', e.target.value)} />
+                            <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.gross === 0 || r.gross === '' || r.gross == null ? '' : r.gross} onChange={e => handleCellChange(tableKey, idx, 'gross', e.target.value)} />
                           </td>
                           <td style={{ padding: '0.25rem' }}>
-                            <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare} onChange={e => handleCellChange(tableKey, idx, 'tare', e.target.value)} />
+                            <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.tare === 0 || r.tare === '' || r.tare == null ? '' : r.tare} onChange={e => handleCellChange(tableKey, idx, 'tare', e.target.value)} />
                           </td>
                           <td style={{ padding: '0.25rem', fontWeight: 600 }}>{formatNet(r.net)}</td>
                         </tr>
@@ -1317,9 +1407,12 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
             })
           )}
         </div>
-        <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
+        <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
           <span>Total {tableKey === 'receivedBatches' ? 'Received' : 'Dispatched'}:</span>
-          <span>{totalNet.toFixed(2)} Kg</span>
+          <span style={{ display: 'flex', gap: '1rem' }}>
+            <span>Gross: {(tableKey === 'receivedBatches' ? totalReceivedGross : totalDispatchedGross).toFixed(2)} Kg</span>
+            <span>Net: {totalNet.toFixed(2)} Kg</span>
+          </span>
         </div>
       </div>
     );
@@ -1327,10 +1420,41 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const sumRows = (rows, key) => (rows || []).reduce((s, r) => {
+      const n = parseFloat(r[key]);
+      return s + (!isNaN(n) && r[key] !== '' && r[key] != null ? n : 0);
+    }, 0);
+    const countDrums = (rows) => (rows || []).filter((r) => r.batchNo || r.drumNo).length;
+    const totalReceivedNet = sumRows(form.receivedBatches, 'net');
+    const totalDispatchedNet = sumRows(form.dispatchedBatches, 'net');
+    const totalReceivedGross = sumRows(form.receivedBatches, 'gross');
+    const totalDispatchedGross = sumRows(form.dispatchedBatches, 'gross');
+    const filledDrums = Math.max(
+      countDrums(form.dispatchedBatches),
+      countDrums(form.receivedBatches),
+      parseInt(form.totalDrums, 10) || 0
+    );
+    const packingMaterials = { ...(form.packingMaterials || {}) };
+    if (!packingMaterials.drumUsed && filledDrums) packingMaterials.drumUsed = String(filledDrums);
+    const packingConsumables = {
+      ...(form.packingConsumables || {}),
+      whiteLdBags: packingMaterials.whiteLdBags || form.packingConsumables?.whiteLdBags || '',
+      blackLdBags: packingMaterials.blackLdBags || form.packingConsumables?.blackLdBags || '',
+      brownTapes: packingMaterials.brownTapes || form.packingConsumables?.brownTapes || '',
+      drumUsed: packingMaterials.drumUsed || form.packingConsumables?.drumUsed || '',
+      otherDetails: packingMaterials.otherDetails || form.packingConsumables?.otherDetails || ''
+    };
     const finalDoc = {
       ...form,
       partyName: form.partyName || form.customerName || mr.partyName,
-      receiptId: mr.id
+      receiptId: mr.id,
+      totalDrums: filledDrums || form.totalDrums || 0,
+      packingMaterials,
+      packingConsumables,
+      totalReceivedNet,
+      totalDispatchedNet,
+      totalReceivedGross,
+      totalDispatchedGross
     };
 
     if (editing) {
@@ -1344,6 +1468,8 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
 
   const totalReceivedNet = (form.receivedBatches || []).reduce((s, r) => s + (parseFloat(r.net) || 0), 0);
   const totalDispatchedNet = (form.dispatchedBatches || []).reduce((s, r) => s + (parseFloat(r.net) || 0), 0);
+  const totalReceivedGross = (form.receivedBatches || []).reduce((s, r) => s + (parseFloat(r.gross) || 0), 0);
+  const totalDispatchedGross = (form.dispatchedBatches || []).reduce((s, r) => s + (parseFloat(r.gross) || 0), 0);
   const formatNet = formatWeightNet;
 
   return (
@@ -1861,11 +1987,11 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   useEffect(() => {
     if (editing) {
       const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
-      const fromBpr = getBPRDispatchedRowsForPL(data, mr, prodOpts);
-      const sourceRows = (editing.batches || []).length ? editing.batches : fromBpr;
-      const mergedBatches = alignDrumRowsToProducts(sourceRows, mr, prodOpts);
+      const mergedBatches = buildPLBatchesFromMR(data, mr, prodOpts, editing.batches || []);
       setForm({
         ...editing,
+        partyName: editing.partyName || mr.partyName || '',
+        receiptNo: editing.receiptNo || mr.receiptNo || '',
         productName: editing.productName?.includes(',')
           ? editing.productName
           : getReceiptProductLabel(mr, prodOpts),
@@ -1876,15 +2002,17 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       const plSerial = data.settings?.serials?.PL || 1;
       const docNo = generateDocNumber('PL', plSerial, new Date());
       const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
-      const plRows = getBPRDispatchedRowsForPL(data, mr, prodOpts);
+      const plRows = buildPLBatchesFromMR(data, mr, prodOpts);
 
       setForm({
         plNo: docNo,
         date: new Date().toISOString().split('T')[0],
+        partyName: mr.partyName || '',
+        receiptNo: mr.receiptNo || '',
         productName: getReceiptProductLabel(mr, prodOpts),
         productSummaries: summaries,
         totalWeight: 0,
-        totalDrums: 0,
+        totalDrums: plRows.length,
         batches: plRows
       });
     }
@@ -1919,12 +2047,14 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const addCustomRow = (productName = '') => {
     const prod = productName || productNames[0] || mr.productName || '';
     setForm(prev => {
-      const prodRowCount = prev.batches.filter(b => normProd(b.productName || prod) === normProd(prod)).length;
+      const prodRows = prev.batches.filter(b => normProd(b.productName || prod) === normProd(prod));
+      const mrBatchNo = getProductBatches(mr, prod, prodOpts)[0]?.batchNo || '';
+      const batchNo = prodRows.find(b => b.batchNo)?.batchNo || mrBatchNo || '';
       return {
         ...prev,
         batches: [...prev.batches, {
-          batchNo: prev.batches.find(b => normProd(b.productName || prod) === normProd(prod))?.batchNo || '',
-          drumNo: (prodRowCount + 1).toString(),
+          batchNo,
+          drumNo: (prodRows.length + 1).toString(),
           productName: prod,
           gross: '',
           tare: '',
@@ -1947,6 +2077,8 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     const finalDoc = {
       ...form,
       receiptId: mr.id,
+      partyName: form.partyName || mr.partyName || '',
+      receiptNo: form.receiptNo || mr.receiptNo || '',
       productName: getReceiptProductLabel(mr, prodOpts),
       productSummaries: summaries.length ? summaries : (form.productSummaries || [])
     };
@@ -1974,6 +2106,14 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         <div>
           <label>Packing List Date</label>
           <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+        </div>
+        <div>
+          <label>Party Name</label>
+          <input type="text" className="input-field" readOnly value={form.partyName || mr.partyName || ''} />
+        </div>
+        <div>
+          <label>MR No</label>
+          <input type="text" className="input-field" readOnly value={form.receiptNo || mr.receiptNo || '—'} />
         </div>
         <div>
           <label>Product(s)</label>
@@ -2242,8 +2382,8 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         </div>
 
         <div style={{ gridColumn: 'span 2' }}>
-          <label>Vehicle No *</label>
-          <input type="text" className="input-field" required placeholder="e.g. GJ-01-XX-0000" value={form.vehicleNo} onChange={e => setForm({...form, vehicleNo: e.target.value})} />
+          <label>Vehicle No</label>
+          <input type="text" className="input-field" placeholder="e.g. GJ-01-XX-0000" value={form.vehicleNo} onChange={e => setForm({...form, vehicleNo: e.target.value})} />
         </div>
         <div style={{ gridColumn: 'span 2' }}>
           <label>Driver Name</label>

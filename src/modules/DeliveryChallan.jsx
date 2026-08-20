@@ -343,8 +343,8 @@ const DeliveryChallan = () => {
                 </div>
 
                 <div>
-                  <label>Vehicle No *</label>
-                  <input type="text" className="input-field" required placeholder="e.g. GJ-01-XX-0000" value={form.vehicleNo} onChange={e => setForm({...form, vehicleNo: e.target.value})} />
+                  <label>Vehicle No</label>
+                  <input type="text" className="input-field" placeholder="e.g. GJ-01-XX-0000" value={form.vehicleNo} onChange={e => setForm({...form, vehicleNo: e.target.value})} />
                 </div>
                 <div>
                   <label>Transporter Name</label>

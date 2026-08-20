@@ -382,8 +382,8 @@ const PurchaseOrders = () => {
                   <input type="date" className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
                 </div>
                 <div>
-                  <label>Party Name</label>
-                  <input type="text" className="input-field" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
+                  <label>Supplier / Party Name *</label>
+                  <input type="text" className="input-field" required placeholder="Enter supplier / party name" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
                 </div>
                 <div>
                   <label>Product Name</label>

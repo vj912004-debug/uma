@@ -1,6 +1,7 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { formatPdfDateDmy } from './taxInvoiceLayout';
-import { escHtml, fmtMoney, buildPrintLogoHtml } from './printTheme';
+import { escHtml, fmtMoney, buildPrintLogoHtml, applyPrintPrefsToHtml } from './printTheme';
+import { PRINT_ROOT_CLASS } from './printPrefs';
 
 const parseWeight = (value) => {
   if (value === '' || value === null || value === undefined) return 0;
@@ -126,51 +127,71 @@ export const buildPackingListHtml = (data, profileInput) => {
   .header {
     display: flex;
     justify-content: space-between;
-    align-items: stretch;
-    gap: 14px;
-    margin-bottom: 10px;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 10px;
+    padding: 0 0 10px;
   }
   .brand {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 10px;
   }
   .logo {
-    width: 78px;
-    height: 78px;
+    width: 64px;
+    height: 64px;
     position: relative;
     flex-shrink: 0;
   }
-  .logo svg, .logo img { width: 100%; height: 100%; object-fit: contain; }
+  .logo svg, .logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 2px;
+  }
   .brand-text h1 {
     margin: 0;
     font-family: Georgia, 'Times New Roman', serif;
-    font-size: 38px;
-    letter-spacing: 1px;
+    font-size: 34px;
+    letter-spacing: 0.5px;
+    word-spacing: normal;
     color: var(--purple);
     line-height: 1;
   }
   .brand-text .tagline {
     color: var(--green);
     font-weight: 700;
-    font-size: 16px;
-    margin-top: 2px;
+    font-size: 13px;
+    margin: 0;
+    line-height: 1.15;
+    letter-spacing: normal;
+    word-spacing: 0;
+    white-space: nowrap;
   }
   .tax-invoice-box {
     background: var(--purple);
     color: #fff;
     text-align: center;
-    padding: 10px 22px;
+    padding: 8px 18px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    min-width: 230px;
+    align-self: center;
+    min-width: 200px;
+    min-height: 64px;
+    border-radius: 6px;
+    box-sizing: border-box;
   }
   .tax-invoice-box .ti-title {
-    font-size: 30px;
+    font-size: 22px;
     font-weight: 800;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
+    margin: 0;
+    line-height: 1.1;
+    white-space: nowrap;
   }
 
   /* ===== PL META INFO ROW ===== */
@@ -227,7 +248,7 @@ export const buildPackingListHtml = (data, profileInput) => {
     font-weight: 700;
     padding: 7px 6px;
     text-align: center;
-    border: 1px solid var(--purple);
+    border: 1px solid rgba(255,255,255,0.55);
   }
   table.items tbody td {
     border: 1px solid var(--lav-border);
@@ -261,7 +282,7 @@ export const buildPackingListHtml = (data, profileInput) => {
   <div class="page">
     <table class="content-wrapper">
       <tr>
-        <td style="padding: 16px;">
+        <td style="padding: 10px 12px;">
       
           <div class="header">
             <div class="brand">
@@ -323,11 +344,12 @@ export const buildPackingListHtml = (data, profileInput) => {
 </html>`;
 };
 
-export const renderPackingListPdf = async (data, { mode = 'save' } = {}) => {
-  const html = buildPackingListHtml(data, data.companyProfile);
+export const renderPackingListPdf = async (data, { mode = 'save', printPrefs } = {}) => {
+  const html = applyPrintPrefsToHtml(buildPackingListHtml(data, data.companyProfile), printPrefs);
   const { jsPDF } = await import('jspdf');
   const html2canvas = (await import('html2canvas')).default;
   const host = document.createElement('div');
+  host.className = PRINT_ROOT_CLASS;
   host.style.cssText = 'position:absolute;left:-12000px;top:0;z-index:-1;background:#fff;';
   host.innerHTML = html;
   document.body.appendChild(host);

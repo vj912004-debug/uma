@@ -29,7 +29,8 @@ import {
   Building2,
   ChevronDown,
   ChevronRight,
-  X
+  X,
+  Phone
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -40,10 +41,11 @@ const Sidebar = () => {
   const userRole = currentUser?.role || data?.settings?.userRole || 'Staff';
 
   const [expandedGroups, setExpandedGroups] = useState({
-    material: true, // "Material Received" default open
+    material: true,
     invoices: false,
     dispatch: false,
-    reports: false,
+    payments: true,
+    reports: true,
     system: false
   });
 
@@ -90,13 +92,21 @@ const Sidebar = () => {
       ]
     },
     {
+      key: 'payments',
+      title: 'Payments',
+      icon: CreditCard,
+      items: [
+        { name: 'Payment Follow-Up', icon: Phone, path: '/payment-follow-up', roles: ['Admin', 'Staff'], pill: true, highlight: true },
+        { name: 'Party Due', icon: DollarSign, path: '/party-due', roles: ['Admin', 'Staff'] },
+        { name: 'Payments', icon: CreditCard, path: '/payments', roles: ['Admin', 'Staff'] }
+      ]
+    },
+    {
       key: 'reports',
       title: 'Reports & Logs',
       icon: Grid,
       items: [
         { name: 'Processing Sheet', icon: Grid, path: '/processing-sheet', roles: ['Admin', 'Staff'] },
-        { name: 'Party Due', icon: DollarSign, path: '/party-due', roles: ['Admin'] },
-        { name: 'Payments', icon: CreditCard, path: '/payments', roles: ['Admin'] },
         { name: 'Tasks', icon: Bell, path: '/tasks', roles: ['Admin', 'Staff'] },
         { name: 'Quotations', icon: PlusSquare, path: '/quotations', roles: ['Admin', 'Staff'] },
         { name: 'Attendance', icon: UserCheck, path: '/attendance', roles: ['Admin', 'Staff'] }
@@ -204,7 +214,12 @@ const Sidebar = () => {
                       key={item.path}
                       to={item.path}
                       className={({ isActive }) =>
-                        ['nav-link', item.highlight ? 'highlight' : '', isActive ? 'active' : '']
+                        [
+                          'nav-link',
+                          item.highlight ? 'highlight' : '',
+                          item.pill ? 'nav-pill' : '',
+                          isActive ? 'active' : ''
+                        ]
                           .filter(Boolean)
                           .join(' ')
                       }

@@ -7,11 +7,12 @@ import {
 import {
   escHtml,
   fmtMoney,
-  fmtQty
+  fmtQty,
+  renderHtmlToPdf
 } from './printTheme';
 
 const NOTE_CHARGES = [...STANDARD_CHARGES_LIST, OTHER_CHARGE_ITEM];
-const NOTE_MIN_ROWS = 8;
+const NOTE_BLANK_ROWS = 7;
 
 const calcNoteLines = (data) => {
   const taxRate = parseFloat(data.taxRate) || 18;
@@ -23,18 +24,15 @@ const calcNoteLines = (data) => {
   let totalQty = 0;
   let sr = 0;
 
-  NOTE_CHARGES.forEach((c) => {
-    if (!data.charges?.[c.key]) return;
-    const qty = parseFloat(data.qtys?.[c.key]) || 1;
-    const rate = parseFloat(data.rates?.[c.key]) || 0;
+  const pushLine = (label, qty, rate) => {
     const amt = qty * rate;
-    if (amt <= 0 && !rate) return;
+    if (amt <= 0 && !rate && !(label || '').trim()) return;
     const sgstAmt = amt * (halfRate / 100);
     const cgstAmt = amt * (halfRate / 100);
     sr += 1;
     rows.push({
       sr,
-      label: c.label || c.key,
+      label: label || 'Description',
       qty,
       rate,
       amt,
@@ -48,54 +46,24 @@ const calcNoteLines = (data) => {
     totalSgst += sgstAmt;
     totalCgst += cgstAmt;
     totalQty += qty;
+  };
+
+  // Prefer manual description lines
+  (data.customCharges || []).forEach((c) => {
+    pushLine(c.description || '', parseFloat(c.qty) || 1, parseFloat(c.rate) || 0);
   });
 
-  (data.customCharges || []).forEach(c => {
-    const qty = parseFloat(c.qty) || 1;
-    const rate = parseFloat(c.rate) || 0;
-    const amt = qty * rate;
-    if (amt <= 0 && !rate) return;
-    const sgstAmt = amt * (halfRate / 100);
-    const cgstAmt = amt * (halfRate / 100);
-    sr += 1;
-    rows.push({
-      sr,
-      label: c.description || 'Custom Charge',
-      qty,
-      rate,
-      amt,
-      sgstRate: halfRate,
-      cgstRate: halfRate,
-      sgstAmt,
-      cgstAmt,
-      rowTotal: amt + sgstAmt + cgstAmt
+  // Legacy checklist charges (older saved notes only)
+  if (!rows.length) {
+    NOTE_CHARGES.forEach((c) => {
+      if (!data.charges?.[c.key]) return;
+      pushLine(c.label || c.key, parseFloat(data.qtys?.[c.key]) || 1, parseFloat(data.rates?.[c.key]) || 0);
     });
-    totalAmt += amt;
-    totalSgst += sgstAmt;
-    totalCgst += cgstAmt;
-    totalQty += qty;
-  });
+  }
 
   if (!rows.length && (data.particulars || data.amount)) {
     const amt = parseFloat(data.subtotal) || parseFloat(data.amount) || 0;
-    const sgstAmt = amt * (halfRate / 100);
-    const cgstAmt = amt * (halfRate / 100);
-    rows.push({
-      sr: 1,
-      label: data.particulars || 'Adjustment',
-      qty: 1,
-      rate: amt,
-      amt,
-      sgstRate: halfRate,
-      cgstRate: halfRate,
-      sgstAmt,
-      cgstAmt,
-      rowTotal: amt + sgstAmt + cgstAmt
-    });
-    totalAmt = amt;
-    totalSgst = sgstAmt;
-    totalCgst = cgstAmt;
-    totalQty = 1;
+    pushLine(data.particulars || 'Adjustment', 1, amt);
   }
 
   const discount = parseFloat(data.discount) || 0;
@@ -122,13 +90,13 @@ const getCommonStyle = () => `
     --grey-line:#d9d9d9;
   }
   *{box-sizing:border-box;font-family:Cambria,Georgia,serif;}
-  html,body{margin:0;padding: 4px;background:#fff;font-family:Cambria,Georgia,serif;color:var(--text);}
+  html,body{margin:0;padding:0;background:#fff;font-family:Cambria,Georgia,serif;color:var(--text);}
   
   /* A4 scaling */
   .page {
     width: 794px;
     min-height: 1123px;
-    padding: 4px;
+    padding: 0;
     margin: 0;
     background: #fff;
     border: none;
@@ -143,34 +111,38 @@ const getCommonStyle = () => `
   .header{
     display:flex;
     justify-content:space-between;
-    align-items:stretch;
+    align-items:center;
     gap:14px;
-    margin-bottom:14px;
-    padding-bottom:14px; border-bottom:1px solid var(--purple); margin-left:-18px; margin-right:-18px; padding-left:18px; padding-right:18px;
+    margin:0 0 8px;padding:0 0 8px;
+    border-bottom:1px solid var(--purple);
   }
   .brand{
     display:flex;
     align-items:center;
-    gap:14px;
+    gap:12px;
+    min-width:0;
   }
   .logo{
-    width:78px;
-    height:78px;
+    width:64px;
+    height:64px;
     position:relative;
     flex-shrink:0;
   }
-  .logo svg{width:100%;height:100%;}
+  .logo svg,.logo img{width:100%;height:100%;object-fit:contain;display:block;}
   .brand-text {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: flex-start;
+    justify-content: center;
+    gap:2px;
   }
   .brand-text h1{
     margin:0;
     font-family:'Times New Roman',Times,serif;
-    font-size:42px;
+    font-size:34px;
     white-space: nowrap;
-    letter-spacing:1px;
+    letter-spacing:0.5px;
+    word-spacing:normal;
     color:#123282;
     line-height:1;
   }
@@ -178,33 +150,48 @@ const getCommonStyle = () => `
     color:#1d9444;
     font-family:Cambria,Georgia,serif;
     font-weight:700;
-    font-size:16px;
-    margin-top:2px;
+    font-size:13px;
+    margin:0;
+    padding:0;
+    line-height:1.15;
+    letter-spacing:normal;
+    word-spacing:0;
+    white-space:nowrap;
   }
   .tax-invoice-box{
     background:var(--purple);
     color:#fff;
     text-align:center;
-    padding:10px 22px;
+    padding:8px 18px;
     display:flex;
     flex-direction:column;
     justify-content:center;
     align-items:center;
-    min-width:230px; border-radius:6px;
+    align-self:center;
+    min-width:200px;
+    min-height:64px;
+    border-radius:6px;
+    overflow:visible;
+    height:auto;
+    box-sizing:border-box;
   }
   .tax-invoice-box .ti-title{
-    font-size:30px;
+    font-size:22px;
     font-weight:800;
-    letter-spacing:1px;
-    margin-bottom:6px;
+    letter-spacing:0.5px;
+    margin:0;
+    padding:0;
+    line-height:1.1;
+    white-space:nowrap;
   }
   .tax-invoice-box .ti-sub{
     background:#fff;
     color:var(--purple);
-    font-size:12px;
+    font-size:10px;
     font-weight:700;
     letter-spacing:.5px;
-    padding:3px 10px;
+    padding:2px 8px;
+    margin-top:4px;
   }
 
   /* ===== COMPANY / INVOICE INFO ROW ===== */
@@ -241,30 +228,76 @@ const getCommonStyle = () => `
     line-height:1.7;
   }
   .reg-details b{color:var(--purple);}
-  .reg-row{display:flex;}
-  .reg-row .label{width:62px;font-weight:700;color:var(--purple);}
-  .reg-row .colon{width:14px;}
+  .reg-row{
+    display:grid;
+    grid-template-columns:52px 12px minmax(0,1fr);
+    column-gap:4px;
+    align-items:center;
+  }
+  .reg-row .label{font-weight:700;color:var(--purple);white-space:nowrap;}
+  .reg-row .colon{white-space:nowrap;}
 
   .invoice-meta{
-    flex:1;
+    flex:1.15;
+    min-width:300px;
     border:1px solid var(--purple); border-radius:6px; overflow:hidden;
   }
   .invoice-meta .block{
-    padding:8px 12px;
+    padding:8px 10px;
     font-size:12px;
   }
   .invoice-meta .block + .block{
     border-top:1px solid var(--lav-border);
   }
   .meta-row{
-    display:flex;
-    margin-bottom:3px;
+    display:grid;
+    grid-template-columns:16px 158px 12px minmax(0,1fr);
+    column-gap:4px;
+    align-items:center;
+    margin-bottom:4px;
+    font-size:12px;
+    line-height:1.3;
+    color:var(--text);
+    white-space:nowrap;
   }
-  .meta-row .m-icon{color:var(--purple);width:18px;flex-shrink:0;display:flex;align-items:center;}
-  .meta-row .m-label{width:145px;flex-shrink:0;color:#333;}
-  .meta-row .m-colon{width:12px;flex-shrink:0;}
-  .meta-row .m-value{font-weight:600;}
-  .meta-row.sub .m-label{width:145px;padding-left:18px;box-sizing:border-box;}
+  .meta-row .m-icon{
+    grid-column:1;
+    color:var(--purple);
+    width:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .meta-row .m-label{
+    grid-column:2;
+    box-sizing:border-box;
+    color:var(--text);
+    font-size:12px;
+    font-weight:700;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    padding-left:0;
+  }
+  .meta-row .m-colon{
+    grid-column:3;
+    font-size:12px;
+    font-weight:700;
+    white-space:nowrap;
+    text-align:left;
+  }
+  .meta-row .m-value{
+    grid-column:4;
+    min-width:0;
+    font-size:12px;
+    font-weight:700;
+    color:var(--text);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  /* ===== BILL TO / SHIP TO ===== */
 
   /* ===== BILL TO / SHIP TO ===== */
   .parties{
@@ -366,7 +399,7 @@ const getCommonStyle = () => `
     padding:3px 2px;
     text-align:center;
     vertical-align:middle;
-    border:1px solid var(--purple);
+    border:1px solid rgba(255,255,255,0.55);
   }
   table.items tbody td{
     border:1px solid var(--lav-border);
@@ -493,7 +526,7 @@ const getCommonStyle = () => `
 
   @media print{
     body{background:#fff;}
-    .page {margin:0;padding: 4px;width:794px;min-height: 1123px;}
+    .page {margin:0;padding: 0;width:794px;min-height: 1123px;}
     .content-wrapper { width: 100%; min-height: 1115px; height: 1115px; border-collapse: collapse; border: 2px solid var(--purple); box-sizing: border-box; }
   .content-wrapper td { padding: 0; }
   }
@@ -570,8 +603,7 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
       </tr>`;
   }).join('');
 
-  const blanksCount = Math.max(0, NOTE_MIN_ROWS - rows.length);
-  const blanks = Array.from({ length: blanksCount }, () => `
+  const blanks = Array.from({ length: NOTE_BLANK_ROWS }, () => `
       <tr class="filler-row">
         <td></td><td></td><td></td><td></td>
         <td class="num">0.00</td><td></td><td class="num">0.00</td>
@@ -615,7 +647,7 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
 <div class="page">
 <table class="content-wrapper">
   <tr>
-    <td valign="top" style="padding: 18px; padding-bottom: 0;">
+    <td valign="top" style="padding: 4px 10px 0;">
 
   <!-- HEADER -->
   <div class="header">
@@ -623,7 +655,7 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
       <div class="logo">${getLogoSvg()}</div>
       <div class="brand-text">
         <h1>UMA MICRON</h1>
-        <div class="tagline">Micronization of API&rsquo;s</div>
+        <div class="tagline">Micronization of API's</div>
       </div>
     </div>
     <div class="tax-invoice-box">
@@ -847,62 +879,22 @@ const buildCreditNoteHtml = (data, profileInput) => {
   return buildNoteHtmlCommon(data, profileInput, 'Credit Note', ['Sales Return', 'Rate Difference', 'Discount', 'Excess Billing', 'Material Rejection']);
 };
 
-const renderPdfCommon = async (html, docNo, prefix, mode) => {
-  const { jsPDF } = await import('jspdf');
-  const html2canvas = (await import('html2canvas')).default;
-  const host = document.createElement('div');
-  host.style.cssText = 'position:absolute;left:-12000px;top:0;z-index:-1;background:#fff;';
-  host.innerHTML = html;
-  document.body.appendChild(host);
-  try {
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const margin = 0;
-    const usableW = pageW - margin * 2;
-    const usableH = pageH - margin * 2;
-
-    const target = host.querySelector('.page') || host.firstElementChild;
-    const canvas = await html2canvas(target, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      width: 794,
-      windowWidth: 794,
-      height: target.scrollHeight,
-      windowHeight: target.scrollHeight,
-      logging: false
-    });
-
-    const naturalW = usableW;
-    const naturalH = (canvas.height * naturalW) / canvas.width;
-    const scale = Math.min(usableW / naturalW, usableH / naturalH, 1);
-    const drawW = naturalW * scale;
-    const drawH = naturalH * scale;
-    const x = margin + (usableW - drawW) / 2;
-    const y = margin;
-    
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297);
-
-    if (mode === 'view') {
-      const url = pdf.output('bloburl');
-      const win = window.open(url, '_blank');
-      if (win) win.document.title = `${prefix}_${docNo}`;
-    } else {
-      pdf.save(`${prefix}_${docNo}.pdf`);
-    }
-  } finally {
-    document.body.removeChild(host);
-  }
+const renderPdfCommon = async (html, docNo, prefix, mode, printPrefs) => {
+  await renderHtmlToPdf(html, {
+    mode,
+    filePrefix: prefix,
+    docNo,
+    fitPage: true,
+    printPrefs
+  });
 };
 
-export const renderDebitNotePdf = async (data, { mode = 'save' } = {}) => {
+export const renderDebitNotePdf = async (data, { mode = 'save', printPrefs } = {}) => {
   const { html, docNo } = buildDebitNoteHtml(data, data.companyProfile);
-  await renderPdfCommon(html, docNo, 'DN', mode);
+  await renderPdfCommon(html, docNo, 'DN', mode, printPrefs);
 };
 
-export const renderCreditNotePdf = async (data, { mode = 'save' } = {}) => {
+export const renderCreditNotePdf = async (data, { mode = 'save', printPrefs } = {}) => {
   const { html, docNo } = buildCreditNoteHtml(data, data.companyProfile);
-  await renderPdfCommon(html, docNo, 'CN', mode);
+  await renderPdfCommon(html, docNo, 'CN', mode, printPrefs);
 };

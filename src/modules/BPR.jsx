@@ -11,7 +11,8 @@ import {
   getPartyProductForMR,
   getReceiptProductNames,
   receiptProductOptions,
-  enrichBPRForPrint
+  enrichBPRForPrint,
+  findAnyPackingList
 } from '../utils/receiptProducts';
 
 const emptyRow = (batchNo, drumNo) => ({ batchNo, drumNo, gross: '', tare: '', net: '' });
@@ -51,10 +52,48 @@ const calcNet = (gross, tare) => {
   return Math.max(0, g - t);
 };
 
-const sumNet = (rows) => rows.reduce((s, r) => {
+const sumNet = (rows) => (rows || []).reduce((s, r) => {
   const n = r.net !== '' && r.net !== undefined ? parseFloat(r.net) : calcNet(r.gross, r.tare);
   return s + (typeof n === 'number' && !isNaN(n) ? n : 0);
 }, 0);
+
+const sumGross = (rows) => (rows || []).reduce((s, r) => {
+  const g = parseFloat(r.gross);
+  return s + (!isNaN(g) && r.gross !== '' && r.gross != null ? g : 0);
+}, 0);
+
+const countFilledDrums = (rows) => (rows || []).filter((r) => r.batchNo || r.drumNo).length;
+
+const applyPlWeightsToRows = (slots, plBatches = []) => {
+  const pool = [...(plBatches || [])];
+  const used = new Set();
+  return slots.map((slot) => {
+    let pi = pool.findIndex(
+      (r, i) =>
+        !used.has(i) &&
+        String(r.batchNo || '') === String(slot.batchNo || '') &&
+        String(r.drumNo || '') === String(slot.drumNo || '')
+    );
+    if (pi < 0) pi = pool.findIndex((r, i) => !used.has(i));
+    if (pi < 0) return { ...slot };
+    used.add(pi);
+    const src = pool[pi];
+    const gross = numberInputValue(src.gross ?? '');
+    const tare = numberInputValue(src.tare ?? '');
+    const net =
+      src.net !== '' && src.net != null
+        ? numberInputValue(src.net)
+        : calcNet(gross, tare);
+    return {
+      ...slot,
+      batchNo: src.batchNo || slot.batchNo,
+      drumNo: src.drumNo != null && src.drumNo !== '' ? String(src.drumNo) : slot.drumNo,
+      gross,
+      tare,
+      net
+    };
+  });
+};
 
 const normalizeRow = (r) => ({
   ...r,
@@ -119,6 +158,8 @@ const BPR = () => {
 
   const totalReceivedNet = sumNet(form.receivedBatches);
   const totalDispatchedNet = sumNet(form.dispatchedBatches);
+  const totalReceivedGross = sumGross(form.receivedBatches);
+  const totalDispatchedGross = sumGross(form.dispatchedBatches);
 
   const buildEmptyBPRForm = (docNo) => ({
     bprNo: docNo,
@@ -197,9 +238,23 @@ const BPR = () => {
     const psdNote = psdNotes.length
       ? [...new Set(psdNotes)].join(' | ')
       : (prodConfig?.psdNote || '');
+    const drumTotal =
+      receivedRows.length ||
+      parseInt(mr.totalDrums, 10) ||
+      activeMRBatches.reduce((s, b) => s + (parseInt(b.drums, 10) || 0), 0) ||
+      0;
+
+    // Auto-create matching drum rows on the dispatch side
+    let dispatchedRows = receivedRows.map((r) => emptyRow(r.batchNo, r.drumNo));
+
+    // Pull gross/tare/net from an existing packing list when available
+    const pl = findAnyPackingList(data.packingLists, mr.id);
+    if (pl?.batches?.length) {
+      dispatchedRows = applyPlWeightsToRows(dispatchedRows, pl.batches);
+    }
+
     const paddedReceived = padBPRBatchRows(receivedRows);
-    // Keep dispatch blank until filled — avoids mirroring received batch/drum on print
-    const paddedDispatched = padBPRBatchRows([]);
+    const paddedDispatched = padBPRBatchRows(dispatchedRows);
 
     setForm({
       bprNo: docNo,
@@ -209,13 +264,22 @@ const BPR = () => {
       totalInputQty: mr.totalQty,
       psdRequirement,
       psdNote,
-      totalDrums: mr.totalDrums || 0,
+      totalDrums: drumTotal,
       doubleDispatch: false,
       receivedBatches: paddedReceived,
       dispatchedBatches: paddedDispatched,
       cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false, bagClean: false },
       pressureMetrics: { grindingPressure: '', injectionPressure: '', feedingSP: '', feedingDP: '', feedingTP: '', millingFP: '', millingFiP: '' },
-      packingConsumables: { fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '' },
+      packingConsumables: {
+        fiberDrumsUsed: '',
+        hdpeDrumsUsed: '',
+        linersUsed: '',
+        whiteLdBags: '',
+        blackLdBags: '',
+        brownTapes: '',
+        drumUsed: drumTotal ? String(drumTotal) : '',
+        otherDetails: ''
+      },
       machineParams: emptyMachineParams(),
       previousBulkDensity: emptyPreviousBulkDensity(),
       bulkDensity: emptyBulkDensity(),
@@ -248,16 +312,35 @@ const BPR = () => {
     setActiveTab(openTab);
     const mr = data.materialReceipts.find(m => m.id === bpr.receiptId);
     const prodConfig = mr ? getPartyProductForMR(mr, data, bpr.productName) : null;
+    let receivedBatches = (bpr.receivedBatches || []).map(normalizeRow);
+    let dispatchedBatches = (bpr.dispatchedBatches || []).map(normalizeRow);
+    const filledReceived = receivedBatches.filter((r) => r.batchNo || r.drumNo);
+    const filledDispatched = dispatchedBatches.filter((r) => r.batchNo || r.drumNo);
+    if (filledReceived.length && !filledDispatched.length) {
+      receivedBatches = padBPRBatchRows(filledReceived);
+      dispatchedBatches = padBPRBatchRows(filledReceived.map((r) => emptyRow(r.batchNo, r.drumNo)));
+    } else {
+      receivedBatches = padBPRBatchRows(receivedBatches);
+      dispatchedBatches = padBPRBatchRows(dispatchedBatches);
+    }
+    const drumTotal =
+      bpr.totalDrums ||
+      filledDispatched.length ||
+      filledReceived.length ||
+      0;
     setForm({
       ...bpr,
       psdNote: bpr.psdNote || prodConfig?.psdNote || '',
       psdRequirement: bpr.psdRequirement || prodConfig?.psdReq || '90% < 10M',
-      receivedBatches: (bpr.receivedBatches || []).map(normalizeRow),
-      dispatchedBatches: (bpr.dispatchedBatches || []).map(normalizeRow),
+      totalDrums: drumTotal,
+      receivedBatches,
+      dispatchedBatches,
       cleaningChecklist: { equipmentCleaned: false, areaCleaned: false, lineClearance: false, bagClean: false, ...(bpr.cleaningChecklist || {}) },
       packingConsumables: {
         fiberDrumsUsed: '', hdpeDrumsUsed: '', linersUsed: '', whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '',
-        ...(bpr.packingConsumables || {})
+        ...(bpr.packingMaterials || {}),
+        ...(bpr.packingConsumables || {}),
+        drumUsed: bpr.packingConsumables?.drumUsed || bpr.packingMaterials?.drumUsed || (drumTotal ? String(drumTotal) : '')
       },
       machineParams: { ...emptyMachineParams(), ...(bpr.machineParams || {}) },
       previousBulkDensity: { ...emptyPreviousBulkDensity(), ...(bpr.previousBulkDensity || {}) },
@@ -341,22 +424,36 @@ const BPR = () => {
           </tbody>
         </table>
       </div>
-      <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
+      <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
         <span>Total:</span>
-        <span>{tableKey === 'receivedBatches' ? totalReceivedNet.toFixed(2) : totalDispatchedNet.toFixed(2)} Kg</span>
+        <span style={{ display: 'flex', gap: '1rem' }}>
+          <span>Gross: {(tableKey === 'receivedBatches' ? totalReceivedGross : totalDispatchedGross).toFixed(2)} Kg</span>
+          <span>Net: {(tableKey === 'receivedBatches' ? totalReceivedNet : totalDispatchedNet).toFixed(2)} Kg</span>
+        </span>
       </div>
     </div>
   );
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const filledDrums = Math.max(
+      countFilledDrums(form.dispatchedBatches),
+      countFilledDrums(form.receivedBatches),
+      parseInt(form.totalDrums, 10) || 0
+    );
+    const pc = { ...(form.packingConsumables || {}) };
+    if (!pc.drumUsed && filledDrums) pc.drumUsed = String(filledDrums);
     const finalDoc = {
       ...form,
       receiptId: editingBPR?.receiptId || selectedMR?.id || '',
       partyName: form.partyName,
       productName: form.productName,
+      totalDrums: filledDrums || form.totalDrums || 0,
+      packingConsumables: pc,
       totalReceivedNet,
-      totalDispatchedNet
+      totalDispatchedNet,
+      totalReceivedGross,
+      totalDispatchedGross
     };
 
     if (editingBPR) {
@@ -517,8 +614,13 @@ const BPR = () => {
                       <td style={{ padding: '0.75rem', fontWeight: 600 }}>{bpr.partyName}</td>
                       <td style={{ padding: '0.75rem' }}>{bpr.productName}</td>
                       <td style={{ padding: '0.75rem' }}>
-                        <span>{bpr.dispatchedBatches?.length || 0} Drums</span>
-                        <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)' }}>Net: {bpr.totalDispatchedNet?.toFixed(1) || 0} Kg</span>
+                        <span>{bpr.totalDrums || countFilledDrums(bpr.dispatchedBatches) || countFilledDrums(bpr.receivedBatches) || 0} Drums</span>
+                        <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          Gross: {(bpr.totalDispatchedGross ?? sumGross(bpr.dispatchedBatches || [])).toFixed(1)} Kg
+                        </span>
+                        <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          Net: {(bpr.totalDispatchedNet ?? sumNet(bpr.dispatchedBatches || [])).toFixed(1)} Kg
+                        </span>
                       </td>
                       <td style={{ padding: '0.75rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -600,7 +702,7 @@ const BPR = () => {
                       <td style={{ padding: '0.75rem' }}>{bpr.productName}</td>
                       <td style={{ padding: '0.75rem' }}>{(bpr.totalReceivedNet ?? sumNet(bpr.receivedBatches || [])).toFixed(2)}</td>
                       <td style={{ padding: '0.75rem' }}>{(bpr.totalDispatchedNet ?? sumNet(bpr.dispatchedBatches || [])).toFixed(2)}</td>
-                      <td style={{ padding: '0.75rem' }}>{bpr.dispatchedBatches?.length || 0}</td>
+                      <td style={{ padding: '0.75rem' }}>{bpr.totalDrums || countFilledDrums(bpr.dispatchedBatches) || countFilledDrums(bpr.receivedBatches) || 0}</td>
                       <td style={{ padding: '0.75rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                           <button type="button" className="btn btn-primary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleEdit(bpr, 'page2')}>Edit Weights</button>

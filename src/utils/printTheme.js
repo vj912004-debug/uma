@@ -1,5 +1,9 @@
 /** Shared purple print theme for TI / PI / DC / DN / CN / BPR HTML PDFs. */
 
+import { applyPrintPrefsToHtml, getStoredPrintPrefs, PRINT_ROOT_CLASS } from './printPrefs';
+
+export { applyPrintPrefsToHtml } from './printPrefs';
+
 export const PRINT_PAGE_W = 794;
 
 export const escHtml = (v) => String(v ?? '')
@@ -265,7 +269,7 @@ export const getSharedPrintStyles = () => `
     font-weight: 700;
     padding: 8px 6px;
     text-align: left;
-    border: 1px solid var(--purple);
+    border: 1px solid rgba(255,255,255,0.55);
   }
   table.items thead th.num, table.invoice-table th.center { text-align: center; }
   table.items tbody td, table.invoice-table td {
@@ -548,10 +552,13 @@ export const renderHtmlToPdf = async (html, {
   filePrefix = 'DOC',
   docNo = 'N/A',
   width = PRINT_PAGE_W,
-  fitPage = false
+  fitPage = false,
+  printPrefs
 } = {}) => {
   const { jsPDF } = await import('jspdf');
   const html2canvas = (await import('html2canvas')).default;
+  const prefs = printPrefs || getStoredPrintPrefs();
+  const htmlWithPrefs = applyPrintPrefsToHtml(html, prefs);
 
   // Render inside an iframe so document <style> (e.g. * { font-size })
   // cannot leak into the live ERP UI and shrink app fonts on Preview.
@@ -562,8 +569,10 @@ export const renderHtmlToPdf = async (html, {
 
   const idoc = iframe.contentDocument || iframe.contentWindow.document;
   idoc.open();
-  idoc.write(html);
+  idoc.write(htmlWithPrefs);
   idoc.close();
+  if (idoc.documentElement) idoc.documentElement.classList.add(PRINT_ROOT_CLASS);
+  if (idoc.body) idoc.body.classList.add(PRINT_ROOT_CLASS);
 
   try {
     await new Promise((r) => {
@@ -659,7 +668,7 @@ export const renderHtmlToPdf = async (html, {
             bodyEl.style.padding = '0';
             bodyEl.style.overflow = 'hidden';
           }
-          clonedDoc.querySelectorAll('.pdf-page, .print-host').forEach((el) => {
+          clonedDoc.querySelectorAll('.pdf-page, .print-host, .page').forEach((el) => {
             el.style.width = `${width}px`;
             el.style.height = `${singlePageHeight}px`;
             el.style.minHeight = `${singlePageHeight}px`;
@@ -668,7 +677,18 @@ export const renderHtmlToPdf = async (html, {
             el.style.transform = 'none';
             el.style.zoom = '1';
             el.style.margin = '0';
+            el.style.padding = '0';
             el.style.boxSizing = 'border-box';
+          });
+          clonedDoc.querySelectorAll('.header').forEach((el) => {
+            el.style.marginTop = '0';
+            el.style.paddingTop = '0';
+            el.style.minHeight = '0';
+            el.style.height = 'auto';
+          });
+          clonedDoc.querySelectorAll('.content-wrapper td[valign="top"], .content-wrapper .pad-top').forEach((el) => {
+            el.style.paddingTop = '4px';
+            el.style.verticalAlign = 'top';
           });
         }
       });

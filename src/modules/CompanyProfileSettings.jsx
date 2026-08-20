@@ -1,13 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Building2, Save, Upload, X } from 'lucide-react';
+import { Building2, Save, Upload, X, Type } from 'lucide-react';
 import RichTextEditor from '../components/RichTextEditor';
 import {
-  DEFAULT_COMPANY_PROFILE,
   mergeCompanyProfile,
   validateCompanyProfile,
   formatCompanyAddressSingle
 } from '../utils/companyProfile';
+import {
+  PRINT_FONTS,
+  PRINT_FONT_SIZES,
+  getStoredPrintPrefs,
+  setStoredPrintPrefs
+} from '../utils/printPrefs';
 
 const Section = ({ title, children }) => (
   <div className="premium-card" style={{ marginBottom: '1.5rem' }}>
@@ -21,6 +26,8 @@ const CompanyProfileSettings = () => {
   const [form, setForm] = useState(() => mergeCompanyProfile(data.companyProfile));
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
+  const [printPrefs, setPrintPrefs] = useState(() => getStoredPrintPrefs());
+  const [printSaved, setPrintSaved] = useState(false);
 
   useEffect(() => {
     setForm(mergeCompanyProfile(data.companyProfile));
@@ -60,6 +67,12 @@ const CompanyProfileSettings = () => {
     setTimeout(() => setSaved(false), 3000);
   };
 
+  const handleSavePrintPrefs = () => {
+    setStoredPrintPrefs(printPrefs);
+    setPrintSaved(true);
+    setTimeout(() => setPrintSaved(false), 3000);
+  };
+
   return (
     <div>
       <header style={{ marginBottom: '2rem' }}>
@@ -73,6 +86,60 @@ const CompanyProfileSettings = () => {
       </header>
 
       <form onSubmit={handleSubmit}>
+        <Section title="Print Format Defaults">
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: 0, marginBottom: '1rem' }}>
+            Default font and size for Tax Invoice, PI, PO, DC, Quotation, Debit/Credit Note, Packing List, BPR, and Payment Follow-Up.
+            You can still change them each time you preview or download.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'end' }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>Default Font</label>
+              <select
+                className="input-field"
+                value={printPrefs.fontFamily}
+                onChange={(e) => setPrintPrefs((p) => ({ ...p, fontFamily: e.target.value }))}
+                style={{ fontFamily: printPrefs.fontFamily }}
+              >
+                {PRINT_FONTS.map((f) => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>Default Font Size</label>
+              <select
+                className="input-field"
+                value={printPrefs.fontSize}
+                onChange={(e) => setPrintPrefs((p) => ({ ...p, fontSize: Number(e.target.value) }))}
+              >
+                {PRINT_FONT_SIZES.map((s) => (
+                  <option key={s} value={s}>{s} px</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div
+            style={{
+              marginTop: '1rem',
+              padding: '0.85rem 1rem',
+              border: '1px solid var(--border-color)',
+              borderRadius: 8,
+              fontFamily: printPrefs.fontFamily,
+              fontSize: printPrefs.fontSize
+            }}
+          >
+            Sample text — UMA MICRON invoice at {printPrefs.fontSize}px
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem', alignItems: 'center' }}>
+            {printSaved && (
+              <span style={{ color: 'var(--accent-primary)', fontSize: '0.85rem', fontWeight: 600 }}>Print defaults saved!</span>
+            )}
+            <button type="button" className="btn btn-primary" onClick={handleSavePrintPrefs}>
+              <Type size={16} /> Save Print Defaults
+            </button>
+          </div>
+        </Section>
+
         <Section title="Basic Info">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">

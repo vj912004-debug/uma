@@ -18,8 +18,34 @@ import { renderDeliveryChallanPdf } from './deliveryChallanHtml';
 import { renderBprPdf } from './bprHtml';
 import { renderPackingListPdf } from './packingListHtml';
 import { renderQuotationPdf } from './quotationPdf';
+import { getStoredPrintPrefs } from './printPrefs';
+import { promptPrintPrefs } from './promptPrintPrefs';
 
 const getProfile = (data) => mergeCompanyProfile(data?.companyProfile || getStoredCompanyProfile());
+
+const resolvePrintPrefs = async (docType, mode, options = {}) => {
+  if (options.printPrefs) return options.printPrefs;
+  if (options.skipPrintPrefs) return getStoredPrintPrefs();
+  return promptPrintPrefs({ mode, docType });
+};
+
+const runHtmlPdf = async (docType, data, mode, options = {}) => {
+  const enriched = { ...data, companyProfile: data?.companyProfile || getStoredCompanyProfile() };
+  const printPrefs = await resolvePrintPrefs(docType, mode, options);
+  if (!printPrefs) return;
+  const opts = { mode, printPrefs };
+
+  if (docType === 'TI') return renderTaxInvoicePdf(enriched, opts);
+  if (docType === 'PI') return renderPerformaInvoicePdf(enriched, opts);
+  if (docType === 'PO') return renderPurchaseOrderPdf(enriched, opts);
+  if (docType === 'DN') return renderDebitNotePdf(enriched, opts);
+  if (docType === 'CN') return renderCreditNotePdf(enriched, opts);
+  if (docType === 'DC') return renderDeliveryChallanPdf(enriched, opts);
+  if (docType === 'BPR') return renderBprPdf(enriched, opts);
+  if (docType === 'PL') return renderPackingListPdf(enriched, opts);
+  if (docType === 'QUOTATION') return renderQuotationPdf(enriched, opts);
+  return null;
+};
 
 const buildPO_PI_TI = (doc, docType, data) => {
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -2109,84 +2135,26 @@ const buildOldLogic = (doc, docType, data) => {
   }
 };
 
-export const exportToPDF = (docType, data) => {
+export const exportToPDF = (docType, data, options = {}) => {
   const enriched = { ...data, companyProfile: data?.companyProfile || getStoredCompanyProfile() };
-  if (docType === 'TI') {
-    renderTaxInvoicePdf(enriched, { mode: 'save' }).catch((err) => console.error('TI PDF export failed:', err));
-    return;
-  }
-  if (docType === 'PI') {
-    renderPerformaInvoicePdf(enriched, { mode: 'save' }).catch((err) => console.error('PI PDF export failed:', err));
-    return;
-  }
-  if (docType === 'PO') {
-    renderPurchaseOrderPdf(enriched, { mode: 'save' }).catch((err) => console.error('PO PDF export failed:', err));
-    return;
-  }
-  if (docType === 'DN') {
-    renderDebitNotePdf(enriched, { mode: 'save' }).catch((err) => console.error('DN PDF export failed:', err));
-    return;
-  }
-  if (docType === 'CN') {
-    renderCreditNotePdf(enriched, { mode: 'save' }).catch((err) => console.error('CN PDF export failed:', err));
-    return;
-  }
-  if (docType === 'DC') {
-    renderDeliveryChallanPdf(enriched, { mode: 'save' }).catch((err) => console.error('DC PDF export failed:', err));
-    return;
-  }
-  if (docType === 'BPR') {
-    renderBprPdf(enriched, { mode: 'save' }).catch((err) => console.error('BPR PDF export failed:', err));
-    return;
-  }
-  if (docType === 'PL') {
-    renderPackingListPdf(enriched, { mode: 'save' }).catch((err) => console.error('PL PDF export failed:', err));
-    return;
-  }
-  if (docType === 'QUOTATION') {
-    renderQuotationPdf(enriched, { mode: 'save' }).catch((err) => console.error('Quotation PDF export failed:', err));
+  const htmlTypes = ['TI', 'PI', 'PO', 'DN', 'CN', 'DC', 'BPR', 'PL', 'QUOTATION'];
+  if (htmlTypes.includes(docType)) {
+    runHtmlPdf(docType, enriched, 'save', options).catch((err) =>
+      console.error(`${docType} PDF export failed:`, err)
+    );
     return;
   }
   const { doc, docNo } = buildPDF(docType, enriched);
   doc.save(`${docType}_${docNo}.pdf`);
 };
 
-export const viewPDF = (docType, data) => {
+export const viewPDF = (docType, data, options = {}) => {
   const enriched = { ...data, companyProfile: data?.companyProfile || getStoredCompanyProfile() };
-  if (docType === 'TI') {
-    renderTaxInvoicePdf(enriched, { mode: 'view' }).catch((err) => console.error('TI PDF view failed:', err));
-    return;
-  }
-  if (docType === 'PI') {
-    renderPerformaInvoicePdf(enriched, { mode: 'view' }).catch((err) => console.error('PI PDF view failed:', err));
-    return;
-  }
-  if (docType === 'PO') {
-    renderPurchaseOrderPdf(enriched, { mode: 'view' }).catch((err) => console.error('PO PDF view failed:', err));
-    return;
-  }
-  if (docType === 'DN') {
-    renderDebitNotePdf(enriched, { mode: 'view' }).catch((err) => console.error('DN PDF view failed:', err));
-    return;
-  }
-  if (docType === 'CN') {
-    renderCreditNotePdf(enriched, { mode: 'view' }).catch((err) => console.error('CN PDF view failed:', err));
-    return;
-  }
-  if (docType === 'DC') {
-    renderDeliveryChallanPdf(enriched, { mode: 'view' }).catch((err) => console.error('DC PDF view failed:', err));
-    return;
-  }
-  if (docType === 'BPR') {
-    renderBprPdf(enriched, { mode: 'view' }).catch((err) => console.error('BPR PDF view failed:', err));
-    return;
-  }
-  if (docType === 'PL') {
-    renderPackingListPdf(enriched, { mode: 'view' }).catch((err) => console.error('PL PDF view failed:', err));
-    return;
-  }
-  if (docType === 'QUOTATION') {
-    renderQuotationPdf(enriched, { mode: 'view' }).catch((err) => console.error('Quotation PDF view failed:', err));
+  const htmlTypes = ['TI', 'PI', 'PO', 'DN', 'CN', 'DC', 'BPR', 'PL', 'QUOTATION'];
+  if (htmlTypes.includes(docType)) {
+    runHtmlPdf(docType, enriched, 'view', options).catch((err) =>
+      console.error(`${docType} PDF view failed:`, err)
+    );
     return;
   }
   const { doc, docNo } = buildPDF(docType, enriched);
@@ -2197,13 +2165,22 @@ export const viewPDF = (docType, data) => {
   }
 };
 
-export const downloadPDF = (docType, data) => {
-  exportToPDF(docType, data);
+export const downloadPDF = (docType, data, options = {}) => {
+  exportToPDF(docType, data, options);
 };
 
-export const downloadAllDocs = (transactionId, data) => {
-  exportToPDF("Material Receipt", { ...data, receiptNo: data.receiptNo || "N/A" });
-  setTimeout(() => { if (data.bprNo && data.bprNo !== '-') exportToPDF("BPR", { ...data, bprNo: data.bprNo }); }, 500);
-  setTimeout(() => { if (data.plNo && data.plNo !== '-') exportToPDF("PL", { ...data, plNo: data.plNo }); }, 1000);
-  setTimeout(() => { if (data.invNo && data.invNo !== '-') exportToPDF("TI", { ...data, invoiceNo: data.invNo }); }, 1500);
+export const downloadAllDocs = async (transactionId, data) => {
+  const printPrefs = await promptPrintPrefs({ mode: 'save', docType: 'BPR' });
+  if (!printPrefs) return;
+  const opts = { printPrefs, skipPrintPrefs: true };
+  exportToPDF('Material Receipt', { ...data, receiptNo: data.receiptNo || 'N/A' }, opts);
+  setTimeout(() => {
+    if (data.bprNo && data.bprNo !== '-') exportToPDF('BPR', { ...data, bprNo: data.bprNo }, opts);
+  }, 500);
+  setTimeout(() => {
+    if (data.plNo && data.plNo !== '-') exportToPDF('PL', { ...data, plNo: data.plNo }, opts);
+  }, 1000);
+  setTimeout(() => {
+    if (data.invNo && data.invNo !== '-') exportToPDF('TI', { ...data, invoiceNo: data.invNo }, opts);
+  }, 1500);
 };

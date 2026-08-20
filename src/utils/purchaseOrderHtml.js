@@ -101,9 +101,8 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
     pushRow(cc.name || '', ccQty, rate, amt, sgstRate, cgstRate);
   });
 
-  const MIN_ROWS = 5;
-  const blanksCount = Math.max(0, MIN_ROWS - (sr - 1));
-  for (let i = 0; i < blanksCount; i++) {
+  const BLANK_ROWS = 7;
+  for (let i = 0; i < BLANK_ROWS; i++) {
     rows.push(`
       <tr class="filler-row">
         <td></td><td></td><td></td><td></td>
@@ -175,12 +174,12 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
     --grey-line:#d9d9d9;
   }
   *{box-sizing:border-box;font-family:Cambria,Georgia,serif;}
-  html,body{margin:0;padding: 4px;background:#fff;font-family:Cambria,Georgia,serif;color:var(--text);}
+  html,body{margin:0;padding:0;background:#fff;font-family:Cambria,Georgia,serif;color:var(--text);}
   
   .page {
     width: 794px;
     min-height: 1123px;
-    padding: 4px;
+    padding: 0;
     margin: 0;
     background: #fff;
     border: none;
@@ -195,34 +194,38 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
   .header{
     display:flex;
     justify-content:space-between;
-    align-items:stretch;
+    align-items:center;
     gap:14px;
-    margin-bottom:14px;
-    padding-bottom:14px; border-bottom:1px solid var(--purple); margin-left:-18px; margin-right:-18px; padding-left:18px; padding-right:18px;
+    margin:0 0 8px;padding:0 0 8px;
+    border-bottom:1px solid var(--purple);
   }
   .brand{
     display:flex;
     align-items:center;
-    gap:14px;
+    gap:12px;
+    min-width:0;
   }
   .logo{
-    width:78px;
-    height:78px;
+    width:64px;
+    height:64px;
     position:relative;
     flex-shrink:0;
   }
-  .logo svg{width:100%;height:100%;}
+  .logo svg,.logo img{width:100%;height:100%;object-fit:contain;display:block;}
   .brand-text {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: flex-start;
+    justify-content: center;
+    gap:2px;
   }
   .brand-text h1{
     margin:0;
     font-family:'Times New Roman',Times,serif;
-    font-size:42px;
+    font-size:34px;
     white-space: nowrap;
-    letter-spacing:1px;
+    letter-spacing:0.5px;
+    word-spacing:normal;
     color:#123282;
     line-height:1;
   }
@@ -230,33 +233,48 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
     color:#1d9444;
     font-family:Cambria,Georgia,serif;
     font-weight:700;
-    font-size:16px;
-    margin-top:2px;
+    font-size:13px;
+    margin:0;
+    padding:0;
+    line-height:1.15;
+    letter-spacing:normal;
+    word-spacing:0;
+    white-space:nowrap;
   }
   .tax-invoice-box{
     background:var(--purple);
     color:#fff;
     text-align:center;
-    padding:10px 22px;
+    padding:8px 18px;
     display:flex;
     flex-direction:column;
     justify-content:center;
     align-items:center;
-    min-width:230px; border-radius:6px;
+    align-self:center;
+    min-width:200px;
+    min-height:64px;
+    border-radius:6px;
+    overflow:visible;
+    height:auto;
+    box-sizing:border-box;
   }
   .tax-invoice-box .ti-title{
-    font-size:30px;
+    font-size:22px;
     font-weight:800;
-    letter-spacing:1px;
-    margin-bottom:6px;
+    letter-spacing:0.5px;
+    margin:0;
+    padding:0;
+    line-height:1.1;
+    white-space:nowrap;
   }
   .tax-invoice-box .ti-sub{
     background:#fff;
     color:var(--purple);
-    font-size:12px;
+    font-size:10px;
     font-weight:700;
     letter-spacing:.5px;
-    padding:3px 10px;
+    padding:2px 8px;
+    margin-top:4px;
   }
 
   /* ===== COMPANY / INVOICE INFO ROW ===== */
@@ -293,30 +311,74 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
     line-height:1.7;
   }
   .reg-details b{color:var(--purple);}
-  .reg-row{display:flex;}
-  .reg-row .label{width:62px;font-weight:700;color:var(--purple);}
-  .reg-row .colon{width:14px;}
+  .reg-row{
+    display:grid;
+    grid-template-columns:52px 12px minmax(0,1fr);
+    column-gap:4px;
+    align-items:center;
+  }
+  .reg-row .label{font-weight:700;color:var(--purple);white-space:nowrap;}
+  .reg-row .colon{white-space:nowrap;}
 
   .invoice-meta{
-    flex:1;
+    flex:1.15;
+    min-width:300px;
     border:1px solid var(--purple); border-radius:6px; overflow:hidden;
   }
   .invoice-meta .block{
-    padding:8px 12px;
+    padding:8px 10px;
     font-size:12px;
   }
   .invoice-meta .block + .block{
     border-top:1px solid var(--purple);
   }
   .meta-row{
-    display:flex;
-    margin-bottom:3px;
+    display:grid;
+    grid-template-columns:16px 158px 12px minmax(0,1fr);
+    column-gap:4px;
+    align-items:center;
+    margin-bottom:4px;
+    font-size:12px;
+    line-height:1.3;
+    color:var(--text);
+    white-space:nowrap;
   }
-  .meta-row .m-icon{color:var(--purple);width:18px;flex-shrink:0;display:flex;align-items:center;}
-  .meta-row .m-label{width:145px;flex-shrink:0;color:#333;}
-  .meta-row .m-colon{width:12px;flex-shrink:0;}
-  .meta-row .m-value{font-weight:600;}
-  .meta-row.sub .m-label{width:145px;padding-left:18px;box-sizing:border-box;}
+  .meta-row .m-icon{
+    grid-column:1;
+    color:var(--purple);
+    width:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .meta-row .m-label{
+    grid-column:2;
+    box-sizing:border-box;
+    color:var(--text);
+    font-size:12px;
+    font-weight:700;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    padding-left:0;
+  }
+  .meta-row .m-colon{
+    grid-column:3;
+    font-size:12px;
+    font-weight:700;
+    white-space:nowrap;
+    text-align:left;
+  }
+  .meta-row .m-value{
+    grid-column:4;
+    min-width:0;
+    font-size:12px;
+    font-weight:700;
+    color:var(--text);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
 
   /* ===== BILL TO / SHIP TO ===== */
   .parties{
@@ -379,7 +441,7 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
     padding:3px 2px;
     text-align:center;
     vertical-align:middle;
-    border:1px solid var(--purple);
+    border:1px solid rgba(255,255,255,0.55);
   }
   table.items tbody td{
     border:1px solid var(--lav-border);
@@ -506,7 +568,7 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
 
   @media print{
     body{background:#fff;}
-    .page {margin:0;padding: 4px;width:794px;min-height: 1123px;}
+    .page {margin:0;padding: 0;width:794px;min-height: 1123px;}
     .content-wrapper { width: 100%; min-height: 1115px; height: 1115px; border-collapse: collapse; border: 2px solid var(--purple); box-sizing: border-box; }
   .content-wrapper td { padding: 0; }
   }
@@ -516,7 +578,7 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
 <div class="page">
 <table class="content-wrapper">
   <tr>
-    <td valign="top" style="padding: 18px; padding-bottom: 0;">
+    <td valign="top" style="padding: 4px 10px 0;">
 
   <!-- HEADER -->
   <div class="header">
@@ -526,7 +588,7 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
       </div>
       <div class="brand-text">
         <h1>${escHtml(profile.companyName || 'UMA MICRON')}</h1>
-        <div class="tagline">Micronization of API&rsquo;s</div>
+        <div class="tagline">Micronization of API's</div>
       </div>
     </div>
     <div class="tax-invoice-box">
@@ -558,9 +620,9 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
       </div>
       <div class="block">
         <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span class="m-label">Ref No.</span><span class="m-colon">:</span><span class="m-value">${poNo}</span></div>
-        <div class="meta-row sub"><span class="m-label">Ref Date</span><span class="m-colon">:</span><span class="m-value">${poDate}</span></div>
-        <div class="meta-row sub"><span class="m-label">Delivery Challan No.</span><span class="m-colon">:</span><span class="m-value">${dcNo}</span></div>
-        <div class="meta-row sub"><span class="m-label">DC Date</span><span class="m-colon">:</span><span class="m-value">${dcDate}</span></div>
+        <div class="meta-row sub"><span class="m-icon"></span><span class="m-label">Ref Date</span><span class="m-colon">:</span><span class="m-value">${poDate}</span></div>
+        <div class="meta-row sub"><span class="m-icon"></span><span class="m-label">Delivery Challan No.</span><span class="m-colon">:</span><span class="m-value">${dcNo}</span></div>
+        <div class="meta-row sub"><span class="m-icon"></span><span class="m-label">DC Date</span><span class="m-colon">:</span><span class="m-value">${dcDate}</span></div>
       </div>
     </div>
   </div>
@@ -721,11 +783,12 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
 </html>`;
 };
 
-export const renderPurchaseOrderPdf = async (data, { mode = 'save' } = {}) => {
+export const renderPurchaseOrderPdf = async (data, { mode = 'save', printPrefs } = {}) => {
   const html = buildPurchaseOrderHtml(data, data.companyProfile);
   const { renderHtmlToPdf } = await import('./printTheme');
   await renderHtmlToPdf(html, {
     mode,
+    printPrefs,
     filePrefix: 'PO',
     docNo: data.poNo || 'N/A',
     width: 794,

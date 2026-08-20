@@ -107,9 +107,8 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   });
 
   // Minimum blank rows; middle page row stretches them to fill remaining height
-  const DC_MIN_ROWS = 24;
-  const blanksCount = Math.max(0, DC_MIN_ROWS - bodyRows.length);
-  for (let i = 0; i < blanksCount; i++) {
+  const DC_BLANK_ROWS = 7;
+  for (let i = 0; i < DC_BLANK_ROWS; i++) {
     bodyRows.push(`
       <tr class="empty">
         <td></td><td></td><td></td><td></td><td></td>
@@ -168,52 +167,71 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 14px;
-    margin-bottom: 8px;
+    gap: 12px;
+    margin: 0 0 10px;
+    padding: 0 0 10px;
   }
   .brand {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 10px;
   }
   .logo {
-    width: 78px;
-    height: 78px;
+    width: 64px;
+    height: 64px;
     position: relative;
     flex-shrink: 0;
   }
-  .logo svg, .logo img { width: 100%; height: 100%; object-fit: contain; }
+  .logo svg, .logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 2px;
+  }
   .brand-text h1 {
     margin: 0;
     font-family: Georgia, 'Times New Roman', serif;
-    font-size: 38px;
-    letter-spacing: 1px;
+    font-size: 34px;
+    letter-spacing: 0.5px;
+    word-spacing: normal;
     color: var(--purple);
     line-height: 1;
   }
   .brand-text .tagline {
     color: var(--green);
     font-weight: 700;
-    font-size: 16px;
-    margin-top: 2px;
+    font-size: 13px;
+    margin: 0;
+    line-height: 1.15;
+    letter-spacing: normal;
+    word-spacing: 0;
+    white-space: nowrap;
   }
   .tax-invoice-box {
     background: var(--purple);
     color: #fff;
     text-align: center;
-    padding: 12px 22px;
+    padding: 8px 18px;
     display: flex;
-    flex-direction: row;
-    gap: 10px;
+    flex-direction: column;
+    gap: 0;
     justify-content: center;
     align-items: center;
-    border-bottom-left-radius: 8px;
+    align-self: center;
+    min-width: 200px;
+    min-height: 64px;
+    border-radius: 6px;
+    box-sizing: border-box;
   }
   .tax-invoice-box .ti-title {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 800;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     margin: 0;
+    line-height: 1.1;
+    white-space: nowrap;
   }
 
   /* ===== COMPANY / INVOICE INFO ROW ===== */
@@ -304,19 +322,22 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     flex: 1;
   }
   .meta-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: 16px 110px 12px minmax(0, 1fr);
+    column-gap: 4px;
     margin-bottom: 6px;
     align-items: center;
+    white-space: nowrap;
   }
-  .meta-row .m-icon { color: var(--purple); width: 22px; flex-shrink: 0; display: flex; align-items: center; }
+  .meta-row .m-icon { color: var(--purple); width: 16px; display: flex; align-items: center; justify-content: center; }
   .meta-row .m-icon svg { width: 16px; height: 16px; display: block; fill: none; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  .meta-row .m-label { width: 110px; flex-shrink: 0; color: #333; font-weight: normal; }
-  .meta-row .m-colon { width: 14px; flex-shrink: 0; font-weight: 600; }
-  .meta-row .m-value { flex-shrink: 0; font-weight: 600; }
+  .meta-row .m-label { color: #333; font-weight: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta-row .m-colon { font-weight: 600; white-space: nowrap; }
+  .meta-row .m-value { min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* ===== 3-row page: header | stretchable items | footer (never clipped) ===== */
   .pad-x { padding-left: 12px; padding-right: 12px; }
-  .pad-top { padding-top: 12px; }
+  .pad-top { padding-top: 4px; }
   .pad-mid { padding-top: 0; padding-bottom: 10px; vertical-align: top; }
   .pad-bot { padding-bottom: 0; vertical-align: bottom; }
 
@@ -334,7 +355,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     font-weight: 700;
     padding: 8px 6px;
     text-align: center;
-    border: 1px solid var(--purple);
+    border:1px solid rgba(255,255,255,0.55);
   }
   table.items tbody td {
     border: 1px solid var(--lav-border);
@@ -572,7 +593,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
 </html>`;
 };
 
-export const renderDeliveryChallanPdf = async (data, { mode = 'save' } = {}) => {
+export const renderDeliveryChallanPdf = async (data, { mode = 'save', printPrefs } = {}) => {
   const appData = data.appData || getDcAppData();
   const html = buildDeliveryChallanHtml(data, data.companyProfile, appData);
   await renderHtmlToPdf(html, {
@@ -580,6 +601,7 @@ export const renderDeliveryChallanPdf = async (data, { mode = 'save' } = {}) => 
     filePrefix: 'DC',
     docNo: data.dcNo || 'N/A',
     width: 794,
-    fitPage: true
+    fitPage: true,
+    printPrefs
   });
 };

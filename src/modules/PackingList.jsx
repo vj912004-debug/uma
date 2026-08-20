@@ -10,9 +10,9 @@ import {
   getReceiptProductNames,
   receiptProductOptions,
   findAnyPackingList,
-  getBPRDispatchedRowsForPL,
   getPLDisplayProductLabel,
-  alignDrumRowsToProducts
+  buildPLBatchesFromMR,
+  getProductBatches
 } from '../utils/receiptProducts';
 
 const PackingList = () => {
@@ -25,6 +25,8 @@ const PackingList = () => {
   const [form, setForm] = useState({
     plNo: '',
     date: new Date().toISOString().split('T')[0],
+    partyName: '',
+    receiptNo: '',
     productName: '',
     productSummaries: [],
     totalWeight: 0,
@@ -74,13 +76,13 @@ const PackingList = () => {
       const summaries = mr
         ? getReceiptProductSummaries(mr, opts).filter(p => p.batchCount > 0 || p.qty > 0)
         : (editingPL.productSummaries || []);
-      const fromBpr = mr ? getBPRDispatchedRowsForPL(data, mr, opts) : [];
-      const sourceRows = (editingPL.batches || []).length ? editingPL.batches : fromBpr;
       const mergedBatches = mr
-        ? alignDrumRowsToProducts(sourceRows, mr, opts)
-        : sourceRows;
+        ? buildPLBatchesFromMR(data, mr, opts, editingPL.batches || [])
+        : (editingPL.batches || []);
       setForm({
         ...editingPL,
+        partyName: editingPL.partyName || mr?.partyName || '',
+        receiptNo: editingPL.receiptNo || mr?.receiptNo || '',
         productName: mr ? getReceiptProductLabel(mr, opts) : (editingPL.productName || ''),
         productSummaries: summaries.length ? summaries : (editingPL.productSummaries || []),
         batches: (mergedBatches || []).filter(isFilledPlRow)
@@ -92,15 +94,17 @@ const PackingList = () => {
       const plSerial = data.settings?.serials?.PL || 1;
       const docNo = generateDocNumber('PL', plSerial, new Date());
       const summaries = getReceiptProductSummaries(activeMR, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
-      const plRows = getBPRDispatchedRowsForPL(data, activeMR, prodOpts).filter(isFilledPlRow);
+      const plRows = buildPLBatchesFromMR(data, activeMR, prodOpts);
 
       setForm({
         plNo: docNo,
         date: new Date().toISOString().split('T')[0],
+        partyName: activeMR.partyName || selectedBPR.partyName || '',
+        receiptNo: activeMR.receiptNo || '',
         productName: getReceiptProductLabel(activeMR, prodOpts),
         productSummaries: summaries,
         totalWeight: 0,
-        totalDrums: 0,
+        totalDrums: plRows.length,
         batches: plRows
       });
     }
@@ -144,12 +148,16 @@ const PackingList = () => {
   const addCustomRow = (productName = '') => {
     const prod = productName || form.productName || productNames[0] || '';
     setForm(prev => {
-      const prodRowCount = prev.batches.filter(b => normProd(b.productName || prod) === normProd(prod)).length;
+      const prodRows = prev.batches.filter(b => normProd(b.productName || prod) === normProd(prod));
+      const mrBatchNo = activeMR
+        ? (getProductBatches(activeMR, prod, prodOpts)[0]?.batchNo || '')
+        : '';
+      const batchNo = prodRows.find(b => b.batchNo)?.batchNo || mrBatchNo || '';
       return {
         ...prev,
         batches: [...prev.batches, {
-          batchNo: prev.batches.find(b => normProd(b.productName || prod) === normProd(prod))?.batchNo || '',
-          drumNo: (prodRowCount + 1).toString(),
+          batchNo,
+          drumNo: (prodRows.length + 1).toString(),
           productName: prod,
           gross: '',
           tare: '',
@@ -177,6 +185,8 @@ const PackingList = () => {
       setForm({
         plNo: '',
         date: new Date().toISOString().split('T')[0],
+        partyName: '',
+        receiptNo: '',
         productName: '',
         productSummaries: [],
         totalWeight: 0,
@@ -195,6 +205,8 @@ const PackingList = () => {
     setForm({
       plNo: docNo,
       date: new Date().toISOString().split('T')[0],
+      partyName: '',
+      receiptNo: '',
       productName: '',
       productSummaries: [],
       totalWeight: 0,
@@ -227,8 +239,13 @@ const PackingList = () => {
     const finalDoc = {
       ...form,
       receiptId: editingPL ? editingPL.receiptId : (selectedBPR?.receiptId || ''),
+      partyName: form.partyName || mr?.partyName || selectedBPR?.partyName || '',
+      receiptNo: form.receiptNo || mr?.receiptNo || '',
       productName: mr ? getReceiptProductLabel(mr, opts) : form.productName,
-      productSummaries: summaries.length ? summaries : (form.productSummaries || [])
+      productSummaries: summaries.length ? summaries : (form.productSummaries || []),
+      batches: (form.batches || []).filter(isFilledPlRow),
+      totalDrums: (form.batches || []).filter(isFilledPlRow).length,
+      totalWeight: grandTotal.net
     };
 
     if (editingPL) {
@@ -377,6 +394,21 @@ const PackingList = () => {
                   <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                 </div>
                 <div>
+                  <label>Party Name</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    readOnly={!!activeMR}
+                    value={form.partyName || ''}
+                    onChange={e => setForm({ ...form, partyName: e.target.value })}
+                    placeholder={activeMR ? '' : 'Enter party name'}
+                  />
+                </div>
+                <div>
+                  <label>MR No</label>
+                  <input type="text" className="input-field" readOnly value={form.receiptNo || activeMR?.receiptNo || '—'} />
+                </div>
+                <div>
                   <label>Product(s)</label>
                   <input
                     type="text"
@@ -390,7 +422,7 @@ const PackingList = () => {
                     <div style={{ marginTop: '0.35rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                       {(form.productSummaries || []).map((p, idx) => (
                         <span key={p.prodName || idx} style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {p.prodName} · {parseFloat(p.qty || 0).toFixed(2)} Kg
+                          {p.prodName} · {parseFloat(p.qty || 0).toFixed(2)} Kg · {p.drums || 0} drums
                         </span>
                       ))}
                     </div>

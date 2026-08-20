@@ -126,7 +126,7 @@ const Dashboard = () => {
           color="#5b1c85"
           subtext={`FY ${currentFY}`}
           subtextColor="var(--text-muted)"
-          path="/party-due"
+          path="/payment-follow-up"
         />
       </div>
 

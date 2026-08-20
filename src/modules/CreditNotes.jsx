@@ -4,21 +4,34 @@ import { useAppContext } from '../context/AppContext';
 import {Eye,  Plus, Search, Edit2, Trash2, FileDown } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
-import DocChargeRow from '../components/DocChargeRow';
 import {
   STANDARD_CHARGES_LIST,
-  OTHER_CHARGE_ITEM,
-  CHARGE_KEYS,
-  defaultChargeFlags,
-  defaultChargeRates,
-  emptyChargeQtys,
-  buildChargeQtys,
-  calcStandardChargesSubtotal,
-  parseChargeFieldValue
+  OTHER_CHARGE_ITEM
 } from '../utils/documentCharges';
 
-const CN_CHARGE_KEYS = [...CHARGE_KEYS, 'other'];
-const chargesList = [...STANDARD_CHARGES_LIST, OTHER_CHARGE_ITEM];
+const blankLine = () => ({ id: Date.now() + Math.random(), description: '', qty: 1, rate: 0 });
+
+const linesFromNote = (note) => {
+  if (Array.isArray(note.customCharges) && note.customCharges.length) {
+    return note.customCharges.map((c) => ({
+      id: c.id || Date.now() + Math.random(),
+      description: c.description || '',
+      qty: c.qty ?? 1,
+      rate: c.rate ?? 0
+    }));
+  }
+  const migrated = [];
+  [...STANDARD_CHARGES_LIST, OTHER_CHARGE_ITEM].forEach((c) => {
+    if (!note.charges?.[c.key]) return;
+    migrated.push({
+      id: `${c.key}-${Date.now()}`,
+      description: c.label || c.key,
+      qty: parseFloat(note.qtys?.[c.key]) || 1,
+      rate: parseFloat(note.rates?.[c.key]) || 0
+    });
+  });
+  return migrated.length ? migrated : [blankLine()];
+};
 
 const CreditNotes = () => {
   const { data, updateData, updateItem, deleteItemSoftly, incrementSerial } = useAppContext();
@@ -37,10 +50,7 @@ const CreditNotes = () => {
     reference: '',
     reason: '',
     particulars: '',
-    charges: defaultChargeFlags({ other: true }),
-    rates: defaultChargeRates(['other']),
-    qtys: emptyChargeQtys(['other']),
-    customCharges: [],
+    customCharges: [blankLine()],
     discount: 0,
     taxRate: 18
   });
@@ -67,10 +77,7 @@ const CreditNotes = () => {
       reference: '',
       reason: '',
       particulars: '',
-      charges: defaultChargeFlags({ other: true }),
-      rates: defaultChargeRates(['other']),
-      qtys: emptyChargeQtys(['other']),
-      customCharges: [],
+      customCharges: [blankLine()],
       discount: 0,
       taxRate: 18
     });
@@ -79,37 +86,20 @@ const CreditNotes = () => {
   };
 
   const handleEdit = (note) => {
-    const legacyQty = parseFloat(note.qty) || 1;
     setForm({
       ...note,
-      qtys: note.qtys
-        ? { ...emptyChargeQtys(['other']), ...note.qtys }
-        : buildChargeQtys({}, legacyQty, ['other']),
-      customCharges: note.customCharges || []
+      customCharges: linesFromNote(note),
+      discount: note.discount || 0,
+      taxRate: note.taxRate ?? 18
     });
     setIsEditing(note.id);
     setIsModalOpen(true);
   };
 
-  const toggleCharge = (key) => {
-    setForm(prev => {
-      const turningOn = !prev.charges[key];
-      const qtys = { ...(prev.qtys || emptyChargeQtys(['other'])) };
-      if (turningOn && (qtys[key] == null || qtys[key] === '')) {
-        qtys[key] = 1;
-      }
-      return { ...prev, charges: { ...prev.charges, [key]: turningOn }, qtys };
-    });
-  };
-
-  const updateQty = (key, val) => {
-    setForm(prev => ({ ...prev, qtys: { ...prev.qtys, [key]: val } }));
-  };
-
   const addCustomCharge = () => {
     setForm(prev => ({
       ...prev,
-      customCharges: [...(prev.customCharges || []), { id: Date.now(), description: '', qty: 1, rate: 0 }]
+      customCharges: [...(prev.customCharges || []), blankLine()]
     }));
   };
 
@@ -121,23 +111,14 @@ const CreditNotes = () => {
   };
 
   const removeCustomCharge = (id) => {
-    setForm(prev => ({
-      ...prev,
-      customCharges: prev.customCharges.filter(c => c.id !== id)
-    }));
-  };
-
-  const handleRateChange = (key, val) => {
-    setForm(prev => ({ ...prev, rates: { ...prev.rates, [key]: parseChargeFieldValue(val) } }));
-  };
-
-  const handleQtyChange = (key, val) => {
-    setForm(prev => ({ ...prev, qtys: { ...(prev.qtys || emptyChargeQtys(['other'])), [key]: parseChargeFieldValue(val) } }));
+    setForm(prev => {
+      const next = (prev.customCharges || []).filter(c => c.id !== id);
+      return { ...prev, customCharges: next.length ? next : [blankLine()] };
+    });
   };
 
   const getSubtotal = () => {
-    let subtotal = calcStandardChargesSubtotal(form.charges, form.rates, form.qtys, 0, CN_CHARGE_KEYS);
-    
+    let subtotal = 0;
     (form.customCharges || []).forEach(c => {
       subtotal += (parseFloat(c.qty) || 0) * (parseFloat(c.rate) || 0);
     });
@@ -158,6 +139,12 @@ const CreditNotes = () => {
 
     const finalDoc = {
       ...form,
+      charges: {},
+      rates: {},
+      qtys: {},
+      customCharges: (form.customCharges || []).filter(
+        (c) => (c.description || '').trim() || (parseFloat(c.qty) || 0) * (parseFloat(c.rate) || 0)
+      ),
       subtotal,
       taxAmount,
       amount: total
@@ -278,13 +265,24 @@ const CreditNotes = () => {
                   <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label>Select Party *</label>
-                  <select className="input-field" required value={form.partyId} onChange={handlePartySelect}>
-                    <option value="">-- Select --</option>
+                  <label>Party (optional select)</label>
+                  <select className="input-field" value={form.partyId} onChange={handlePartySelect}>
+                    <option value="">-- Select or type name below --</option>
                     {data.parties.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                   </select>
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Supplier / Party Name *</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    required
+                    placeholder="Enter party name manually"
+                    value={form.partyName}
+                    onChange={e => setForm(prev => ({ ...prev, partyName: e.target.value, partyId: '' }))}
+                  />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Ref Invoice (Optional)</label>
@@ -320,47 +318,31 @@ const CreditNotes = () => {
                 </div>
               </div>
 
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', pb: '0.5rem' }}>Credit Note Charges Grid</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 600, margin: 0 }}>Line Items</h3>
+                <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={addCustomCharge}>
+                  <Plus size={14} /> Add Row
+                </button>
+              </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
                 <div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {chargesList.map(item => (
-                      <DocChargeRow
-                        key={item.key}
-                        item={item}
-                        charges={form.charges}
-                        rates={form.rates}
-                        qtys={form.qtys}
-                        materialQty={1}
-                        onToggle={toggleCharge}
-                        onQtyChange={handleQtyChange}
-                        onRateChange={handleRateChange}
-                      />
-                    ))}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                    <span>Description</span>
+                    <span>Qty</span>
+                    <span>Rate (₹)</span>
+                    <span />
                   </div>
-
-                  <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                      <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.9rem', fontWeight: 600 }}>Manual Custom Charges</label>
-                      <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={addCustomCharge}>
-                        <Plus size={14} /> Add Row
+                  {(form.customCharges || []).map(c => (
+                    <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                      <input type="text" className="input-field" placeholder="Enter description" value={c.description} onChange={e => updateCustomCharge(c.id, 'description', e.target.value)} />
+                      <input type="number" className="input-field" placeholder="Qty" value={c.qty} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
+                      <input type="number" className="input-field" placeholder="Rate" value={c.rate} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
+                      <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeCustomCharge(c.id)}>
+                        <Trash2 size={16} />
                       </button>
                     </div>
-                    {(form.customCharges || []).map(c => (
-                      <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
-                        <input type="text" className="input-field" placeholder="Description" value={c.description} onChange={e => updateCustomCharge(c.id, 'description', e.target.value)} />
-                        <input type="number" className="input-field" placeholder="Qty" value={c.qty} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
-                        <input type="number" className="input-field" placeholder="Rate" value={c.rate} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
-                        <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeCustomCharge(c.id)}>
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    ))}
-                    {(form.customCharges || []).length === 0 && (
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No manual charges added.</div>
-                    )}
-                  </div>
+                  ))}
                 </div>
 
                 <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

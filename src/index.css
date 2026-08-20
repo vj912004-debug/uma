@@ -460,6 +460,28 @@ tbody tr:hover td {
   color: #5b1c85;
 }
 
+/* Payments → Payment Follow-Up white pill CTA */
+.nav-link.nav-pill {
+  background: #ffffff;
+  color: #3d2b7d !important;
+  border-radius: 999px;
+  font-weight: 700;
+  margin: 0.15rem 0.15rem 0.35rem;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.nav-link.nav-pill:hover {
+  background: #f3f0ff;
+  color: #2f2263 !important;
+}
+
+.nav-link.nav-pill.active {
+  background: #ffffff;
+  color: #2f2263 !important;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
 .sidebar-footer {
   margin-top: auto;
   padding-top: 0.85rem;

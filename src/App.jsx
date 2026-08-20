@@ -21,6 +21,7 @@ import EWayTI from './modules/EWayTI';
 import ProcessingSheet from './modules/ProcessingSheet';
 import PartyDue from './modules/PartyDue';
 import Payments from './modules/Payments';
+import PaymentFollowUp from './modules/PaymentFollowUp';
 import TaskManager from './modules/TaskManager';
 import MasterSetup from './modules/MasterSetup';
 import Reports from './modules/Reports';
@@ -54,8 +55,9 @@ const AppLayout = () => (
         <Route path="/tax-invoice" element={<TaxInvoice />} />
         <Route path="/eway-ti" element={<EWayTI />} />
         <Route path="/processing-sheet" element={<ProcessingSheet />} />
-        <Route path="/party-due" element={<ProtectedRoute adminOnly><PartyDue /></ProtectedRoute>} />
-        <Route path="/payments" element={<ProtectedRoute adminOnly><Payments /></ProtectedRoute>} />
+        <Route path="/party-due" element={<ProtectedRoute><PartyDue /></ProtectedRoute>} />
+        <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+        <Route path="/payment-follow-up" element={<ProtectedRoute><PaymentFollowUp /></ProtectedRoute>} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/tasks" element={<TaskManager />} />
         <Route path="/quotations" element={<Quotations />} />

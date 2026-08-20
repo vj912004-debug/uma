@@ -1,6 +1,7 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { formatPdfDateSlash } from './taxInvoiceLayout';
-import { escHtml, buildPrintLogoHtml } from './printTheme';
+import { escHtml, buildPrintLogoHtml, applyPrintPrefsToHtml } from './printTheme';
+import { PRINT_ROOT_CLASS } from './printPrefs';
 
 const hasWeight = (row = {}) => {
   const vals = [row.gross, row.tare, row.net];
@@ -11,13 +12,17 @@ const hasWeight = (row = {}) => {
   });
 };
 
-/** Hide dispatch cells that are only a copy of received with no weights filled. */
+/** Hide dispatch weight cells that are only an empty mirror of received. Keep drum labels. */
 const resolveDispatchRow = (received = {}, dispatched = {}) => {
+  if (!dispatched || (!dispatched.batchNo && !dispatched.drumNo && !hasWeight(dispatched))) {
+    return dispatched;
+  }
   if (hasWeight(dispatched)) return dispatched;
   const sameBatch = String(dispatched.batchNo || '') === String(received.batchNo || '');
   const sameDrum = String(dispatched.drumNo || '') === String(received.drumNo || '');
   if (sameBatch && sameDrum && (dispatched.batchNo || dispatched.drumNo)) {
-    return { batchNo: '', drumNo: '', gross: '', tare: '', net: '' };
+    // Keep batch/drum identity so auto-added drums print; clear only mirrored empty weights
+    return { ...dispatched, gross: '', tare: '', net: '' };
   }
   return dispatched;
 };
@@ -145,7 +150,18 @@ export const buildBprHtml = (data, profileInput) => {
   const batchNos = [...new Set((data.receivedBatches || []).map((b) => b.batchNo).filter(Boolean))];
   const primaryBatchNo = batchNos.join(', ') || data.batchNo || '';
   const totalNoBatch = batchNos.length || data.totalNoBatch || '';
-  const pc = data.packingConsumables || {};
+  const pc = {
+    ...(data.packingMaterials || {}),
+    ...(data.packingConsumables || {})
+  };
+  if (!pc.drumUsed) {
+    const drumCount = Math.max(
+      (data.dispatchedBatches || []).filter((r) => r.batchNo || r.drumNo).length,
+      (data.receivedBatches || []).filter((r) => r.batchNo || r.drumNo).length,
+      parseInt(data.totalDrums, 10) || 0
+    );
+    if (drumCount) pc.drumUsed = String(drumCount);
+  }
   const prevBd = data.previousBulkDensity || {};
   const bd = data.bulkDensity || {};
 
@@ -489,7 +505,7 @@ export const buildBprHtml = (data, profileInput) => {
   .meta-item{padding:4px 8px;border-right:1px solid #e2d3f3;border-bottom:1px solid #e2d3f3;font-size:12px;width:32%;box-sizing:border-box;color:#4a0080;font-weight:600;}
   .meta-item.label{color:#5a009d;font-weight:700;background:#e2d3f3;width:18%;}
   table.items{width:100%;border-collapse:collapse;margin-bottom:6px;font-size:12px;flex:1;table-layout:auto;}
-  table.items thead th{background:#5a009d;color:#fff;font-weight:700;padding:4px 3px;text-align:center;border:1px solid #5a009d;font-size:12px;white-space:nowrap;}
+  table.items thead th{background:#5a009d;color:#fff;font-weight:700;padding:4px 3px;text-align:center;border:1px solid rgba(255,255,255,0.55);font-size:12px;white-space:nowrap;}
   table.items tbody td{border:1px solid #7c12bd;padding:2px 3px;height:26px;text-align:center;color:#4a0080;font-weight:600;font-size:12px;white-space:nowrap;}
   table.items tbody tr.total-hl td{background:#e2d3f3;color:#4a0080;font-weight:700;height:24px;}
   .barfoot{background:#5a009d;color:#fff;padding:6px 12px;display:flex;justify-content:space-between;font-size:12px;margin-top:auto;border-radius:4px;}
@@ -564,11 +580,12 @@ export const buildBprHtml = (data, profileInput) => {
 </html>`;
 };
 
-export const renderBprPdf = async (data, { mode = 'save' } = {}) => {
-  const html = buildBprHtml(data, data.companyProfile);
+export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => {
+  const html = applyPrintPrefsToHtml(buildBprHtml(data, data.companyProfile), printPrefs);
   const { jsPDF } = await import('jspdf');
   const html2canvas = (await import('html2canvas')).default;
   const host = document.createElement('div');
+  host.className = PRINT_ROOT_CLASS;
   host.style.cssText = 'position:absolute;left:-12000px;top:0;z-index:-1;background:#fff;';
   host.innerHTML = html;
   document.body.appendChild(host);

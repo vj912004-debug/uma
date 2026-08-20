@@ -239,27 +239,46 @@ export const buildMRDrumSlots = (mr, prodOpts = {}) => {
   return slots;
 };
 
-const formatPlDrumRow = (row, productName) => ({
-  batchNo: row?.batchNo || '',
-  drumNo: row?.drumNo != null ? String(row.drumNo) : '',
-  productName,
-  gross: numberInputValue(row?.gross ?? ''),
-  tare: numberInputValue(row?.tare ?? ''),
-  net: numberInputValue(row?.net ?? '')
-});
+const formatPlDrumRow = (row, slot = {}) => {
+  const productName = slot.productName || row?.productName || '';
+  const batchNo = (row?.batchNo && String(row.batchNo).trim())
+    ? row.batchNo
+    : (slot.batchNo || '');
+  const drumNo =
+    row?.drumNo != null && String(row.drumNo).trim() !== ''
+      ? String(row.drumNo)
+      : (slot.drumNo != null ? String(slot.drumNo) : '');
+  return {
+    batchNo,
+    drumNo,
+    productName,
+    gross: numberInputValue(row?.gross ?? ''),
+    tare: numberInputValue(row?.tare ?? ''),
+    net: numberInputValue(row?.net ?? '')
+  };
+};
+
+const isMeaningfulPlRow = (r) => {
+  if (!r) return false;
+  const hasWeight = [r.gross, r.tare, r.net].some((v) => {
+    if (v === '' || v === undefined || v === null) return false;
+    const n = typeof v === 'number' ? v : parseFloat(v);
+    return !Number.isNaN(n) && n !== 0;
+  });
+  const hasId = String(r.batchNo || '').trim() || String(r.drumNo ?? '').trim();
+  return hasWeight || !!hasId;
+};
 
 /** Map BPR/PL weight rows onto MR product drum slots (fixes multi-product PL). */
 export const alignDrumRowsToProducts = (rows, mr, prodOpts = {}) => {
   const slots = buildMRDrumSlots(mr, prodOpts);
-  const pool = [...(rows || [])];
-  if (!slots.length) return pool;
-
-  if (pool.length === slots.length) {
-    return slots.map((slot, i) => formatPlDrumRow(pool[i], slot.productName));
+  const pool = [...(rows || [])].filter(isMeaningfulPlRow);
+  if (!slots.length) {
+    return pool.map((r) => formatPlDrumRow(r, { productName: r.productName, batchNo: r.batchNo, drumNo: r.drumNo }));
   }
 
   const used = new Set();
-  return slots.map(slot => {
+  return slots.map((slot) => {
     let pi = pool.findIndex((r, i) => !used.has(i)
       && norm(r.batchNo) === norm(slot.batchNo)
       && norm(String(r.drumNo)) === norm(String(slot.drumNo))
@@ -272,30 +291,52 @@ export const alignDrumRowsToProducts = (rows, mr, prodOpts = {}) => {
         && norm(String(r.drumNo)) === norm(String(slot.drumNo)));
     }
 
+    // Prefer weight-filled rows for positional fallback so empty pads don't steal slots
+    if (pi < 0) {
+      pi = pool.findIndex((r, i) => {
+        if (used.has(i)) return false;
+        const hasWeight = [r.gross, r.tare, r.net].some((v) => {
+          if (v === '' || v == null) return false;
+          const n = parseFloat(v);
+          return !Number.isNaN(n) && n !== 0;
+        });
+        return hasWeight;
+      });
+    }
+
     if (pi < 0) {
       pi = pool.findIndex((r, i) => !used.has(i));
     }
 
     if (pi < 0) {
-      return formatPlDrumRow(null, slot.productName);
+      return formatPlDrumRow(null, slot);
     }
 
     used.add(pi);
-    return formatPlDrumRow(pool[pi], slot.productName);
+    return formatPlDrumRow(pool[pi], slot);
   });
 };
 
-/** All dispatched BPR drum rows for a receipt (multi-product combined PL). */
-export const getBPRDispatchedRowsForPL = (data, mr, prodOpts = {}) => {
+/** Build PL batch rows from Material Receipt drums, overlaying BPR/existing weights. */
+export const buildPLBatchesFromMR = (data, mr, prodOpts = {}, existingRows = null) => {
   if (!mr?.id) return [];
   const opts = {
     ...prodOpts,
     productionPlans: prodOpts.productionPlans || data?.productionPlans || []
   };
-  const allBprs = (data?.bprs || []).filter(b => b.receiptId === mr.id);
-  const bprRows = allBprs.flatMap(bpr => bpr.dispatchedBatches || []);
-  return alignDrumRowsToProducts(bprRows, mr, opts);
+  const bprRows = (data?.bprs || [])
+    .filter((b) => b.receiptId === mr.id && !b.isDeleted)
+    .flatMap((bpr) => bpr.dispatchedBatches || [])
+    .filter(isMeaningfulPlRow);
+  const source = Array.isArray(existingRows) && existingRows.length
+    ? existingRows.filter(isMeaningfulPlRow)
+    : bprRows;
+  return alignDrumRowsToProducts(source, mr, opts);
 };
+
+/** All dispatched BPR drum rows for a receipt (multi-product combined PL). */
+export const getBPRDispatchedRowsForPL = (data, mr, prodOpts = {}) =>
+  buildPLBatchesFromMR(data, mr, prodOpts, null);
 
 export const getPLDisplayProductLabel = (pl, appData = {}) => {
   const mr = (appData.materialReceipts || []).find(r => r.id === pl?.receiptId);
@@ -503,15 +544,54 @@ export const getPartyProductForMR = (mr, data, productNameHint = '') => {
 export const enrichBPRForPrint = (bpr, appData = {}) => {
   if (!bpr) return bpr;
   const mr = (appData.materialReceipts || []).find(r => r.id === bpr.receiptId);
-  if (!mr) return bpr;
-  const prod = getPartyProductForMR(mr, appData, bpr.productName);
+  const prod = mr ? getPartyProductForMR(mr, appData, bpr.productName) : null;
+
+  const sumKey = (rows, key) => (rows || []).reduce((s, r) => {
+    const n = parseFloat(r[key]);
+    return s + (!Number.isNaN(n) && r[key] !== '' && r[key] != null ? n : 0);
+  }, 0);
+  const countDrums = (rows) => (rows || []).filter((r) => r.batchNo || r.drumNo).length;
+
+  const totalReceivedGross = bpr.totalReceivedGross ?? sumKey(bpr.receivedBatches, 'gross');
+  const totalDispatchedGross = bpr.totalDispatchedGross ?? sumKey(bpr.dispatchedBatches, 'gross');
+  const totalReceivedNet = bpr.totalReceivedNet ?? sumKey(bpr.receivedBatches, 'net');
+  const totalDispatchedNet = bpr.totalDispatchedNet ?? sumKey(bpr.dispatchedBatches, 'net');
+  const filledDrums = Math.max(
+    countDrums(bpr.dispatchedBatches),
+    countDrums(bpr.receivedBatches),
+    parseInt(bpr.totalDrums, 10) || 0,
+    parseInt(mr?.totalDrums, 10) || 0
+  );
+
+  const packingConsumables = {
+    whiteLdBags: '',
+    blackLdBags: '',
+    brownTapes: '',
+    drumUsed: '',
+    otherDetails: '',
+    fiberDrumsUsed: '',
+    hdpeDrumsUsed: '',
+    linersUsed: '',
+    ...(bpr.packingMaterials || {}),
+    ...(bpr.packingConsumables || {})
+  };
+  if (!packingConsumables.drumUsed && filledDrums) {
+    packingConsumables.drumUsed = String(filledDrums);
+  }
+
   return {
     ...bpr,
-    partyName: bpr.partyName || bpr.customerName || mr.partyName || '',
-    customerName: bpr.customerName || bpr.partyName || mr.partyName || '',
-    productName: bpr.productName || mr.productName || '',
+    partyName: bpr.partyName || bpr.customerName || mr?.partyName || '',
+    customerName: bpr.customerName || bpr.partyName || mr?.partyName || '',
+    productName: bpr.productName || mr?.productName || '',
     psdNote: bpr.psdNote || prod?.psdNote || '',
-    psdRequirement: bpr.psdRequirement || prod?.psdReq || ''
+    psdRequirement: bpr.psdRequirement || prod?.psdReq || '',
+    totalDrums: filledDrums || bpr.totalDrums || '',
+    totalReceivedGross,
+    totalDispatchedGross,
+    totalReceivedNet,
+    totalDispatchedNet,
+    packingConsumables
   };
 };
 

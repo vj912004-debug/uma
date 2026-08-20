@@ -542,14 +542,14 @@ export const buildQuotationHtml = (data, profileInput) => {
 </html>`;
 };
 
-export const renderQuotationPdf = async (data, { mode = 'save' } = {}) => {
-  alert('Loading NEW two-page quotation format!');
+export const renderQuotationPdf = async (data, { mode = 'save', printPrefs } = {}) => {
   const html = buildQuotationHtml(data, data.companyProfile);
   await renderHtmlToPdf(html, {
     mode,
-    filePrefix: 'QUOTATION_NEW',
+    filePrefix: 'QUOTATION',
     docNo: data.quotationNo || 'N/A',
     width: 850,
-    fitPage: false
+    fitPage: false,
+    printPrefs
   });
 };
