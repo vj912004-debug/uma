@@ -101,7 +101,7 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
     pushRow(cc.name || '', ccQty, rate, amt, sgstRate, cgstRate);
   });
 
-  const BLANK_ROWS = 7;
+  const BLANK_ROWS = 4;
   for (let i = 0; i < BLANK_ROWS; i++) {
     rows.push(`
       <tr class="filler-row">
@@ -178,16 +178,20 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
   
   .page {
     width: 794px;
+    height: 1123px;
+    max-height: 1123px;
     min-height: 1123px;
     padding: 0;
     margin: 0;
     background: #fff;
     border: none;
     display: block;
+    overflow: hidden;
+    box-sizing: border-box;
   }
 
   /* Outline for the whole content */
-  .content-wrapper { width: 100%; min-height: 1115px; height: 1115px; border-collapse: collapse; border: 2px solid var(--purple); box-sizing: border-box; }
+  .content-wrapper { width: 100%; height: 100%; min-height: 0; border-collapse: collapse; border: 2px solid var(--purple); box-sizing: border-box; table-layout: fixed; }
   .content-wrapper td { padding: 0; }
 
   /* ===== HEADER ===== */
@@ -430,7 +434,7 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
     width:100%;
     table-layout:fixed;
     border-collapse:collapse;
-    margin-bottom:14px;
+    margin-bottom:8px;
     font-size:12px;
     color: var(--text);
   }
@@ -452,7 +456,7 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
   table.items tbody td.num{text-align:right;padding-right:3px;}
   table.items tbody td.center{text-align:center;}
   table.items tbody td.left{text-align:left;padding-left:3px;}
-  table.items tbody tr.filler-row td{height:18px;}
+  table.items tbody tr.filler-row td{height:14px;}
   table.items tfoot td{
     border:1px solid var(--purple);
     background:var(--lav-bg);
@@ -530,9 +534,9 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
     border:1px solid var(--lav-border);
   }
   .f3-body{
-    padding:10px 12px;
+    padding:8px 10px;
     font-size:12px;
-    line-height:1.6;
+    line-height:1.45;
   }
   .f3-body ol{margin:0;padding-left:16px;}
   .sig-col{
@@ -543,12 +547,12 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
   .sig-col .for-company{
     font-weight:800;
     color:var(--purple);
-    padding:10px 12px 0;
+    padding:8px 12px 0;
     font-size:12px;
       text-align:center;
   }
   .sig-col .sig-line{
-    margin:30px 12px 10px;
+    margin:14px 12px 8px;
     border-top:1px solid #333;
     text-align:center;
     padding-top:4px;
@@ -559,8 +563,8 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
   .barfoot{
     background:var(--purple);
     color:#fff;
-    margin:14px -18px -18px -18px;
-    padding:8px 16px;
+    margin:8px -10px 0 -10px;
+    padding:7px 14px;
     display:flex;
     justify-content:space-between;
     font-size:12px;
@@ -568,8 +572,8 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
 
   @media print{
     body{background:#fff;}
-    .page {margin:0;padding: 0;width:794px;min-height: 1123px;}
-    .content-wrapper { width: 100%; min-height: 1115px; height: 1115px; border-collapse: collapse; border: 2px solid var(--purple); box-sizing: border-box; }
+    .page {margin:0;padding: 0;width:794px;height: 1123px;max-height:1123px;overflow:hidden;}
+    .content-wrapper { width: 100%; height: 100%; min-height: 0; border-collapse: collapse; border: 2px solid var(--purple); box-sizing: border-box; table-layout: fixed; }
   .content-wrapper td { padding: 0; }
   }
 </style>
@@ -715,7 +719,7 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
       </td>
   </tr>
   <tr>
-    <td valign="bottom" style="padding: 18px; padding-top: 0; height: 1px;">
+    <td valign="bottom" style="padding: 8px 10px 0; height: 1px;">
   <!-- BANK DETAILS + TOTALS -->
   <div class="bottom">
     <div class="bank">

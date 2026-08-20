@@ -276,6 +276,21 @@ export const buildPrintPrefsCss = (prefs) => {
     margin-top: 4px !important;
     padding: 2px 8px !important;
   }
+  .uma-print-root .footer3,
+  .uma-print-root .barfoot,
+  .uma-print-root .bottom {
+    flex-shrink: 0 !important;
+  }
+  .uma-print-root .sig-col .sig-line {
+    margin: 14px 12px 8px !important;
+  }
+  .uma-print-root .barfoot {
+    margin: 8px -10px 0 -10px !important;
+    padding: 7px 14px !important;
+  }
+  .uma-print-root table.items tbody tr.filler-row td {
+    height: 14px !important;
+  }
 `;
 };
 

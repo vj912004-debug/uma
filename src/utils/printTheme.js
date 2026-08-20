@@ -385,11 +385,11 @@ export const getSharedPrintStyles = () => `
   .sig-col .for-company {
     font-weight: 800;
     color: var(--purple);
-    padding: 10px 12px 0;
+    padding: 8px 12px 0;
     font-size: 12.5px;
   }
   .sig-col .sig-line, .signature-space {
-    margin: 30px 12px 10px;
+    margin: 14px 12px 8px;
     border-top: 1px solid #333;
     text-align: center;
     padding-top: 4px;
@@ -433,8 +433,8 @@ export const getSharedPrintStyles = () => `
   .barfoot, .bottom-status-bar {
     background: var(--purple);
     color: #fff;
-    margin: 14px -18px -18px -18px;
-    padding: 8px 16px;
+    margin: 8px -10px 0 -10px;
+    padding: 7px 14px;
     display: flex;
     justify-content: space-between;
     font-size: 11.5px;
@@ -625,15 +625,31 @@ export const renderHtmlToPdf = async (html, {
     for (let i = 0; i < targets.length; i++) {
       const target = targets[i];
       const originalCss = target.style.cssText;
+      let fitScale = 1;
 
       if (lockToSinglePage) {
         target.style.width = `${width}px`;
+        target.style.height = 'auto';
+        target.style.minHeight = '0';
+        target.style.maxHeight = 'none';
+        target.style.overflow = 'visible';
+        target.style.boxSizing = 'border-box';
+        target.style.margin = '0';
+        target.style.zoom = '1';
+        // Measure natural height, then mildly shrink if content would clip the footer
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const naturalH = Math.max(target.scrollHeight, target.offsetHeight || 0);
+        fitScale = naturalH > singlePageHeight + 2
+          ? Math.max(0.88, Math.min(1, singlePageHeight / naturalH))
+          : 1;
         target.style.height = `${singlePageHeight}px`;
         target.style.minHeight = `${singlePageHeight}px`;
         target.style.maxHeight = `${singlePageHeight}px`;
         target.style.overflow = 'hidden';
-        target.style.boxSizing = 'border-box';
-        target.style.margin = '0';
+        if (fitScale < 1) {
+          target.style.zoom = String(fitScale);
+        }
       } else {
         const pages = Math.max(1, Math.ceil(target.scrollHeight / singlePageHeight));
         target.style.minHeight = `${pages * singlePageHeight}px`;
@@ -675,7 +691,7 @@ export const renderHtmlToPdf = async (html, {
             el.style.maxHeight = `${singlePageHeight}px`;
             el.style.overflow = 'hidden';
             el.style.transform = 'none';
-            el.style.zoom = '1';
+            el.style.zoom = fitScale < 1 ? String(fitScale) : '1';
             el.style.margin = '0';
             el.style.padding = '0';
             el.style.boxSizing = 'border-box';
@@ -689,6 +705,12 @@ export const renderHtmlToPdf = async (html, {
           clonedDoc.querySelectorAll('.content-wrapper td[valign="top"], .content-wrapper .pad-top').forEach((el) => {
             el.style.paddingTop = '4px';
             el.style.verticalAlign = 'top';
+          });
+          clonedDoc.querySelectorAll('.footer3, .barfoot, .bottom').forEach((el) => {
+            el.style.flexShrink = '0';
+          });
+          clonedDoc.querySelectorAll('.sig-col .sig-line').forEach((el) => {
+            el.style.margin = '14px 12px 8px';
           });
         }
       });

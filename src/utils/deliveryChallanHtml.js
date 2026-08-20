@@ -107,7 +107,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   });
 
   // Minimum blank rows; middle page row stretches them to fill remaining height
-  const DC_BLANK_ROWS = 7;
+  const DC_BLANK_ROWS = 4;
   for (let i = 0; i < DC_BLANK_ROWS; i++) {
     bodyRows.push(`
       <tr class="empty">
