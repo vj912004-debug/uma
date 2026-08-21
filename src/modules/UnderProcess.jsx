@@ -1278,7 +1278,7 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         totalNoBatch: activeMRBatches.length
       }));
     }
-  }, [form.date, editing, mr, activeProductName, scopedQty, scopedDrums, data.settings?.serials?.BPR]);
+  }, [editing, mr, activeProductName, scopedQty, scopedDrums, data.settings?.serials?.BPR]);
 
   // Handle double dispatch drums expansion
   const toggleDoubleDispatch = () => {

@@ -88,16 +88,6 @@ const CHARGE_ITEMS = [
   { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
 ];
 
-const buildAllProductSettings = (party, existing = {}) => {
-  const settings = { ...existing };
-  (party?.products || []).forEach(prod => {
-    if (!settings[prod.name]) {
-      settings[prod.name] = buildProductSettingsFromParty(prod);
-    }
-  });
-  return settings;
-};
-
 const getProductSettings = (formData, party, prodName) =>
   formData.productSettings?.[prodName]
   || buildProductSettingsFromParty((party?.products || []).find(p => p.name === prodName));
@@ -246,7 +236,7 @@ const MaterialReceipt = () => {
         productName: '',
         nickName: '',
         batches: [],
-        productSettings: buildAllProductSettings(party)
+        productSettings: {}
       }));
     }
   };
@@ -266,8 +256,13 @@ const MaterialReceipt = () => {
   const handleAddBatchForProduct = (prodName) => {
     setFormData(prev => {
       const party = data.parties.find(p => p.id === prev.partyId);
-      const defaultBatch = makeDefaultBatch(prodName, party, prev.productSettings);
-      return { ...prev, batches: [...prev.batches, defaultBatch] };
+      const productSettings = { ...(prev.productSettings || {}) };
+      if (!productSettings[prodName]) {
+        const prodConfig = (party?.products || []).find(p => p.name === prodName);
+        productSettings[prodName] = buildProductSettingsFromParty(prodConfig);
+      }
+      const defaultBatch = makeDefaultBatch(prodName, party, productSettings);
+      return { ...prev, productSettings, batches: [...prev.batches, defaultBatch] };
     });
   };
 
@@ -305,7 +300,24 @@ const MaterialReceipt = () => {
 
   const handleEdit = (mr) => {
     const prepared = prepareReceiptEditData(mr, data.parties);
-    const productSettings = buildAllProductSettings(prepared.party, prepared.baseForm.productSettings);
+    // Keep settings only for products that have received batches on this receipt
+    const receivedNames = new Set(
+      (prepared.baseForm.batches || [])
+        .filter(b => !b.isEmptyDrums && b.productName)
+        .map(b => b.productName.trim().toLowerCase())
+    );
+    const productSettings = {};
+    Object.entries(prepared.baseForm.productSettings || {}).forEach(([name, settings]) => {
+      if (receivedNames.has(name.trim().toLowerCase())) {
+        productSettings[name] = settings;
+      }
+    });
+    (prepared.party?.products || []).forEach(prod => {
+      if (!receivedNames.has(prod.name.trim().toLowerCase())) return;
+      if (!productSettings[prod.name]) {
+        productSettings[prod.name] = buildProductSettingsFromParty(prod);
+      }
+    });
     setFormData({
       ...prepared.baseForm,
       productSettings,
@@ -426,7 +438,7 @@ const MaterialReceipt = () => {
         data.productionPlans || []
       );
 
-      const syncedProductSettings = { ...(formData.productSettings || {}) };
+      const syncedProductSettings = {};
       (selectedPartyObj?.products || []).forEach(prod => {
         const hasBatch = formData.batches.some(
           b => !b.isEmptyDrums
@@ -499,6 +511,15 @@ const MaterialReceipt = () => {
   // Get active products for selected party
   const selectedPartyObj = data.parties.find(p => p.id === formData.partyId);
   const partyProducts = selectedPartyObj?.products || [];
+  // Only products that have received / entered batch material on this receipt
+  const receivedProducts = partyProducts.filter(prod =>
+    formData.batches.some(
+      b => !b.isEmptyDrums && (b.productName || '').trim().toLowerCase() === prod.name.trim().toLowerCase()
+    )
+  );
+  const productsAvailableToAdd = partyProducts.filter(prod =>
+    !receivedProducts.some(r => r.name.trim().toLowerCase() === prod.name.trim().toLowerCase())
+  );
 
   // Filtered List
   const filteredReceipts = (data.materialReceipts || []).filter(mr => 
@@ -837,7 +858,43 @@ const MaterialReceipt = () => {
                 </div>
               )}
 
-              {formData.partyId && partyProducts.map((prod, pIdx) => {
+              {formData.partyId && partyProducts.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem', padding: '0.85rem 1rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Received Products</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                      Only materials you add below appear on this receipt.
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <select
+                      className="input-field"
+                      style={{ minWidth: '220px' }}
+                      value=""
+                      disabled={productsAvailableToAdd.length === 0}
+                      onChange={e => {
+                        const name = e.target.value;
+                        if (name) handleAddBatchForProduct(name);
+                      }}
+                    >
+                      <option value="">
+                        {productsAvailableToAdd.length === 0 ? 'All party products added' : 'Add received product…'}
+                      </option>
+                      {productsAvailableToAdd.map(prod => (
+                        <option key={prod.name} value={prod.name}>{prod.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {formData.partyId && partyProducts.length > 0 && receivedProducts.length === 0 && (
+                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--input-bg)', borderRadius: '8px', marginBottom: '1.5rem', border: '1px dashed var(--border-color)' }}>
+                  No material received yet. Use &quot;Add received product&quot; to enter only the materials that arrived.
+                </div>
+              )}
+
+              {formData.partyId && receivedProducts.map((prod, pIdx) => {
                 const settings = getProductSettings(formData, selectedPartyObj, prod.name);
                 const productBatchEntries = formData.batches
                   .map((batch, idx) => ({ batch, idx }))
@@ -856,6 +913,22 @@ const MaterialReceipt = () => {
                           PSD Req: {prod.psdReq || '—'} · Cleaning ₹{settings.rates?.cleaning ?? prod.charges?.cleaning ?? 0} · Processing ₹{settings.rates?.processing ?? prod.charges?.processing ?? 0} · Filter Bag ₹{settings.rates?.filterBag ?? prod.charges?.filterBag ?? 0}
                         </p>
                       </div>
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', color: 'rgba(239, 68, 68, 0.95)' }}
+                        onClick={() => {
+                          if (!window.confirm(`Remove all batches for "${prod.name}" from this receipt?`)) return;
+                          setFormData(prev => ({
+                            ...prev,
+                            batches: prev.batches.filter(
+                              b => b.isEmptyDrums || (b.productName || '').trim().toLowerCase() !== prod.name.trim().toLowerCase()
+                            )
+                          }));
+                        }}
+                      >
+                        Remove Product
+                      </button>
                     </div>
 
                     <div style={{ marginBottom: '1.25rem' }}>

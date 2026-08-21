@@ -324,10 +324,18 @@ export const buildPLBatchesFromMR = (data, mr, prodOpts = {}, existingRows = nul
     ...prodOpts,
     productionPlans: prodOpts.productionPlans || data?.productionPlans || []
   };
-  const bprRows = (data?.bprs || [])
-    .filter((b) => b.receiptId === mr.id && !b.isDeleted)
-    .flatMap((bpr) => bpr.dispatchedBatches || [])
-    .filter(isMeaningfulPlRow);
+  const allBprs = (data?.bprs || []).filter((b) => b.receiptId === mr.id && !b.isDeleted);
+  const dispatchedRows = allBprs.flatMap((bpr) => bpr.dispatchedBatches || []).filter(isMeaningfulPlRow);
+  const receivedRows = allBprs.flatMap((bpr) => bpr.receivedBatches || []).filter(isMeaningfulPlRow);
+  // Prefer dispatched weights; fall back to received when dispatch side is still empty
+  const bprRows = dispatchedRows.some((r) => {
+    const g = parseFloat(r.gross);
+    const t = parseFloat(r.tare);
+    const n = parseFloat(r.net);
+    return (!Number.isNaN(g) && g !== 0) || (!Number.isNaN(t) && t !== 0) || (!Number.isNaN(n) && n !== 0);
+  })
+    ? dispatchedRows
+    : (receivedRows.length ? receivedRows : dispatchedRows);
   const source = Array.isArray(existingRows) && existingRows.length
     ? existingRows.filter(isMeaningfulPlRow)
     : bprRows;

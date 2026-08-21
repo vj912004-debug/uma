@@ -255,6 +255,8 @@ export const buildPackingListHtml = (data, profileInput) => {
     padding: 4px 6px;
     text-align: center;
     height: 22px;
+    background: #ffffff;
+    color: #231f20;
   }
   table.items tbody tr.empty td { height: 22px; }
 

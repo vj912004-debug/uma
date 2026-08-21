@@ -106,12 +106,12 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     }
   });
 
-  // Minimum blank rows; middle page row stretches them to fill remaining height
-  const DC_BLANK_ROWS = 4;
+  // Blank handwriting rows — equal height via CSS (table fills middle of page)
+  const DC_BLANK_ROWS = 14;
   for (let i = 0; i < DC_BLANK_ROWS; i++) {
     bodyRows.push(`
       <tr class="empty">
-        <td></td><td></td><td></td><td></td><td></td>
+        <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
       </tr>`);
   }
 
@@ -153,14 +153,28 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
 
   .content-wrapper {
     width: 100%;
+    height: 100%;
     flex: 1;
     border-collapse: collapse;
     border: 2px solid var(--purple);
     box-sizing: border-box;
+    table-layout: fixed;
   }
   .content-wrapper td { padding: 0; vertical-align: top; }
+  /* Header + footer content-sized; items band fills leftover page height */
+  .content-wrapper tr.dc-top,
+  .content-wrapper tr.dc-bot {
+    height: 1px;
+  }
+  .content-wrapper tr.items-row {
+    height: 100%;
+  }
   .content-wrapper td.pad-bot { vertical-align: bottom; }
-  .content-wrapper td.pad-mid { vertical-align: top; }
+  .content-wrapper td.pad-mid {
+    vertical-align: top;
+    padding-bottom: 8px;
+    height: 100%;
+  }
 
   /* ===== HEADER ===== */
   .header {
@@ -335,19 +349,23 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   .meta-row .m-colon { font-weight: 600; white-space: nowrap; }
   .meta-row .m-value { min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /* ===== 3-row page: header | stretchable items | footer (never clipped) ===== */
+  /* ===== Items table fills middle; blank rows share leftover height evenly ===== */
   .pad-x { padding-left: 12px; padding-right: 12px; }
   .pad-top { padding-top: 4px; }
-  .pad-mid { padding-top: 0; padding-bottom: 10px; vertical-align: top; }
+  .pad-mid { padding-top: 0; padding-bottom: 8px; vertical-align: top; }
   .pad-bot { padding-bottom: 0; vertical-align: bottom; }
 
   table.items {
     width: 100%;
     max-width: 100%;
+    height: 100%;
     border-collapse: collapse;
     table-layout: fixed;
     margin: 0;
     font-size:12px;
+  }
+  table.items thead {
+    height: 1px;
   }
   table.items thead th {
     background: var(--purple);
@@ -359,26 +377,43 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   }
   table.items tbody td {
     border: 1px solid var(--lav-border);
-    padding: 6px 4px;
-    height: 20px;
+    padding: 4px 6px;
     vertical-align: middle;
     font-size:12px;
     font-weight: 500;
     word-break: break-word;
     overflow-wrap: anywhere;
+    background: #fff;
+    color: #231f20;
+  }
+  /* Data / note rows stay compact */
+  table.items tbody tr:not(.empty) td {
+    height: 24px;
+    white-space: nowrap;
+  }
+  table.items tbody tr:not(.empty) td.left {
     white-space: pre-wrap;
   }
   table.items tbody td.num { text-align: center; }
   table.items tbody td.left { text-align: left; }
+  /* Blank rows: no fixed height so they split remaining space equally */
   table.items tbody tr.empty td {
-    height: 20px;
+    height: auto;
+    padding: 0;
     border: 1px solid var(--lav-border);
+    background: #fff;
+    line-height: 0;
+    font-size: 0;
+  }
+  table.items tfoot {
+    height: 1px;
   }
   table.items tfoot td {
     border: 1px solid var(--purple);
     background: var(--lav-bg);
     font-weight: 800;
-    padding: 8px 6px;
+    padding: 7px 6px;
+    height: 28px;
     color: var(--purple-dark);
     text-align: center;
   }
@@ -450,7 +485,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
 
   <div class="page pdf-page print-host">
     <table class="content-wrapper">
-  <tr>
+  <tr class="dc-top">
     <td class="pad-x pad-top" valign="top">
       <div class="header">
         <div class="brand">
@@ -555,7 +590,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
         </table>
     </td>
   </tr>
-  <tr>
+  <tr class="dc-bot">
     <td class="pad-x pad-bot">
       <div class="dc-footer-grid">
         <div class="dc-meta-card">

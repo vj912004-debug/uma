@@ -93,7 +93,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     pushRow(cc.name || '', ccQty, rate, amt);
   });
 
-  const BLANK_ROWS = 4;
+  const BLANK_ROWS = 10;
   for (let i = 0; i < BLANK_ROWS; i++) {
     rows.push(`
       <tr class="filler-row">

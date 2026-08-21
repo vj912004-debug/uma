@@ -254,25 +254,93 @@ export const buildQuotationHtml = (data, profileInput) => {
     clip-path:ellipse(70% 100% at 50% 100%);margin-top:6px;}
 
   /* ============ PAGE 2 ============ */
+  .sheet.page2{
+    display:flex;
+    flex-direction:column;
+    min-height:1202px;
+    padding-bottom:48px;
+  }
   .page2-header{background:var(--purple);color:#fff;display:flex;align-items:center;gap:8px;
-    padding:9px 28px;font-size:13px;font-weight:800;letter-spacing:.4px;margin:0;
+    padding:9px 28px;font-size:13px;font-weight:800;letter-spacing:.4px;margin:0;flex-shrink:0;
     clip-path:polygon(0 0,100% 0,100% 100%,3% 100%);}
   .page2-header svg{width:15px;height:15px;fill:#fff;}
 
-  .terms-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;padding:18px 28px 4px 28px;}
-  .term{border:1px solid #e6e6e6;border-top:3px solid var(--purple);border-radius:6px;padding:9px 7px;
-    background:#fdfdfd;}
-  .term .ticon{width:20px;height:20px;margin-bottom:5px;}
-  .term h4{color:var(--purple-dark);font-size:8.6px;font-weight:800;letter-spacing:.2px;margin-bottom:4px;}
-  .term p{font-size:8px;color:#555;line-height:1.4;}
+  .page2-body{
+    flex:1 1 auto;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+    gap:16px;
+    padding:20px 28px 12px 28px;
+  }
 
-  .bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 28px 22px 28px;}
-  .bbox{background:#f7f9fb;border:1px solid #e3e8ee;border-radius:6px;padding:12px 14px;}
-  .bbox-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
-  .bbox-head svg{width:16px;height:16px;fill:var(--purple-dark);}
-  .bbox-head h4{color:var(--purple-dark);font-size:11px;font-weight:800;letter-spacing:.2px;}
-  .bbox ol{padding-left:16px;font-size:9.6px;line-height:1.55;color:#333;}
-  .sign2{text-align:right;margin-top:14px;}
+  .terms-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    grid-auto-rows:1fr;
+    gap:14px;
+    flex:1.05 1 0;
+    min-height:0;
+  }
+  .term{
+    border:1px solid #e6e6e6;
+    border-top:3px solid var(--purple);
+    border-radius:6px;
+    padding:18px 16px;
+    background:#fdfdfd;
+    min-width:0;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .term-head{
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    gap:8px;
+    flex-shrink:0;
+  }
+  .term .ticon{width:20px;height:20px;flex-shrink:0;margin:0;}
+  .term h4{
+    color:var(--purple-dark);
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.2px;
+    margin:0;
+    line-height:1.2;
+  }
+  .term p{
+    font-size:9.6px;
+    color:#555;
+    line-height:1.55;
+    margin:0;
+  }
+
+  .bottom-grid{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:16px;
+    flex:1 1 0;
+    min-height:0;
+    align-items:stretch;
+  }
+  .bbox{
+    background:#f7f9fb;
+    border:1px solid #e3e8ee;
+    border-radius:6px;
+    padding:16px 18px;
+    min-width:0;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+  }
+  .bbox-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-shrink:0;}
+  .bbox-head svg{width:16px;height:16px;fill:var(--purple-dark);flex-shrink:0;}
+  .bbox-head h4{color:var(--purple-dark);font-size:11px;font-weight:800;letter-spacing:.2px;margin:0;}
+  .bbox ol{padding-left:16px;font-size:9.8px;line-height:1.65;color:#333;margin:0;flex:1 1 auto;}
+  .bbox ol li + li{margin-top:8px;}
+  .sign2{text-align:right;margin-top:auto;padding-top:16px;flex-shrink:0;}
   .sign2 p{font-size:10.5px;}
   .sign2 .sig{font-family:'Brush Script MT',cursive;color:var(--purple);font-size:19px;margin:6px 30px 0 0;}
   .sign2 .seal{width:52px;height:52px;margin-left:auto;margin-top:2px;}
@@ -288,6 +356,7 @@ export const buildQuotationHtml = (data, profileInput) => {
   @media print{
     body{background:#fff;padding:0;}
     .sheet{box-shadow:none;margin:0;width:210mm;min-height:297mm;border-radius:0;}
+    .sheet.page2{min-height:297mm;}
   }
 </style>
 </head>
@@ -459,38 +528,51 @@ export const buildQuotationHtml = (data, profileInput) => {
 </div>
 
 <!-- ============================================================ PAGE 2 ============================================================ -->
-<div class="sheet pdf-page">
+<div class="sheet pdf-page page2">
   <div class="page2-header"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM6 8h12M6 12h12M6 16h8"/></svg>TERMS &amp; CONDITIONS</div>
 
+  <div class="page2-body">
   <div class="terms-grid">
     <div class="term">
-      <svg class="ticon" viewBox="0 0 24 24" fill="var(--purple)"><path d="M6 2h9l5 5v15H6zm8 1.5V8h4.5z"/></svg>
-      <h4>TAXES</h4>
+      <div class="term-head">
+        <svg class="ticon" viewBox="0 0 24 24" fill="var(--purple)"><path d="M6 2h9l5 5v15H6zm8 1.5V8h4.5z"/></svg>
+        <h4>TAXES</h4>
+      </div>
       <p>GST will be charged extra as applicable.</p>
     </div>
     <div class="term">
-      <svg class="ticon" viewBox="0 0 24 24" fill="#2f9e8f"><path d="M17 4L4 17l1.4 1.4L18.4 5.4zM6.5 4a2.5 2.5 0 100 5 2.5 2.5 0 000-5zm11 10a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"/></svg>
-      <h4>PROCESS LOSS</h4>
+      <div class="term-head">
+        <svg class="ticon" viewBox="0 0 24 24" fill="#2f9e8f"><path d="M17 4L4 17l1.4 1.4L18.4 5.4zM6.5 4a2.5 2.5 0 100 5 2.5 2.5 0 000-5zm11 10a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"/></svg>
+        <h4>PROCESS LOSS</h4>
+      </div>
       <p>Loss occurs during processing is on your account.</p>
     </div>
     <div class="term">
-      <svg class="ticon" viewBox="0 0 24 24" fill="var(--green)"><path d="M12 4V1L8 5l4 4V6a6 6 0 11-6 6H4a8 8 0 108-8z"/></svg>
-      <h4>BATCH / CHANGE OVER</h4>
+      <div class="term-head">
+        <svg class="ticon" viewBox="0 0 24 24" fill="var(--green)"><path d="M12 4V1L8 5l4 4V6a6 6 0 11-6 6H4a8 8 0 108-8z"/></svg>
+        <h4>BATCH / CHANGE OVER</h4>
+      </div>
       <p>If same material is required to be micronized in separate batch(es) or different PSD specification, Change Over Charge @ ₹ 500/- per batch or per specification will be applicable.</p>
     </div>
     <div class="term">
-      <svg class="ticon" viewBox="0 0 24 24" fill="var(--orange)"><path d="M3 6h11v8H3zM14 9h4l3 3v2h-7zM6.5 19a2 2 0 100-4 2 2 0 000 4zm12 0a2 2 0 100-4 2 2 0 000 4z"/></svg>
-      <h4>OTHER CHARGES</h4>
+      <div class="term-head">
+        <svg class="ticon" viewBox="0 0 24 24" fill="var(--orange)"><path d="M3 6h11v8H3zM14 9h4l3 3v2h-7zM6.5 19a2 2 0 100-4 2 2 0 000 4zm12 0a2 2 0 100-4 2 2 0 000 4z"/></svg>
+        <h4>OTHER CHARGES</h4>
+      </div>
       <p>This is only processing charges. All other charges like Transportation, Insurance, Repacking material charges will be extra.</p>
     </div>
     <div class="term">
-      <svg class="ticon" viewBox="0 0 24 24" fill="#2f9e8f"><path d="M2 5h20v14H2zm0 4h20v2H2zm3 5h6v2H5z"/></svg>
-      <h4>PAYMENT TERMS</h4>
+      <div class="term-head">
+        <svg class="ticon" viewBox="0 0 24 24" fill="#2f9e8f"><path d="M2 5h20v14H2zm0 4h20v2H2zm3 5h6v2H5z"/></svg>
+        <h4>PAYMENT TERMS</h4>
+      </div>
       <p>100% Advance against Performa Invoice.</p>
     </div>
     <div class="term">
-      <svg class="ticon" viewBox="0 0 24 24" fill="#2f9e8f"><path d="M7 2v2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2h-2V2h-2v2H9V2zm-2 8h14v9H5z"/></svg>
-      <h4>VALIDITY</h4>
+      <div class="term-head">
+        <svg class="ticon" viewBox="0 0 24 24" fill="#2f9e8f"><path d="M7 2v2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2h-2V2h-2v2H9V2zm-2 8h14v9H5z"/></svg>
+        <h4>VALIDITY</h4>
+      </div>
       <p>This quotation is valid up to ${validityDate}.</p>
     </div>
   </div>
@@ -526,6 +608,7 @@ export const buildQuotationHtml = (data, profileInput) => {
         <p><b>${sigName}</b><br><small>Authorised Signatory</small></p>
       </div>
     </div>
+  </div>
   </div>
 
   <div class="bottom-banner">

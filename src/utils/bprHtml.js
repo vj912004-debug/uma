@@ -173,8 +173,13 @@ export const buildBprHtml = (data, profileInput) => {
   const productName = data.productName || data.product || '';
   const bprNo = escHtml(data.bprNo || 'N/A');
 
-  const received = data.receivedBatches || [];
-  const dispatched = data.dispatchedBatches || [];
+  const receivedRaw = data.receivedBatches || [];
+  const dispatchedRaw = data.dispatchedBatches || [];
+  const isLiveRow = (r) => !!(r && (r.batchNo || r.drumNo || hasWeight(r)));
+  const receivedLive = receivedRaw.filter(isLiveRow);
+  const dispatchedLive = dispatchedRaw.filter(isLiveRow);
+  const received = receivedLive.length ? receivedLive : receivedRaw;
+  const dispatched = dispatchedLive.length ? dispatchedLive : dispatchedRaw;
   const rowCount = Math.max(received.length, dispatched.length, BPR_PAGE2_ROW_COUNT);
   const packingRows = [];
   for (let i = 0; i < rowCount; i++) {
@@ -504,9 +509,9 @@ export const buildBprHtml = (data, profileInput) => {
   .meta{display:flex;flex-wrap:wrap;border:1.5px solid #5a009d;margin-bottom:6px;border-radius:4px;overflow:hidden;}
   .meta-item{padding:4px 8px;border-right:1px solid #e2d3f3;border-bottom:1px solid #e2d3f3;font-size:12px;width:32%;box-sizing:border-box;color:#4a0080;font-weight:600;}
   .meta-item.label{color:#5a009d;font-weight:700;background:#e2d3f3;width:18%;}
-  table.items{width:100%;border-collapse:collapse;margin-bottom:6px;font-size:12px;flex:1;table-layout:auto;}
+  table.items{width:100%;border-collapse:collapse;margin-bottom:6px;font-size:12px;flex:1;table-layout:auto;background:#fff;}
   table.items thead th{background:#5a009d;color:#fff;font-weight:700;padding:4px 3px;text-align:center;border:1px solid rgba(255,255,255,0.55);font-size:12px;white-space:nowrap;}
-  table.items tbody td{border:1px solid #7c12bd;padding:2px 3px;height:26px;text-align:center;color:#4a0080;font-weight:600;font-size:12px;white-space:nowrap;}
+  table.items tbody td{border:1px solid #7c12bd;padding:2px 3px;height:26px;text-align:center;color:#4a0080;font-weight:600;font-size:12px;white-space:nowrap;background:#ffffff;}
   table.items tbody tr.total-hl td{background:#e2d3f3;color:#4a0080;font-weight:700;height:24px;}
   .barfoot{background:#5a009d;color:#fff;padding:6px 12px;display:flex;justify-content:space-between;font-size:12px;margin-top:auto;border-radius:4px;}
   .signs{display:flex;border:1px solid #7c12bd;margin-top:12px;margin-bottom:12px;border-radius:4px;overflow:hidden;}
@@ -584,19 +589,34 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
   const html = applyPrintPrefsToHtml(buildBprHtml(data, data.companyProfile), printPrefs);
   const { jsPDF } = await import('jspdf');
   const html2canvas = (await import('html2canvas')).default;
-  const host = document.createElement('div');
-  host.className = PRINT_ROOT_CLASS;
-  host.style.cssText = 'position:absolute;left:-12000px;top:0;z-index:-1;background:#fff;';
-  host.innerHTML = html;
-  document.body.appendChild(host);
+
+  // iframe isolates BPR styles from ERP dark-theme table CSS (which was hiding weights)
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('title', 'bpr-pdf-render');
+  iframe.style.cssText = 'position:fixed;left:-12000px;top:0;width:794px;height:1400px;border:0;opacity:0;pointer-events:none;';
+  document.body.appendChild(iframe);
+  const idoc = iframe.contentDocument || iframe.contentWindow.document;
+  idoc.open();
+  idoc.write(html);
+  idoc.close();
+  if (idoc.documentElement) idoc.documentElement.classList.add(PRINT_ROOT_CLASS);
+  if (idoc.body) idoc.body.classList.add(PRINT_ROOT_CLASS);
+
   const fileBase = data._blankSheet
     ? `BPR_Blank`
     : `BPR_${data.bprNo || 'N/A'}`;
   try {
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    await new Promise((r) => {
+      if (idoc.readyState === 'complete') {
+        requestAnimationFrame(() => requestAnimationFrame(r));
+      } else {
+        iframe.onload = () => requestAnimationFrame(() => requestAnimationFrame(r));
+      }
+    });
+    await new Promise((r) => setTimeout(r, 50));
 
-    const pageNodes = [...host.querySelectorAll('.page')];
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageNodes = [...idoc.querySelectorAll('.page')];
     for (let i = 0; i < pageNodes.length; i++) {
       if (i > 0) pdf.addPage();
       const target = pageNodes[i];
@@ -606,9 +626,19 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
         backgroundColor: '#ffffff',
         width: 794,
         windowWidth: 794,
-        height: target.scrollHeight,
-        windowHeight: target.scrollHeight,
-        logging: false
+        height: Math.max(target.scrollHeight, 1123),
+        windowHeight: Math.max(target.scrollHeight, 1123),
+        logging: false,
+        onclone: (clonedDoc) => {
+          clonedDoc.querySelectorAll('table.items tbody td').forEach((el) => {
+            el.style.background = '#ffffff';
+            el.style.color = '#4a0080';
+          });
+          clonedDoc.querySelectorAll('table.items thead th').forEach((el) => {
+            el.style.background = '#5a009d';
+            el.style.color = '#ffffff';
+          });
+        }
       });
       pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297);
     }
@@ -621,7 +651,7 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
       pdf.save(`${fileBase}.pdf`);
     }
   } finally {
-    document.body.removeChild(host);
+    iframe.remove();
   }
 };
 
