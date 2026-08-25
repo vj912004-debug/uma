@@ -44,6 +44,12 @@ const CreditNotes = () => {
     date: new Date().toISOString().split('T')[0],
     partyId: '',
     partyName: '',
+    address: '',
+    billAddress: '',
+    shipAddress: '',
+    gstin: '',
+    state: 'GUJARAT',
+    stateCode: '24',
     refInvoice: '',
     refInvoiceDate: '',
     poNo: '',
@@ -58,9 +64,21 @@ const CreditNotes = () => {
   const handlePartySelect = (e) => {
     const party = data.parties.find(p => p.id === e.target.value);
     if (party) {
-      setForm(prev => ({ ...prev, partyId: party.id, partyName: party.name }));
+      const bill = party.billAddress || '';
+      const ship = party.shipAddress || bill;
+      setForm(prev => ({
+        ...prev,
+        partyId: party.id,
+        partyName: party.name || prev.partyName,
+        address: bill || prev.address || '',
+        billAddress: bill || prev.billAddress || '',
+        shipAddress: ship || prev.shipAddress || '',
+        gstin: party.gstinBill || prev.gstin || '',
+        state: party.state || prev.state || 'GUJARAT',
+        stateCode: party.stateCode || prev.stateCode || '24'
+      }));
     } else {
-      setForm(prev => ({ ...prev, partyId: '', partyName: '' }));
+      setForm(prev => ({ ...prev, partyId: '' }));
     }
   };
 
@@ -71,6 +89,12 @@ const CreditNotes = () => {
       date: new Date().toISOString().split('T')[0],
       partyId: '',
       partyName: '',
+      address: '',
+      billAddress: '',
+      shipAddress: '',
+      gstin: '',
+      state: 'GUJARAT',
+      stateCode: '24',
       refInvoice: '',
       refInvoiceDate: '',
       poNo: '',
@@ -86,8 +110,18 @@ const CreditNotes = () => {
   };
 
   const handleEdit = (note) => {
+    const party = data.parties?.find(p => p.id === note.partyId) || {};
+    const bill = note.billAddress || note.address || party.billAddress || '';
+    const ship = note.shipAddress || bill || party.shipAddress || '';
     setForm({
       ...note,
+      partyName: note.partyName || party.name || '',
+      address: bill,
+      billAddress: bill,
+      shipAddress: ship,
+      gstin: note.gstin || note.gstinBill || party.gstinBill || '',
+      state: note.state || note.billState || 'GUJARAT',
+      stateCode: note.stateCode || note.billStateCode || '24',
       customCharges: linesFromNote(note),
       discount: note.discount || 0,
       taxRate: note.taxRate ?? 18
@@ -137,8 +171,13 @@ const CreditNotes = () => {
     const taxAmount = taxable * (form.taxRate / 100);
     const total = taxable + taxAmount;
 
+    const billAddress = (form.billAddress || form.address || '').trim();
+    const shipAddress = (form.shipAddress || billAddress).trim();
     const finalDoc = {
       ...form,
+      address: billAddress,
+      billAddress,
+      shipAddress,
       charges: {},
       rates: {},
       qtys: {},
@@ -220,22 +259,32 @@ const CreditNotes = () => {
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button title="Preview PDF" onClick={() => {
                           const party = data.parties?.find(p => p.id === note.partyId) || {};
+                          const billAddress = note.billAddress || note.address || party.billAddress || '';
+                          const shipAddress = note.shipAddress || billAddress || party.shipAddress || '';
                           viewPDF('CN', {
                             ...note,
-                            address: party.billAddress,
-                            state: 'GUJARAT',
-                            stateCode: '24',
-                            gstin: party.gstinBill
+                            partyName: note.partyName || party.name || '',
+                            address: billAddress,
+                            billAddress,
+                            shipAddress,
+                            state: note.state || 'GUJARAT',
+                            stateCode: note.stateCode || '24',
+                            gstin: note.gstin || note.gstinBill || party.gstinBill || ''
                           });
                         }} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Eye size={16} /></button>
                           <button onClick={() => {
                           const party = data.parties?.find(p => p.id === note.partyId) || {};
+                          const billAddress = note.billAddress || note.address || party.billAddress || '';
+                          const shipAddress = note.shipAddress || billAddress || party.shipAddress || '';
                           exportToPDF('CN', {
                             ...note,
-                            address: party.billAddress,
-                            state: 'GUJARAT',
-                            stateCode: '24',
-                            gstin: party.gstinBill
+                            partyName: note.partyName || party.name || '',
+                            address: billAddress,
+                            billAddress,
+                            shipAddress,
+                            state: note.state || 'GUJARAT',
+                            stateCode: note.stateCode || '24',
+                            gstin: note.gstin || note.gstinBill || party.gstinBill || ''
                           });
                         }} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={16} /></button>
                         <button onClick={() => handleEdit(note)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={16} /></button>
@@ -265,23 +314,66 @@ const CreditNotes = () => {
                   <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label>Party (optional select)</label>
+                  <label>Party Name *</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    required
+                    placeholder="Type party / customer name"
+                    value={form.partyName}
+                    onChange={e => setForm(prev => ({ ...prev, partyName: e.target.value }))}
+                  />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Load from Parties (optional)</label>
                   <select className="input-field" value={form.partyId} onChange={handlePartySelect}>
-                    <option value="">-- Select or type name below --</option>
+                    <option value="">-- Select to auto-fill name / address --</option>
                     {data.parties.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                   </select>
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label>Supplier / Party Name *</label>
+                  <label>Bill To Address</label>
+                  <textarea
+                    className="input-field"
+                    rows="3"
+                    placeholder="Type bill-to address manually"
+                    value={form.billAddress || form.address || ''}
+                    onChange={e => setForm(prev => ({
+                      ...prev,
+                      billAddress: e.target.value,
+                      address: e.target.value
+                    }))}
+                  />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Ship To Address</label>
+                  <textarea
+                    className="input-field"
+                    rows="3"
+                    placeholder="Type ship-to address manually"
+                    value={form.shipAddress || ''}
+                    onChange={e => setForm(prev => ({ ...prev, shipAddress: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label>GSTIN</label>
                   <input
                     type="text"
                     className="input-field"
-                    required
-                    placeholder="Enter party name manually"
-                    value={form.partyName}
-                    onChange={e => setForm(prev => ({ ...prev, partyName: e.target.value, partyId: '' }))}
+                    placeholder="Party GSTIN"
+                    value={form.gstin || ''}
+                    onChange={e => setForm(prev => ({ ...prev, gstin: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label>State</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={form.state || ''}
+                    onChange={e => setForm(prev => ({ ...prev, state: e.target.value }))}
                   />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>

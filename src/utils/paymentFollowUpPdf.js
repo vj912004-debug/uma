@@ -1,6 +1,6 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { formatPdfDateDmy } from './taxInvoiceLayout';
-import { renderHtmlToPdf } from './printTheme';
+import { renderHtmlToPdf, buildPrintBrandHtml } from './printTheme';
 import { applyPrintPrefsToHtml } from './printPrefs';
 import { money } from './paymentFollowUpData';
 
@@ -38,6 +38,9 @@ export const buildPaymentFollowUpStatementHtml = ({
   html,body{margin:0;padding:0;background:#fff;color:#111;width:794px;}
   .page{width:794px;padding:28px 32px;box-sizing:border-box;}
   .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #3d2b7d;padding-bottom:12px;margin-bottom:16px;}
+  .brand{max-width:420px;}
+  .brand-lockup{width:280px;height:70px;display:flex;align-items:center;}
+  .brand-lockup img{width:100%;height:100%;object-fit:contain;object-position:left center;display:block;}
   .brand h1{margin:0;color:#3d2b7d;font-size:22px;}
   .brand p{margin:4px 0 0;font-size:11px;color:#444;line-height:1.4;}
   .doc-title{text-align:right;}
@@ -59,8 +62,11 @@ export const buildPaymentFollowUpStatementHtml = ({
 <div class="page pdf-page print-host">
   <div class="head">
     <div class="brand">
-      <h1>${esc(profile.companyName || 'UMA MICRON')}</h1>
-      <p>${esc(profile.addressLine1 || '')}<br>
+      ${buildPrintBrandHtml(profile, {
+        companyName: profile.companyName || 'UMA MICRON',
+        tagline: profile.tagline || "Micronization of API's"
+      })}
+      <p style="margin-top:8px;">${esc(profile.addressLine1 || '')}<br>
       ${esc(profile.city || '')} - ${esc(profile.pincode || '')}, ${esc(profile.state || '')}<br>
       GSTIN: ${esc(profile.gstNumber || '')}<br>
       ${esc(profile.phone || '')} | ${esc(profile.email || '')}</p>

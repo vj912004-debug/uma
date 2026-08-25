@@ -1,7 +1,7 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { buildDcPrintLines, getDcAppData } from './deliveryChallanLayout';
 import { formatPdfDateDmy } from './taxInvoiceLayout';
-import { escHtml, fmtQty, buildPrintLogoHtml, renderHtmlToPdf } from './printTheme';
+import { escHtml, fmtQty, buildPrintBrandHtml, renderHtmlToPdf, hasPrintVal } from './printTheme';
 
 export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   const profile = mergeCompanyProfile(profileInput);
@@ -118,8 +118,6 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   const drumsTotal = parseInt(totalDrums, 10) > 0 ? String(parseInt(totalDrums, 10)) : '';
   const qtyTotal = parseFloat(totalQty) > 0 ? fmtQty(totalQty) : '';
 
-  const logoHtml = buildPrintLogoHtml(profile);
-
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -197,6 +195,10 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     flex-shrink: 0;
   }
   .logo svg, .logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+  .brand-lockup{width:280px;height:70px;flex-shrink:0;display:flex;align-items:center;}
+  .brand-lockup img{width:100%;height:100%;object-fit:contain;object-position:left center;display:block;}
+
   .brand-text {
     display: flex;
     flex-direction: column;
@@ -489,14 +491,11 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
     <td class="pad-x pad-top" valign="top">
       <div class="header">
         <div class="brand">
-          <div class="logo">
-            ${logoHtml}
-          </div>
-          <div class="brand-text">
-            <h1>${escHtml(profile.companyName || 'UMA MICRON')}</h1>
-            <div class="tagline">Micronization of API's</div>
-          </div>
-        </div>
+      ${buildPrintBrandHtml(profile, {
+        companyName: profile.companyName || 'UMA MICRON',
+        tagline: profile.tagline || "Micronization of API's"
+      })}
+    </div>
         <div class="tax-invoice-box">
           <div class="ti-title">DELIVERY CHALLAN</div>
           <svg style="width:36px; height:36px; fill:#fff;" viewBox="0 0 24 24">
@@ -595,10 +594,10 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
       <div class="dc-footer-grid">
         <div class="dc-meta-card">
           <div class="box-head"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> TRANSPORT DETAILS</div>
-          <div class="dc-meta-row"><div class="dc-meta-label">Vehicle No.</div><div class="data-value">: &nbsp;${escHtml(data.vehicleNo || '')}</div></div>
-          <div class="dc-meta-row"><div class="dc-meta-label">Drivers name</div><div class="data-value">: &nbsp;${escHtml(data.driverName || '')}</div></div>
-          <div class="dc-meta-row"><div class="dc-meta-label">Driver's Contact</div><div class="data-value">: &nbsp;${escHtml(data.driverContact || data.driverPhone || '')}</div></div>
-          <div class="dc-meta-row"><div class="dc-meta-label">Transporter's Name</div><div class="data-value">: &nbsp;${escHtml(data.transporterName || data.transporter || '')}</div></div>
+          ${hasPrintVal(data.vehicleNo) ? `<div class="dc-meta-row"><div class="dc-meta-label">Vehicle No.</div><div class="data-value">: &nbsp;${escHtml(data.vehicleNo)}</div></div>` : ''}
+          ${hasPrintVal(data.driverName) ? `<div class="dc-meta-row"><div class="dc-meta-label">Drivers name</div><div class="data-value">: &nbsp;${escHtml(data.driverName)}</div></div>` : ''}
+          ${hasPrintVal(data.driverContact || data.driverPhone) ? `<div class="dc-meta-row"><div class="dc-meta-label">Driver's Contact</div><div class="data-value">: &nbsp;${escHtml(data.driverContact || data.driverPhone)}</div></div>` : ''}
+          ${hasPrintVal(data.transporterName || data.transporter) ? `<div class="dc-meta-row"><div class="dc-meta-label">Transporter's Name</div><div class="data-value">: &nbsp;${escHtml(data.transporterName || data.transporter)}</div></div>` : ''}
         </div>
         <div class="dc-sign-stack">
           <div class="dc-sign-card">

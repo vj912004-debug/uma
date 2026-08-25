@@ -28,6 +28,7 @@ import {
   getReceiptProductSummaries,
   getProductQty,
   getProductDisplayIndex,
+  getMRReceivedQty,
   receiptProductOptions
 } from '../utils/receiptProducts';
 
@@ -78,8 +79,8 @@ const InvoicesPI = () => {
     const mrParty = prodOpts.party || data.parties.find(p => p.id === freshMR.partyId);
     const productLabel = getReceiptProductLabel(freshMR, prodOpts);
     const productSummaries = getReceiptProductSummaries(freshMR, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
-    const materialQty = productSummaries.reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0)
-      || parseFloat(freshMR.totalQty)
+    const materialQty = getMRReceivedQty(freshMR, prodOpts)
+      || productSummaries.reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0)
       || 0;
     const productCharges = initProductChargesFromMR(freshMR, mrParty, prodOpts);
     const piSerial = data.settings?.serials?.PI || 1;

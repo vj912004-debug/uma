@@ -1,5 +1,5 @@
 import { DEFAULT_COMPANY_PROFILE, mergeCompanyProfile } from './companyProfile';
-import { flattenMRChargeSnapshot } from './documentCharges';
+import { flattenMRChargeSnapshot, syncAllTaxInvoicesWithProformas } from './documentCharges';
 
 const normName = (s) => (s || '').trim().toLowerCase();
 
@@ -96,6 +96,8 @@ export const normalizeAppState = (parsed) => {
   if (!parsed || typeof parsed !== 'object') return baseState;
 
   const processingFieldsMigrated = parsed.settings?.productionPlanProcessingManualOnly;
+  const rawInvoices = parsed.invoices || [];
+  const { invoices: syncedInvoices } = syncAllTaxInvoicesWithProformas(rawInvoices);
 
   return {
     ...baseState,
@@ -123,7 +125,7 @@ export const normalizeAppState = (parsed) => {
     paymentPromises: parsed.paymentPromises || [],
     bprs: parsed.bprs || [],
     packingLists: parsed.packingLists || [],
-    invoices: parsed.invoices || [],
+    invoices: syncedInvoices,
     quotations: parsed.quotations || [],
     debitNotes: parsed.debitNotes || [],
     creditNotes: parsed.creditNotes || [],

@@ -1,89 +1,138 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { formatPdfDateDmy } from './taxInvoiceLayout';
-import { escHtml, fmtMoney, buildPrintLogoHtml, applyPrintPrefsToHtml } from './printTheme';
-import { PRINT_ROOT_CLASS } from './printPrefs';
+import {
+  escHtml,
+  fmtMoney,
+  buildPrintBrandHtml,
+  applyPrintPrefsToHtml,
+  renderHtmlToPdf
+} from './printTheme';
 
 const parseWeight = (value) => {
   if (value === '' || value === null || value === undefined) return 0;
   return parseFloat(value) || 0;
 };
 
+const padDrums = (n) => {
+  const v = parseInt(n, 10);
+  if (!Number.isFinite(v) || v < 0) return '00';
+  return String(v).padStart(2, '0');
+};
+
+const isSievingLumpBatch = (batch = {}) => {
+  const text = `${batch.batchNo || ''} ${batch.drumNo || ''} ${batch.productName || ''}`.toLowerCase();
+  return /sieving\s*lumps?/.test(text);
+};
+
 export const buildPackingListHtml = (data, profileInput) => {
   const profile = mergeCompanyProfile(profileInput);
-  // Drop blank filler rows (no weights and no identifiers) so Grand Total sits under real data
-  const batches = (data.batches || []).filter((batch) => {
+  const rawBatches = (data.batches || []).filter((batch) => {
     const hasWeight = parseWeight(batch.gross) > 0 || parseWeight(batch.tare) > 0 || parseWeight(batch.net) > 0;
     const hasId = String(batch.batchNo || '').trim() || String(batch.drumNo ?? '').trim();
     return hasWeight || hasId;
   });
+
+  let sievingLumps = parseWeight(
+    data.sievingLumps ?? data.sievingLumpsNet ?? data.lumpsNet ?? data.lumpsNetWeight ?? ''
+  );
+  const batches = [];
+  rawBatches.forEach((batch) => {
+    if (isSievingLumpBatch(batch)) {
+      const net = batch.net !== '' && batch.net != null
+        ? parseWeight(batch.net)
+        : Math.max(0, parseWeight(batch.gross) - parseWeight(batch.tare));
+      if (net > 0 && sievingLumps <= 0) sievingLumps = net;
+      return;
+    }
+    batches.push(batch);
+  });
+
   const plNo = escHtml(data.plNo || '');
   const plDate = escHtml(formatPdfDateDmy(data.date) || '');
+  const productName = escHtml(data.productName || '');
+  const companyName = escHtml(profile.companyName || 'UMA MICRON');
 
-  // ── Group batches by batchNo ──
-  const batchGroups = [];
-  const batchGroupMap = {};
+  let grandGross = 0;
+  let grandTare = 0;
+  let grandNet = 0;
   let globalSr = 1;
 
+  // Group consecutive / same batch numbers — each batch gets its own TOTAL
+  const batchGroups = [];
+  const groupMap = {};
   batches.forEach((batch) => {
-    const key = batch.batchNo || 'Unknown';
-    if (!batchGroupMap[key]) {
-      batchGroupMap[key] = { batchNo: key, rows: [], totalGross: 0, totalTare: 0, totalNet: 0 };
-      batchGroups.push(batchGroupMap[key]);
+    const key = String(batch.batchNo || '').trim() || '—';
+    if (!groupMap[key]) {
+      groupMap[key] = { batchNo: key, rows: [], gross: 0, tare: 0, net: 0 };
+      batchGroups.push(groupMap[key]);
     }
     const gross = parseWeight(batch.gross);
     const tare = parseWeight(batch.tare);
     const net = batch.net !== '' && batch.net !== null && batch.net !== undefined
       ? parseWeight(batch.net)
       : Math.max(0, gross - tare);
-
-    batchGroupMap[key].rows.push({ ...batch, gross, tare, net, sr: globalSr++ });
-    batchGroupMap[key].totalGross += gross;
-    batchGroupMap[key].totalTare += tare;
-    batchGroupMap[key].totalNet += net;
+    groupMap[key].rows.push({ batch, gross, tare, net });
+    groupMap[key].gross += gross;
+    groupMap[key].tare += tare;
+    groupMap[key].net += net;
+    grandGross += gross;
+    grandTare += tare;
+    grandNet += net;
   });
 
-  // ── Build table rows (data only — no empty spacer rows) ──
-  let grandGross = 0;
-  let grandTare = 0;
-  let grandNet = 0;
-
   const tableRowsHtml = batchGroups.map((group) => {
-    grandGross += group.totalGross;
-    grandTare += group.totalTare;
-    grandNet += group.totalNet;
-
-    return group.rows.map((r) => `
+    const rowHtml = group.rows.map(({ batch, gross, tare, net }) => {
+      const sr = globalSr++;
+      return `
       <tr>
-        <td class="num">${r.sr}</td>
-        <td class="num">${escHtml(r.batchNo || '')}</td>
-        <td class="num">${escHtml(r.drumNo ?? '')}</td>
-        <td class="num">${r.gross > 0 ? fmtMoney(r.gross) : ''}</td>
-        <td class="num">${r.tare > 0 ? fmtMoney(r.tare) : ''}</td>
-        <td class="num">${r.net > 0 ? fmtMoney(r.net) : ''}</td>
-      </tr>`).join('');
+        <td>${sr}</td>
+        <td>${escHtml(batch.batchNo || '')}</td>
+        <td>${escHtml(batch.drumNo ?? '')}</td>
+        <td class="num">${gross > 0 ? fmtMoney(gross) : ''}</td>
+        <td class="num">${tare > 0 ? fmtMoney(tare) : ''}</td>
+        <td class="num">${net > 0 ? fmtMoney(net) : ''}</td>
+      </tr>`;
+    }).join('');
+
+    const batchTotalHtml = `
+      <tr class="batch-total-row">
+        <td></td>
+        <td colspan="2" class="total-label">TOTAL — Batch ${escHtml(group.batchNo)}</td>
+        <td class="num">${fmtMoney(group.gross)}</td>
+        <td class="num">${fmtMoney(group.tare)}</td>
+        <td class="num">${fmtMoney(group.net)}</td>
+      </tr>`;
+
+    return `${rowHtml}${batchTotalHtml}`;
   }).join('');
 
-  const TARGET_ROW_COUNT = 33;
-  const actualRowsCount = batchGroups.reduce((acc, g) => acc + g.rows.length, 0);
-  const emptyRowsCount = Math.max(0, TARGET_ROW_COUNT - actualRowsCount);
-  const emptyRowsHtml = Array.from({ length: emptyRowsCount }).map(() => `
-      <tr class="empty">
-        <td class="num">&nbsp;</td>
-        <td class="num">&nbsp;</td>
-        <td class="num">&nbsp;</td>
-        <td class="num">&nbsp;</td>
-        <td class="num">&nbsp;</td>
-        <td class="num">&nbsp;</td>
-      </tr>`).join('');
+  // Sample layout: Sieving Lumps under Gross, value under Net
+  const sievingLumpsHtml = sievingLumps > 0 ? `
+      <tr class="special-row">
+        <td></td>
+        <td></td>
+        <td></td>
+        <td class="special-label">Sieving Lumps</td>
+        <td></td>
+        <td class="num">${fmtMoney(sievingLumps)}</td>
+      </tr>` : '';
 
+  const netWithLumps = grandNet + sievingLumps;
   const declaredNet = parseFloat(data.totalWeight);
-  const finalNet = Number.isFinite(declaredNet) && declaredNet > 0 ? declaredNet : grandNet;
-  const totalDrums = parseInt(data.totalDrums, 10) || batches.length;
+  const finalNet = Number.isFinite(declaredNet) && declaredNet > 0 ? declaredNet : netWithLumps;
 
-  const logoHtml = buildPrintLogoHtml(profile);
+  // Always show overall total when there is data (align Gross / Tare / Net with batch totals)
+  const overallTotalHtml = (batchGroups.length > 0 || sievingLumps > 0) ? `
+      <tr class="total-row">
+        <td></td>
+        <td colspan="2" class="total-label">GRAND TOTAL</td>
+        <td class="num">${fmtMoney(grandGross)}</td>
+        <td class="num">${fmtMoney(grandTare)}</td>
+        <td class="num">${fmtMoney(finalNet)}</td>
+      </tr>` : '';
 
-  // Determine product name from batches or form data
-  const productName = escHtml(data.productName || '');
+  const totalDrums = padDrums(parseInt(data.totalDrums, 10) || batches.length);
+  const qtyText = finalNet > 0 ? `${fmtMoney(finalNet)} KGS` : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -96,251 +145,145 @@ export const buildPackingListHtml = (data, profileInput) => {
     --purple-dark:#2f2263;
     --lav-bg:#efeaf7;
     --lav-border:#c9bce8;
-    --orange:#f47920;
     --green:#2fa84f;
     --text:#231f20;
-    --grey-line:#d9d9d9;
   }
-  *{box-sizing:border-box;font-family:Cambria,Georgia,serif;}
-  html,body{margin:0;padding:0;background:#fff;font-family:Cambria,Georgia,serif;color:var(--text);}
-  
-  .page {
-    width: 794px;
-    height: 1123px;
-    padding: 4px;
-    margin: 0;
-    background: #fff;
-    display: flex;
-    flex-direction: column;
+  *{box-sizing:border-box;margin:0;padding:0;font-family:Cambria,Georgia,serif;}
+  html,body{margin:0;padding:0;background:#fff;color:var(--text);}
+  .page{
+    width:794px;height:1123px;padding:8px;margin:0;background:#fff;
+    display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;
+  }
+  .sheet{
+    flex:1;border:2px solid var(--purple);padding:12px 14px 0;
+    display:flex;flex-direction:column;box-sizing:border-box;min-height:0;
   }
 
-  .content-wrapper {
-    width: 100%;
-    flex: 1;
-    border-collapse: collapse;
-    border: 2px solid var(--purple);
-    box-sizing: border-box;
+  .header{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+    margin:0 0 12px;padding:0 0 10px;
   }
-  .content-wrapper td { padding: 0; vertical-align: top; }
+  .brand{display:flex;align-items:center;gap:10px;min-width:0;}
+  .logo{width:64px;height:64px;flex-shrink:0;}
+  .logo img,.logo svg{width:100%;height:100%;object-fit:contain;display:block;}
 
-  /* ===== HEADER ===== */
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    margin: 0 0 10px;
-    padding: 0 0 10px;
+  .brand-lockup{width:280px;height:70px;flex-shrink:0;display:flex;align-items:center;}
+  .brand-lockup img{width:100%;height:100%;object-fit:contain;object-position:left center;display:block;}
+
+  .brand-text h1{
+    margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;
+    letter-spacing:.5px;color:var(--purple);line-height:1;text-transform:uppercase;
   }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  .brand-text .tagline{
+    color:var(--green);font-weight:700;font-size:13px;margin-top:2px;line-height:1.15;
   }
-  .logo {
-    width: 64px;
-    height: 64px;
-    position: relative;
-    flex-shrink: 0;
+  .tax-invoice-box{
+    background:var(--purple);color:#fff;text-align:center;padding:10px 20px;
+    min-width:200px;min-height:64px;border-radius:6px;box-sizing:border-box;
+    display:flex;flex-direction:column;justify-content:center;align-items:center;
   }
-  .logo svg, .logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
-  .brand-text {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: flex-start;
-    gap: 2px;
+  .tax-invoice-box .ti-title{
+    font-size:22px;font-weight:800;letter-spacing:.5px;margin:0;line-height:1.1;white-space:nowrap;
   }
-  .brand-text h1 {
-    margin: 0;
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 34px;
-    letter-spacing: 0.5px;
-    word-spacing: normal;
-    color: var(--purple);
-    line-height: 1;
-  }
-  .brand-text .tagline {
-    color: var(--green);
-    font-weight: 700;
-    font-size: 13px;
-    margin: 0;
-    line-height: 1.15;
-    letter-spacing: normal;
-    word-spacing: 0;
-    white-space: nowrap;
-  }
-  .tax-invoice-box {
-    background: var(--purple);
-    color: #fff;
-    text-align: center;
-    padding: 8px 18px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    align-self: center;
-    min-width: 200px;
-    min-height: 64px;
-    border-radius: 6px;
-    box-sizing: border-box;
-  }
-  .tax-invoice-box .ti-title {
-    font-size: 22px;
-    font-weight: 800;
-    letter-spacing: 0.5px;
-    margin: 0;
-    line-height: 1.1;
-    white-space: nowrap;
+  .tax-invoice-box .ti-sub{
+    margin-top:5px;background:#fff;color:var(--purple);font-size:10px;font-weight:700;
+    letter-spacing:.4px;padding:2px 8px;border-radius:3px;
   }
 
-  /* ===== PL META INFO ROW ===== */
-  .pl-meta-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 10px;
-    gap: 20px;
+  .pl-meta{
+    display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;
+    margin-bottom:14px;padding:10px 12px;
+    border:1px solid var(--lav-border);border-radius:6px;background:var(--lav-bg);
   }
-  .pl-meta-left {
-    font-size:12px;
-    line-height: 2;
+  .meta-field{display:flex;gap:8px;align-items:baseline;font-size:13px;line-height:1.5;}
+  .meta-field .lbl{font-weight:700;color:var(--purple);white-space:nowrap;min-width:120px;}
+  .meta-field .colon{font-weight:700;color:var(--purple);}
+  .meta-field .val{font-weight:600;color:var(--text);}
+
+  .table-wrap{flex:1 1 auto;min-height:0;margin-bottom:10px;}
+  table.items{
+    width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px;background:#fff;
   }
-  .pl-meta-right {
-    font-size:12px;
-    line-height: 2;
+  table.items thead th{
+    background:var(--purple);color:#fff;font-weight:700;padding:8px 6px;
+    text-align:center;vertical-align:middle;border:1px solid rgba(255,255,255,.55);
+    line-height:1.25;font-size:12px;
   }
-  .meta-field {
-    display: flex;
-    gap: 8px;
-    align-items: baseline;
+  table.items tbody td{
+    border:1px solid var(--lav-border);padding:6px 4px;text-align:center;
+    vertical-align:middle;background:#fff;color:var(--text);height:28px;font-weight:600;
   }
-  .meta-field .lbl {
-    font-weight: 700;
-    color: var(--purple);
-    white-space: nowrap;
+  table.items tbody td.num{text-align:center;}
+  table.items tbody tr.special-row td,
+  table.items tbody tr.batch-total-row td,
+  table.items tbody tr.total-row td{
+    background:var(--lav-bg);color:var(--purple-dark);font-weight:800;
+    border-color:var(--purple);
   }
-  .meta-field .colon {
-    font-weight: 700;
-    color: var(--purple);
+  table.items tbody tr.batch-total-row td{
+    background:#f3eef9;
   }
-  .meta-field .val {
-    font-weight: 600;
-    min-width: 120px;
-  }
-  .meta-field .val-line {
-    font-weight: 400;
-    border-bottom: 1px solid #999;
-    min-width: 160px;
-    display: inline-block;
-    padding-bottom: 1px;
+  table.items td.special-label,
+  table.items td.total-label{
+    font-weight:800;text-align:center;white-space:nowrap;color:var(--purple);
   }
 
-  /* ===== TABLE ===== */
-  table.items {
-    width: 100%;
-    border-collapse: collapse;
-    font-size:12px;
-  }
-  table.items thead th {
-    background: var(--purple);
-    color: #fff;
-    font-weight: 700;
-    padding: 7px 6px;
-    text-align: center;
-    border: 1px solid rgba(255,255,255,0.55);
-  }
-  table.items tbody td {
-    border: 1px solid var(--lav-border);
-    padding: 4px 6px;
-    text-align: center;
-    height: 22px;
-    background: #ffffff;
-    color: #231f20;
-  }
-  table.items tbody tr.empty td { height: 22px; }
-
-  /* Batch subtotal row */
-  table.items tbody tr.batch-subtotal td {
-    border: 1px solid var(--lav-border);
-    border-top: 2px solid var(--purple);
-    padding: 5px 6px;
-    background: var(--lav-bg);
-    color: var(--purple-dark);
-  }
-
-  /* Grand total row */
-  table.items tfoot td {
-    border: 2px solid var(--purple);
-    background: var(--purple);
-    color: #fff;
-    font-weight: 800;
-    padding: 7px 6px;
-    text-align: center;
+  .barfoot{
+    background:var(--purple);color:#fff;margin:0 -14px 0 -14px;padding:8px 14px;
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:12px;flex-shrink:0;
   }
 </style>
 </head>
 <body>
   <div class="page">
-    <table class="content-wrapper">
-      <tr>
-        <td style="padding: 10px 12px;">
-      
-          <div class="header">
-            <div class="brand">
-              <div class="logo">
-                ${logoHtml}
-              </div>
-              <div class="brand-text">
-                <h1>${escHtml(profile.companyName || 'UMA MICRON')}</h1>
-                <div class="tagline">Micronization of API's</div>
-              </div>
-            </div>
-            <div class="tax-invoice-box">
-              <div class="ti-title">PACKING LIST</div>
-            </div>
-          </div>
+    <div class="sheet">
+      <div class="header">
+        <div class="brand">
+      ${buildPrintBrandHtml(profile, {
+        companyName: profile.companyName || 'UMA MICRON',
+        tagline: profile.tagline || "Micronization of API's"
+      })}
+    </div>
+        <div class="tax-invoice-box">
+          <div class="ti-title">PACKING LIST</div>
+          <div class="ti-sub">${plNo || 'ORIGINAL'}</div>
+        </div>
+      </div>
 
-          <div class="pl-meta-row">
-            <div class="pl-meta-left">
-              <div class="meta-field"><span class="lbl">PL No.</span><span class="colon">:</span><span class="val-line">${plNo || '&nbsp;'}</span></div>
-              <div class="meta-field"><span class="lbl">Date</span><span class="colon">:</span><span class="val-line">${plDate || '&nbsp;'}</span></div>
-            </div>
-            <div class="pl-meta-right">
-              <div class="meta-field"><span class="lbl">Name of Product</span><span class="colon">:</span><span class="val">${productName || '&nbsp;'}</span></div>
-              <div class="meta-field"><span class="lbl">Total Drum</span><span class="colon">:</span><span class="val">${escHtml(totalDrums)}</span></div>
-              <div class="meta-field"><span class="lbl">Total Quantity</span><span class="colon">:</span><span class="val">${fmtMoney(finalNet)} KGS</span></div>
-            </div>
-          </div>
+      <div class="pl-meta">
+        <div class="meta-field"><span class="lbl">Name of Product</span><span class="colon">:</span><span class="val">${productName || '&nbsp;'}</span></div>
+        <div class="meta-field"><span class="lbl">Date</span><span class="colon">:</span><span class="val">${plDate || '&nbsp;'}</span></div>
+        <div class="meta-field"><span class="lbl">Total Quantity</span><span class="colon">:</span><span class="val">${escHtml(qtyText) || '&nbsp;'}</span></div>
+        <div class="meta-field"><span class="lbl">Total Drums</span><span class="colon">:</span><span class="val">${escHtml(totalDrums)}</span></div>
+      </div>
 
-          <table class="items">
-            <thead>
-              <tr>
-                <th style="width:8%;">Sr. No.</th>
-                <th style="width:18%;">Batch No.</th>
-                <th style="width:10%;">Drum No.</th>
-                <th style="width:18%;">Gross Wt. (kg)</th>
-                <th style="width:16%;">Tare Wt. (kg)</th>
-                <th style="width:18%;">Net Wt. (kg)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${tableRowsHtml}
-              ${emptyRowsHtml}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="3">GRAND TOTAL</td>
-                <td>${grandGross > 0 ? fmtMoney(grandGross) : ''}</td>
-                <td>${grandTare > 0 ? fmtMoney(grandTare) : ''}</td>
-                <td>${fmtMoney(finalNet)}</td>
-              </tr>
-            </tfoot>
-          </table>
+      <div class="table-wrap">
+        <table class="items">
+          <thead>
+            <tr>
+              <th style="width:10%;">Sr. No.</th>
+              <th style="width:18%;">Batch No.</th>
+              <th style="width:12%;">Drum No.</th>
+              <th style="width:20%;">Gross Wt. (kg)</th>
+              <th style="width:20%;">Tare Wt. (kg)</th>
+              <th style="width:20%;">Net Wt. (kg)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRowsHtml}
+            ${sievingLumpsHtml}
+            ${overallTotalHtml}
+          </tbody>
+        </table>
+      </div>
 
-        </td>
-      </tr>
-    </table>
+      <div class="barfoot">
+        <span>Thank you for your business!</span>
+        <span>E. &amp; O.E.</span>
+        <span>Page 1 of 1</span>
+      </div>
+    </div>
   </div>
 </body>
 </html>`;
@@ -348,39 +291,11 @@ export const buildPackingListHtml = (data, profileInput) => {
 
 export const renderPackingListPdf = async (data, { mode = 'save', printPrefs } = {}) => {
   const html = applyPrintPrefsToHtml(buildPackingListHtml(data, data.companyProfile), printPrefs);
-  const { jsPDF } = await import('jspdf');
-  const html2canvas = (await import('html2canvas')).default;
-  const host = document.createElement('div');
-  host.className = PRINT_ROOT_CLASS;
-  host.style.cssText = 'position:absolute;left:-12000px;top:0;z-index:-1;background:#fff;';
-  host.innerHTML = html;
-  document.body.appendChild(host);
-  try {
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-    const target = host.querySelector('.page') || host.firstElementChild;
-    const canvas = await html2canvas(target, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      width: 794,
-      windowWidth: 794,
-      height: 1123,
-      windowheight: 1123,
-      logging: false
-    });
-
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297);
-
-    if (mode === 'view') {
-      const url = pdf.output('bloburl');
-      const win = window.open(url, '_blank');
-      if (win) win.document.title = `PL_${data.plNo || 'N/A'}`;
-    } else {
-      pdf.save(`PL_${data.plNo || 'N/A'}.pdf`);
-    }
-  } finally {
-    document.body.removeChild(host);
-  }
+  await renderHtmlToPdf(html, {
+    mode,
+    filePrefix: 'PL',
+    docNo: data.plNo || 'N/A',
+    fitPage: true,
+    printPrefs
+  });
 };

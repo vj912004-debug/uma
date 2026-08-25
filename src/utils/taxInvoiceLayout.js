@@ -7,6 +7,7 @@ export const TI_CHARGES_LIST = [
   { key: 'filterBag', label: 'Filter Bag Charges(591190)' },
   { key: 'sieving', label: 'Sieving Charges(998842)' },
   { key: 'hdpeDrum', label: 'HDPE Drum (39233090)' },
+  { key: 'fiberDrum', label: 'Fiber Drum (7310)' },
   { key: 'liner', label: 'Liner (39233090)' },
   { key: 'courier', label: 'Courier Charges(996812)' },
   { key: 'transportation', label: 'Transportation (996511)' },
@@ -151,8 +152,11 @@ export const buildTiChargeAmounts = (data) => {
       const prodQty = summary?.qty || 0;
       if (pc.charges?.processing) {
         const rate = parseFloat(pc.rates?.processing || 0);
-        const lineQty = prodQty || parseFloat(pc.qtys?.processing) || 0;
-        addLine('processing', lineQty, rate, lineQty * rate);
+        // Match form: processing qty = product material qty
+        const lineQty = prodQty || 0;
+        if (lineQty > 0 && rate > 0) {
+          addLine('processing', lineQty, rate, lineQty * rate);
+        }
       }
       TI_CHARGES_LIST.forEach((c) => {
         if (c.key === 'processing') return;
@@ -161,7 +165,8 @@ export const buildTiChargeAmounts = (data) => {
             ? (parseFloat(pc.qtys[c.key]) || 0)
             : 1;
           const rate = parseFloat(pc.rates?.[c.key] || 0);
-          addLine(c.key, rowQty, rate, rowQty * rate);
+          const amt = rowQty * rate;
+          if (amt > 0) addLine(c.key, rowQty, rate, amt);
         }
       });
     });
@@ -219,6 +224,7 @@ export const calcTiTotals = (data) => {
   TI_CHARGES_LIST.forEach((charge) => {
     const line = chargeAmounts[charge.key] || { qty: 0, rate: 0, amt: 0 };
     const amt = line.amt || 0;
+    if (amt <= 0) return;
     const sgstAmt = amt * (sgstRate / 100);
     const cgstAmt = amt * (cgstRate / 100);
     const rowTotal = amt + sgstAmt + cgstAmt;

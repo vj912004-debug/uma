@@ -553,8 +553,6 @@ const MaterialReceipt = () => {
           type="number"
           className="input-field"
           style={{ padding: '0.3rem', fontSize: '0.825rem' }}
-          required
-          min="1"
           value={batch.drums === 0 || batch.drums === '' ? '' : batch.drums}
           onChange={e => handleBatchCellChange(idx, 'drums', e.target.value === '' ? '' : parseInt(e.target.value, 10) || '')}
         />
@@ -564,7 +562,6 @@ const MaterialReceipt = () => {
           type="number"
           className="input-field"
           style={{ padding: '0.3rem', fontSize: '0.825rem' }}
-          required
           value={batch.qty === 0 || batch.qty === '' ? '' : batch.qty}
           onChange={e => handleBatchCellChange(idx, 'qty', e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
         />
@@ -1028,8 +1025,8 @@ const MaterialReceipt = () => {
                           <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
                             <th style={{ padding: '0.5rem', width: '60px' }}>Sr No</th>
                             <th style={{ padding: '0.5rem' }}>Batch Number *</th>
-                            <th style={{ padding: '0.5rem', width: '120px' }}>No of Drums *</th>
-                            <th style={{ padding: '0.5rem', width: '150px' }}>Quantity (Kg) *</th>
+                            <th style={{ padding: '0.5rem', width: '120px' }}>No of Drums</th>
+                            <th style={{ padding: '0.5rem', width: '150px' }}>Quantity (Kg)</th>
                             <th style={{ padding: '0.5rem' }}>PSD Req *</th>
                             <th style={{ padding: '0.5rem', width: '120px' }}>PSD Report</th>
                             <th style={{ padding: '0.5rem', width: '120px' }}>PSD Method</th>

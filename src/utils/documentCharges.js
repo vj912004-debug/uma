@@ -402,11 +402,117 @@ export const resolveReceiptChargesForDoc = (mr, party, options = {}) => {
   };
 };
 
-/** TI charges: prefer saved PI product blocks, fall back to MR settings. */
+/**
+ * Commercial + financial terms from linked PI for a Tax Invoice.
+ * Clones PI charges/discount/tax/totals as-is so TI matches PI exactly.
+ */
+export const getLinkedPITermsForTI = (invoices, receiptId) => {
+  const pi = findAnyProformaInvoice(invoices, receiptId);
+  if (!pi) return null;
+
+  let productCharges = null;
+  if (pi.productCharges && Object.keys(pi.productCharges).length > 0) {
+    productCharges = sanitizeProductCharges(pi.productCharges);
+  } else if (pi.charges || pi.rates || pi.qtys) {
+    const target = pi.productName?.includes(',')
+      ? String(pi.productName).split(',')[0].trim()
+      : (pi.productName || 'Product');
+    productCharges = sanitizeProductCharges({
+      [target]: {
+        charges: pi.charges || {},
+        rates: pi.rates || {},
+        qtys: pi.qtys || {}
+      }
+    });
+  }
+
+  return {
+    pi,
+    productCharges,
+    discount: parseFloat(pi.discount) || 0,
+    taxRate: pi.taxRate ?? 18,
+    customCharges: Array.isArray(pi.customCharges)
+      ? JSON.parse(JSON.stringify(pi.customCharges))
+      : [],
+    qty: parseFloat(pi.qty) || 0,
+    subtotal: pi.subtotal,
+    taxAmount: pi.taxAmount,
+    total: pi.total
+  };
+};
+
+/** Copy PI money fields onto a TI so both documents show the same total. */
+export const applyProformaFinancialsToTaxInvoice = (ti, piOrTerms) => {
+  if (!ti || !piOrTerms) return ti;
+  const pi = piOrTerms.pi || piOrTerms;
+  const terms = piOrTerms.productCharges !== undefined || piOrTerms.pi
+    ? piOrTerms
+    : getLinkedPITermsForTI([pi, ti], pi.receiptId || ti.receiptId);
+  if (!terms && typeof pi.total !== 'number') return ti;
+
+  const productCharges = terms?.productCharges
+    || (pi.productCharges ? sanitizeProductCharges(pi.productCharges) : ti.productCharges);
+  const discount = terms ? terms.discount : (parseFloat(pi.discount) || 0);
+  const taxRate = terms ? terms.taxRate : (pi.taxRate ?? ti.taxRate ?? 18);
+  const customCharges = terms?.customCharges?.length
+    ? terms.customCharges
+    : (Array.isArray(pi.customCharges) ? JSON.parse(JSON.stringify(pi.customCharges)) : (ti.customCharges || []));
+  const qty = (terms?.qty > 0 ? terms.qty : null)
+    ?? (parseFloat(pi.qty) > 0 ? parseFloat(pi.qty) : null)
+    ?? ti.qty;
+  const subtotal = typeof pi.subtotal === 'number' ? pi.subtotal : ti.subtotal;
+  const taxAmount = typeof pi.taxAmount === 'number' ? pi.taxAmount : ti.taxAmount;
+  const total = typeof pi.total === 'number' ? pi.total : ti.total;
+
+  return {
+    ...ti,
+    productCharges: productCharges || ti.productCharges,
+    customCharges,
+    discount,
+    taxRate,
+    qty,
+    subtotal,
+    taxAmount,
+    total,
+    charges: productCharges
+      ? (Object.values(productCharges)[0]?.charges || ti.charges)
+      : ti.charges,
+    rates: productCharges
+      ? (Object.values(productCharges)[0]?.rates || ti.rates)
+      : ti.rates,
+    qtys: productCharges
+      ? (Object.values(productCharges)[0]?.qtys || ti.qtys)
+      : ti.qtys
+  };
+};
+
+/** Repair all TIs so each matches its linked PI total (in-memory; caller persists). */
+export const syncAllTaxInvoicesWithProformas = (invoices = []) => {
+  let changed = false;
+  const next = invoices.map((inv) => {
+    const isTI = !inv?.isDeleted && (
+      inv.type === 'Tax Invoice' || inv.invoiceNo?.includes('/IN/')
+    );
+    if (!isTI || !inv.receiptId) return inv;
+    const pi = findAnyProformaInvoice(invoices, inv.receiptId);
+    if (!pi || typeof pi.total !== 'number') return inv;
+
+    const sameTotal = Math.abs((parseFloat(inv.total) || 0) - (parseFloat(pi.total) || 0)) < 0.005;
+    const sameDiscount = Math.abs((parseFloat(inv.discount) || 0) - (parseFloat(pi.discount) || 0)) < 0.005;
+    const sameQty = Math.abs((parseFloat(inv.qty) || 0) - (parseFloat(pi.qty) || 0)) < 0.005;
+    if (sameTotal && sameDiscount && sameQty) return inv;
+
+    changed = true;
+    return applyProformaFinancialsToTaxInvoice(inv, pi);
+  });
+  return { invoices: next, changed };
+};
+
+/** TI charges: prefer exact PI product blocks, fall back to MR settings. */
 export const resolveTIProductChargesForDoc = (mr, party, invoices, prodOpts = {}) => {
-  const pi = findAnyProformaInvoice(invoices, mr?.id);
-  if (pi?.productCharges && Object.keys(pi.productCharges).length > 0) {
-    return normalizeProductChargesFromDoc(pi.productCharges, pi, mr, prodOpts, party);
+  const terms = getLinkedPITermsForTI(invoices, mr?.id);
+  if (terms?.productCharges && Object.keys(terms.productCharges).length > 0) {
+    return terms.productCharges;
   }
   return initProductChargesFromMR(mr, party, prodOpts);
 };
@@ -530,6 +636,21 @@ export const calcProductChargesSubtotalWithQty = (productCharges, qtyForProduct)
     }, 0);
   }, 0);
 
+/** Prefer saved doc charges; only fill missing products from fallback (never re-enable MR-only flags). */
+const mergeSavedChargesPreferDoc = (savedCharges, fallbackCharges) => {
+  const saved = sanitizeProductCharges(savedCharges);
+  const fallback = fallbackCharges || {};
+  if (Object.keys(saved).length > 0) {
+    const merged = { ...fallback };
+    Object.entries(saved).forEach(([name, pc]) => {
+      const matchKey = Object.keys(merged).find(k => normProdKey(k) === normProdKey(name)) || name;
+      merged[matchKey] = pc;
+    });
+    return merged;
+  }
+  return fallback;
+};
+
 /** Merge MR product breakdown + per-product charges before PI PDF export. */
 export const enrichPIForPrint = (pi, appData = {}) => {
   if (!pi?.receiptId) return pi;
@@ -539,24 +660,9 @@ export const enrichPIForPrint = (pi, appData = {}) => {
   const prodOpts = receiptProductOptions(mr, appData);
   const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
   const fromMR = initProductChargesFromMR(mr, prodOpts.party, prodOpts);
-  const saved = pi.productCharges || {};
-  const mergedCharges = { ...fromMR };
-
-  Object.entries(saved).forEach(([name, pc]) => {
-    const matchKey = Object.keys(mergedCharges).find(k => normProdKey(k) === normProdKey(name)) || name;
-    const base = mergedCharges[matchKey] || {
-      charges: emptyChargeFlagsOnly(),
-      rates: emptyChargeRates(),
-      qtys: emptyChargeQtys()
-    };
-    mergedCharges[matchKey] = {
-      charges: { ...base.charges, ...(pc.charges || {}) },
-      rates: { ...base.rates, ...(pc.rates || {}) },
-      qtys: { ...base.qtys, ...(pc.qtys || {}) }
-    };
-  });
-
-  const totalQty = getMRReceivedQty(mr, prodOpts);
+  const mergedCharges = mergeSavedChargesPreferDoc(pi.productCharges, fromMR);
+  const savedQty = parseFloat(pi.qty) || 0;
+  const liveQty = getMRReceivedQty(mr, prodOpts);
 
   return {
     ...pi,
@@ -569,7 +675,7 @@ export const enrichPIForPrint = (pi, appData = {}) => {
     productName: summaries.length ? getReceiptProductLabel(mr, prodOpts) : pi.productName,
     productSummaries: summaries.length ? summaries : (pi.productSummaries || []),
     productCharges: mergedCharges,
-    qty: totalQty > 0 ? totalQty : pi.qty
+    qty: savedQty > 0 ? savedQty : (liveQty || pi.qty)
   };
 };
 
@@ -582,28 +688,12 @@ export const enrichTIForPrint = (ti, appData = {}) => {
   const prodOpts = receiptProductOptions(mr, appData);
   const pl = findAnyPackingList(appData.packingLists, ti.receiptId);
   const summaries = buildPLProductSummaries(pl, mr, prodOpts);
-  const pi = findAnyProformaInvoice(appData.invoices, ti.receiptId);
-  const baseCharges = (pi?.productCharges && Object.keys(pi.productCharges).length > 0)
-    ? normalizeProductChargesFromDoc(pi.productCharges, pi, mr, prodOpts, prodOpts.party)
-    : initProductChargesFromMR(mr, prodOpts.party, prodOpts);
-  const saved = ti.productCharges || {};
-  const mergedCharges = { ...baseCharges };
-
-  Object.entries(saved).forEach(([name, pc]) => {
-    const matchKey = Object.keys(mergedCharges).find(k => normProdKey(k) === normProdKey(name)) || name;
-    const base = mergedCharges[matchKey] || {
-      charges: emptyChargeFlagsOnly(),
-      rates: emptyChargeRates(),
-      qtys: emptyChargeQtys()
-    };
-    mergedCharges[matchKey] = {
-      charges: { ...base.charges, ...(pc.charges || {}) },
-      rates: { ...base.rates, ...(pc.rates || {}) },
-      qtys: { ...base.qtys, ...(pc.qtys || {}) }
-    };
-  });
-
-  const plWeight = getMRReceivedQty(mr, prodOpts);
+  const piTerms = getLinkedPITermsForTI(appData.invoices, ti.receiptId);
+  const baseCharges = piTerms?.productCharges
+    || initProductChargesFromMR(mr, prodOpts.party, prodOpts);
+  const mergedCharges = mergeSavedChargesPreferDoc(ti.productCharges, baseCharges);
+  const savedQty = parseFloat(ti.qty) || 0;
+  const liveQty = getMRReceivedQty(mr, prodOpts);
 
   return {
     ...ti,
@@ -614,6 +704,6 @@ export const enrichTIForPrint = (ti, appData = {}) => {
     productName: summaries.length ? getReceiptProductLabel(mr, prodOpts) : ti.productName,
     productSummaries: summaries.length ? summaries : (ti.productSummaries || []),
     productCharges: mergedCharges,
-    qty: plWeight > 0 ? plWeight : (ti.qty || 0)
+    qty: savedQty > 0 ? savedQty : (liveQty || 0)
   };
 };

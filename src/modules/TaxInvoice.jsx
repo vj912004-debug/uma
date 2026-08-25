@@ -15,8 +15,11 @@ import {
   mergeSavedDocCharges,
   getFreshMaterialReceipt,
   findAnyTaxInvoice,
+  findAnyProformaInvoice,
   resolveTIProductChargesForDoc,
-  normalizeProductChargesFromDoc,
+  getLinkedPITermsForTI,
+  applyProformaFinancialsToTaxInvoice,
+  syncAllTaxInvoicesWithProformas,
   sanitizeProductCharges,
   enrichTIForPrint
 } from '../utils/documentCharges';
@@ -96,7 +99,9 @@ const TaxInvoice = () => {
     const receivedQty = getMRReceivedQty(freshMR, opts);
     const productSummaries = buildPLProductSummaries(pl, freshMR, opts);
     const productLabel = getReceiptProductLabel(freshMR, opts);
-    const productCharges = resolveTIProductChargesForDoc(freshMR, mrParty, data.invoices, opts);
+    const piTerms = getLinkedPITermsForTI(data.invoices, freshMR.id);
+    const productCharges = piTerms?.productCharges
+      || resolveTIProductChargesForDoc(freshMR, mrParty, data.invoices, opts);
     const prod = (mrParty?.products || []).find(p => p.name === productSummaries[0]?.prodName);
     const tiSerial = data.settings?.serials?.TI || 1;
     return {
@@ -115,16 +120,22 @@ const TaxInvoice = () => {
       productSummaries,
       productCharges,
       hsnCode: prod?.hsn || '',
-      qty: receivedQty,
+      qty: piTerms?.qty > 0 ? piTerms.qty : receivedQty,
       charges: defaultChargeFlags(),
       rates: defaultChargeRates(),
       qtys: emptyChargeQtys(),
-      customCharges: [],
-      discount: 0,
-      taxRate: 18,
+      customCharges: piTerms?.customCharges || [],
+      discount: piTerms?.discount ?? 0,
+      taxRate: piTerms?.taxRate ?? 18,
       terms: 'Payment against delivery.'
     };
   };
+
+  // Keep every TI total identical to its linked PI (repairs existing mismatches)
+  useEffect(() => {
+    const { invoices, changed } = syncAllTaxInvoicesWithProformas(data.invoices);
+    if (changed) setData((prev) => ({ ...prev, invoices }));
+  }, [data.invoices, setData]);
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -138,16 +149,24 @@ const TaxInvoice = () => {
         : (editingDoc.productSummaries || []);
       const receivedQty = mr ? getMRReceivedQty(mr, opts) : (parseFloat(editingDoc.qty) || 0);
       const merged = mergeSavedDocCharges(editingDoc, receivedQty);
-      const productCharges = mr
-        ? normalizeProductChargesFromDoc(editingDoc.productCharges, editingDoc, mr, opts, opts.party)
-        : (editingDoc.productCharges || {});
+      const piTerms = getLinkedPITermsForTI(data.invoices, editingDoc.receiptId);
+      // Prefer linked PI commercial terms so TI total matches PI after Save
+      const productCharges = piTerms?.productCharges
+        || (editingDoc.productCharges && Object.keys(editingDoc.productCharges).length
+          ? sanitizeProductCharges(editingDoc.productCharges)
+          : (editingDoc.productCharges || {}));
       setForm(prev => ({
         ...editingDoc,
         ...merged,
-        qty: receivedQty,
+        qty: receivedQty > 0 ? receivedQty : (parseFloat(editingDoc.qty) || 0),
         productName: mr ? getReceiptProductLabel(mr, opts) : (editingDoc.productName || ''),
         productSummaries: productSummaries.length ? productSummaries : (editingDoc.productSummaries || []),
         productCharges,
+        customCharges: piTerms?.customCharges?.length
+          ? piTerms.customCharges
+          : (editingDoc.customCharges || []),
+        discount: piTerms ? piTerms.discount : (editingDoc.discount || 0),
+        taxRate: piTerms ? piTerms.taxRate : (editingDoc.taxRate ?? 18),
         invoiceNo: prev.invoiceNo || editingDoc.invoiceNo,
         date: prev.date || editingDoc.date
       }));
@@ -160,12 +179,17 @@ const TaxInvoice = () => {
       const opts = receiptProductOptions(freshMR, data);
       const mrParty = opts.party || data.parties.find(p => p.id === freshMR.partyId);
       const receivedQty = getMRReceivedQty(freshMR, opts);
+      const piTerms = getLinkedPITermsForTI(data.invoices, freshMR.id);
       setForm(prev => ({
         ...prev,
         qty: receivedQty,
         productName: getReceiptProductLabel(freshMR, opts),
         productSummaries: buildPLProductSummaries(selectedPL, freshMR, opts),
-        productCharges: resolveTIProductChargesForDoc(freshMR, mrParty, data.invoices, opts)
+        productCharges: piTerms?.productCharges
+          || resolveTIProductChargesForDoc(freshMR, mrParty, data.invoices, opts),
+        customCharges: piTerms?.customCharges || prev.customCharges || [],
+        discount: piTerms?.discount ?? prev.discount ?? 0,
+        taxRate: piTerms?.taxRate ?? prev.taxRate ?? 18
       }));
     }
   }, [editingDoc?.id, selectedPL?.id, isModalOpen]);
@@ -399,10 +423,11 @@ const TaxInvoice = () => {
       : (form.productCharges || {});
     const firstProd = chargeProductNames[0] || productName;
     const legacyBlock = sanitizedProductCharges[firstProd] || {};
+    const receiptId = activeMR?.id || activePL?.receiptId || editingDoc?.receiptId || '';
 
-    const finalDoc = {
+    let finalDoc = {
       ...form,
-      receiptId: activeMR?.id || activePL?.receiptId || editingDoc?.receiptId || '',
+      receiptId,
       partyName: form.partyName,
       productName,
       productSummaries,
@@ -418,6 +443,12 @@ const TaxInvoice = () => {
       ewayBillNo: editingDoc?.ewayBillNo || '',
       ewayBillDate: editingDoc?.ewayBillDate || ''
     };
+
+    // Force TI financials to match linked PI exactly
+    const linkedPI = findAnyProformaInvoice(data.invoices, receiptId);
+    if (linkedPI && typeof linkedPI.total === 'number') {
+      finalDoc = applyProformaFinancialsToTaxInvoice(finalDoc, linkedPI);
+    }
 
     if (editingDoc) {
       updateItem('invoices', editingDoc.id, finalDoc);

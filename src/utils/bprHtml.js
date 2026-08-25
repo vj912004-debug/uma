@@ -1,6 +1,6 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { formatPdfDateSlash } from './taxInvoiceLayout';
-import { escHtml, buildPrintLogoHtml, applyPrintPrefsToHtml } from './printTheme';
+import { escHtml, buildPrintBrandHtml, applyPrintPrefsToHtml } from './printTheme';
 import { PRINT_ROOT_CLASS } from './printPrefs';
 
 const hasWeight = (row = {}) => {
@@ -90,8 +90,10 @@ const penIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" str
 
 const emptyBatchRow = () => ({ batchNo: '', drumNo: '', gross: '', tare: '', net: '' });
 
+/** Minimum blank filler rows after live data on Batch Packing Record (Page 2). */
+export const BPR_PAGE2_BLANK_ROWS = 7;
 /** Empty data rows on Batch Packing Record (Page 2) so the grid fills A4. */
-export const BPR_PAGE2_ROW_COUNT = 22;
+export const BPR_PAGE2_ROW_COUNT = 21;
 
 /** Blank BPR print payload — empty Page 1 (Processing) + Page 2 (Packing). */
 export const buildBlankBprPayload = ({ partyName = '', productName = '', companyProfile } = {}) => {
@@ -154,53 +156,210 @@ export const buildBprHtml = (data, profileInput) => {
     ...(data.packingMaterials || {}),
     ...(data.packingConsumables || {})
   };
-  if (!pc.drumUsed) {
-    const drumCount = Math.max(
-      (data.dispatchedBatches || []).filter((r) => r.batchNo || r.drumNo).length,
-      (data.receivedBatches || []).filter((r) => r.batchNo || r.drumNo).length,
-      parseInt(data.totalDrums, 10) || 0
-    );
-    if (drumCount) pc.drumUsed = String(drumCount);
-  }
+  const drumCount = Math.max(
+    (data.dispatchedBatches || []).filter((r) => r.batchNo || r.drumNo).length,
+    (data.receivedBatches || []).filter((r) => r.batchNo || r.drumNo).length,
+    parseInt(data.totalDrums, 10) || 0
+  );
+  pc.drumUsed = String(
+    pc.drumUsed || pc.fiberDrumsUsed || pc.hdpeDrumsUsed || (drumCount ? drumCount : '') || ''
+  ).trim();
   const prevBd = data.previousBulkDensity || {};
   const bd = data.bulkDensity || {};
-
-  const dispatchedNet = typeof data.totalDispatchedNet === 'number'
-    ? data.totalDispatchedNet.toFixed(2)
-    : (parseFloat(data.totalDispatchedNet) || 0).toFixed(2);
 
   const customerName = data.partyName || data.customerName || data.party || '';
   const productName = data.productName || data.product || '';
   const bprNo = escHtml(data.bprNo || 'N/A');
 
-  const receivedRaw = data.receivedBatches || [];
-  const dispatchedRaw = data.dispatchedBatches || [];
+  const isSievingLumpRow = (r = {}) => {
+    const batch = String(r.batchNo || '').trim().toLowerCase();
+    const drum = String(r.drumNo || '').trim().toLowerCase();
+    return /sieving\s*lumps?/.test(batch) || /sieving\s*lumps?/.test(drum);
+  };
+
+  const lumpWeightFromRow = (r = {}) => {
+    const candidates = [r.net, r.tare, r.gross];
+    for (const v of candidates) {
+      if (v === '' || v == null) continue;
+      const n = parseFloat(v);
+      if (!Number.isNaN(n) && n !== 0) return n;
+    }
+    return 0;
+  };
+
+  // Pull sieving lumps from BPR field, PL, or a special batch row
+  let sievingLumps = parseFloat(
+    data.lumpsNetWeight ?? data.sievingLumps ?? data.sievingLumpsNet ?? data.lumpsNet ?? ''
+  );
+  if (!Number.isFinite(sievingLumps) || sievingLumps <= 0) sievingLumps = 0;
+
+  const stripLumpRows = (rows) => {
+    const kept = [];
+    (rows || []).forEach((row) => {
+      if (isSievingLumpRow(row)) {
+        const w = lumpWeightFromRow(row);
+        if (w > 0 && sievingLumps <= 0) sievingLumps = w;
+        return;
+      }
+      kept.push(row);
+    });
+    return kept;
+  };
+
+  let receivedRaw = stripLumpRows(data.receivedBatches || []);
+  let dispatchedRaw = stripLumpRows(data.dispatchedBatches || []);
   const isLiveRow = (r) => !!(r && (r.batchNo || r.drumNo || hasWeight(r)));
-  const receivedLive = receivedRaw.filter(isLiveRow);
-  const dispatchedLive = dispatchedRaw.filter(isLiveRow);
-  const received = receivedLive.length ? receivedLive : receivedRaw;
-  const dispatched = dispatchedLive.length ? dispatchedLive : dispatchedRaw;
-  const rowCount = Math.max(received.length, dispatched.length, BPR_PAGE2_ROW_COUNT);
+  const rowKey = (r = {}) => `${String(r.batchNo || '').trim().toLowerCase()}||${String(r.drumNo ?? '').trim().toLowerCase()}`;
+
+  // If received has drum labels but no weights, mirror matching dispatched / fill from pair
+  const fillEmptyReceived = (received, dispatched) => {
+    if (hasWeight(received)) return received;
+    if (!hasWeight(dispatched)) return received;
+    return {
+      ...received,
+      batchNo: received.batchNo || dispatched.batchNo || '',
+      drumNo: received.drumNo != null && received.drumNo !== '' ? received.drumNo : (dispatched.drumNo ?? ''),
+      gross: dispatched.gross ?? '',
+      tare: dispatched.tare ?? '',
+      net: dispatched.net ?? ''
+    };
+  };
+
+  // Keep received/dispatched paired (same drum)
+  let paired = [];
+  if (receivedRaw.length && receivedRaw.length === dispatchedRaw.length) {
+    paired = receivedRaw.map((r, i) => {
+      const d = dispatchedRaw[i] || {};
+      return { r: fillEmptyReceived(r || {}, d), d };
+    });
+  } else {
+    const dispatchPool = dispatchedRaw.map((d, i) => ({ d: d || {}, i, used: false }));
+    paired = receivedRaw.map((r) => {
+      const row = r || {};
+      const key = rowKey(row);
+      let match = key !== '||'
+        ? dispatchPool.find((x) => !x.used && rowKey(x.d) === key)
+        : null;
+      if (!match) match = dispatchPool.find((x) => !x.used && isLiveRow(x.d));
+      if (match) match.used = true;
+      const d = match?.d || {};
+      return { r: fillEmptyReceived(row, d), d };
+    });
+    dispatchPool.filter((x) => !x.used && isLiveRow(x.d)).forEach((x) => {
+      paired.push({ r: fillEmptyReceived({}, x.d), d: x.d });
+    });
+  }
+
+  let livePairs = paired.filter(({ r, d }) => isLiveRow(r) || isLiveRow(d));
+
+  // Group by batch so each Batch No gets its own TOTAL on the print
+  const batchGroups = [];
+  const groupMap = {};
+  livePairs.forEach((pair) => {
+    const r = pair.r || {};
+    const d = pair.d || {};
+    const key = String(r.batchNo || d.batchNo || '').trim() || '—';
+    if (!groupMap[key]) {
+      groupMap[key] = { batchNo: key, pairs: [] };
+      batchGroups.push(groupMap[key]);
+    }
+    groupMap[key].pairs.push(pair);
+  });
+
+  // Always pad to a full-page grid; keep at least blank rows after live data + batch totals
+  const baseRows = livePairs.length;
+  const batchTotalRows = batchGroups.length;
+  const needLumpRow = sievingLumps > 0 ? 1 : 0;
+  const rowCount = Math.max(
+    baseRows + batchTotalRows + needLumpRow + BPR_PAGE2_BLANK_ROWS,
+    BPR_PAGE2_ROW_COUNT
+  );
+
+  const parseWtNum = (v) => {
+    if (v === '' || v == null) return 0;
+    const n = typeof v === 'number' ? v : parseFloat(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const netNum = (row) => {
+    const s = calcNet(row);
+    const n = parseFloat(s);
+    return (!s || Number.isNaN(n)) ? 0 : n;
+  };
+
   const packingRows = [];
-  for (let i = 0; i < rowCount; i++) {
-    const r = received[i] || {};
-    const d = resolveDispatchRow(r, dispatched[i] || {});
-    packingRows.push(`
+  let printedDispatchNet = 0;
+  batchGroups.forEach((group) => {
+    let gRGross = 0;
+    let gRTare = 0;
+    let gRNet = 0;
+    let gDGross = 0;
+    let gDTare = 0;
+    let gDNet = 0;
+    group.pairs.forEach(({ r: rawR, d: rawD }) => {
+      const r = rawR || {};
+      const d = resolveDispatchRow(r, rawD || {});
+      const dNetStr = calcNet(d);
+      const dNet = parseFloat(dNetStr);
+      if (!Number.isNaN(dNet) && dNetStr) printedDispatchNet += dNet;
+      gRGross += parseWtNum(r.gross);
+      gRTare += parseWtNum(r.tare);
+      gRNet += netNum(r);
+      gDGross += parseWtNum(d.gross);
+      gDTare += parseWtNum(d.tare);
+      gDNet += (!Number.isNaN(dNet) && dNetStr) ? dNet : 0;
+      packingRows.push(`
       <tr>
         <td>${escHtml(r.batchNo || '')}</td>
         <td>${escHtml(r.drumNo || '')}</td>
-        <td>${fmtWt(r.gross)}</td>
-        <td>${fmtWt(r.tare)}</td>
-        <td>${calcNet(r)}</td>
+        <td class="wt">${fmtWt(r.gross)}</td>
+        <td class="wt">${fmtWt(r.tare)}</td>
+        <td class="wt">${calcNet(r)}</td>
         <td>${escHtml(d.batchNo || '')}</td>
         <td>${escHtml(d.drumNo || '')}</td>
-        <td>${fmtWt(d.gross)}</td>
-        <td>${fmtWt(d.tare)}</td>
-        <td>${calcNet(d)}</td>
+        <td class="wt">${fmtWt(d.gross)}</td>
+        <td class="wt">${fmtWt(d.tare)}</td>
+        <td class="wt">${dNetStr}</td>
+      </tr>`);
+    });
+    packingRows.push(`
+      <tr class="batch-total-row">
+        <td colspan="2" class="batch-total-label">TOTAL — Batch ${escHtml(group.batchNo)}</td>
+        <td class="wt">${gRGross > 0 ? gRGross.toFixed(2) : ''}</td>
+        <td class="wt">${gRTare > 0 ? gRTare.toFixed(2) : ''}</td>
+        <td class="wt">${gRNet > 0 ? gRNet.toFixed(2) : ''}</td>
+        <td colspan="2" class="batch-total-label">TOTAL — Batch ${escHtml(group.batchNo)}</td>
+        <td class="wt">${gDGross > 0 ? gDGross.toFixed(2) : ''}</td>
+        <td class="wt">${gDTare > 0 ? gDTare.toFixed(2) : ''}</td>
+        <td class="wt">${gDNet > 0 ? gDNet.toFixed(2) : ''}</td>
+      </tr>`);
+  });
+
+  if (sievingLumps > 0) {
+    printedDispatchNet += sievingLumps;
+    packingRows.push(`
+      <tr class="lump-row">
+        <td></td><td></td><td></td><td></td><td></td>
+        <td></td>
+        <td></td>
+        <td class="lump-label">Sieving Lumps</td>
+        <td></td>
+        <td class="wt">${sievingLumps.toFixed(2)}</td>
       </tr>`);
   }
 
-  const logoHtml = `<div class="logo-wrap">${buildPrintLogoHtml(profile)}</div>`;
+  while (packingRows.length < rowCount) {
+    packingRows.push(`
+      <tr>
+        <td></td><td></td><td></td><td></td><td></td>
+        <td></td><td></td><td></td><td></td><td></td>
+      </tr>`);
+  }
+
+  const savedDispatchNet = typeof data.totalDispatchedNet === 'number'
+    ? data.totalDispatchedNet
+    : (parseFloat(data.totalDispatchedNet) || 0);
+  const finalDispatchNet = printedDispatchNet > 0 ? printedDispatchNet : savedDispatchNet;
+  const dispatchedNet = finalDispatchNet > 0 ? finalDispatchNet.toFixed(2) : '';
 
   const prevBdRows = METRIC_ROWS.map((m) => `
     <tr>
@@ -223,10 +382,11 @@ export const buildBprHtml = (data, profileInput) => {
     <div class="sheet">
       <table class="header-table">
         <tr>
-          <td style="width:15%;"><div class="logo-box">${logoHtml}</div></td>
-          <td style="width:55%;text-align:center;">
-            <div class="company-title">${escHtml(profile.companyName || 'UMA MICRON')}</div>
-            <div class="company-subtitle">Micronization of API's</div>
+          <td style="width:70%;" colspan="2" class="left-align">
+            ${buildPrintBrandHtml(profile, {
+              companyName: profile.companyName || 'UMA MICRON',
+              tagline: profile.tagline || "Micronization of API's"
+            })}
           </td>
           <td style="width:30%;">
             <div class="bpr-badge">
@@ -312,7 +472,7 @@ export const buildBprHtml = (data, profileInput) => {
         </tr>
       </table>
 
-      <table class="badge-row"><tr><td><span class="pill-badge">Previous Record Of Bulk Density for reference</span></td></tr></table>
+      <div class="section-badge"><span class="pill-badge">Previous Record Of Bulk Density for reference</span></div>
       <table class="g">
         <tr class="light-purple-header">
           <td style="width:18%;"></td>
@@ -329,7 +489,7 @@ export const buildBprHtml = (data, profileInput) => {
         ${bdRows}
       </table>
 
-      <table class="badge-row"><tr><td><span class="pill-badge">Packing Materials Used</span></td></tr></table>
+      <div class="section-badge"><span class="pill-badge">Packing Materials Used</span></div>
       <table class="g">
         <tr class="light-purple-header">
           <td style="width:22%;">White LD Bags</td>
@@ -347,7 +507,7 @@ export const buildBprHtml = (data, profileInput) => {
         </tr>
       </table>
 
-      <table class="badge-row"><tr><td><span class="pill-badge">Dispatch Material Quantity Details</span></td></tr></table>
+      <div class="section-badge"><span class="pill-badge">Dispatch Material Quantity Details</span></div>
       <table class="g">
         <tr class="light-purple-header">
           <td style="width:22%;">Micronized Material net weight</td>
@@ -404,26 +564,31 @@ export const buildBprHtml = (data, profileInput) => {
   *{box-sizing:border-box;margin:0;padding:0;font-family:Cambria,Georgia,serif;}
   html,body{margin:0;padding:0;background:#fff;}
   .page{
-    width:794px;min-height:1123px;padding:8px;margin:0;background:#fff;
-    display:flex;flex-direction:column;page-break-after:always;
+    width:794px;height:1123px;min-height:1123px;max-height:1123px;padding:8px;margin:0;background:#fff;
+    display:flex;flex-direction:column;page-break-after:always;box-sizing:border-box;overflow:hidden;
   }
   .sheet{
-    flex:1;border:2px solid #5a009d;padding:10px;display:flex;flex-direction:column;
+    flex:1 1 auto;height:100%;min-height:0;border:2px solid #5a009d;padding:10px;
+    display:flex;flex-direction:column;box-sizing:border-box;position:relative;
   }
   table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:-1px;}
   table.g th,table.g td{
     border:1px solid #7c12bd;text-align:center;vertical-align:middle;
-    font-size:12px;font-weight:700;color:#4a0080;padding:3px 2px;
+    font-size:12px;font-weight:700;color:#231f20 !important;padding:3px 2px;
     word-break:break-all;overflow-wrap:break-word;white-space:pre-wrap;
+    background:#ffffff;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
-  .purple-header{background:#5a009d;color:#fff !important;}
-  .light-purple-header td,.light-purple-header th{background:#e2d3f3;color:#4a0080;}
+  .purple-header{background:#5a009d !important;color:#fff !important;}
+  .light-purple-header td,.light-purple-header th{background:#e2d3f3 !important;color:#4a0080 !important;}
   .left-align{text-align:left !important;padding-left:6px !important;}
   .header-table{border:none;margin-bottom:8px;}
   .header-table td{border:none !important;padding:2px;}
   .logo-box{display:flex;align-items:center;justify-content:center;}
   .logo-wrap{width:56px;height:44px;display:flex;align-items:center;justify-content:center;}
   .logo-wrap img{width:100%;height:100%;object-fit:contain;display:block;}
+  .brand-lockup{width:280px;height:70px;flex-shrink:0;display:flex;align-items:center;}
+  .brand-lockup img{width:100%;height:100%;object-fit:contain;object-position:left center;display:block;}
   .company-title{font-size:26px;font-weight:900;color:#4a0080;letter-spacing:1px;line-height:1.1;}
   .company-subtitle{font-size:12px;font-weight:700;color:#008822;margin-top:2px;}
   .bpr-badge{
@@ -432,9 +597,25 @@ export const buildBprHtml = (data, profileInput) => {
   .bpr-badge .title{font-size:12px;font-weight:700;letter-spacing:.4px;}
   .bpr-badge .code{font-size:12px;font-weight:700;margin-top:3px;}
   .badge-row td{border:none !important;text-align:left;padding:4px 0 2px !important;height:auto;}
+  .section-badge{
+    display:block;
+    width:100%;
+    margin:6px 0 0 0;
+    padding:0;
+    position:relative;
+    z-index:2;
+    line-height:1.2;
+  }
   .pill-badge{
-    background:#5a009d;color:#fff;border-radius:10px;padding:3px 12px;
-    display:inline-block;font-size:12px;font-weight:700;
+    background:#5a009d;color:#fff;border-radius:10px;padding:4px 14px;
+    display:inline-block;font-size:12px;font-weight:700;line-height:1.25;
+    position:relative;z-index:2;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
+  .section-badge + table.g{
+    margin-top:2px;
+    position:relative;
+    z-index:1;
   }
   .psd-note-box{
     flex:1;
@@ -490,7 +671,7 @@ export const buildBprHtml = (data, profileInput) => {
     white-space: pre-wrap;
     word-break: break-word;
   }
-  .page-p1 .sheet{min-height:calc(1123px - 16px);}
+  .page-p1 .sheet{height:100%;}
   .signature-container{
     display:flex;justify-content:space-between;margin-top:auto;border:1px solid #7c12bd;flex-shrink:0;
   }
@@ -509,16 +690,59 @@ export const buildBprHtml = (data, profileInput) => {
   .meta{display:flex;flex-wrap:wrap;border:1.5px solid #5a009d;margin-bottom:6px;border-radius:4px;overflow:hidden;}
   .meta-item{padding:4px 8px;border-right:1px solid #e2d3f3;border-bottom:1px solid #e2d3f3;font-size:12px;width:32%;box-sizing:border-box;color:#4a0080;font-weight:600;}
   .meta-item.label{color:#5a009d;font-weight:700;background:#e2d3f3;width:18%;}
-  table.items{width:100%;border-collapse:collapse;margin-bottom:6px;font-size:12px;flex:1;table-layout:auto;background:#fff;}
-  table.items thead th{background:#5a009d;color:#fff;font-weight:700;padding:4px 3px;text-align:center;border:1px solid rgba(255,255,255,0.55);font-size:12px;white-space:nowrap;}
-  table.items tbody td{border:1px solid #7c12bd;padding:2px 3px;height:26px;text-align:center;color:#4a0080;font-weight:600;font-size:12px;white-space:nowrap;background:#ffffff;}
-  table.items tbody tr.total-hl td{background:#e2d3f3;color:#4a0080;font-weight:700;height:24px;}
-  .barfoot{background:#5a009d;color:#fff;padding:6px 12px;display:flex;justify-content:space-between;font-size:12px;margin-top:auto;border-radius:4px;}
-  .signs{display:flex;border:1px solid #7c12bd;margin-top:12px;margin-bottom:12px;border-radius:4px;overflow:hidden;}
-  .sign{flex:1;padding:10px 14px;min-height:50px;display:flex;align-items:flex-end;gap:6px;font-size:12px;font-weight:700;color:#4a0080;}
+  table.items{
+    width:100%;border-collapse:collapse;margin:0;font-size:12px;
+    flex:0 0 auto;height:auto;table-layout:fixed;background:#fff;
+  }
+  table.items col.c-batch{width:16%;}
+  table.items col.c-drum{width:8%;}
+  table.items col.c-wt{width:8%;}
+  table.items thead th{
+    background:#5a009d !important;color:#fff !important;font-weight:700;
+    padding:5px 3px;text-align:center;vertical-align:middle;
+    border:1px solid rgba(255,255,255,0.55);
+    font-size:11px;line-height:1.2;height:auto;max-height:none;
+    white-space:normal;word-break:break-word;
+  }
+  table.items thead th .eg{
+    display:block;font-size:7.5px;font-weight:500;letter-spacing:0;margin-top:1px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  table.items tbody td{
+    border:1px solid #7c12bd;padding:4px 3px;height:30px;min-height:30px;
+    text-align:center;vertical-align:middle;color:#231f20 !important;font-weight:700;
+    font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    background:#ffffff !important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
+  table.items tbody td.wt{color:#231f20 !important;font-weight:700;}
+  table.items tbody td.lump-label{
+    font-weight:700;font-size:11px;white-space:nowrap;overflow:visible;
+  }
+  table.items tbody tr.total-hl td{
+    background:#e2d3f3 !important;color:#4a0080 !important;font-weight:700;height:36px;min-height:36px;
+  }
+  table.items tbody tr.batch-total-row td{
+    background:#f3eef9 !important;color:#4a0080 !important;font-weight:700;height:32px;min-height:32px;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
+  table.items tbody td.batch-total-label{
+    text-align:right;font-size:10px;font-weight:800;white-space:nowrap;
+  }
+  .table-wrap{
+    flex:0 0 auto;min-height:0;display:flex;flex-direction:column;margin-bottom:10px;
+  }
+  .barfoot{
+    background:#5a009d;color:#fff;padding:7px 14px;display:flex;justify-content:space-between;align-items:center;
+    font-size:12px;margin:auto -10px -10px -10px;border-radius:0;flex-shrink:0;width:auto;box-sizing:border-box;
+    letter-spacing:0.01px;word-spacing:normal;
+  }
+  .barfoot span{white-space:nowrap;letter-spacing:0.01px;word-spacing:0.02em;}
+  .signs{display:flex;border:1px solid #7c12bd;margin-top:4px;margin-bottom:0;border-radius:4px;overflow:hidden;flex-shrink:0;}
+  .sign{flex:1;padding:10px 14px;min-height:52px;display:flex;align-items:flex-end;gap:6px;font-size:12px;font-weight:700;color:#4a0080;}
   .sign + .sign{border-left:1px solid #7c12bd;}
   .sign .line{flex:1;border-bottom:1px solid #777;margin-left:6px;min-height:16px;}
-  .page-p2 .sheet{min-height:calc(1123px - 16px);}
+  .page-p2 .sheet{height:100%;}
 </style>
 </head>
 <body>
@@ -529,11 +753,10 @@ export const buildBprHtml = (data, profileInput) => {
     <div class="sheet">
       <div class="p2-header">
         <div class="p2-brand">
-          <div class="p2-logo">${logoHtml}</div>
-          <div>
-            <div class="company-title" style="font-size:22px;">${escHtml(profile.companyName || 'UMA MICRON')}</div>
-            <div class="company-subtitle">Micronization of API's</div>
-          </div>
+          ${buildPrintBrandHtml(profile, {
+            companyName: profile.companyName || 'UMA MICRON',
+            tagline: profile.tagline || "Micronization of API's"
+          })}
         </div>
         <div class="bpr-badge">
           <div class="title">BATCH PACKING RECORD</div>
@@ -548,33 +771,41 @@ export const buildBprHtml = (data, profileInput) => {
         <div class="meta-item label">Customer</div><div class="meta-item">${escHtml(customerName)}</div>
       </div>
 
-      <table class="items">
-        <thead>
-          <tr>
-            <th colspan="5">RECEIVED MATERIALS WEIGHT</th>
-            <th colspan="5">DISPATCHED (MICRONIZED) MATERIALS WEIGHT</th>
-          </tr>
-          <tr>
-            <th style="line-height:1.2;">BATCH NO.<br><span style="font-size:8px;font-weight:500;">(e.g. UMA/BPR/26-27/0001)</span></th><th>DRUM NO</th><th>GROSS</th><th>TARE</th><th>NET</th>
-            <th style="line-height:1.2;">BATCH NO.<br><span style="font-size:8px;font-weight:500;">(e.g. UMA/BPR/26-27/0001)</span></th><th>DRUM NO</th><th>GROSS</th><th>TARE</th><th>NET</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${packingRows.join('')}
-          <tr class="total-hl">
-            <td colspan="4" style="text-align:center;">Micronized Material Net Weight</td>
-            <td>${dispatchedNet !== '0.00' ? dispatchedNet : ''}</td>
-            <td colspan="5"></td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-wrap">
+        <table class="items">
+          <colgroup>
+            <col class="c-batch" /><col class="c-drum" /><col class="c-wt" /><col class="c-wt" /><col class="c-wt" />
+            <col class="c-batch" /><col class="c-drum" /><col class="c-wt" /><col class="c-wt" /><col class="c-wt" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th colspan="5">RECEIVED MATERIALS WEIGHT</th>
+              <th colspan="5">DISPATCHED (MICRONIZED) MATERIALS WEIGHT</th>
+            </tr>
+            <tr>
+              <th>BATCH NO.<span class="eg">(e.g. UMA/BPR/26-27/0001)</span></th>
+              <th>DRUM NO</th><th>GROSS</th><th>TARE</th><th>NET</th>
+              <th>BATCH NO.<span class="eg">(e.g. UMA/BPR/26-27/0001)</span></th>
+              <th>DRUM NO</th><th>GROSS</th><th>TARE</th><th>NET</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${packingRows.join('')}
+            <tr class="total-hl">
+              <td colspan="5"></td>
+              <td colspan="4" style="text-align:center;">${batchGroups.length > 1 || sievingLumps > 0 ? 'GRAND TOTAL — Micronized Net Weight' : 'Micronized Material Net Weight'}</td>
+              <td class="wt">${dispatchedNet}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <div class="signs" style="width:40%;">
         <div class="sign">${penIcon} Plant Supervisor Sign<span class="line"></span></div>
       </div>
 
       <div class="barfoot">
-        <span>Thankyou for your business!</span>
+        <span>Thank&nbsp;you for your business!</span>
         <span>E. &amp; O.E.</span>
         <span>Page 2 of 2</span>
       </div>
@@ -593,7 +824,7 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
   // iframe isolates BPR styles from ERP dark-theme table CSS (which was hiding weights)
   const iframe = document.createElement('iframe');
   iframe.setAttribute('title', 'bpr-pdf-render');
-  iframe.style.cssText = 'position:fixed;left:-12000px;top:0;width:794px;height:1400px;border:0;opacity:0;pointer-events:none;';
+  iframe.style.cssText = 'position:fixed;left:-12000px;top:0;width:794px;height:1400px;border:0;opacity:1;visibility:hidden;pointer-events:none;';
   document.body.appendChild(iframe);
   const idoc = iframe.contentDocument || iframe.contentWindow.document;
   idoc.open();
@@ -626,17 +857,79 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
         backgroundColor: '#ffffff',
         width: 794,
         windowWidth: 794,
-        height: Math.max(target.scrollHeight, 1123),
-        windowHeight: Math.max(target.scrollHeight, 1123),
+        height: 1123,
+        windowHeight: 1123,
         logging: false,
         onclone: (clonedDoc) => {
-          clonedDoc.querySelectorAll('table.items tbody td').forEach((el) => {
-            el.style.background = '#ffffff';
-            el.style.color = '#4a0080';
+          clonedDoc.querySelectorAll('.page').forEach((el) => {
+            el.style.height = '1123px';
+            el.style.minHeight = '1123px';
+            el.style.maxHeight = '1123px';
+            el.style.display = 'flex';
+            el.style.flexDirection = 'column';
+            el.style.overflow = 'hidden';
+            el.style.boxSizing = 'border-box';
+          });
+          clonedDoc.querySelectorAll('.sheet').forEach((el) => {
+            el.style.flex = '1 1 auto';
+            el.style.height = '100%';
+            el.style.minHeight = '0';
+            el.style.display = 'flex';
+            el.style.flexDirection = 'column';
+            el.style.boxSizing = 'border-box';
+          });
+          clonedDoc.querySelectorAll('.table-wrap').forEach((el) => {
+            el.style.flex = '0 0 auto';
+            el.style.minHeight = '0';
+            el.style.display = 'flex';
+            el.style.flexDirection = 'column';
+            el.style.marginBottom = '10px';
+          });
+          clonedDoc.querySelectorAll('table.items').forEach((el) => {
+            el.style.flex = '0 0 auto';
+            el.style.height = 'auto';
+            el.style.margin = '0';
           });
           clonedDoc.querySelectorAll('table.items thead th').forEach((el) => {
-            el.style.background = '#5a009d';
-            el.style.color = '#ffffff';
+            el.style.height = 'auto';
+            el.style.padding = '5px 3px';
+            el.style.verticalAlign = 'middle';
+            el.style.whiteSpace = 'normal';
+          });
+          clonedDoc.querySelectorAll('table.items tbody td').forEach((el) => {
+            el.style.height = '38px';
+            el.style.minHeight = '38px';
+            el.style.maxHeight = '';
+            el.style.padding = '6px 3px';
+            el.style.verticalAlign = 'middle';
+          });
+          clonedDoc.querySelectorAll('table.items tbody td.lump-label').forEach((el) => {
+            el.style.overflow = 'visible';
+            el.style.whiteSpace = 'nowrap';
+          });
+          clonedDoc.querySelectorAll('.signs').forEach((el) => {
+            el.style.marginTop = '4px';
+            el.style.marginBottom = '0';
+            el.style.flexShrink = '0';
+          });
+          clonedDoc.querySelectorAll('.barfoot').forEach((el) => {
+            el.style.margin = 'auto -10px -10px -10px';
+            el.style.borderRadius = '0';
+            el.style.flexShrink = '0';
+            el.style.width = 'auto';
+            el.style.boxSizing = 'border-box';
+          });
+          clonedDoc.querySelectorAll('table.items tbody td, table.g td').forEach((el) => {
+            el.style.setProperty('background', el.classList.contains('purple-header') ? '#5a009d' : '#ffffff', 'important');
+            el.style.setProperty('color', el.classList.contains('purple-header') ? '#ffffff' : '#231f20', 'important');
+            el.style.setProperty('opacity', '1', 'important');
+            el.style.setProperty('visibility', 'visible', 'important');
+          });
+          clonedDoc.querySelectorAll('table.items thead th, table.g .light-purple-header td').forEach((el) => {
+            if (el.closest('thead')) {
+              el.style.setProperty('background', '#5a009d', 'important');
+              el.style.setProperty('color', '#ffffff', 'important');
+            }
           });
         }
       });

@@ -1,3 +1,5 @@
+import { DEFAULT_PRINT_LOGO_SRC } from './defaultPrintLogo';
+
 export const DEFAULT_COMPANY_PROFILE = {
   companyName: 'UMA MICRON',
   logo: '',
@@ -109,19 +111,17 @@ const drawFallbackLogo = (doc, x, y) => {
 
 export const drawCompanyLogo = (doc, x, y, profile, size = {}) => {
   const p = mergeCompanyProfile(profile);
-  const w = size.width ?? 28;
-  const h = size.height ?? 28;
-  if (p.logo && p.logo.startsWith('data:image')) {
-    try {
-      const format = p.logo.includes('image/jpeg') ? 'JPEG' : 'PNG';
-      doc.addImage(p.logo, format, x, y, w, h);
-      return;
-    } catch {
-      drawFallbackLogo(doc, x, y);
-      return;
-    }
+  const custom = p.logo && p.logo.startsWith('data:image') ? p.logo : '';
+  const src = custom || DEFAULT_PRINT_LOGO_SRC;
+  // Full brand lockup is wide; keep icon-ish box only for custom square logos
+  const w = size.width ?? (custom ? 28 : 52);
+  const h = size.height ?? (custom ? 28 : 14);
+  try {
+    const format = src.includes('image/jpeg') || src.startsWith('data:image/jpg') ? 'JPEG' : 'PNG';
+    doc.addImage(src, format, x, y, w, h);
+  } catch {
+    drawFallbackLogo(doc, x, y);
   }
-  drawFallbackLogo(doc, x, y);
 };
 
 /**

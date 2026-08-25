@@ -76,17 +76,102 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root label,
   .uma-print-root .meta-table td,
   .uma-print-root .items-table td,
+  .uma-print-root table.items td,
+  .uma-print-root table.items th,
   .uma-print-root .party-card,
   .uma-print-root .party-body,
   .uma-print-root .party-foot,
   .uma-print-root .bank-box,
+  .uma-print-root .bank-row,
+  .uma-print-root .bank-body,
+  .uma-print-root .totals-body,
   .uma-print-root .terms,
   .uma-print-root .footer-bar,
   .uma-print-root .status-bar,
   .uma-print-root .company-info,
   .uma-print-root .reg-details,
-  .uma-print-root .invoice-meta .block {
+  .uma-print-root .invoice-meta .block,
+  .uma-print-root .meta-field,
+  .uma-print-root .meta-field .lbl,
+  .uma-print-root .meta-field .val,
+  .uma-print-root .meta-field .colon,
+  .uma-print-root .pl-meta,
+  .uma-print-root .trow,
+  .uma-print-root .dc-meta-row,
+  .uma-print-root .dc-meta-card,
+  .uma-print-root .dc-meta-card > div,
+  .uma-print-root .dc-sign-title,
+  .uma-print-root .reason-bar,
+  .uma-print-root .note-title,
+  .uma-print-root .amount-words,
+  .uma-print-root .hsn-box,
+  .uma-print-root .barfoot,
+  .uma-print-root .meta-item,
+  .uma-print-root .sign,
+  .uma-print-root .meta,
+  .uma-print-root .meta .box,
+  .uma-print-root .note,
+  .uma-print-root .contact-bar,
+  .uma-print-root .contact-bar .citem,
+  .uma-print-root .info-table,
+  .uma-print-root .info-table td,
+  .uma-print-root .letter-text,
+  .uma-print-root .letter-text p,
+  .uma-print-root .subject,
+  .uma-print-root .card,
+  .uma-print-root .card .co-name,
+  .uma-print-root .card .addr,
+  .uma-print-root .pill-head,
+  .uma-print-root table.dt td,
+  .uma-print-root table.dt th,
+  .uma-print-root .feat p,
+  .uma-print-root .fr-note,
+  .uma-print-root .fr-sign p,
+  .uma-print-root .fr-sign .name,
+  .uma-print-root .term,
+  .uma-print-root .term h4,
+  .uma-print-root .term p,
+  .uma-print-root .bbox,
+  .uma-print-root .bbox-head h4,
+  .uma-print-root .bbox ol,
+  .uma-print-root .bbox ol li,
+  .uma-print-root .sign2 p,
+  .uma-print-root .sign2 .name,
+  .uma-print-root .bottom-banner,
+  .uma-print-root .bottom-banner .thankyou,
+  .uma-print-root .bottom-banner .items,
+  .uma-print-root .page2-header,
+  .uma-print-root .tbl-title,
+  .uma-print-root .body-pad,
+  .uma-print-root .page2-body {
     font-size: ${fontSize}px !important;
+  }
+  /* Quotation contact bar: keep GSTIN / phone / email / web on one line */
+  .uma-print-root .contact-bar .citem.c-tight span {
+    white-space: nowrap !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+  }
+  /* Keep body copy readable in html2canvas (esp. Quotation + Cambria).
+     Avoid non-zero word-spacing around currency/brackets — it inserts a gap
+     before ")" after symbols like ₹ (e.g. "(₹ )" in Rate (₹) / Rupees (₹)). */
+  .uma-print-root .letter-text,
+  .uma-print-root .letter-text p,
+  .uma-print-root .term p,
+  .uma-print-root .bbox ol,
+  .uma-print-root .bbox ol li,
+  .uma-print-root td,
+  .uma-print-root th,
+  .uma-print-root p,
+  .uma-print-root li {
+    word-spacing: normal !important;
+    letter-spacing: 0.01px !important;
+  }
+  .uma-print-root .sym {
+    white-space: nowrap !important;
+    word-spacing: 0 !important;
+    letter-spacing: 0 !important;
+    display: inline !important;
   }
   .uma-print-root .meta-row {
     display: grid !important;
@@ -215,6 +300,20 @@ export const buildPrintPrefsCss = (prefs) => {
     object-fit: contain !important;
     display: block !important;
   }
+  .uma-print-root .brand-lockup {
+    width: 280px !important;
+    height: 70px !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+  .uma-print-root .brand-lockup img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    object-position: left center !important;
+    display: block !important;
+  }
   .uma-print-root .brand-text {
     display: flex !important;
     flex-direction: column !important;
@@ -276,20 +375,86 @@ export const buildPrintPrefsCss = (prefs) => {
     margin-top: 4px !important;
     padding: 2px 8px !important;
   }
+  .uma-print-root .bpr-badge .title,
+  .uma-print-root .bpr-badge .code {
+    font-size: 12px !important;
+  }
+  .uma-print-root .company-title {
+    font-size: 26px !important;
+  }
+  /* Quotation purple banner — sized to leave room for full 2-page layout */
+  .uma-print-root .header:has(.quote-banner) {
+    align-items: stretch !important;
+    padding: 0 0 0 22px !important;
+    margin: 0 !important;
+    min-height: 96px !important;
+    height: auto !important;
+    overflow: hidden !important;
+  }
+  .uma-print-root .quote-banner {
+    align-self: stretch !important;
+    height: auto !important;
+    min-height: 96px !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+  }
+  .uma-print-root .quote-banner .fill {
+    min-width: 280px !important;
+    min-height: 96px !important;
+    height: 100% !important;
+    padding: 0 24px 0 44px !important;
+  }
+  .uma-print-root .quote-banner h2 {
+    font-size: 28px !important;
+    line-height: 1 !important;
+    letter-spacing: 2px !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+  }
+  .uma-print-root .quote-banner .sub {
+    font-size: 9px !important;
+    margin-top: 6px !important;
+    padding: 3px 10px !important;
+  }
+  .uma-print-root .sheet.quot-compact .header:has(.quote-banner),
+  .uma-print-root .sheet.quot-compact .quote-banner,
+  .uma-print-root .sheet.quot-compact .quote-banner .fill {
+    min-height: 84px !important;
+  }
+  .uma-print-root .sheet.quot-compact .quote-banner h2 {
+    font-size: 24px !important;
+  }
   .uma-print-root .footer3,
   .uma-print-root .barfoot,
   .uma-print-root .bottom {
     flex-shrink: 0 !important;
   }
   .uma-print-root .sig-col .sig-line {
-    margin: 14px 12px 8px !important;
+    margin: 28px 12px 8px !important;
   }
   .uma-print-root .barfoot {
     margin: 8px -10px 0 -10px !important;
     padding: 7px 14px !important;
   }
+  /* BPR page 2: flush footer to sheet border (no white gap under the bar) */
+  .uma-print-root .page-p2 .barfoot,
+  .uma-print-root .page-p2 .sheet > .barfoot {
+    margin: auto -10px -10px -10px !important;
+    border-radius: 0 !important;
+    width: auto !important;
+  }
+  .uma-print-root .barfoot span {
+    white-space: nowrap !important;
+    letter-spacing: 0.01px !important;
+    word-spacing: 0.02em !important;
+  }
   .uma-print-root table.items tbody tr.filler-row td {
-    height: 14px !important;
+    height: 12px !important;
+  }
+  .uma-print-root .footer3,
+  .uma-print-root .f3col,
+  .uma-print-root .sig-col {
+    overflow: visible !important;
   }
 `;
 };

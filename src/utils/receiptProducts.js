@@ -419,19 +419,24 @@ export const buildDCFieldsFromProducts = (mr, pl, prodOpts, selectedProductNames
   };
 };
 
-/** Authoritative Material Receipt quantity (received), not packing-list net. */
+/**
+ * Authoritative Material Receipt quantity for billing (PI/TI/DC).
+ * Prefer product batch-sum (same as PI create) so PI and TI qty/totals match;
+ * fall back to mr.totalQty only when batches have no qty.
+ */
 export const getMRReceivedQty = (mr, prodOpts = {}, selectedProductNames = null) => {
   if (!mr) return 0;
   const mrTotal = parseFloat(mr.totalQty) || 0;
-  if (!selectedProductNames?.length) return mrTotal || getReceiptProductSummaries(mr, prodOpts)
-    .reduce((s, p) => s + (parseFloat(p.qty) || 0), 0);
+  if (!selectedProductNames?.length) {
+    const fromProducts = getReceiptProductSummaries(mr, prodOpts)
+      .reduce((s, p) => s + (parseFloat(p.qty) || 0), 0);
+    return fromProducts > 0 ? fromProducts : mrTotal;
+  }
 
   const selectedSet = new Set(selectedProductNames.map((n) => norm(n)));
   const summaries = getReceiptProductSummaries(mr, prodOpts)
     .filter((p) => selectedSet.has(norm(p.prodName)));
   const fromProducts = summaries.reduce((s, p) => s + (parseFloat(p.qty) || 0), 0);
-  const allSummaries = getReceiptProductSummaries(mr, prodOpts).filter((p) => p.batchCount > 0 || p.qty > 0);
-  if (summaries.length === allSummaries.length && mrTotal > 0) return mrTotal;
   return fromProducts > 0 ? fromProducts : mrTotal;
 };
 
@@ -553,20 +558,98 @@ export const enrichBPRForPrint = (bpr, appData = {}) => {
   if (!bpr) return bpr;
   const mr = (appData.materialReceipts || []).find(r => r.id === bpr.receiptId);
   const prod = mr ? getPartyProductForMR(mr, appData, bpr.productName) : null;
+  const pl = findAnyPackingList(appData.packingLists, bpr.receiptId);
 
   const sumKey = (rows, key) => (rows || []).reduce((s, r) => {
     const n = parseFloat(r[key]);
     return s + (!Number.isNaN(n) && r[key] !== '' && r[key] != null ? n : 0);
   }, 0);
   const countDrums = (rows) => (rows || []).filter((r) => r.batchNo || r.drumNo).length;
+  const rowHasWeight = (r = {}) => [r.gross, r.tare, r.net].some((v) => {
+    if (v === '' || v === undefined || v === null) return false;
+    const n = parseFloat(v);
+    return !Number.isNaN(n) && n !== 0;
+  });
+  const calcRowNet = (gross, tare, net) => {
+    if (net !== '' && net != null && !Number.isNaN(parseFloat(net)) && parseFloat(net) !== 0) {
+      return net;
+    }
+    const g = parseFloat(gross);
+    const t = parseFloat(tare);
+    if (!Number.isNaN(g) && !Number.isNaN(t) && gross !== '' && tare !== '') {
+      return Math.max(0, g - t);
+    }
+    return net ?? '';
+  };
 
-  const totalReceivedGross = bpr.totalReceivedGross ?? sumKey(bpr.receivedBatches, 'gross');
-  const totalDispatchedGross = bpr.totalDispatchedGross ?? sumKey(bpr.dispatchedBatches, 'gross');
-  const totalReceivedNet = bpr.totalReceivedNet ?? sumKey(bpr.receivedBatches, 'net');
-  const totalDispatchedNet = bpr.totalDispatchedNet ?? sumKey(bpr.dispatchedBatches, 'net');
+  let receivedBatches = [...(bpr.receivedBatches || [])];
+  let dispatchedBatches = [...(bpr.dispatchedBatches || [])];
+
+  // If BPR drum weights are empty but Packing List has them, copy into print payload
+  if (pl?.batches?.length) {
+    const fillFromPl = (slots) => {
+      const pool = [...pl.batches];
+      const used = new Set();
+      return slots.map((slot) => {
+        if (rowHasWeight(slot)) return slot;
+        let pi = pool.findIndex(
+          (r, i) =>
+            !used.has(i)
+            && String(r.batchNo || '') === String(slot.batchNo || '')
+            && String(r.drumNo || '') === String(slot.drumNo || '')
+        );
+        if (pi < 0) pi = pool.findIndex((r, i) => !used.has(i) && rowHasWeight(r));
+        if (pi < 0) return slot;
+        used.add(pi);
+        const src = pool[pi];
+        const gross = src.gross ?? '';
+        const tare = src.tare ?? '';
+        const net = calcRowNet(gross, tare, src.net);
+        return {
+          ...slot,
+          batchNo: slot.batchNo || src.batchNo || '',
+          drumNo: slot.drumNo != null && slot.drumNo !== '' ? slot.drumNo : (src.drumNo ?? ''),
+          gross: gross === '' || gross == null ? (slot.gross ?? '') : gross,
+          tare: tare === '' || tare == null ? (slot.tare ?? '') : tare,
+          net: net === '' || net == null ? (slot.net ?? '') : net
+        };
+      });
+    };
+
+    // Separate pools so both sides can receive PL weights when empty
+    dispatchedBatches = fillFromPl(dispatchedBatches);
+    receivedBatches = fillFromPl(receivedBatches);
+
+    // If received still empty but dispatched has weights, mirror for print
+    receivedBatches = receivedBatches.map((slot, idx) => {
+      if (rowHasWeight(slot)) return slot;
+      const d = dispatchedBatches[idx] || {};
+      if (!rowHasWeight(d)) return slot;
+      return {
+        ...slot,
+        batchNo: slot.batchNo || d.batchNo || '',
+        drumNo: slot.drumNo != null && slot.drumNo !== '' ? slot.drumNo : (d.drumNo ?? ''),
+        gross: d.gross ?? '',
+        tare: d.tare ?? '',
+        net: d.net ?? ''
+      };
+    });
+  }
+
+  const sievingLumps = parseFloat(
+    bpr.lumpsNetWeight ?? bpr.sievingLumps ?? pl?.sievingLumps ?? pl?.sievingLumpsNet ?? ''
+  );
+  const lumpsVal = Number.isFinite(sievingLumps) && sievingLumps > 0 ? sievingLumps : 0;
+
+  const totalReceivedGross = bpr.totalReceivedGross ?? sumKey(receivedBatches, 'gross');
+  const totalDispatchedGross = bpr.totalDispatchedGross ?? sumKey(dispatchedBatches, 'gross');
+  const totalReceivedNet = bpr.totalReceivedNet ?? sumKey(receivedBatches, 'net');
+  const computedDispatchNet = sumKey(dispatchedBatches, 'net') + lumpsVal;
+  const totalDispatchedNet = (bpr.totalDispatchedNet > 0 ? bpr.totalDispatchedNet : null)
+    ?? (computedDispatchNet > 0 ? computedDispatchNet : 0);
   const filledDrums = Math.max(
-    countDrums(bpr.dispatchedBatches),
-    countDrums(bpr.receivedBatches),
+    countDrums(dispatchedBatches),
+    countDrums(receivedBatches),
     parseInt(bpr.totalDrums, 10) || 0,
     parseInt(mr?.totalDrums, 10) || 0
   );
@@ -583,9 +666,13 @@ export const enrichBPRForPrint = (bpr, appData = {}) => {
     ...(bpr.packingMaterials || {}),
     ...(bpr.packingConsumables || {})
   };
-  if (!packingConsumables.drumUsed && filledDrums) {
-    packingConsumables.drumUsed = String(filledDrums);
-  }
+  packingConsumables.drumUsed = String(
+    packingConsumables.drumUsed
+      || packingConsumables.fiberDrumsUsed
+      || packingConsumables.hdpeDrumsUsed
+      || (filledDrums ? filledDrums : '')
+      || ''
+  ).trim();
 
   return {
     ...bpr,
@@ -595,11 +682,19 @@ export const enrichBPRForPrint = (bpr, appData = {}) => {
     psdNote: bpr.psdNote || prod?.psdNote || '',
     psdRequirement: bpr.psdRequirement || prod?.psdReq || '',
     totalDrums: filledDrums || bpr.totalDrums || '',
+    receivedBatches,
+    dispatchedBatches,
     totalReceivedGross,
     totalDispatchedGross,
     totalReceivedNet,
     totalDispatchedNet,
-    packingConsumables
+    lumpsNetWeight: bpr.lumpsNetWeight || lumpsVal || '',
+    sievingLumps: lumpsVal || bpr.sievingLumps || '',
+    packingConsumables,
+    packingMaterials: {
+      ...(bpr.packingMaterials || {}),
+      drumUsed: packingConsumables.drumUsed
+    }
   };
 };
 

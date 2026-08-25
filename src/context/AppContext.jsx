@@ -7,6 +7,7 @@ import {
 } from '../api/client';
 import { loadStateFromLocalStorage, normalizeAppState } from '../utils/appState';
 import { mergeCompanyProfile } from '../utils/companyProfile';
+import { syncAllTaxInvoicesWithProformas } from '../utils/documentCharges';
 
 const AppContext = createContext();
 
@@ -125,19 +126,31 @@ export const AppProvider = ({ children }) => {
       console.error(`Module ${module} not found in state.`);
       return;
     }
-    setData(prev => ({
-      ...prev,
-      [module]: [...(prev[module] || []), newItem],
-      auditLogs: logAudit(prev, 'CREATE', module, null, newItem)
-    }));
+    setData(prev => {
+      let nextModule = [...(prev[module] || []), newItem];
+      if (module === 'invoices') {
+        const synced = syncAllTaxInvoicesWithProformas(nextModule);
+        nextModule = synced.invoices;
+      }
+      return {
+        ...prev,
+        [module]: nextModule,
+        auditLogs: logAudit(prev, 'CREATE', module, null, newItem)
+      };
+    });
   };
 
   const updateItem = (module, id, updatedItem) => {
     setData(prev => {
       const oldItem = (prev[module] || []).find(i => i.id === id);
+      let nextModule = (prev[module] || []).map(item => item.id === id ? updatedItem : item);
+      if (module === 'invoices') {
+        const synced = syncAllTaxInvoicesWithProformas(nextModule);
+        nextModule = synced.invoices;
+      }
       return {
         ...prev,
-        [module]: (prev[module] || []).map(item => item.id === id ? updatedItem : item),
+        [module]: nextModule,
         auditLogs: logAudit(prev, 'UPDATE', module, oldItem, updatedItem)
       };
     });

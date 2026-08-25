@@ -7,7 +7,7 @@ import {
   buildTiChargeAmounts,
   getSplitGstRates
 } from './taxInvoiceLayout';
-import { renderHtmlToPdf } from './printTheme';
+import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml } from './printTheme';
 export const escHtml = (v) => String(v ?? '')
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
@@ -41,11 +41,15 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   let sr = 1;
 
   const pushRow = (desc, qty, rate, amt) => {
-    const sgstAmt = amt * (sgstCalc / 100);
-    const cgstAmt = amt * (cgstCalc / 100);
-    const igstAmt = amt * (igstCalc / 100);
-    const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
-    totalAmt += amt;
+    const lineAmt = parseFloat(amt) || 0;
+    if (lineAmt <= 0) return;
+    // Never emit a body "TOTAL" line — footer already has the summary row
+    if (/^\s*total\s*$/i.test(String(desc || ''))) return;
+    const sgstAmt = lineAmt * (sgstCalc / 100);
+    const cgstAmt = lineAmt * (cgstCalc / 100);
+    const igstAmt = lineAmt * (igstCalc / 100);
+    const rowTotal = lineAmt + sgstAmt + cgstAmt + igstAmt;
+    totalAmt += lineAmt;
     totalSgst += sgstAmt;
     totalCgst += cgstAmt;
     totalIgst += igstAmt;
@@ -58,8 +62,8 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
       cleanDesc = match[1].trim();
     }
 
-    const rateCell = amt > 0 ? printGstRate : '';
-    const igstRateCell = amt > 0 && igstCalc ? printGstRate : '';
+    const rateCell = lineAmt > 0 ? printGstRate : '';
+    const igstRateCell = lineAmt > 0 && igstCalc ? printGstRate : '';
 
     rows.push(`
       <tr>
@@ -67,7 +71,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <td class="left">${escHtml(cleanDesc)}</td>
         <td class="center">${fmtQty(qty)}</td>
         <td class="num">${rate ? escHtml(parseFloat(rate).toFixed(2)) : ''}</td>
-        <td class="num">${fmtMoney(amt)}</td>
+        <td class="num">${fmtMoney(lineAmt)}</td>
         <td class="num">${rateCell}</td>
         <td class="num">${fmtMoney(sgstAmt)}</td>
         <td class="num">${rateCell}</td>
@@ -80,8 +84,8 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
 
   TI_CHARGES_LIST.forEach((charge) => {
     const line = chargeAmounts[charge.key];
-    if (!line) return;
-    pushRow(charge.label, line.qty, line.rate, line.amt || 0);
+    if (!line || !(line.amt > 0)) return;
+    pushRow(charge.label, line.qty, line.rate, line.amt);
   });
 
   (data.customCharges || []).forEach((cc) => {
@@ -93,14 +97,26 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     pushRow(cc.name || '', ccQty, rate, amt);
   });
 
-  const BLANK_ROWS = 10;
+  // Apply discount the same way as the form (taxable = subtotal - discount)
+  const discount = parseFloat(data.discount) || 0;
+  if (discount > 0 && totalAmt > 0) {
+    const grossAmt = totalAmt;
+    totalAmt = Math.max(0, grossAmt - discount);
+    const ratio = grossAmt > 0 ? totalAmt / grossAmt : 0;
+    totalSgst *= ratio;
+    totalCgst *= ratio;
+    totalIgst *= ratio;
+    totalAll = totalAmt + totalSgst + totalCgst + totalIgst;
+  }
+
+  const BLANK_ROWS = 7;
   for (let i = 0; i < BLANK_ROWS; i++) {
     rows.push(`
       <tr class="filler-row">
         <td></td><td></td><td></td><td></td>
-        <td class="num">0.00</td><td></td><td class="num">0.00</td>
-        <td></td><td class="num">0.00</td><td></td><td class="num">0.00</td>
-        <td class="num">0.00</td>
+        <td></td><td></td><td></td>
+        <td></td><td></td><td></td><td></td>
+        <td></td>
       </tr>`);
   }
 
@@ -110,10 +126,10 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
 
   const docNo = escHtml(data.invoiceNo || 'N/A');
   const docDate = escHtml(formatPdfDateDmy(data.date) || 'N/A');
-  const poNo = escHtml(data.partyDocNo || 'Verbal');
-  const poDate = escHtml(formatPdfDateDmy(data.partyDocDate) || '');
-  const dcNo = escHtml(data.dcNo || '');
-  const dcDate = escHtml(formatPdfDateDmy(data.dcDate) || '');
+  const poNoRaw = data.partyDocNo || '';
+  const poDateRaw = formatPdfDateDmy(data.partyDocDate) || '';
+  const dcNoRaw = data.dcNo || '';
+  const dcDateRaw = formatPdfDateDmy(data.dcDate) || '';
   const companyState = escHtml(profile.state || 'Gujarat');
   
   const billName = escHtml(data.partyName || '');
@@ -195,6 +211,10 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     flex-shrink:0;
   }
   .logo svg,.logo img{width:100%;height:100%;object-fit:contain;display:block;}
+
+  .brand-lockup{width:280px;height:70px;flex-shrink:0;display:flex;align-items:center;}
+  .brand-lockup img{width:100%;height:100%;object-fit:contain;object-position:left center;display:block;}
+
   .brand-text {
     display: flex;
     flex-direction: column;
@@ -441,7 +461,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   table.items tbody td.num{text-align:right;padding-right:3px;}
   table.items tbody td.center{text-align:center;}
   table.items tbody td.left{text-align:left;padding-left:3px;}
-  table.items tbody tr.filler-row td{height:14px;}
+  table.items tbody tr.filler-row td{height:12px;}
   table.items tfoot td{
     border:1px solid var(--purple);
     background:var(--lav-bg);
@@ -455,8 +475,9 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   .bottom{
     display:flex;
     gap:14px;
-    margin-bottom:14px;
+    margin-bottom:8px;
     align-items:stretch;
+    flex-shrink:0;
   }
   .bank{
     flex:1;
@@ -513,46 +534,51 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
     display:flex;
     gap:14px;
     margin-bottom:0;
+    flex-shrink:0;
   }
   .f3col{
     flex:1;
     border:1px solid var(--lav-border);
+    min-height:88px;
   }
   .f3-body{
     padding:8px 10px;
-    font-size:12px;
-    line-height:1.45;
+    font-size:11px;
+    line-height:1.4;
   }
   .f3-body ol{margin:0;padding-left:16px;}
   .sig-col{
     display:flex;
     flex-direction:column;
     justify-content:space-between;
+    min-height:88px;
   }
   .sig-col .for-company{
     font-weight:800;
     color:var(--purple);
     padding:8px 12px 0;
     font-size:12px;
-      text-align:center;
+    text-align:center;
   }
   .sig-col .sig-line{
-    margin:14px 12px 8px;
+    margin:28px 12px 8px;
     border-top:1px solid #333;
     text-align:center;
     padding-top:4px;
     font-size:12px;
+    flex-shrink:0;
   }
 
   /* ===== BAR FOOTER ===== */
   .barfoot{
     background:var(--purple);
     color:#fff;
-    margin:8px -10px 0 -10px;
-    padding:7px 14px;
+    margin:6px -10px 0 -10px;
+    padding:6px 14px;
     display:flex;
     justify-content:space-between;
-    font-size:12px;
+    font-size:11px;
+    flex-shrink:0;
   }
 
   @media print{
@@ -572,13 +598,10 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
   <!-- HEADER -->
   <div class="header">
     <div class="brand">
-      <div class="logo">
-        <img src="data:image/png;base64,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" style="width:100%;height:100%;object-fit:contain;" alt="Logo" />
-      </div>
-      <div class="brand-text">
-        <h1>UMA MICRON</h1>
-        <div class="tagline">Micronization of API's</div>
-      </div>
+      ${buildPrintBrandHtml(profile, {
+        companyName: profile.companyName || 'UMA MICRON',
+        tagline: profile.tagline || "Micronization of API's"
+      })}
     </div>
     <div class="tax-invoice-box">
       <div class="ti-title">TAX INVOICE</div>
@@ -609,10 +632,10 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="m-label">Invoice Date</span><span class="m-colon">:</span><span class="m-value">${docDate}</span></div>
       </div>
       <div class="block">
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span class="m-label">PO No.</span><span class="m-colon">:</span><span class="m-value">${poNo}</span></div>
-        <div class="meta-row sub"><span class="m-icon"></span><span class="m-label">PO Date</span><span class="m-colon">:</span><span class="m-value">${poDate}</span></div>
-        <div class="meta-row sub"><span class="m-icon"></span><span class="m-label">Delivery Challan No.</span><span class="m-colon">:</span><span class="m-value">${dcNo}</span></div>
-        <div class="meta-row sub"><span class="m-icon"></span><span class="m-label">DC Date</span><span class="m-colon">:</span><span class="m-value">${dcDate}</span></div>
+        ${buildOptionalMetaRowHtml('PO No.', poNoRaw, { iconHtml: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>' })}
+        ${buildOptionalMetaRowHtml('PO Date', poDateRaw, { sub: true })}
+        ${buildOptionalMetaRowHtml('Delivery Challan No.', dcNoRaw, { sub: true })}
+        ${buildOptionalMetaRowHtml('DC Date', dcDateRaw, { sub: true })}
       </div>
     </div>
   </div>
@@ -625,10 +648,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <div class="cname">${billName}</div>
         ${billAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
       </div>
-      <div class="party-foot">
-        <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>${billGstin}</span></div>
-        <div class="frow"><span class="flabel">State</span><span class="fcolon">:</span><span>${billState} ${billStateCode ? '(' + escHtml(billStateCode) + ')' : ''}</span></div>
-      </div>
+      ${buildPartyFootHtml(data.gstinBill || data.gstin || '', data.billState || data.state || '', data.billStateCode || data.stateCode || '')}
     </div>
     <div class="party">
       <div class="party-head"><svg viewBox="0 0 24 24"><path d="M3 16V7h9v9"/><path d="M12 10h5l3 3v3h-8z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg> SHIP TO</div>
@@ -636,10 +656,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
         <div class="cname">${shipName}</div>
         ${shipAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
       </div>
-      <div class="party-foot">
-        <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>${shipGstin}</span></div>
-        <div class="frow"><span class="flabel">State</span><span class="fcolon">:</span><span>${shipState} ${shipStateCode ? '(' + escHtml(shipStateCode) + ')' : ''}</span></div>
-      </div>
+      ${buildPartyFootHtml(data.gstinShip || data.gstin || '', data.shipState || data.state || '', data.shipStateCode || data.stateCode || '')}
     </div>
   </div>
 
@@ -705,7 +722,7 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
       </td>
   </tr>
   <tr>
-    <td valign="bottom" style="padding: 8px 10px 0; height: 1px;">
+    <td valign="bottom" style="padding: 4px 10px 0; height: 1px;">
   <!-- BANK DETAILS + TOTALS -->
   <div class="bottom">
     <div class="bank">
@@ -721,7 +738,9 @@ export const buildTaxInvoiceHtml = (data, profileInput) => {
 
     <div class="totals">
       <div class="totals-body">
-        <div class="trow"><span class="tlabel">Total Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>
+        <div class="trow"><span class="tlabel">Total Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(totalAmt + discount)}</span></div>
+        ${discount > 0 ? `<div class="trow"><span class="tlabel">Discount</span><span class="tval">&#8377; ${fmtMoney(discount)}</span></div>
+        <div class="trow"><span class="tlabel">Taxable Amount</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>` : ''}
         <div class="trow"><span class="tlabel">CGST @ ${displayRate}%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
         <div class="trow"><span class="tlabel">SGST @ ${displayRate}%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
         <div class="trow"><span class="tlabel">IGST @ ${taxRate}%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>

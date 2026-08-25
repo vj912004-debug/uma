@@ -276,10 +276,8 @@ const ProcessingSheet = () => {
     { key: 'receivedQty', label: 'Recd Qty' },
     { key: 'piNo', label: 'PI No' },
     { key: 'bprDate', label: 'BPR Date' },
-    { key: 'bprNetQty', label: 'Milled Qty' },
     { key: 'dcNo', label: 'DC No' },
     { key: 'dcDate', label: 'DC Date' },
-    { key: 'dcNetQty', label: 'DC Qty' },
     { key: 'tiNo', label: 'Tax Inv No' },
     { key: 'invoiceDate', label: 'Invoice Date' },
     { key: 'totalBill', label: 'Bill Amount' },
@@ -294,16 +292,28 @@ const ProcessingSheet = () => {
     { key: 'ewayStatus', label: 'E-Way' }
   ];
 
+  const fullTextStyle = (value, minPx = 80) => {
+    const len = String(value ?? '').length;
+    return {
+      minWidth: `${Math.max(minPx, Math.ceil(len * 8.2) + 16)}px`,
+      width: 'auto',
+      textAlign: 'left',
+      overflow: 'visible'
+    };
+  };
+
   const renderInput = (row, field, value, extraStyle = {}) => (
     <input
       type="text"
       value={value ?? ''}
+      size={Math.max(8, String(value ?? '').length + 1)}
       onChange={(e) => handleCellChange(row.id, field, e.target.value, row.invoiceId)}
+      title={value ?? ''}
       style={{
         background: 'transparent',
         border: '1px solid transparent',
         color: 'inherit',
-        width: '100%',
+        width: 'auto',
         minWidth: '60px',
         fontSize: 'inherit',
         outline: 'none',
@@ -312,6 +322,7 @@ const ProcessingSheet = () => {
         padding: '0',
         textAlign: 'center',
         transition: 'all 0.2s ease',
+        overflow: 'visible',
         ...extraStyle
       }}
       onFocus={(e) => { e.target.style.borderBottom = '1px solid var(--accent-primary)'; }}
@@ -329,7 +340,7 @@ const ProcessingSheet = () => {
         border: '1px solid transparent',
         color: 'inherit',
         width: '100%',
-        minWidth: '100px',
+        minWidth: '118px',
         fontSize: 'inherit',
         outline: 'none',
         fontFamily: 'inherit',
@@ -351,43 +362,52 @@ const ProcessingSheet = () => {
       case 'paid':
         return <span>₹{parseFloat(value || 0).toFixed(2)}</span>;
       case 'tdsDeduction':
-        return renderInput(row, 'tdsDeduction', value);
+        return renderInput(row, 'tdsDeduction', value, fullTextStyle(value, 70));
       case 'dueStatus':
         return renderInput(row, 'dueStatus', value, {
+          ...fullTextStyle(value, 70),
+          textAlign: 'center',
           fontWeight: 700,
           color: value === 'Overdue' ? '#ef4444' : value === '0' ? '#10b981' : '#f59e0b'
         });
       case 'outstanding':
         return (
-          <span style={{ fontWeight: 700, color: parseFloat(value) > 0 ? '#ef4444' : 'inherit' }}>
+          <span style={{ fontWeight: 700, color: parseFloat(value) > 0 ? '#ef4444' : 'inherit', whiteSpace: 'nowrap' }}>
             ₹{parseFloat(value || 0).toFixed(2)}
           </span>
         );
       case 'piNo':
-        return renderInput(row, 'piNo', value);
+        return renderInput(row, 'piNo', value, fullTextStyle(value, 170));
       case 'tiNo':
-        return renderInput(row, 'tiNo', value);
+        return renderInput(row, 'tiNo', value, fullTextStyle(value, 170));
+      case 'dcNo':
+        return renderInput(row, 'dcNo', value, fullTextStyle(value, 150));
       case 'manualPaid':
-        return renderInput(row, 'manualPaid', value);
+        return renderInput(row, 'manualPaid', value, fullTextStyle(value, 80));
       case 'partyName':
-        return renderInput(row, 'partyName', value);
+        return renderInput(row, 'partyName', value, fullTextStyle(value, 160));
+      case 'productName':
+        return renderInput(row, 'productName', value, fullTextStyle(value, 140));
       case 'paymentAmounts':
-        return (
-          <span title={value || ''} style={{ maxWidth: '180px', display: 'inline-block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {renderInput(row, 'paymentAmounts', value)}
-          </span>
-        );
+        return renderInput(row, 'paymentAmounts', value, fullTextStyle(value, 140));
       case 'paymentRef':
-        return renderInput(row, 'paymentRef', value);
+        return renderInput(row, 'paymentRef', value, fullTextStyle(value, 140));
       case 'paymentDates':
-        return renderInput(row, 'paymentDates', value);
+        return renderInput(row, 'paymentDates', value, fullTextStyle(value, 120));
+      case 'totalBill':
+        return renderInput(row, 'totalBill', value, fullTextStyle(value, 90));
+      case 'receivedQty':
+        return renderInput(row, 'receivedQty', value, fullTextStyle(value, 70));
+      case 'ewayStatus':
+        return renderInput(row, 'ewayStatus', value, fullTextStyle(value, 80));
       default:
-        return renderInput(row, col.key, value);
+        return renderInput(row, col.key, value, fullTextStyle(value, 80));
     }
   };
 
-  const thStyle = { padding: '1rem', fontWeight: 600, color: 'var(--text-muted)', background: 'var(--bg-card)', borderBottom: '1px solid var(--border-color)', fontSize: '0.75rem' };
-  const tdStyle = { padding: '1rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.8rem' };
+  const thStyle = { padding: '1rem', fontWeight: 600, color: 'var(--text-muted)', background: 'var(--bg-card)', borderBottom: '1px solid var(--border-color)', fontSize: '0.75rem', whiteSpace: 'nowrap' };
+  const tdStyle = { padding: '1rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'visible' };
+  const tableStyle = { width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', textAlign: 'center', whiteSpace: 'nowrap', tableLayout: 'auto' };
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
@@ -457,21 +477,19 @@ const ProcessingSheet = () => {
                 <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>{filteredRows.length} record{filteredRows.length === 1 ? '' : 's'}</span>
               </div>
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                <table style={tableStyle}>
                   <thead>
                      <tr>
                        <th style={thStyle}>Sr No</th>
                        <th style={thStyle}>M.R. Date</th>
-                       <th style={thStyle}>Party Name</th>
-                       <th style={thStyle}>Product</th>
+                       <th style={{ ...thStyle, minWidth: '160px' }}>Party Name</th>
+                       <th style={{ ...thStyle, minWidth: '140px' }}>Product</th>
                        <th style={thStyle}>Recd Qty</th>
-                       <th style={thStyle}>P / I No</th>
+                       <th style={{ ...thStyle, minWidth: '170px' }}>P / I No</th>
                        <th style={thStyle}>BPR Date</th>
-                       <th style={thStyle}>Milled Qty</th>
-                       <th style={thStyle}>DC No</th>
+                       <th style={{ ...thStyle, minWidth: '150px' }}>DC No</th>
                        <th style={thStyle}>DC Date</th>
-                       <th style={thStyle}>DC Qty</th>
-                       <th style={thStyle}>Tax Inv No</th>
+                       <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
                      </tr>
                   </thead>
                   <tbody>
@@ -479,16 +497,14 @@ const ProcessingSheet = () => {
                      <tr key={`receipt-${row.rowKey}`}>
                        <td style={tdStyle}>{renderCell(row, {key: 'srNo'})}</td>
                        <td style={tdStyle}>{renderCell(row, {key: 'date'})}</td>
-                       <td style={tdStyle}>{renderCell(row, {key: 'partyName'})}</td>
-                       <td style={tdStyle}>{renderCell(row, {key: 'productName'})}</td>
+                       <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'partyName'})}</td>
+                       <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'productName'})}</td>
                        <td style={tdStyle}>{renderCell(row, {key: 'receivedQty'})}</td>
-                       <td style={{...tdStyle, color: '#8b5cf6', fontWeight: 600 }}>{renderCell(row, {key: 'piNo'})}</td>
+                       <td style={{...tdStyle, color: '#8b5cf6', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'piNo'})}</td>
                        <td style={tdStyle}>{renderCell(row, {key: 'bprDate'})}</td>
-                       <td style={tdStyle}>{renderCell(row, {key: 'bprNetQty'})}</td>
-                       <td style={tdStyle}>{renderCell(row, {key: 'dcNo'})}</td>
+                       <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'dcNo'})}</td>
                        <td style={tdStyle}>{renderCell(row, {key: 'dcDate'})}</td>
-                       <td style={tdStyle}>{renderCell(row, {key: 'dcNetQty'})}</td>
-                       <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600 }}>{renderCell(row, {key: 'tiNo'})}</td>
+                       <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'tiNo'})}</td>
                      </tr>
                     ))}
                   </tbody>
@@ -502,31 +518,31 @@ const ProcessingSheet = () => {
                 <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>{filteredRows.length} invoice{filteredRows.length === 1 ? '' : 's'}</span>
               </div>
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                <table style={tableStyle}>
                   <thead>
                      <tr>
-                       <th style={thStyle}>Tax Inv No</th>
+                       <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
                        <th style={thStyle}>Invoice Date</th>
                        <th style={thStyle}>Bill Amount</th>
                        <th style={thStyle}>Payment Recd (Auto)</th>
                        <th style={thStyle}>Total Recd (Manual)</th>
-                       <th style={thStyle}>Cheque / Ref Details</th>
-                       <th style={thStyle}>Payment Dates</th>
-                       <th style={thStyle}>Amounts Received</th>
+                       <th style={{ ...thStyle, minWidth: '140px' }}>Cheque / Ref Details</th>
+                       <th style={{ ...thStyle, minWidth: '120px' }}>Payment Dates</th>
+                       <th style={{ ...thStyle, minWidth: '140px' }}>Amounts Received</th>
                        <th style={thStyle}>TDS Deducted</th>
                      </tr>
                   </thead>
                   <tbody>
                     {filteredRows.map((row) => (
                      <tr key={`billing-${row.rowKey}`}>
-                       <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600 }}>{renderCell(row, {key: 'tiNo'})}</td>
+                       <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'tiNo'})}</td>
                        <td style={tdStyle}>{renderCell(row, {key: 'invoiceDate'})}</td>
                        <td style={tdStyle}>{renderCell(row, {key: 'totalBill'})}</td>
                        <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600 }}>{renderCell(row, {key: 'paid'})}</td>
                        <td style={tdStyle}>{renderCell(row, {key: 'manualPaid'})}</td>
-                       <td style={tdStyle}>{renderCell(row, {key: 'paymentRef'})}</td>
-                       <td style={tdStyle}>{renderCell(row, {key: 'paymentDates'})}</td>
-                       <td style={tdStyle}>{renderCell(row, {key: 'paymentAmounts'})}</td>
+                       <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentRef'})}</td>
+                       <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentDates'})}</td>
+                       <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentAmounts'})}</td>
                        <td style={{...tdStyle, color: '#8b5cf6', fontWeight: 600 }}>{renderCell(row, {key: 'tdsDeduction'})}</td>
                      </tr>
                     ))}
@@ -540,15 +556,15 @@ const ProcessingSheet = () => {
                 <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem' }}>Payment Reconciliation</span>
               </div>
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                <table style={tableStyle}>
                   <thead>
                      <tr>
-                       <th style={thStyle}>Tax Inv No</th>
+                       <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
                        <th style={thStyle}>Payment Recd (Auto)</th>
                        <th style={thStyle}>Total Recd (Manual)</th>
-                       <th style={thStyle}>Cheque / Ref Details</th>
-                       <th style={thStyle}>Payment Dates</th>
-                       <th style={thStyle}>Amounts Received</th>
+                       <th style={{ ...thStyle, minWidth: '140px' }}>Cheque / Ref Details</th>
+                       <th style={{ ...thStyle, minWidth: '120px' }}>Payment Dates</th>
+                       <th style={{ ...thStyle, minWidth: '140px' }}>Amounts Received</th>
                        <th style={thStyle}>TDS Deduction</th>
                        <th style={thStyle}>Due Status</th>
                        <th style={thStyle}>Outstanding</th>
@@ -558,12 +574,12 @@ const ProcessingSheet = () => {
                   <tbody>
                     {filteredRows.map((row) => (
                      <tr key={`recon-${row.rowKey}`}>
-                       <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600 }}>{renderCell(row, {key: 'tiNo'})}</td>
+                       <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'tiNo'})}</td>
                        <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600 }}>{renderCell(row, {key: 'paid'})}</td>
                        <td style={tdStyle}>{renderCell(row, {key: 'manualPaid'})}</td>
-                       <td style={tdStyle}>{renderCell(row, {key: 'paymentRef'})}</td>
-                       <td style={tdStyle}>{renderCell(row, {key: 'paymentDates'})}</td>
-                       <td style={tdStyle}>{renderCell(row, {key: 'paymentAmounts'})}</td>
+                       <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentRef'})}</td>
+                       <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentDates'})}</td>
+                       <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentAmounts'})}</td>
                        <td style={{...tdStyle, color: '#8b5cf6', fontWeight: 600 }}>{renderCell(row, {key: 'tdsDeduction'})}</td>
                        <td style={tdStyle}>{renderCell(row, {key: 'dueStatus'})}</td>
                        <td style={{...tdStyle, color: '#ef4444', fontWeight: 600 }}>{renderCell(row, {key: 'outstanding'})}</td>

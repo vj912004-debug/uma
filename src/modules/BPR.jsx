@@ -374,9 +374,13 @@ const BPR = () => {
     setForm(prev => {
       const list = [...prev[tableKey]];
       const item = { ...list[idx] };
-      item[field] = parseOptionalNumber(val);
-      if (field === 'gross' || field === 'tare') {
-        item.net = calcNet(item.gross, item.tare);
+      if (field === 'batchNo' || field === 'drumNo') {
+        item[field] = val;
+      } else {
+        item[field] = parseOptionalNumber(val);
+        if (field === 'gross' || field === 'tare') {
+          item.net = calcNet(item.gross, item.tare);
+        }
       }
       list[idx] = item;
       return { ...prev, [tableKey]: list };
@@ -390,49 +394,91 @@ const BPR = () => {
     }));
   };
 
-  const renderWeightTable = (tableKey, title) => (
-    <div style={{ background: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-        <h4 style={{ margin: 0, fontSize: '0.95rem' }}>{title}</h4>
-        <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow(tableKey)}>+ Add Row</button>
-      </div>
-      <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
-              <th style={{ padding: '0.35rem' }}>Batch No</th>
-              <th style={{ padding: '0.35rem' }}>Drum No</th>
-              <th style={{ padding: '0.35rem' }}>Gross</th>
-              <th style={{ padding: '0.35rem' }}>Tare</th>
-              <th style={{ padding: '0.35rem' }}>Net</th>
-            </tr>
-          </thead>
-          <tbody>
-            {form[tableKey].map((r, idx) => (
-              <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ padding: '0.25rem' }}>{r.batchNo}</td>
-                <td style={{ padding: '0.25rem' }}>{r.drumNo}</td>
-                <td style={{ padding: '0.25rem' }}>
-                  <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={numberInputValue(r.gross)} onChange={e => handleCellChange(tableKey, idx, 'gross', e.target.value)} />
-                </td>
-                <td style={{ padding: '0.25rem' }}>
-                  <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={numberInputValue(r.tare)} onChange={e => handleCellChange(tableKey, idx, 'tare', e.target.value)} />
-                </td>
-                <td style={{ padding: '0.25rem', fontWeight: 600 }}>{displayNet(r.net, r.gross, r.tare)}</td>
+  const buildBatchGroups = (rows) => {
+    const batchGroups = [];
+    const map = {};
+    const parseWt = (v) => (v === '' || v === undefined || v === null ? 0 : parseFloat(v) || 0);
+    rows.forEach((r, idx) => {
+      const key = String(r.batchNo ?? '').trim() || '—';
+      if (!map[key]) {
+        map[key] = { batchNo: key, rows: [], gross: 0, tare: 0, net: 0 };
+        batchGroups.push(map[key]);
+      }
+      const net = r.net !== '' && r.net !== undefined && r.net !== null
+        ? parseWt(r.net)
+        : Math.max(0, parseWt(r.gross) - parseWt(r.tare));
+      map[key].rows.push({ r, idx, netVal: net });
+      map[key].gross += parseWt(r.gross);
+      map[key].tare += parseWt(r.tare);
+      map[key].net += net;
+    });
+    return batchGroups;
+  };
+
+  const renderWeightTable = (tableKey, title) => {
+    const batchGroups = buildBatchGroups(form[tableKey] || []);
+    return (
+      <div style={{ background: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <h4 style={{ margin: 0, fontSize: '0.95rem' }}>{title}</h4>
+          <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow(tableKey)}>+ Add Row</button>
+        </div>
+        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                <th style={{ padding: '0.35rem' }}>Batch No</th>
+                <th style={{ padding: '0.35rem' }}>Drum No</th>
+                <th style={{ padding: '0.35rem' }}>Gross</th>
+                <th style={{ padding: '0.35rem' }}>Tare</th>
+                <th style={{ padding: '0.35rem' }}>Net</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {batchGroups.map(group => (
+                <React.Fragment key={`${tableKey}-batch-${group.batchNo}`}>
+                  {group.rows.map(({ r, idx, netVal }) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.25rem' }}>
+                        <input type="text" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.batchNo || ''} onChange={e => handleCellChange(tableKey, idx, 'batchNo', e.target.value)} />
+                      </td>
+                      <td style={{ padding: '0.25rem' }}>
+                        <input type="text" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem', width: '60px' }} value={r.drumNo || ''} onChange={e => handleCellChange(tableKey, idx, 'drumNo', e.target.value)} />
+                      </td>
+                      <td style={{ padding: '0.25rem' }}>
+                        <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={numberInputValue(r.gross)} onChange={e => handleCellChange(tableKey, idx, 'gross', e.target.value)} />
+                      </td>
+                      <td style={{ padding: '0.25rem' }}>
+                        <input type="number" step="0.01" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} placeholder="—" value={numberInputValue(r.tare)} onChange={e => handleCellChange(tableKey, idx, 'tare', e.target.value)} />
+                      </td>
+                      <td style={{ padding: '0.25rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                        {netVal > 0 ? netVal.toFixed(2) : displayNet(r.net, r.gross, r.tare)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr style={{ background: 'rgba(91, 28, 133, 0.1)', borderBottom: '2px solid var(--accent-primary)' }}>
+                    <td colSpan={2} style={{ padding: '0.45rem 0.35rem', textAlign: 'right', fontWeight: 800, color: 'var(--accent-primary)', fontSize: '0.8rem' }}>
+                      TOTAL — Batch {group.batchNo}
+                    </td>
+                    <td style={{ padding: '0.45rem 0.35rem', fontWeight: 700, textAlign: 'center', fontSize: '0.8rem' }}>{group.gross.toFixed(2)}</td>
+                    <td style={{ padding: '0.45rem 0.35rem', fontWeight: 700, textAlign: 'center', fontSize: '0.8rem' }}>{group.tare.toFixed(2)}</td>
+                    <td style={{ padding: '0.45rem 0.35rem', fontWeight: 800, color: 'var(--accent-primary)' }}>{group.net.toFixed(2)}</td>
+                  </tr>
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
+          <span>GRAND TOTAL:</span>
+          <span style={{ display: 'flex', gap: '1rem', color: 'var(--accent-primary)' }}>
+            <span>Gross: {(tableKey === 'receivedBatches' ? totalReceivedGross : totalDispatchedGross).toFixed(2)} Kg</span>
+            <span>Net: {(tableKey === 'receivedBatches' ? totalReceivedNet : totalDispatchedNet).toFixed(2)} Kg</span>
+          </span>
+        </div>
       </div>
-      <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
-        <span>Total:</span>
-        <span style={{ display: 'flex', gap: '1rem' }}>
-          <span>Gross: {(tableKey === 'receivedBatches' ? totalReceivedGross : totalDispatchedGross).toFixed(2)} Kg</span>
-          <span>Net: {(tableKey === 'receivedBatches' ? totalReceivedNet : totalDispatchedNet).toFixed(2)} Kg</span>
-        </span>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
