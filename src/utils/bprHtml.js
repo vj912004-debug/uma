@@ -91,11 +91,10 @@ const penIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" str
 const emptyBatchRow = () => ({ batchNo: '', drumNo: '', gross: '', tare: '', net: '' });
 
 /**
- * Blank handwriting rows after live drum data on Batch Packing Record (Page 2).
- * Always appended; never removed to make room for summary rows — page fit shrinks
- * filler height instead so Micronized / Lumps / Sample / Irrecoverable always print.
+ * Blank grid rows on Batch Packing Record page 2. CSS stretches them to fill
+ * leftover A4 space so the sheet does not look empty.
  */
-export const BPR_PAGE2_BLANK_ROWS = 7;
+export const BPR_PAGE2_BLANK_ROWS = 18;
 /** Form pad target for received/dispatched editors (not the print blank count). */
 export const BPR_PAGE2_ROW_COUNT = 14;
 
@@ -214,14 +213,47 @@ export const buildBprHtml = (data, profileInput) => {
   let dispatchedRaw = stripLumpRows(data.dispatchedBatches || []);
   const isLiveRow = (r) => !!(r && (r.batchNo || r.drumNo || hasWeight(r)));
   const rowKey = (r = {}) => `${String(r.batchNo || '').trim().toLowerCase()}||${String(r.drumNo ?? '').trim().toLowerCase()}`;
+  const pairKey = (r = {}, d = {}) => {
+    const batch = String(r.batchNo || d.batchNo || '').trim().toLowerCase();
+    const drum = String(
+      (r.drumNo != null && r.drumNo !== '') ? r.drumNo : (d.drumNo ?? '')
+    ).trim().toLowerCase();
+    return `${batch}||${drum}`;
+  };
+  const pairScore = ({ r = {}, d = {} }) =>
+    (hasWeight(r) ? 2 : 0) + (hasWeight(d) ? 2 : 0) + ((r.batchNo || d.batchNo) ? 1 : 0) + ((r.drumNo != null && r.drumNo !== '') || (d.drumNo != null && d.drumNo !== '') ? 1 : 0);
+
   // Drop trailing empty pad rows so pairing stays aligned with real drums.
   const trimTrailingEmpty = (rows) => {
     const copy = [...(rows || [])];
     while (copy.length && !isLiveRow(copy[copy.length - 1])) copy.pop();
     return copy;
   };
-  receivedRaw = trimTrailingEmpty(receivedRaw);
-  dispatchedRaw = trimTrailingEmpty(dispatchedRaw);
+  // Collapse duplicate batch+drum rows in source arrays (keeps first weighted row).
+  const dedupeBatchRows = (rows) => {
+    const seen = new Map();
+    const out = [];
+    (rows || []).forEach((row) => {
+      if (!isLiveRow(row)) return;
+      const key = rowKey(row);
+      if (key === '||') {
+        out.push(row);
+        return;
+      }
+      if (!seen.has(key)) {
+        seen.set(key, out.length);
+        out.push(row);
+        return;
+      }
+      const idx = seen.get(key);
+      const prev = out[idx];
+      // Prefer the row that actually has weights
+      if (!hasWeight(prev) && hasWeight(row)) out[idx] = row;
+    });
+    return out;
+  };
+  receivedRaw = dedupeBatchRows(trimTrailingEmpty(receivedRaw));
+  dispatchedRaw = dedupeBatchRows(trimTrailingEmpty(dispatchedRaw));
 
   // If received has drum labels but no weights, mirror matching dispatched / fill from pair
   const fillEmptyReceived = (received, dispatched) => {
@@ -237,32 +269,52 @@ export const buildBprHtml = (data, profileInput) => {
     };
   };
 
-  // Keep received/dispatched paired (same drum)
+  // Pair by batch+drum identity — never emit the same drum twice.
+  const dispatchPool = dispatchedRaw.map((d, i) => ({ d: d || {}, i, used: false }));
   let paired = [];
-  if (receivedRaw.length && receivedRaw.length === dispatchedRaw.length) {
-    paired = receivedRaw.map((r, i) => {
-      const d = dispatchedRaw[i] || {};
-      return { r: fillEmptyReceived(r || {}, d), d };
-    });
-  } else {
-    const dispatchPool = dispatchedRaw.map((d, i) => ({ d: d || {}, i, used: false }));
-    paired = receivedRaw.map((r) => {
-      const row = r || {};
-      const key = rowKey(row);
-      let match = key !== '||'
-        ? dispatchPool.find((x) => !x.used && rowKey(x.d) === key)
-        : null;
-      if (!match) match = dispatchPool.find((x) => !x.used && isLiveRow(x.d));
-      if (match) match.used = true;
-      const d = match?.d || {};
-      return { r: fillEmptyReceived(row, d), d };
-    });
-    dispatchPool.filter((x) => !x.used && isLiveRow(x.d)).forEach((x) => {
-      paired.push({ r: fillEmptyReceived({}, x.d), d: x.d });
-    });
-  }
+  const usedPairKeys = new Set();
 
-  let livePairs = paired.filter(({ r, d }) => isLiveRow(r) || isLiveRow(d));
+  receivedRaw.forEach((r) => {
+    const row = r || {};
+    const key = rowKey(row);
+    if (key !== '||' && usedPairKeys.has(key)) return;
+
+    let match = key !== '||'
+      ? dispatchPool.find((x) => !x.used && rowKey(x.d) === key)
+      : null;
+    // Only greedily take an unlabeled dispatch row when received itself has no identity
+    if (!match && key === '||') {
+      match = dispatchPool.find((x) => !x.used && isLiveRow(x.d) && rowKey(x.d) === '||');
+    }
+    if (match) match.used = true;
+    const d = match?.d || {};
+    const pk = pairKey(row, d);
+    if (pk !== '||') usedPairKeys.add(pk);
+    paired.push({ r: fillEmptyReceived(row, d), d });
+  });
+
+  dispatchPool.filter((x) => !x.used && isLiveRow(x.d)).forEach((x) => {
+    const key = rowKey(x.d);
+    if (key !== '||' && usedPairKeys.has(key)) return;
+    if (key !== '||') usedPairKeys.add(key);
+    paired.push({ r: fillEmptyReceived({}, x.d), d: x.d });
+  });
+
+  // Final safety: one printed line per batch+drum (prefer fuller weight data).
+  const livePairs = (() => {
+    const best = new Map();
+    const anonymous = [];
+    paired.filter(({ r, d }) => isLiveRow(r) || isLiveRow(d)).forEach((pair) => {
+      const key = pairKey(pair.r, pair.d);
+      if (key === '||') {
+        anonymous.push(pair);
+        return;
+      }
+      const prev = best.get(key);
+      if (!prev || pairScore(pair) >= pairScore(prev)) best.set(key, pair);
+    });
+    return [...best.values(), ...anonymous];
+  })();
 
   // Group by batch so each Batch No gets its own TOTAL on the print
   const batchGroups = [];
@@ -355,14 +407,11 @@ export const buildBprHtml = (data, profileInput) => {
       </tr>`);
   }
 
-  // Exactly N blank filler rows after live data (summary rows follow separately).
-  for (let i = 0; i < BPR_PAGE2_BLANK_ROWS; i += 1) {
-    packingRows.push(`
-      <tr class="filler-row">
-        <td></td><td></td><td></td><td></td><td></td>
-        <td></td><td></td><td></td><td></td><td></td>
-      </tr>`);
-  }
+  const fillerRowsHtml = Array.from({ length: BPR_PAGE2_BLANK_ROWS }, () => `
+            <tr class="filler-row">
+              <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+              <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+            </tr>`).join('');
 
   const savedDispatchNet = typeof data.totalDispatchedNet === 'number'
     ? data.totalDispatchedNet
@@ -749,6 +798,15 @@ export const buildBprHtml = (data, profileInput) => {
     width:100%;border-collapse:collapse;margin:0;font-size:12px;
     flex:0 0 auto;height:auto;table-layout:fixed;background:#fff;
   }
+  .page-p2 .table-wrap{
+    flex:1 1 auto;min-height:0;display:flex;flex-direction:column;margin-bottom:6px;
+  }
+  .page-p2 table.items{
+    flex:1 1 auto;height:100%;width:100%;
+  }
+  .page-p2 .barfoot{
+    margin:6px -10px -10px -10px !important;
+  }
   table.items col.c-batch{width:16%;}
   table.items col.c-drum{width:8%;}
   table.items col.c-wt{width:8%;}
@@ -784,8 +842,13 @@ export const buildBprHtml = (data, profileInput) => {
   table.items tbody tr.total-hl td{
     background:#e2d3f3 !important;color:#4a0080 !important;font-weight:700;height:36px;min-height:36px;
   }
+  table.items tbody tr.filler-row{
+    height:1%;
+  }
   table.items tbody tr.filler-row td{
-    height:26px;min-height:18px;padding:2px;
+    height:auto;min-height:16px;max-height:none;padding:2px 3px;
+    line-height:1 !important;font-size:10px;color:transparent !important;
+    -webkit-text-fill-color:transparent !important;
   }
   table.items tbody tr.summary-row td{
     background:#fff !important;color:#231f20 !important;font-weight:700;height:28px;min-height:28px;
@@ -803,12 +866,18 @@ export const buildBprHtml = (data, profileInput) => {
     text-align:right;font-size:10px;font-weight:800;white-space:nowrap;
   }
   .table-wrap{
-    flex:0 0 auto;min-height:0;display:flex;flex-direction:column;margin-bottom:10px;
+    flex:0 0 auto;min-height:0;display:flex;flex-direction:column;margin-bottom:8px;
+  }
+  .page-p2 .table-wrap{
+    flex:1 1 auto;min-height:0;
   }
   .barfoot{
     background:#5a009d;color:#fff;padding:7px 14px;display:flex;justify-content:space-between;align-items:center;
     font-size:12px;margin:auto -10px -10px -10px;border-radius:0;flex-shrink:0;width:auto;box-sizing:border-box;
     letter-spacing:0.01px;word-spacing:normal;
+  }
+  .page-p2 .barfoot{
+    margin:6px -10px -10px -10px !important;
   }
   .barfoot span{white-space:nowrap;letter-spacing:0.01px;word-spacing:0.02em;}
   .signs{display:flex;border:1px solid #7c12bd;margin-top:4px;margin-bottom:0;border-radius:4px;overflow:hidden;flex-shrink:0;}
@@ -864,6 +933,7 @@ export const buildBprHtml = (data, profileInput) => {
           </thead>
           <tbody>
             ${packingRows.join('')}
+            ${fillerRowsHtml}
             ${summaryRowsHtml}
           </tbody>
         </table>
@@ -885,51 +955,6 @@ export const buildBprHtml = (data, profileInput) => {
 </html>`;
 };
 
-/**
- * Keep page-2 summary rows (Micronized / Lumps / Sample / Irrecoverable) on the
- * printable A4 area by shrinking filler blank rows — never by dropping summaries.
- */
-const fitBprPage2ToA4 = (pageEl, pageHeightPx = 1123) => {
-  if (!pageEl || !pageEl.classList.contains('page-p2')) return;
-
-  pageEl.style.height = `${pageHeightPx}px`;
-  pageEl.style.minHeight = `${pageHeightPx}px`;
-  pageEl.style.maxHeight = `${pageHeightPx}px`;
-  pageEl.style.overflow = 'hidden';
-  pageEl.style.boxSizing = 'border-box';
-
-  const overflows = () => pageEl.scrollHeight > pageHeightPx + 2;
-  if (!overflows()) return;
-
-  const setFillerHeight = (px) => {
-    pageEl.querySelectorAll('tr.filler-row td').forEach((td) => {
-      td.style.height = `${px}px`;
-      td.style.minHeight = `${px}px`;
-      td.style.maxHeight = `${px}px`;
-      td.style.paddingTop = '1px';
-      td.style.paddingBottom = '1px';
-    });
-  };
-
-  for (let h = 24; h >= 10; h -= 2) {
-    setFillerHeight(h);
-    if (!overflows()) return;
-  }
-
-  // Still overflowing: drop blank fillers from the bottom only (keep all summary rows).
-  const fillers = [...pageEl.querySelectorAll('tr.filler-row')];
-  while (overflows() && fillers.length) {
-    const row = fillers.pop();
-    if (row) row.remove();
-  }
-
-  if (!overflows()) return;
-
-  // Last resort: slight zoom so summary + footer stay visible.
-  const scale = Math.max(0.82, pageHeightPx / Math.max(pageEl.scrollHeight, 1));
-  pageEl.style.zoom = String(scale);
-};
-
 export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => {
   let printData = data;
   try {
@@ -948,7 +973,7 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
   // iframe isolates BPR styles from ERP dark-theme table CSS (which was hiding weights)
   const iframe = document.createElement('iframe');
   iframe.setAttribute('title', 'bpr-pdf-render');
-  iframe.style.cssText = 'position:fixed;left:-12000px;top:0;width:794px;height:1400px;border:0;opacity:1;visibility:hidden;pointer-events:none;';
+  iframe.style.cssText = 'position:fixed;left:0;top:0;width:794px;height:1123px;border:0;opacity:0;pointer-events:none;z-index:-1;';
   document.body.appendChild(iframe);
   const idoc = iframe.contentDocument || iframe.contentWindow.document;
   idoc.open();
@@ -969,9 +994,6 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
       }
     });
     await new Promise((r) => setTimeout(r, 50));
-
-    // Fit page 2 before capture so 7 blanks + 4 summary rows never clip off A4.
-    idoc.querySelectorAll('.page.page-p2').forEach((el) => fitBprPage2ToA4(el, 1123));
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageNodes = [...idoc.querySelectorAll('.page')];
@@ -1005,7 +1027,21 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.flexDirection = 'column';
             el.style.boxSizing = 'border-box';
           });
-          clonedDoc.querySelectorAll('.table-wrap').forEach((el) => {
+          clonedDoc.querySelectorAll('.page.page-p2 .table-wrap').forEach((el) => {
+            el.style.flex = '1 1 auto';
+            el.style.minHeight = '0';
+            el.style.display = 'flex';
+            el.style.flexDirection = 'column';
+            el.style.marginBottom = '6px';
+            el.style.overflow = 'visible';
+          });
+          clonedDoc.querySelectorAll('.page.page-p2 table.items').forEach((el) => {
+            el.style.flex = '1 1 auto';
+            el.style.height = '100%';
+            el.style.margin = '0';
+            el.style.overflow = 'visible';
+          });
+          clonedDoc.querySelectorAll('.page:not(.page-p2) .table-wrap').forEach((el) => {
             el.style.flex = '0 0 auto';
             el.style.minHeight = '0';
             el.style.display = 'flex';
@@ -1013,7 +1049,7 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.marginBottom = '10px';
             el.style.overflow = 'visible';
           });
-          clonedDoc.querySelectorAll('table.items').forEach((el) => {
+          clonedDoc.querySelectorAll('.page:not(.page-p2) table.items').forEach((el) => {
             el.style.flex = '0 0 auto';
             el.style.height = 'auto';
             el.style.margin = '0';
@@ -1042,10 +1078,22 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
           clonedDoc.querySelectorAll('table.items tbody td').forEach((el) => {
             const isFiller = el.closest('tr.filler-row');
             const isSummary = el.closest('tr.summary-row');
-            el.style.height = isFiller ? (el.style.height || '22px') : '26px';
-            el.style.minHeight = isFiller ? (el.style.minHeight || '12px') : '26px';
+            if (isFiller) {
+              el.style.height = 'auto';
+              el.style.minHeight = '16px';
+              el.style.maxHeight = 'none';
+              el.style.padding = '2px';
+              el.style.verticalAlign = 'middle';
+              el.style.visibility = 'visible';
+              el.style.setProperty('background', '#ffffff', 'important');
+              el.style.setProperty('color', 'transparent', 'important');
+              el.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
+              return;
+            }
+            el.style.height = '26px';
+            el.style.minHeight = '26px';
             el.style.maxHeight = '';
-            el.style.padding = isFiller ? '1px 2px' : '3px 2px';
+            el.style.padding = '3px 2px';
             el.style.verticalAlign = 'middle';
             el.style.overflow = 'visible';
             el.style.textOverflow = 'clip';
@@ -1062,8 +1110,8 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
               el.style.minHeight = '26px';
             }
           });
-          // Re-apply page-2 fit on the clone so capture matches (summary never clipped).
-          clonedDoc.querySelectorAll('.page.page-p2').forEach((el) => fitBprPage2ToA4(el, 1123));
+          // Do NOT re-run fill here — html2canvas clone layout is unreliable and
+          // would wipe blank rows added on the live iframe.
           clonedDoc.querySelectorAll('table.items tbody td.wt').forEach((el) => {
             el.style.setProperty('color', '#231f20', 'important');
             el.style.setProperty('-webkit-text-fill-color', '#231f20', 'important');
@@ -1079,7 +1127,14 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.marginBottom = '0';
             el.style.flexShrink = '0';
           });
-          clonedDoc.querySelectorAll('.barfoot').forEach((el) => {
+          clonedDoc.querySelectorAll('.page.page-p2 .barfoot').forEach((el) => {
+            el.style.margin = '6px -10px -10px -10px';
+            el.style.borderRadius = '0';
+            el.style.flexShrink = '0';
+            el.style.width = 'auto';
+            el.style.boxSizing = 'border-box';
+          });
+          clonedDoc.querySelectorAll('.page:not(.page-p2) .barfoot').forEach((el) => {
             el.style.margin = 'auto -10px -10px -10px';
             el.style.borderRadius = '0';
             el.style.flexShrink = '0';

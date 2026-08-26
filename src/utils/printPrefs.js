@@ -478,7 +478,7 @@ export const buildPrintPrefsCss = (prefs) => {
   }
   .uma-print-root .page-p2 .barfoot,
   .uma-print-root .page-p2 .sheet > .barfoot {
-    margin: auto -10px -10px -10px !important;
+    margin: 6px -10px -10px -10px !important;
     border-radius: 0 !important;
     width: auto !important;
   }
@@ -488,8 +488,21 @@ export const buildPrintPrefsCss = (prefs) => {
     word-spacing: 0.02em !important;
   }
   .uma-print-root table.items tbody tr.filler-row td {
-    height: ${Math.max(14, Math.round(22 * padScale))}px !important;
-    min-height: 10px !important;
+    height: auto !important;
+    min-height: 16px !important;
+    max-height: none !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+  .uma-print-root .page-p2 .table-wrap {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
+  .uma-print-root .page-p2 table.items {
+    flex: 1 1 auto !important;
+    height: 100% !important;
   }
   .uma-print-root table.items tbody tr.summary-row td {
     visibility: visible !important;
