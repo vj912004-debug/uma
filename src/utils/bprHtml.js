@@ -880,10 +880,10 @@ export const buildBprHtml = (data, profileInput) => {
     margin:6px -10px -10px -10px !important;
   }
   .barfoot span{white-space:nowrap;letter-spacing:0.01px;word-spacing:0.02em;}
-  .signs{display:flex;border:1px solid #7c12bd;margin-top:4px;margin-bottom:0;border-radius:4px;overflow:hidden;flex-shrink:0;}
-  .sign{flex:1;padding:10px 14px;min-height:52px;display:flex;align-items:flex-end;gap:6px;font-size:12px;font-weight:700;color:#4a0080;}
+  .signs{display:flex;border:1px solid #7c12bd;margin-top:4px;margin-bottom:0;border-radius:4px;overflow:hidden;flex:0 0 auto;height:auto;align-self:flex-start;}
+  .sign{flex:1;padding:4px 10px;min-height:0;height:auto;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#4a0080;line-height:1.2;}
   .sign + .sign{border-left:1px solid #7c12bd;}
-  .sign .line{flex:1;border-bottom:1px solid #777;margin-left:6px;min-height:16px;}
+  .sign .line{flex:1;border-bottom:1px solid #777;margin-left:6px;min-height:0;height:1px;align-self:flex-end;margin-bottom:2px;}
   .page-p2 .sheet{height:100%;}
 </style>
 </head>
@@ -1127,7 +1127,16 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
           clonedDoc.querySelectorAll('.signs').forEach((el) => {
             el.style.marginTop = '4px';
             el.style.marginBottom = '0';
-            el.style.flexShrink = '0';
+            el.style.flex = '0 0 auto';
+            el.style.height = 'auto';
+            el.style.minHeight = '0';
+            el.style.alignSelf = 'flex-start';
+          });
+          clonedDoc.querySelectorAll('.sign').forEach((el) => {
+            el.style.padding = '4px 10px';
+            el.style.minHeight = '0';
+            el.style.height = 'auto';
+            el.style.alignItems = 'center';
           });
           clonedDoc.querySelectorAll('.page.page-p2 .barfoot').forEach((el) => {
             el.style.margin = '6px -10px -10px -10px';
