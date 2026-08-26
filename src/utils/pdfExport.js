@@ -21,6 +21,7 @@ import { renderPackingListPdf } from './packingListHtml';
 import { renderQuotationPdf } from './quotationPdf';
 import { getStoredPrintPrefs } from './printPrefs';
 import { promptPrintPrefs } from './promptPrintPrefs';
+import { fillPrintPartyFields, loadUmaAppData } from './printTheme';
 
 const getProfile = (data) => mergeCompanyProfile(data?.companyProfile || getStoredCompanyProfile());
 
@@ -31,7 +32,11 @@ const resolvePrintPrefs = async (docType, mode, options = {}) => {
 };
 
 const runHtmlPdf = async (docType, data, mode, options = {}) => {
-  const enriched = { ...data, companyProfile: data?.companyProfile || getStoredCompanyProfile() };
+  const appData = data?.appData || loadUmaAppData();
+  const withParty = docType === 'BPR'
+    ? data
+    : fillPrintPartyFields(data, appData);
+  const enriched = { ...withParty, companyProfile: data?.companyProfile || getStoredCompanyProfile() };
   const printPrefs = await resolvePrintPrefs(docType, mode, options);
   if (!printPrefs) return;
   const opts = { mode, printPrefs };

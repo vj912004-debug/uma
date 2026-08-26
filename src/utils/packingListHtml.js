@@ -5,7 +5,8 @@ import {
   fmtMoney,
   buildPrintBrandHtml,
   applyPrintPrefsToHtml,
-  renderHtmlToPdf
+  renderHtmlToPdf,
+  buildFillerRowsHtml
 } from './printTheme';
 
 const parseWeight = (value) => {
@@ -106,6 +107,8 @@ export const buildPackingListHtml = (data, profileInput) => {
     return `${rowHtml}${batchTotalHtml}`;
   }).join('');
 
+  const fillerRowsHtml = buildFillerRowsHtml(6, 12);
+
   // Sample layout: Sieving Lumps under Gross, value under Net
   const sievingLumpsHtml = sievingLumps > 0 ? `
       <tr class="special-row">
@@ -200,9 +203,10 @@ export const buildPackingListHtml = (data, profileInput) => {
   .meta-field .colon{font-weight:700;color:var(--purple);}
   .meta-field .val{font-weight:600;color:var(--text);}
 
-  .table-wrap{flex:1 1 auto;min-height:0;margin-bottom:10px;}
+  .table-wrap{flex:1 1 auto;min-height:0;margin-bottom:10px;display:flex;flex-direction:column;}
   table.items{
     width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px;background:#fff;
+    flex:1 1 auto;height:100%;
   }
   table.items thead th{
     background:var(--purple);color:#fff;font-weight:700;padding:8px 6px;
@@ -214,6 +218,10 @@ export const buildPackingListHtml = (data, profileInput) => {
     vertical-align:middle;background:#fff;color:var(--text);height:28px;font-weight:600;
   }
   table.items tbody td.num{text-align:center;}
+  table.items tbody tr.filler-row { height: 1%; }
+  table.items tbody tr.filler-row td {
+    height: auto; min-height: 18px; padding: 2px 4px;
+  }
   table.items tbody tr.special-row td,
   table.items tbody tr.batch-total-row td,
   table.items tbody tr.total-row td{
@@ -272,6 +280,7 @@ export const buildPackingListHtml = (data, profileInput) => {
           </thead>
           <tbody>
             ${tableRowsHtml}
+            ${fillerRowsHtml}
             ${sievingLumpsHtml}
             ${overallTotalHtml}
           </tbody>

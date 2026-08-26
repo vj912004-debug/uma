@@ -1,11 +1,12 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { buildDcPrintLines, getDcAppData } from './deliveryChallanLayout';
-import { formatPdfDateDmy } from './taxInvoiceLayout';
-import { escHtml, fmtQty, buildPrintBrandHtml, renderHtmlToPdf, hasPrintVal } from './printTheme';
+import { formatPdfDateDmy, splitPartyAddressLines } from './taxInvoiceLayout';
+import { escHtml, fmtQty, buildPrintBrandHtml, renderHtmlToPdf, hasPrintVal, fillPrintPartyFields } from './printTheme';
 
-export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
+export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
+  const appData = appDataInput || raw?.appData || getDcAppData();
+  const data = fillPrintPartyFields(raw, appData);
   const profile = mergeCompanyProfile(profileInput);
-  const appData = appDataInput || getDcAppData();
   const { lines, totalDrums, totalQty } = buildDcPrintLines(data, appData);
   const linkedMr = (appData.materialReceipts || []).find((r) => r.id === data.receiptId) || null;
   const deliveryNotes = (
@@ -25,8 +26,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   const stateCode = escHtml(data.shipStateCode || data.billStateCode || data.stateCode || '24');
   const partyGstin = escHtml(data.gstinShip || data.gstinBill || data.gstin || '');
   const partyName = escHtml(data.partyName || '');
-  const address = escHtml(data.shipAddress || data.billAddress || data.address || '');
-  const addressLines = address.split(/\r?\n/).filter(Boolean);
+  const addressLines = splitPartyAddressLines(data.shipAddress || data.billAddress || data.address || '', 42);
 
   let companyPan = escHtml(profile.panNumber || '');
   if (!companyPan && profile.gstNumber && profile.gstNumber.length >= 15) {
@@ -318,16 +318,23 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   }
   .party-head svg { width: 16px; height: 16px; display: block; fill: none; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .party-body {
-    padding: 10px 12px;
+    padding: 8px 12px;
     font-size:12px;
-    line-height: 1.55;
+    line-height: 1.4;
     flex: 1;
+    white-space: normal;
+    min-height: 0;
   }
   .party-body .cname {
     color: var(--purple);
     font-weight: 800;
     font-size:12px;
-    margin-bottom: 4px;
+    margin: 0 0 2px;
+  }
+  .party-body .addr {
+    margin: 0;
+    line-height: 1.4;
+    white-space: normal;
   }
   .party-foot {
     border-top: 1px solid var(--lav-border);
@@ -552,10 +559,7 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
       <div class="parties">
         <div class="party">
           <div class="party-head"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> SHIP TO</div>
-          <div class="party-body">
-            <div class="cname">${partyName}</div>
-            ${addressLines.map(line => `<div>${escHtml(line)}</div>`).join('')}
-          </div>
+          <div class="party-body"><div class="cname">${partyName}</div>${addressLines.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
           <div class="party-foot">
             <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>${partyGstin}</span></div>
             <div class="frow"><span class="flabel">State</span><span class="fcolon">:</span><span>${shipState} (${stateCode})</span></div>

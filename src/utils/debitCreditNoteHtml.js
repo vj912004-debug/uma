@@ -1,5 +1,5 @@
 import { mergeCompanyProfile } from './companyProfile';
-import { formatPdfDateDmy, splitPartyAddressLines } from './taxInvoiceLayout';
+import { formatPdfDateDmy, splitPartyAddressLines, getSplitGstRates } from './taxInvoiceLayout';
 import {
   STANDARD_CHARGES_LIST,
   OTHER_CHARGE_ITEM
@@ -10,83 +10,113 @@ import {
   fmtQty,
   renderHtmlToPdf,
   buildPrintBrandHtml,
-  hasPrintVal,
-  buildPartyFootHtml
+  buildPartyFootHtml,
+  buildFillerRowsHtml,
+  ITEMS_TABLE_FILL_CSS,
+  FIT_FOOTER_CSS,
+  fillPrintPartyFields,
+  loadUmaAppData,
+  buildFooterTerms,
+  formatPrintTermsHtml,
+  DEFAULT_INVOICE_TERMS,
+  buildOptionalMetaRowHtml
 } from './printTheme';
 
 const NOTE_CHARGES = [...STANDARD_CHARGES_LIST, OTHER_CHARGE_ITEM];
-const NOTE_BLANK_ROWS = 4;
-const CREDIT_NOTE_BLANK_ROWS = 6;
 
-const calcNoteLines = (data) => {
-  const taxRate = parseFloat(data.taxRate) || 18;
-  const halfRate = taxRate / 2;
+/** Line items + GST totals for Debit/Credit Notes (shared by form + print). */
+export const calcNoteLines = (data) => {
+  const { taxRate, displayRate, sgst: sgstCalc, cgst: cgstCalc, igst: igstCalc } = getSplitGstRates(data);
   const rows = [];
   let totalAmt = 0;
   let totalSgst = 0;
   let totalCgst = 0;
+  let totalIgst = 0;
   let totalQty = 0;
   let sr = 0;
 
   const pushLine = (label, qty, rate) => {
-    // Never emit a body "TOTAL" line — footer already has the summary row
     if (/^\s*total\s*$/i.test(String(label || ''))) return;
-    const amt = qty * rate;
-    if (amt <= 0 && !rate && !(label || '').trim()) return;
-    const sgstAmt = amt * (halfRate / 100);
-    const cgstAmt = amt * (halfRate / 100);
+    const q = parseFloat(qty) || 0;
+    const r = parseFloat(rate) || 0;
+    const amt = q * r;
+    if (amt <= 0) return;
+    const sgstAmt = amt * (sgstCalc / 100);
+    const cgstAmt = amt * (cgstCalc / 100);
+    const igstAmt = amt * (igstCalc / 100);
     sr += 1;
     rows.push({
       sr,
       label: label || 'Description',
-      qty,
-      rate,
+      qty: q,
+      rate: r,
       amt,
-      sgstRate: halfRate,
-      cgstRate: halfRate,
+      sgstRate: sgstCalc,
+      cgstRate: cgstCalc,
+      igstRate: igstCalc,
       sgstAmt,
       cgstAmt,
-      rowTotal: amt + sgstAmt + cgstAmt
+      igstAmt,
+      rowTotal: amt + sgstAmt + cgstAmt + igstAmt
     });
     totalAmt += amt;
     totalSgst += sgstAmt;
     totalCgst += cgstAmt;
-    totalQty += qty;
+    totalIgst += igstAmt;
+    totalQty += q;
   };
 
-  // Prefer manual description lines (only what user entered)
   (data.customCharges || []).forEach((c) => {
-    const desc = String(c.description || '').trim();
+    const desc = String(c.description || c.name || '').trim();
     const qty = parseFloat(c.qty) || 0;
     const rate = parseFloat(c.rate) || 0;
-    const amt = qty * rate;
-    if (!desc && amt <= 0) return;
-    pushLine(desc, qty || 1, rate);
+    if (!desc && qty * rate <= 0) return;
+    pushLine(desc, qty, rate);
   });
 
-  // Legacy checklist charges (older saved notes only)
   if (!rows.length) {
     NOTE_CHARGES.forEach((c) => {
       if (!data.charges?.[c.key]) return;
-      pushLine(c.label || c.key, parseFloat(data.qtys?.[c.key]) || 1, parseFloat(data.rates?.[c.key]) || 0);
+      pushLine(c.label || c.key, parseFloat(data.qtys?.[c.key]) || 0, parseFloat(data.rates?.[c.key]) || 0);
     });
   }
 
-  if (!rows.length && (data.particulars || data.amount)) {
-    const amt = parseFloat(data.subtotal) || parseFloat(data.amount) || 0;
-    pushLine(data.particulars || 'Adjustment', 1, amt);
+  // Legacy notes: use saved ex-GST subtotal only (never GST-inclusive amount).
+  if (!rows.length) {
+    const taxable = parseFloat(data.subtotal);
+    if (Number.isFinite(taxable) && taxable > 0) {
+      pushLine(data.particulars || 'Adjustment', 1, taxable);
+    }
   }
 
   const discount = parseFloat(data.discount) || 0;
+  const grossAmt = totalAmt;
   if (discount > 0 && totalAmt > 0) {
-    const ratio = Math.max(0, totalAmt - discount) / totalAmt;
-    totalAmt = Math.max(0, totalAmt - discount);
+    totalAmt = Math.max(0, grossAmt - discount);
+    const ratio = grossAmt > 0 ? totalAmt / grossAmt : 0;
     totalSgst *= ratio;
     totalCgst *= ratio;
+    totalIgst *= ratio;
   }
 
-  const totalAll = totalAmt + totalSgst + totalCgst;
-  return { rows, totalAmt, totalSgst, totalCgst, totalIgst: 0, totalAll, totalQty };
+  const totalAll = totalAmt + totalSgst + totalCgst + totalIgst;
+  const roundedTotal = Math.round(totalAll);
+  const roundOff = roundedTotal - totalAll;
+  return {
+    rows,
+    grossAmt,
+    discount,
+    totalAmt,
+    totalSgst,
+    totalCgst,
+    totalIgst,
+    totalAll,
+    totalQty,
+    taxRate,
+    displayRate,
+    roundedTotal,
+    roundOff
+  };
 };
 
 const getCommonStyle = () => `
@@ -113,14 +143,24 @@ const getCommonStyle = () => `
     margin: 0;
     background: #fff;
     border: none;
-    display: block;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     box-sizing: border-box;
   }
 
-  /* Outline for the whole content */
-  .content-wrapper { width: 100%; height: 100%; min-height: 0; border-collapse: collapse; border: 2px solid var(--purple); box-sizing: border-box; table-layout: fixed; }
-  .content-wrapper td { padding: 0; }
+  .content-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border: 2px solid var(--purple);
+    box-sizing: border-box;
+  }
+  .inv-top { flex: 0 0 auto; padding: 4px 10px 0; }
+  .items-row { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 0 10px 4px; }
+  .inv-bot { flex: 0 0 auto; padding: 8px 10px 0; }
 
   /* ===== HEADER ===== */
   .header{
@@ -266,7 +306,7 @@ const getCommonStyle = () => `
     font-size:12px;
   }
   .invoice-meta .block + .block{
-    border-top:1px solid var(--lav-border);
+    border-top:1px solid var(--purple);
   }
   .meta-row{
     display:grid;
@@ -317,12 +357,10 @@ const getCommonStyle = () => `
   }
 
   /* ===== BILL TO / SHIP TO ===== */
-
-  /* ===== BILL TO / SHIP TO ===== */
   .parties{
     display:flex;
-    gap:14px;
-    margin-bottom:14px;
+    gap:10px;
+    margin-bottom:8px;
   }
   .party{
     flex:1;
@@ -342,16 +380,22 @@ const getCommonStyle = () => `
   }
   .party-head svg, .box-head svg{flex-shrink:0;}
   .party-body{
-    padding:10px 12px;
+    padding:8px 12px;
     font-size:12px;
-    line-height:1.55;
-    min-height: 80px;
+    line-height:1.4;
+    min-height:0;
+    white-space:normal;
   }
   .party-body .cname{
     color:var(--purple);
     font-weight:800;
     font-size:12px;
-    margin-bottom:4px;
+    margin:0 0 2px;
+  }
+  .party-body .addr{
+    margin:0;
+    line-height:1.4;
+    white-space:normal;
   }
   .party-foot{
     border-top:1px solid var(--lav-border);
@@ -372,7 +416,7 @@ const getCommonStyle = () => `
     flex-wrap:wrap;
     gap:14px;
     background:var(--lav-bg);
-    margin-bottom:14px;
+    margin-bottom:8px;
   }
   .reason-bar .label{
     font-weight:800;
@@ -402,7 +446,20 @@ const getCommonStyle = () => `
   }
 
   /* ===== TABLE ===== */
+  ${ITEMS_TABLE_FILL_CSS}
+  ${FIT_FOOTER_CSS}
+  .cn-page .content-wrapper tr.inv-bot,
+  .dn-page .content-wrapper tr.inv-bot { height: auto; }
+  .cn-page .content-wrapper tr.inv-bot > td,
+  .dn-page .content-wrapper tr.inv-bot > td { height: auto; min-height: 280px; overflow: visible; }
+  .content-wrapper tr.items-row > td { padding: 0 10px 4px; }
   .table-container { }
+  table.items tbody tr.filler-row { height: 18px; }
+  table.items tbody tr.filler-row td {
+    height: 18px !important;
+    min-height: 18px !important;
+    max-height: 18px !important;
+  }
   table.items{
     width:100%;
     table-layout:fixed;
@@ -415,21 +472,35 @@ const getCommonStyle = () => `
     background:var(--purple);
     color:#fff;
     font-weight:700;
-    padding:3px 2px;
+    padding:6px 3px;
     text-align:center;
     vertical-align:middle;
     border:1px solid rgba(255,255,255,0.55);
+    line-height:1.15;
+    white-space:normal;
+    word-break:break-word;
+    overflow:visible;
+    font-size:12px;
+    letter-spacing:0;
   }
   table.items tbody td{
     border:1px solid var(--lav-border);
-    padding:3px 3px;
-    height:18px;
+    padding:4px 3px;
+    height:auto;
+    min-height:22px;
     vertical-align:middle;
+    overflow:visible;
   }
-  table.items tbody td.num{text-align:right;padding-right:3px;}
-  table.items tbody td.center{text-align:center;}
-  table.items tbody td.left{text-align:left;padding-left:3px;}
-  table.items tbody tr.filler-row td{height:14px;}
+  table.items tbody td.num{text-align:right;padding-right:3px;white-space:nowrap;}
+  table.items tbody td.center{text-align:center;white-space:nowrap;}
+  table.items tbody td.left{
+    text-align:left;
+    padding-left:3px;
+    white-space:normal;
+    overflow-wrap:break-word;
+    word-break:break-word;
+    line-height:1.25;
+  }
   table.items tfoot td{
     border:1px solid var(--purple);
     background:var(--lav-bg);
@@ -442,8 +513,8 @@ const getCommonStyle = () => `
   /* ===== BOTTOM SECTION: bank + totals ===== */
   .bottom{
     display:flex;
-    gap:14px;
-    margin-bottom:14px;
+    gap:10px;
+    margin-bottom:8px;
     align-items:stretch;
   }
   .bank{
@@ -497,39 +568,50 @@ const getCommonStyle = () => `
   }
 
   /* ===== TERMS / DECLARATION / SIGNATORY ===== */
-  .footer3{
-    display:flex;
-    gap:14px;
-    margin-bottom:0;
+  table.footer3{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:10px 0;
+    margin:6px 0 0;
+    table-layout:fixed;
   }
-  .f3col{
-    flex:1;
+  table.footer3 td.f3col{
+    width:33.33%;
+    height:128px;
     border:1px solid var(--lav-border);
+    vertical-align:top;
+    padding:0;
   }
   .f3-body{
     padding:8px 10px;
-    font-size:12px;
-    line-height:1.45;
+    font-size:11px;
+    line-height:1.4;
+    white-space:normal;
+    overflow:visible;
+    overflow-wrap:break-word;
+    display:block;
   }
-  .f3-body ol{margin:0;padding-left:16px;}
-  .sig-col{
-    display:flex;
-    flex-direction:column;
-    justify-content:space-between;
+  .f3-body ol{margin:0;padding-left:18px;list-style-position:outside;}
+  .f3-body li{white-space:normal;margin:0 0 4px;padding-left:4px;}
+  .f3-body .term-line{margin:0 0 4px;white-space:normal;}
+  .sig-col .sig-body{
+    display:block;
+    padding-top:8px;
   }
-  .sig-col .for-company{
-    font-weight:800;
-    color:var(--purple);
-    padding:8px 12px 0;
-    font-size:12px;
-      text-align:center;
+  .sig-col .sig-space{
+    display:block;
+    height:56px;
+    min-height:56px;
+    max-height:56px;
   }
   .sig-col .sig-line{
-    margin:14px 12px 8px;
+    margin:0;
     border-top:1px solid #333;
     text-align:center;
     padding-top:4px;
-    font-size:12px;
+    font-size:11px;
+    color:#231f20;
+    visibility:visible;
   }
 
   /* ===== BAR FOOTER ===== */
@@ -545,13 +627,13 @@ const getCommonStyle = () => `
 
   @media print{
     body{background:#fff;}
-    .page {margin:0;padding: 0;width:794px;height: 1123px;max-height:1123px;overflow:hidden;}
-    .content-wrapper { width: 100%; height: 100%; min-height: 0; border-collapse: collapse; border: 2px solid var(--purple); box-sizing: border-box; table-layout: fixed; }
-  .content-wrapper td { padding: 0; }
+    .page {margin:0;padding: 0;width:794px;height: 1123px;max-height:1123px;overflow:hidden;display:flex;flex-direction:column;}
+    .content-wrapper { display:flex; flex-direction:column; width:100%; height:100%; min-height:0; border:2px solid var(--purple); box-sizing:border-box; }
   }
 `;
 
-const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
+const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
+  const data = fillPrintPartyFields(raw, raw?.appData || loadUmaAppData());
   const profile = mergeCompanyProfile(profileInput);
   const docNo = escHtml(data.noteNo || 'N/A');
   const docDate = escHtml(formatPdfDateDmy(data.date) || 'N/A');
@@ -560,7 +642,21 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
   const poNoRaw = data.poNo || '';
   const refRaw = data.reference || '';
 
-  const { rows, totalAmt, totalSgst, totalCgst, totalIgst, totalQty } = calcNoteLines(data);
+  const {
+    rows,
+    grossAmt,
+    discount,
+    totalAmt,
+    totalSgst,
+    totalCgst,
+    totalIgst,
+    totalAll,
+    totalQty,
+    taxRate,
+    displayRate,
+    roundedTotal,
+    roundOff
+  } = calcNoteLines(data);
 
   // Bill To
   const billName = escHtml(data.partyName || '');
@@ -576,30 +672,15 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
   const shipStateCode = escHtml(data.shipStateCode || data.stateCode || '');
   const shipGstin = escHtml(data.gstinShip || data.gstin || '');
 
-  let companyPan = escHtml(profile.panNumber || '');
-  if (!companyPan && profile.gstNumber && profile.gstNumber.length >= 15) {
-    companyPan = escHtml(profile.gstNumber.substring(2, 12));
-  }
-  const companyState = escHtml(profile.state || 'Gujarat');
-  
-  const isIgst = (billState.toLowerCase() !== companyState.toLowerCase()) && billState !== '';
-  const displayIgst = isIgst ? (totalSgst + totalCgst) : (totalIgst || 0);
-  const displaySgst = isIgst ? 0 : totalSgst;
-  const displayCgst = isIgst ? 0 : totalCgst;
-  const displayTotalAll = totalAmt + displaySgst + displayCgst + displayIgst;
-
   const bodyRows = rows.map((r) => {
     let desc = r.label;
     const match = r.label.match(/(.*?)\s*\(\d+\)$/);
     if (match) {
       desc = match[1].trim();
     }
-    const sgstAmt = isIgst ? 0 : r.sgstAmt;
-    const cgstAmt = isIgst ? 0 : r.cgstAmt;
-    const igstAmt = isIgst ? (r.sgstAmt + r.cgstAmt) : 0;
     const sgstRate = r.sgstRate || 0;
     const cgstRate = r.cgstRate || 0;
-    const igstRate = sgstRate + cgstRate;
+    const igstRate = r.igstRate || 0;
     
     return `
       <tr>
@@ -608,31 +689,18 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
         <td class="center">${fmtQty(r.qty)}</td>
         <td class="num">${fmtMoney(r.rate)}</td>
         <td class="num">${fmtMoney(r.amt)}</td>
-        <td class="num">${isIgst ? '' : sgstRate}</td>
-        <td class="num">${isIgst ? '0.00' : fmtMoney(sgstAmt)}</td>
-        <td class="num">${isIgst ? '' : cgstRate}</td>
-        <td class="num">${isIgst ? '0.00' : fmtMoney(cgstAmt)}</td>
-        <td class="num">${!isIgst ? '' : igstRate}</td>
-        <td class="num">${!isIgst ? '0.00' : fmtMoney(igstAmt)}</td>
+        <td class="num">${sgstRate ? sgstRate : ''}</td>
+        <td class="num">${fmtMoney(r.sgstAmt)}</td>
+        <td class="num">${cgstRate ? cgstRate : ''}</td>
+        <td class="num">${fmtMoney(r.cgstAmt)}</td>
+        <td class="num">${igstRate ? igstRate : ''}</td>
+        <td class="num">${fmtMoney(r.igstAmt)}</td>
         <td class="num">${fmtMoney(r.rowTotal)}</td>
       </tr>`;
   }).join('');
 
-  const blankCount = noteType === 'Credit Note' ? CREDIT_NOTE_BLANK_ROWS : NOTE_BLANK_ROWS;
-  const blanks = Array.from({ length: blankCount }, () => `
-      <tr class="filler-row">
-        <td></td><td></td><td></td><td></td>
-        <td></td><td></td><td></td>
-        <td></td><td></td><td></td><td></td>
-        <td></td>
-      </tr>
-  `).join('');
-
-  const roundedTotal = Math.round(displayTotalAll);
-  const roundOff = roundedTotal - displayTotalAll;
-  const totalTaxAmount = displaySgst + displayCgst + displayIgst;
-  const taxHalf = (parseFloat(data.taxRate) || 18) / 2;
-  const taxFull = parseFloat(data.taxRate) || 18;
+  const blanks = buildFillerRowsHtml(12, 10);
+  const totalTaxAmount = totalSgst + totalCgst + totalIgst;
   
   let reasonBar = '';
   if (reasonsArray && reasonsArray.length) {
@@ -660,10 +728,9 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
 <style>${getCommonStyle()}</style>
 </head>
 <body>
-<div class="page">
-<table class="content-wrapper">
-  <tr>
-    <td valign="top" style="padding: 4px 10px 0;">
+<div class="page ${noteType === 'Debit Note' ? 'dn-page' : 'cn-page'}">
+<div class="content-wrapper">
+  <div class="inv-top">
 
   <!-- HEADER -->
   <div class="header">
@@ -697,16 +764,15 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
     </div>
 
     <div class="invoice-meta">
-      <div style="text-align:center; padding:6px 0 2px; font-weight:800; color:var(--purple); font-size:12px; letter-spacing:0.5px;">REFERENCE DETAILS</div>
-      <div class="block" style="padding-top:4px;">
+      <div class="block">
         <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">${noteType} No.</span><span class="m-colon">:</span><span class="m-value">${docNo}</span></div>
         <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="m-label">${noteType} Date</span><span class="m-colon">:</span><span class="m-value">${docDate}</span></div>
       </div>
       <div class="block">
-        ${hasPrintVal(refInvoiceRaw) ? `<div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">Original Invoice No.</span><span class="m-colon">:</span><span class="m-value">${escHtml(refInvoiceRaw)}</span></div>` : ''}
-        ${hasPrintVal(refDateRaw) ? `<div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">Original Invoice Date</span><span class="m-colon">:</span><span class="m-value">${escHtml(refDateRaw)}</span></div>` : ''}
-        ${hasPrintVal(poNoRaw) ? `<div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 2.9c0-.5.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg></span><span class="m-label">Customer PO No.</span><span class="m-colon">:</span><span class="m-value">${escHtml(poNoRaw)}</span></div>` : ''}
-        ${hasPrintVal(refRaw) ? `<div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">Reference</span><span class="m-colon">:</span><span class="m-value">${escHtml(refRaw)}</span></div>` : ''}
+        ${buildOptionalMetaRowHtml('Original Invoice No.', refInvoiceRaw, { iconHtml: '<svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg>' })}
+        ${buildOptionalMetaRowHtml('Original Invoice Date', refDateRaw, { sub: true })}
+        ${buildOptionalMetaRowHtml('Customer PO No.', poNoRaw, { sub: true })}
+        ${buildOptionalMetaRowHtml('Reference', refRaw, { sub: true })}
       </div>
     </div>
   </div>
@@ -715,40 +781,37 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
   <div class="parties">
     <div class="party">
       <div class="party-head"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg> BILL TO</div>
-      <div class="party-body">
-        <div class="cname">${billName}</div>
-        ${billAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
-      </div>
+      <div class="party-body"><div class="cname">${billName}</div>${billAddr.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
       ${buildPartyFootHtml(data.gstinBill || data.gstin || '', data.billState || data.state || '', data.billStateCode || data.stateCode || '')}
     </div>
     <div class="party">
       <div class="party-head"><svg viewBox="0 0 24 24"><path d="M3 16V7h9v9"/><path d="M12 10h5l3 3v3h-8z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg> SHIP TO</div>
-      <div class="party-body">
-        <div class="cname">${shipName}</div>
-        ${shipAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
-      </div>
+      <div class="party-body"><div class="cname">${shipName}</div>${shipAddr.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
       ${buildPartyFootHtml(data.gstinShip || data.gstin || '', data.shipState || data.state || '', data.shipStateCode || data.stateCode || '')}
     </div>
   </div>
 
   ${reasonBar}
 
+  </div>
+  <div class="items-row">
+
   <!-- ITEMS TABLE -->
   <div class="table-container">
     <table class="items">
     <colgroup>
         <col style="width: 3%;">
-        <col style="width: 22%;">
+        <col style="width: 26%;">
+        <col style="width: 6%;">
+        <col style="width: 6%;">
         <col style="width: 8%;">
+        <col style="width: 5%;">
         <col style="width: 8%;">
-        <col style="width: 9%;">
-        <col style="width: 4%;">
-        <col style="width: 9%;">
-        <col style="width: 4%;">
-        <col style="width: 9%;">
-        <col style="width: 4%;">
-        <col style="width: 9%;">
-        <col style="width: 11%;">
+        <col style="width: 5%;">
+        <col style="width: 8%;">
+        <col style="width: 5%;">
+        <col style="width: 8%;">
+        <col style="width: 12%;">
       </colgroup>
       <thead>
         <tr>
@@ -782,21 +845,19 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
           <td></td>
           <td class="num">${fmtMoney(totalAmt)}</td>
           <td></td>
-          <td class="num">${fmtMoney(displaySgst)}</td>
+          <td class="num">${fmtMoney(totalSgst)}</td>
           <td></td>
-          <td class="num">${fmtMoney(displayCgst)}</td>
+          <td class="num">${fmtMoney(totalCgst)}</td>
           <td></td>
-          <td class="num">${fmtMoney(displayIgst)}</td>
-          <td class="num">${fmtMoney(displayTotalAll)}</td>
+          <td class="num">${fmtMoney(totalIgst)}</td>
+          <td class="num">${fmtMoney(totalAll)}</td>
         </tr>
       </tfoot>
   </table>
   </div>
 
-      </td>
-  </tr>
-  <tr>
-    <td valign="bottom" style="padding: 8px 10px 0; height: 1px;">
+  </div>
+  <div class="inv-bot">
   <!-- BANK DETAILS + TOTALS -->
   <div class="bottom">
     ${noteType === 'Debit Note' ? `
@@ -824,10 +885,12 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
 
     <div class="totals">
       <div class="totals-body">
-        <div class="trow"><span class="tlabel">Taxable Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>
-        <div class="trow"><span class="tlabel">CGST @ ${taxHalf}%</span><span class="tval">${isIgst ? '-' : '&#8377; ' + fmtMoney(displayCgst)}</span></div>
-        <div class="trow"><span class="tlabel">SGST @ ${taxHalf}%</span><span class="tval">${isIgst ? '-' : '&#8377; ' + fmtMoney(displaySgst)}</span></div>
-        <div class="trow"><span class="tlabel">IGST @ ${taxFull}%</span><span class="tval">${isIgst ? '&#8377; ' + fmtMoney(displayIgst) : '-'}</span></div>
+        <div class="trow"><span class="tlabel">Total Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(grossAmt)}</span></div>
+        ${discount > 0 ? `<div class="trow"><span class="tlabel">Discount</span><span class="tval">&#8377; ${fmtMoney(discount)}</span></div>
+        <div class="trow"><span class="tlabel">Taxable Amount</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>` : ''}
+        <div class="trow"><span class="tlabel">CGST @ ${displayRate}%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
+        <div class="trow"><span class="tlabel">SGST @ ${displayRate}%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
+        <div class="trow"><span class="tlabel">IGST @ ${taxRate}%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
         <div class="trow rule"><span class="tlabel">Total Tax Amount</span><span class="tval">&#8377; ${fmtMoney(totalTaxAmount)}</span></div>
         <div class="trow"><span class="tlabel">Round Off</span><span class="tval">&#8377; ${fmtMoney(roundOff)}</span></div>
       </div>
@@ -839,28 +902,11 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
   </div>
 
   <!-- TERMS / DECLARATION / SIGNATORY -->
-  <div class="footer3">
-    <div class="f3col">
-      <div class="box-head"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg> TERMS &amp; CONDITIONS</div>
-      <div class="f3-body">
-        <ol>
-          <li>Subject to Vadodara Jurisdiction.</li>
-          <li>Payment terms as per our agreed terms.</li>
-          <li>Interest will be charged @ 24% p.a. if the amount remains unpaid from the due date.</li>
-        </ol>
-      </div>
-    </div>
-    <div class="f3col">
-      <div class="box-head"><svg viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5z"/><path d="M9 12l2 2 4-4"/></svg> DECLARATION</div>
-      <div class="f3-body">
-        This ${noteType} is issued against the above tax invoice and forms an integral part of the original transaction.
-      </div>
-    </div>
-    <div class="f3col sig-col">
-      <div class="for-company">For UMA MICRON</div>
-      <div class="sig-line">Authorised Signatory</div>
-    </div>
-  </div>
+  ${buildFooterTerms(
+    profile.companyName || 'UMA MICRON',
+    formatPrintTermsHtml(data.terms, DEFAULT_INVOICE_TERMS),
+    `This ${noteType} is issued against the above tax invoice and forms an integral part of the original transaction.`
+  )}
 
   <!-- BAR FOOTER -->
   <div class="barfoot">
@@ -870,9 +916,8 @@ const buildNoteHtmlCommon = (data, profileInput, noteType, reasonsArray) => {
     <span>Page 1 of 1</span>
   </div>
 
-    </td>
-  </tr>
-</table>
+  </div>
+</div>
 </div>
 </body>
 </html>`;

@@ -8,6 +8,7 @@ import {
   STANDARD_CHARGES_LIST,
   OTHER_CHARGE_ITEM
 } from '../utils/documentCharges';
+import { calcNoteLines } from '../utils/debitCreditNoteHtml';
 
 const blankLine = () => ({ id: Date.now() + Math.random(), description: '', qty: 1, rate: 0 });
 
@@ -31,6 +32,24 @@ const linesFromNote = (note) => {
     });
   });
   return migrated.length ? migrated : [blankLine()];
+};
+
+const notePrintPayload = (note, party = {}) => {
+  const billAddress = note.billAddress || note.address || party.billAddress || '';
+  const shipAddress = note.shipAddress || billAddress || party.shipAddress || '';
+  return {
+    ...note,
+    partyName: note.partyName || party.name || '',
+    address: billAddress,
+    billAddress,
+    shipAddress,
+    billState: note.billState || note.state || party.billState || party.state || '',
+    billStateCode: note.billStateCode || note.stateCode || party.stateCode || '',
+    state: note.state || note.billState || party.state || '',
+    stateCode: note.stateCode || note.billStateCode || party.stateCode || '',
+    gstin: note.gstin || note.gstinBill || party.gstinBill || '',
+    gstinBill: note.gstinBill || note.gstin || party.gstinBill || ''
+  };
 };
 
 const DebitNotes = () => {
@@ -151,26 +170,11 @@ const DebitNotes = () => {
     });
   };
 
-  const getSubtotal = () => {
-    let subtotal = 0;
-    (form.customCharges || []).forEach(c => {
-      subtotal += (parseFloat(c.qty) || 0) * (parseFloat(c.rate) || 0);
-    });
-
-    if (subtotal === 0 && (form.particulars || form.amount)) {
-      subtotal = parseFloat(form.amount) || 0;
-    }
-    return subtotal;
-  };
+  const noteTotals = calcNoteLines(form);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const subtotal = getSubtotal();
-    const discountAmount = parseFloat(form.discount) || 0;
-    const taxable = Math.max(0, subtotal - discountAmount);
-    const taxAmount = taxable * (form.taxRate / 100);
-    const total = taxable + taxAmount;
-
+    const calc = calcNoteLines(form);
     const billAddress = (form.billAddress || form.address || '').trim();
     const shipAddress = (form.shipAddress || billAddress).trim();
     const finalDoc = {
@@ -178,15 +182,18 @@ const DebitNotes = () => {
       address: billAddress,
       billAddress,
       shipAddress,
+      billState: form.billState || form.state || '',
+      billStateCode: form.billStateCode || form.stateCode || '',
+      gstinBill: form.gstinBill || form.gstin || '',
       charges: {},
       rates: {},
       qtys: {},
       customCharges: (form.customCharges || []).filter(
         (c) => (c.description || '').trim() || (parseFloat(c.qty) || 0) * (parseFloat(c.rate) || 0)
       ),
-      subtotal,
-      taxAmount,
-      amount: total
+      subtotal: calc.grossAmt,
+      taxAmount: calc.totalSgst + calc.totalCgst + calc.totalIgst,
+      amount: calc.roundedTotal
     };
 
     if (isEditing) {
@@ -259,33 +266,11 @@ const DebitNotes = () => {
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button title="Preview PDF" onClick={() => {
                           const party = data.parties?.find(p => p.id === note.partyId) || {};
-                          const billAddress = note.billAddress || note.address || party.billAddress || '';
-                          const shipAddress = note.shipAddress || billAddress || party.shipAddress || '';
-                          viewPDF('DN', {
-                            ...note,
-                            partyName: note.partyName || party.name || '',
-                            address: billAddress,
-                            billAddress,
-                            shipAddress,
-                            state: note.state || 'GUJARAT',
-                            stateCode: note.stateCode || '24',
-                            gstin: note.gstin || note.gstinBill || party.gstinBill || ''
-                          });
+                          viewPDF('DN', notePrintPayload(note, party));
                         }} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Eye size={16} /></button>
                           <button onClick={() => {
                           const party = data.parties?.find(p => p.id === note.partyId) || {};
-                          const billAddress = note.billAddress || note.address || party.billAddress || '';
-                          const shipAddress = note.shipAddress || billAddress || party.shipAddress || '';
-                          exportToPDF('DN', {
-                            ...note,
-                            partyName: note.partyName || party.name || '',
-                            address: billAddress,
-                            billAddress,
-                            shipAddress,
-                            state: note.state || 'GUJARAT',
-                            stateCode: note.stateCode || '24',
-                            gstin: note.gstin || note.gstinBill || party.gstinBill || ''
-                          });
+                          exportToPDF('DN', notePrintPayload(note, party));
                         }} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={16} /></button>
                         <button onClick={() => handleEdit(note)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={16} /></button>
                         <button onClick={() => deleteItemSoftly('debitNotes', note.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }}><Trash2 size={16} /></button>
@@ -441,12 +426,18 @@ const DebitNotes = () => {
                   <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--accent-primary)' }}>GST Tax Calculations</h4>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <span>Subtotal:</span>
-                    <span style={{ fontWeight: 600 }}>₹{getSubtotal().toFixed(2)}</span>
+                    <span style={{ fontWeight: 600 }}>₹{noteTotals.grossAmt.toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
                     <span>Discount (₹):</span>
                     <input type="number" className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.discount} onChange={e => setForm({...form, discount: parseFloat(e.target.value) || 0})} />
                   </div>
+                  {noteTotals.discount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                      <span>Taxable Amount:</span>
+                      <span>₹{noteTotals.totalAmt.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
                     <span>GST Rate (%):</span>
                     <select className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
@@ -457,16 +448,26 @@ const DebitNotes = () => {
                     </select>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span>CGST @{(form.taxRate / 2)}%:</span>
-                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
+                    <span>CGST @{noteTotals.displayRate}%:</span>
+                    <span>₹{noteTotals.totalCgst.toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span>SGST @{(form.taxRate / 2)}%:</span>
-                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
+                    <span>SGST @{noteTotals.displayRate}%:</span>
+                    <span>₹{noteTotals.totalSgst.toFixed(2)}</span>
+                  </div>
+                  {noteTotals.totalIgst > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                      <span>IGST @{noteTotals.taxRate}%:</span>
+                      <span>₹{noteTotals.totalIgst.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span>Round Off:</span>
+                    <span>₹{noteTotals.roundOff.toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
                     <span>Grand Total:</span>
-                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (1 + form.taxRate / 100)).toFixed(2)}</span>
+                    <span>₹{noteTotals.roundedTotal.toFixed(2)}</span>
                   </div>
                 </div>
               </div>

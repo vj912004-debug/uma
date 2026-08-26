@@ -22,6 +22,368 @@ export const fmtQty = (n) => {
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
 };
 
+const BLANK_PRINT_RE = /^(n\/?a|-|—|–|none|null|undefined)$/i;
+const GST_STATE_NAMES = {
+  '24': 'GUJARAT',
+  '27': 'MAHARASHTRA',
+  '07': 'DELHI',
+  '33': 'TAMIL NADU',
+  '29': 'KARNATAKA',
+  '36': 'TELANGANA',
+  '37': 'ANDHRA PRADESH',
+  '08': 'RAJASTHAN',
+  '09': 'UTTAR PRADESH',
+  '23': 'MADHYA PRADESH',
+  '06': 'HARYANA',
+  '03': 'PUNJAB'
+};
+
+const firstPrintText = (...vals) => {
+  for (const v of vals) {
+    if (v == null || v === false) continue;
+    const s = Array.isArray(v)
+      ? v.filter((x) => x != null && String(x).trim()).join('\n').trim()
+      : String(v).trim();
+    if (!s || BLANK_PRINT_RE.test(s)) continue;
+    return s;
+  }
+  return '';
+};
+
+const normGstin = (s) => String(s || '').replace(/[\s-]/g, '').toUpperCase();
+const normPartyName = (s) => String(s || '')
+  .toLowerCase()
+  .replace(/[.,'"()]/g, '')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const docHasAddress = (d) => Boolean(firstPrintText(
+  d?.billAddress,
+  d?.address,
+  d?.shipAddress,
+  d?.billingAddress,
+  d?.partyAddress
+));
+
+export const loadUmaAppData = () => {
+  try {
+    const raw = localStorage.getItem('uma_erp_data');
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+/** Fill blank print addresses/GSTIN from Material Receipt or Parties master. */
+export const fillPrintPartyFields = (data, appData = {}) => {
+  if (!data) return data;
+  const parties = appData.parties || [];
+  const mrs = appData.materialReceipts || [];
+  const extraDocs = [
+    ...mrs,
+    ...(appData.invoices || []),
+    ...(appData.purchaseOrders || []),
+    ...(appData.deliveryChallans || []),
+    ...(appData.debitNotes || []),
+    ...(appData.creditNotes || [])
+  ];
+  const partyName = data.partyName || data.customerName || data.shipName || '';
+  const gstinHint = normGstin(data.gstinBill || data.gstin || data.gstinShip || '');
+
+  const matchParty = (p) => {
+    if (!p) return false;
+    if (data.partyId && p.id === data.partyId) return true;
+    if (partyName && normPartyName(p.name) === normPartyName(partyName)) return true;
+    if (gstinHint && (
+      normGstin(p.gstinBill) === gstinHint
+      || normGstin(p.gstinShip) === gstinHint
+      || normGstin(p.gstin) === gstinHint
+    )) return true;
+    return false;
+  };
+
+  let party = parties.find((p) => data.partyId && p.id === data.partyId)
+    || parties.find((p) => partyName && normPartyName(p.name) === normPartyName(partyName))
+    || parties.find((p) => gstinHint && (
+      normGstin(p.gstinBill) === gstinHint
+      || normGstin(p.gstinShip) === gstinHint
+      || normGstin(p.gstin) === gstinHint
+    ))
+    || null;
+
+  let mr = mrs.find((r) => data.receiptId && r.id === data.receiptId)
+    || extraDocs.find((r) => data.receiptId && r.receiptId === data.receiptId && docHasAddress(r))
+    || mrs.find((r) => partyName && normPartyName(r.partyName) === normPartyName(partyName) && docHasAddress(r))
+    || extraDocs.find((r) => gstinHint && normGstin(r.gstinBill || r.gstin || r.gstinShip) === gstinHint && docHasAddress(r))
+    || extraDocs.find((r) => partyName && normPartyName(r.partyName) === normPartyName(partyName) && docHasAddress(r))
+    || mrs.find((r) => partyName && normPartyName(r.partyName) === normPartyName(partyName))
+    || null;
+
+  if (!party && mr) {
+    party = parties.find((p) => p.id === mr.partyId)
+      || parties.find((p) => matchParty(p) || normPartyName(p.name) === normPartyName(mr.partyName))
+      || null;
+  }
+
+  const billAddress = firstPrintText(
+    data.billAddress,
+    data.address,
+    data.billingAddress,
+    data.partyAddress,
+    mr?.billAddress,
+    mr?.address,
+    mr?.shipAddress,
+    party?.billAddress,
+    party?.address
+  );
+  const shipAddress = firstPrintText(
+    data.shipAddress,
+    data.shippingAddress,
+    mr?.shipAddress,
+    party?.shipAddress,
+    billAddress
+  );
+  const gstinBill = firstPrintText(data.gstinBill, data.gstin, mr?.gstinBill, party?.gstinBill, party?.gstin);
+  const gstinShip = firstPrintText(data.gstinShip, mr?.gstinShip, party?.gstinShip, gstinBill);
+  const gstState = GST_STATE_NAMES[gstinBill.slice(0, 2)] || '';
+
+  return {
+    ...data,
+    billAddress,
+    shipAddress,
+    address: firstPrintText(data.address, billAddress),
+    partyAddress: firstPrintText(data.partyAddress, billAddress),
+    gstinBill,
+    gstinShip,
+    gstin: firstPrintText(data.gstin, gstinBill),
+    billState: firstPrintText(data.billState, data.state, mr?.billState, party?.billState, party?.state, gstState),
+    shipState: firstPrintText(data.shipState, mr?.shipState, party?.shipState, data.billState, data.state, gstState)
+  };
+};
+
+/** Empty grid rows that stretch to fill leftover table height. */
+export const buildFillerRowsHtml = (colCount, rowCount = 12) => {
+  const cells = Array.from({ length: colCount }, () => '<td>&nbsp;</td>').join('');
+  return Array.from({ length: rowCount }, () => `<tr class="filler-row">${cells}</tr>`).join('');
+};
+
+/** Pages that pin Terms/Declaration/Signatory inside A4 without html2canvas flex clipping. */
+export const FIT_FOOTER_PAGE_SEL = '.ti-page, .pi-page, .cn-page, .dn-page, .po-page';
+
+export const FIT_FOOTER_CSS = `
+  .ti-page .content-wrapper,
+  .pi-page .content-wrapper,
+  .cn-page .content-wrapper,
+  .dn-page .content-wrapper,
+  .po-page .content-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border: 2px solid var(--purple);
+    box-sizing: border-box;
+  }
+  .ti-page .inv-top,
+  .pi-page .inv-top,
+  .cn-page .inv-top,
+  .dn-page .inv-top,
+  .po-page .inv-top {
+    flex: 0 0 auto;
+    padding: 4px 10px 0;
+  }
+  .ti-page .items-row,
+  .pi-page .items-row,
+  .cn-page .items-row,
+  .dn-page .items-row,
+  .po-page .items-row {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0 10px 4px;
+  }
+  .ti-page .inv-bot,
+  .pi-page .inv-bot,
+  .cn-page .inv-bot,
+  .dn-page .inv-bot,
+  .po-page .inv-bot {
+    flex: 0 0 auto;
+    padding: 8px 10px 0;
+  }
+  .ti-page .table-container,
+  .pi-page .table-container,
+  .cn-page .table-container,
+  .dn-page .table-container,
+  .po-page .table-container,
+  .ti-page table.items,
+  .pi-page table.items,
+  .cn-page table.items,
+  .dn-page table.items,
+  .po-page table.items { height: auto; max-height: 100%; }
+  table.footer3 {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 10px 0;
+    margin: 6px 0 0;
+    table-layout: fixed;
+  }
+  table.footer3 td.f3col {
+    width: 33.33%;
+    height: 128px;
+    border: 1px solid var(--lav-border);
+    vertical-align: top;
+    padding: 0;
+  }
+  table.footer3 .f3-body {
+    display: block;
+    height: auto;
+    min-height: 0;
+    padding: 8px 10px;
+  }
+  table.footer3 .sig-body {
+    display: block;
+    height: auto;
+    min-height: 0;
+    padding-top: 8px;
+  }
+  table.footer3 .sig-space {
+    display: block;
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
+  }
+`;
+
+export const layoutFitFooterPages = (doc, pageHeight) => {
+  if (!doc) return;
+  doc.querySelectorAll(FIT_FOOTER_PAGE_SEL).forEach((page) => {
+    const wrap = page.querySelector('.content-wrapper') || page;
+    const topRow = page.querySelector('.inv-top');
+    const itemsRow = page.querySelector('.items-row');
+    const botRow = page.querySelector('.inv-bot');
+    if (!itemsRow || !botRow) return;
+
+    page.style.setProperty('overflow', 'visible', 'important');
+    wrap.style.setProperty('display', 'flex', 'important');
+    wrap.style.setProperty('flex-direction', 'column', 'important');
+    wrap.style.setProperty('height', 'auto', 'important');
+    wrap.style.setProperty('max-height', 'none', 'important');
+
+    itemsRow.style.setProperty('height', 'auto', 'important');
+    itemsRow.style.setProperty('max-height', 'none', 'important');
+    itemsRow.style.setProperty('flex', '0 0 auto', 'important');
+    itemsRow.style.setProperty('overflow', 'visible', 'important');
+    botRow.style.setProperty('height', 'auto', 'important');
+    botRow.style.setProperty('max-height', 'none', 'important');
+    botRow.style.setProperty('flex', '0 0 auto', 'important');
+    botRow.style.setProperty('overflow', 'visible', 'important');
+    page.querySelectorAll('.table-container, table.items').forEach((el) => {
+      el.style.setProperty('height', 'auto', 'important');
+      el.style.setProperty('max-height', 'none', 'important');
+    });
+    page.querySelectorAll('tr.filler-row').forEach((tr) => {
+      tr.style.height = '16px';
+      [...tr.children].forEach((td) => {
+        td.style.height = '16px';
+        td.style.minHeight = '16px';
+        td.style.maxHeight = '16px';
+      });
+    });
+    page.querySelectorAll('table.items tbody tr:not(.filler-row) td').forEach((td) => {
+      td.style.height = 'auto';
+      td.style.minHeight = '22px';
+      td.style.maxHeight = 'none';
+      td.style.overflow = 'visible';
+    });
+    page.querySelectorAll('table.items tbody td.left').forEach((td) => {
+      td.style.whiteSpace = 'normal';
+      td.style.overflowWrap = 'break-word';
+      td.style.wordBreak = 'break-word';
+    });
+
+    void page.offsetHeight;
+
+    const topH = topRow ? Math.ceil(topRow.offsetHeight) : 0;
+    let botH = Math.ceil(Math.max(botRow.offsetHeight, botRow.scrollHeight, 0));
+    if (botH < 80) botH = 320;
+    const itemsH = Math.max(80, pageHeight - topH - botH - 4);
+
+    wrap.style.setProperty('height', `${pageHeight}px`, 'important');
+    wrap.style.setProperty('max-height', `${pageHeight}px`, 'important');
+    itemsRow.style.setProperty('height', `${itemsH}px`, 'important');
+    itemsRow.style.setProperty('max-height', `${itemsH}px`, 'important');
+    itemsRow.style.setProperty('flex', `0 0 ${itemsH}px`, 'important');
+    itemsRow.style.setProperty('overflow', 'hidden', 'important');
+    botRow.style.setProperty('flex', '0 0 auto', 'important');
+    page.querySelectorAll('.table-container').forEach((el) => {
+      el.style.setProperty('height', 'auto', 'important');
+      el.style.setProperty('max-height', '100%', 'important');
+      el.style.setProperty('overflow', 'visible', 'important');
+    });
+    page.querySelectorAll('table.items').forEach((el) => {
+      el.style.setProperty('height', 'auto', 'important');
+      el.style.setProperty('max-height', '100%', 'important');
+    });
+
+    page.style.setProperty('height', `${pageHeight}px`, 'important');
+    page.style.setProperty('max-height', `${pageHeight}px`, 'important');
+    page.style.setProperty('overflow', 'hidden', 'important');
+
+    void page.offsetHeight;
+    const pageBottom = page.getBoundingClientRect().bottom;
+    const footEl = page.querySelector('.barfoot') || botRow;
+    const extra = Math.ceil(footEl.getBoundingClientRect().bottom - pageBottom);
+    if (extra > 0) {
+      const nextH = Math.max(60, itemsH - extra - 10);
+      itemsRow.style.setProperty('height', `${nextH}px`, 'important');
+      itemsRow.style.setProperty('max-height', `${nextH}px`, 'important');
+      itemsRow.style.setProperty('flex', `0 0 ${nextH}px`, 'important');
+    }
+  });
+};
+
+
+export const ITEMS_TABLE_FILL_CSS = `
+  .content-wrapper tr.inv-top,
+  .content-wrapper tr.inv-bot { height: 1px; }
+  .content-wrapper tr.inv-bot > td { height: 1px; vertical-align: bottom; }
+  .pi-page .content-wrapper tr.inv-bot,
+  .ti-page .content-wrapper tr.inv-bot,
+  .cn-page .content-wrapper tr.inv-bot,
+  .dn-page .content-wrapper tr.inv-bot,
+  .po-page .content-wrapper tr.inv-bot { height: auto; }
+  .pi-page .content-wrapper tr.inv-bot > td,
+  .ti-page .content-wrapper tr.inv-bot > td,
+  .cn-page .content-wrapper tr.inv-bot > td,
+  .dn-page .content-wrapper tr.inv-bot > td,
+  .po-page .content-wrapper tr.inv-bot > td {
+    height: auto;
+    min-height: 280px;
+    vertical-align: bottom;
+  }
+  .content-wrapper tr.items-row { height: 100%; }
+  .content-wrapper tr.items-row > td {
+    height: 100%;
+    vertical-align: top;
+    padding: 0 10px 6px;
+  }
+  .table-container { height: 100%; }
+  table.items { height: 100%; }
+  table.items thead,
+  table.items tfoot { height: 1px; }
+  table.items tbody tr.filler-row { height: 1%; }
+  table.items tbody tr.filler-row td {
+    height: auto !important;
+    min-height: 18px;
+    padding: 2px 3px !important;
+    border: 1px solid var(--lav-border) !important;
+    line-height: 1;
+    background: #fff;
+    vertical-align: middle;
+  }
+`;
+
+
 export const getSharedPrintStyles = () => `
   :root {
     --purple: #3d2b7d;
@@ -251,16 +613,22 @@ export const getSharedPrintStyles = () => `
   }
   .party-head svg, .box-head svg, .card-title i { flex-shrink: 0; }
   .party-body, .card-body {
-    padding: 10px 12px;
+    padding: 8px 12px;
     font-size: 12.5px;
-    line-height: 1.55;
-    min-height: 80px;
+    line-height: 1.4;
+    min-height: 0;
+    white-space: normal;
   }
   .party-body .cname, .client-title {
     color: var(--purple);
     font-weight: 800;
     font-size: 14px;
-    margin-bottom: 4px;
+    margin: 0 0 2px;
+  }
+  .party-body .addr {
+    margin: 0;
+    line-height: 1.4;
+    white-space: normal;
   }
   .party-foot, .card-footer-data {
     border-top: 1px solid var(--lav-border);
@@ -373,44 +741,78 @@ export const getSharedPrintStyles = () => `
   }
 
   /* ===== TERMS / DECLARATION / SIGNATORY ===== */
-  .footer3, .footer-terms-container {
-    display: flex;
-    gap: 14px;
-    margin-bottom: 0;
+  table.footer3, .footer-terms-container {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 10px 0;
+    margin: 8px 0 0;
+    table-layout: fixed;
     border: none;
     padding: 0;
-    margin-top: 0;
   }
-  .f3col, .terms-column {
-    flex: 1;
+  table.footer3 td.f3col, .terms-column {
+    width: 33.33%;
+    height: 128px;
+    min-width: 0;
     border: 1px solid var(--lav-border);
     padding: 0;
+    vertical-align: top;
+    overflow: visible;
   }
   .f3-body {
-    padding: 10px 12px;
-    font-size: 11.5px;
-    line-height: 1.6;
+    padding: 6px 10px;
+    font-size: 11px;
+    line-height: 1.4;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: break-word;
+    word-break: normal;
+    display: block;
   }
-  .f3-body ol, .terms-column ol { margin: 0; padding-left: 16px; margin-top: 6px; font-size: 11.5px; line-height: 1.6; }
-  
-  .sig-col, .signature-column {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
+  .f3-body ol, .terms-column ol {
+    margin: 0;
+    padding-left: 18px;
+    font-size: inherit;
+    line-height: 1.4;
+    list-style-position: outside;
+  }
+  .f3-body li {
+    white-space: normal;
+    margin: 0 0 4px;
+    padding-left: 4px;
+  }
+  .f3-body .term-line {
+    margin: 0 0 4px;
+    white-space: normal;
+    overflow-wrap: break-word;
   }
   .sig-col .for-company {
     font-weight: 800;
     color: var(--purple);
     padding: 8px 12px 0;
     font-size: 12.5px;
+    text-align: center;
+  }
+  .sig-col .sig-body {
+    display: block;
+    padding-top: 4px;
+  }
+  .sig-col .sig-space {
+    display: block;
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
   }
   .sig-col .sig-line, .signature-space {
-    margin: 14px 12px 8px;
+    margin: 0;
     border-top: 1px solid #333;
     text-align: center;
     padding-top: 4px;
-    font-size: 11.5px;
+    font-size: 11px;
     width: auto;
+    color: #231f20;
+    visibility: visible;
+    flex-shrink: 0;
   }
   
   /* Additional overrides for DC custom grid bottom */
@@ -563,8 +965,7 @@ export const buildPartyCard = (title, iconClass, name, addressLines, gstin, stat
   <div class="party">
     <div class="party-head">${iconHtml} ${escHtml(title)}</div>
     <div class="party-body">
-      ${hasPrintVal(name) ? `<div class="cname">${escHtml(name)}</div>` : ''}
-      ${lines.map(line => `<div>${escHtml(line)}</div>`).join('')}
+      ${hasPrintVal(name) ? `<div class="cname">${escHtml(name)}</div>` : ''}${lines.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}
     </div>
     ${buildPartyFootHtml(gstin, state, stateCode)}
   </div>`;
@@ -590,25 +991,64 @@ export const buildBankDetailsBox = (profile) => {
   </div>`;
 };
 
-export const buildFooterTerms = (companyName, termsHtml, declarationHtml) => `
-  <div class="footer3">
-    <div class="f3col">
-      <div class="box-head"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg> TERMS &amp; CONDITIONS</div>
-      <div class="f3-body">
-        ${termsHtml}
-      </div>
-    </div>
-    <div class="f3col">
-      <div class="box-head"><svg viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5z"/><path d="M9 12l2 2 4-4"/></svg> DECLARATION</div>
-      <div class="f3-body">
-        ${declarationHtml}
-      </div>
-    </div>
-    <div class="f3col sig-col">
-      <div class="for-company">For ${escHtml(companyName || 'UMA MICRON')}</div>
-      <div class="sig-line">Authorised Signatory</div>
-    </div>
-  </div>`;
+export const DEFAULT_INVOICE_TERMS = [
+  'Subject to Vadodara Jurisdiction.',
+  'Payment terms as per our agreed terms.',
+  'Interest will be charged @ 24% p.a. if the amount remains unpaid from the due date.'
+];
+
+export const DEFAULT_PO_TERMS = [
+  'Delivery 10 days from the date of Purchase Order.',
+  'Transportation Extra As Actual.',
+  '10 Years Warranty'
+];
+
+export const DEFAULT_INVOICE_DECLARATION =
+  'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.';
+
+/** Split stored terms into numbered lines (real newlines; no CSS list markers). */
+export const formatPrintTermsHtml = (terms, fallbackLines = DEFAULT_INVOICE_TERMS) => {
+  const raw = String(terms || '').trim();
+  const source = raw ? raw.split(/\r?\n/) : fallbackLines;
+  const stripNum = (line) => String(line || '')
+    .replace(/^\s*\d{1,2}[.)]\s*/, '')
+    .replace(/^\s*\d{1,2}(?=[A-Za-z])/, '')
+    .trim();
+  const lines = source.map(stripNum).filter(Boolean);
+  const items = lines.length ? lines : fallbackLines;
+  return items.map((line, i) => (
+    `<div class="term-line">${i + 1}. ${escHtml(line)}</div>`
+  )).join('');
+};
+
+export const buildFooterTerms = (companyName, termsHtml, declarationHtml) => {
+  const rawTerms = String(termsHtml || '');
+  const termsBlock = /<[^>]+>/.test(rawTerms)
+    ? rawTerms
+    : formatPrintTermsHtml(rawTerms, DEFAULT_INVOICE_TERMS);
+  const declarationRaw = String(declarationHtml || DEFAULT_INVOICE_DECLARATION).trim();
+  const declaration = /</.test(declarationRaw) ? declarationRaw : escHtml(declarationRaw);
+  return `
+  <table class="footer3">
+    <tr>
+      <td class="f3col">
+        <div class="box-head"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg> TERMS &amp; CONDITIONS</div>
+        <div class="f3-body">${termsBlock}</div>
+      </td>
+      <td class="f3col">
+        <div class="box-head"><svg viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5z"/><path d="M9 12l2 2 4-4"/></svg> DECLARATION</div>
+        <div class="f3-body">${declaration}</div>
+      </td>
+      <td class="f3col sig-col">
+        <div class="box-head" style="justify-content:center;">For ${escHtml(companyName || 'UMA MICRON')}</div>
+        <div class="f3-body sig-body">
+          <div class="sig-space"></div>
+          <div class="sig-line">Authorised Signatory</div>
+        </div>
+      </td>
+    </tr>
+  </table>`;
+};
 
 export const buildStatusBar = (pageText = 'Page 1 of 1', customText = 'This is a computer-generated document.') => `
   <div class="barfoot">
@@ -760,6 +1200,7 @@ export const renderHtmlToPdf = async (html, {
       target.style.boxSizing = 'border-box';
       target.style.margin = '0';
       target.style.zoom = '1';
+      layoutFitFooterPages(idoc, singlePageHeight);
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const naturalH = Math.max(target.scrollHeight, target.offsetHeight || 0);
@@ -793,6 +1234,10 @@ export const renderHtmlToPdf = async (html, {
         target.style.maxHeight = `${singlePageHeight}px`;
         target.style.overflow = 'hidden';
       }
+
+      layoutFitFooterPages(idoc, singlePageHeight);
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
       const captureH = (lockThisPage || (!overflows && pageNodes.length > 0))
         ? singlePageHeight
@@ -876,7 +1321,9 @@ export const renderHtmlToPdf = async (html, {
             el.style.margin = '0';
           });
           clonedDoc.querySelectorAll('.quote-banner h2').forEach((el) => {
-            el.style.fontSize = '28px';
+            const scaleRaw = getComputedStyle(clonedDoc.documentElement).getPropertyValue('--print-scale');
+            const printScale = parseFloat(scaleRaw) || 1;
+            el.style.fontSize = `${Math.round(28 * printScale)}px`;
             el.style.lineHeight = '1';
             el.style.margin = '0';
           });
@@ -884,14 +1331,53 @@ export const renderHtmlToPdf = async (html, {
             el.style.paddingTop = '4px';
             el.style.verticalAlign = 'top';
           });
-          clonedDoc.querySelectorAll('.sig-col .sig-line').forEach((el) => {
-            el.style.margin = '28px 12px 8px';
-            el.style.visibility = 'visible';
+          clonedDoc.querySelectorAll('.f3-body, .f3-body ol, .f3-body li, .f3-body .term-line').forEach((el) => {
+            el.style.whiteSpace = 'normal';
+            el.style.overflow = 'visible';
+            el.style.wordBreak = 'normal';
+            el.style.overflowWrap = 'break-word';
           });
-          clonedDoc.querySelectorAll('.footer3, .sig-col, .f3col, .barfoot').forEach((el) => {
+          clonedDoc.querySelectorAll('table.footer3 td.f3col').forEach((el) => {
+            el.style.display = 'table-cell';
+            el.style.height = '128px';
+            el.style.maxHeight = 'none';
+            el.style.overflow = 'visible';
+            el.style.verticalAlign = 'top';
+          });
+          clonedDoc.querySelectorAll('table.footer3 .f3-body, table.footer3 .sig-body').forEach((el) => {
+            el.style.display = 'block';
+            el.style.flex = 'none';
+            el.style.height = 'auto';
+            el.style.minHeight = '0';
+            el.style.overflow = 'visible';
+          });
+          clonedDoc.querySelectorAll('table.footer3 .sig-space').forEach((el) => {
+            el.style.display = 'block';
+            el.style.flex = 'none';
+            el.style.height = '56px';
+            el.style.minHeight = '56px';
+            el.style.maxHeight = '56px';
+          });
+          clonedDoc.querySelectorAll('.sig-col .sig-line, .sig-line').forEach((el) => {
+            el.style.margin = '0';
+            el.style.visibility = 'visible';
+            el.style.display = 'block';
+            el.style.color = '#231f20';
+            el.style.webkitTextFillColor = '#231f20';
+          });
+          clonedDoc.querySelectorAll('.footer3, .barfoot').forEach((el) => {
             el.style.overflow = 'visible';
             el.style.flexShrink = '0';
           });
+          clonedDoc.querySelectorAll('.barfoot').forEach((el) => {
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.lineHeight = '1.35';
+            el.style.minHeight = '32px';
+            el.style.paddingTop = el.style.paddingTop || '8px';
+            el.style.paddingBottom = '10px';
+          });
+          layoutFitFooterPages(clonedDoc, singlePageHeight);
         }
       });
 

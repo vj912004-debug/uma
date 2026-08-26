@@ -92,3 +92,36 @@ export const isTaxInvoiceDoc = (inv) => {
   const no = String(inv.invoiceNo || '');
   return no.includes('/IN/') || /\/TI\//i.test(no);
 };
+
+const noteMatchesParty = (note, party) => {
+  if (!note || note.isDeleted) return false;
+  if (party?.id && note.partyId && String(note.partyId) === String(party.id)) return true;
+  const a = String(note.partyName || '').trim().toLowerCase();
+  const b = String(party?.name || '').trim().toLowerCase();
+  return Boolean(a && b && a === b);
+};
+
+const noteAmount = (note) => parseFloat(note?.amount) || 0;
+
+/** Debit notes increase dues; credit notes reduce dues. */
+export const getPartyDebitCreditNet = (data, party) => {
+  if (!party) return 0;
+  const dn = (data?.debitNotes || []).filter((n) => noteMatchesParty(n, party)).reduce((s, n) => s + noteAmount(n), 0);
+  const cn = (data?.creditNotes || []).filter((n) => noteMatchesParty(n, party)).reduce((s, n) => s + noteAmount(n), 0);
+  return dn - cn;
+};
+
+const noteMatchesInvoice = (note, invoiceNo) => {
+  if (!note || note.isDeleted) return false;
+  const ref = String(note.refInvoice || '').trim().toLowerCase();
+  const inv = String(invoiceNo || '').trim().toLowerCase();
+  return Boolean(ref && inv && ref === inv);
+};
+
+/** Net DN − CN tagged to a tax invoice number. */
+export const getInvoiceDebitCreditNet = (data, invoiceNo) => {
+  if (!invoiceNo) return 0;
+  const dn = (data?.debitNotes || []).filter((n) => noteMatchesInvoice(n, invoiceNo)).reduce((s, n) => s + noteAmount(n), 0);
+  const cn = (data?.creditNotes || []).filter((n) => noteMatchesInvoice(n, invoiceNo)).reduce((s, n) => s + noteAmount(n), 0);
+  return dn - cn;
+};

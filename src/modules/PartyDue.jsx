@@ -114,6 +114,23 @@ const PartyDue = () => {
       }
     });
 
+    const applyNoteToFy = (note, sign) => {
+      if (note?.isDeleted) return;
+      const sameParty = (party.id && note.partyId && String(note.partyId) === String(party.id))
+        || (party.name && note.partyName && String(note.partyName).trim().toLowerCase() === String(party.name).trim().toLowerCase());
+      if (!sameParty) return;
+      const amt = (parseFloat(note.amount) || 0) * sign;
+      if (!amt) return;
+      const fy = getFYOfDate(note.date);
+      if (Object.prototype.hasOwnProperty.call(invoiceDuesByFY, fy)) {
+        invoiceDuesByFY[fy] += amt;
+      } else {
+        invoiceDuesByFY[currentFY] += amt;
+      }
+    };
+    (data.debitNotes || []).forEach((n) => applyNoteToFy(n, 1));
+    (data.creditNotes || []).forEach((n) => applyNoteToFy(n, -1));
+
     const o = party.dueOverrides || {};
     const finals = {};
     let totalDue = 0;

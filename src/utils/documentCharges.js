@@ -1,4 +1,5 @@
 import { findDedicatedReceiptDoc, findReceiptDoc, getProductBatches, getProductQty, getReceiptProductNames, getReceiptProductSummaries, getReceiptProductLabel, receiptProductOptions, resolveReceiptProductName, findAnyPackingList, buildPLProductSummaries, getMRReceivedQty } from './receiptProducts';
+import { fillPrintPartyFields } from './printTheme';
 
 const normProdKey = (s) => (s || '').trim().toLowerCase();
 
@@ -653,57 +654,65 @@ const mergeSavedChargesPreferDoc = (savedCharges, fallbackCharges) => {
 
 /** Merge MR product breakdown + per-product charges before PI PDF export. */
 export const enrichPIForPrint = (pi, appData = {}) => {
-  if (!pi?.receiptId) return pi;
-  const mr = getFreshMaterialReceipt(appData.materialReceipts, pi.receiptId);
-  if (!mr) return pi;
+  if (!pi) return pi;
+  let next = { ...pi };
+  if (pi.receiptId) {
+    const mr = getFreshMaterialReceipt(appData.materialReceipts, pi.receiptId);
+    if (mr) {
+      const prodOpts = receiptProductOptions(mr, appData);
+      const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
+      const fromMR = initProductChargesFromMR(mr, prodOpts.party, prodOpts);
+      const mergedCharges = mergeSavedChargesPreferDoc(pi.productCharges, fromMR);
+      const savedQty = parseFloat(pi.qty) || 0;
+      const liveQty = getMRReceivedQty(mr, prodOpts);
 
-  const prodOpts = receiptProductOptions(mr, appData);
-  const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
-  const fromMR = initProductChargesFromMR(mr, prodOpts.party, prodOpts);
-  const mergedCharges = mergeSavedChargesPreferDoc(pi.productCharges, fromMR);
-  const savedQty = parseFloat(pi.qty) || 0;
-  const liveQty = getMRReceivedQty(mr, prodOpts);
-
-  return {
-    ...pi,
-    partyDocNo: pi.partyDocNo || mr.partyDocNo || '',
-    partyDocDate: pi.partyDocDate || mr.partyDocDate || '',
-    billAddress: pi.billAddress || mr.billAddress || prodOpts.party?.billAddress || '',
-    shipAddress: pi.shipAddress || mr.shipAddress || prodOpts.party?.shipAddress || '',
-    gstinBill: pi.gstinBill || mr.gstinBill || prodOpts.party?.gstinBill || '',
-    gstinShip: pi.gstinShip || mr.gstinShip || prodOpts.party?.gstinShip || '',
-    productName: summaries.length ? getReceiptProductLabel(mr, prodOpts) : pi.productName,
-    productSummaries: summaries.length ? summaries : (pi.productSummaries || []),
-    productCharges: mergedCharges,
-    qty: savedQty > 0 ? savedQty : (liveQty || pi.qty)
-  };
+      next = {
+        ...pi,
+        partyDocNo: pi.partyDocNo || mr.partyDocNo || '',
+        partyDocDate: pi.partyDocDate || mr.partyDocDate || '',
+        billAddress: String(pi.billAddress || '').trim() || mr.billAddress || prodOpts.party?.billAddress || '',
+        shipAddress: String(pi.shipAddress || '').trim() || mr.shipAddress || prodOpts.party?.shipAddress || '',
+        gstinBill: pi.gstinBill || mr.gstinBill || prodOpts.party?.gstinBill || '',
+        gstinShip: pi.gstinShip || mr.gstinShip || prodOpts.party?.gstinShip || '',
+        productName: summaries.length ? getReceiptProductLabel(mr, prodOpts) : pi.productName,
+        productSummaries: summaries.length ? summaries : (pi.productSummaries || []),
+        productCharges: mergedCharges,
+        qty: savedQty > 0 ? savedQty : (liveQty || pi.qty)
+      };
+    }
+  }
+  return fillPrintPartyFields(next, appData);
 };
 
 /** Merge MR/PI/PL data into a TI before PDF export (one bill, all products). */
 export const enrichTIForPrint = (ti, appData = {}) => {
-  if (!ti?.receiptId) return ti;
-  const mr = getFreshMaterialReceipt(appData.materialReceipts, ti.receiptId);
-  if (!mr) return ti;
+  if (!ti) return ti;
+  let next = { ...ti };
+  if (ti.receiptId) {
+    const mr = getFreshMaterialReceipt(appData.materialReceipts, ti.receiptId);
+    if (mr) {
+      const prodOpts = receiptProductOptions(mr, appData);
+      const pl = findAnyPackingList(appData.packingLists, ti.receiptId);
+      const summaries = buildPLProductSummaries(pl, mr, prodOpts);
+      const piTerms = getLinkedPITermsForTI(appData.invoices, ti.receiptId);
+      const baseCharges = piTerms?.productCharges
+        || initProductChargesFromMR(mr, prodOpts.party, prodOpts);
+      const mergedCharges = mergeSavedChargesPreferDoc(ti.productCharges, baseCharges);
+      const savedQty = parseFloat(ti.qty) || 0;
+      const liveQty = getMRReceivedQty(mr, prodOpts);
 
-  const prodOpts = receiptProductOptions(mr, appData);
-  const pl = findAnyPackingList(appData.packingLists, ti.receiptId);
-  const summaries = buildPLProductSummaries(pl, mr, prodOpts);
-  const piTerms = getLinkedPITermsForTI(appData.invoices, ti.receiptId);
-  const baseCharges = piTerms?.productCharges
-    || initProductChargesFromMR(mr, prodOpts.party, prodOpts);
-  const mergedCharges = mergeSavedChargesPreferDoc(ti.productCharges, baseCharges);
-  const savedQty = parseFloat(ti.qty) || 0;
-  const liveQty = getMRReceivedQty(mr, prodOpts);
-
-  return {
-    ...ti,
-    billAddress: ti.billAddress || mr.billAddress || prodOpts.party?.billAddress || '',
-    shipAddress: ti.shipAddress || mr.shipAddress || prodOpts.party?.shipAddress || '',
-    gstinBill: ti.gstinBill || mr.gstinBill || prodOpts.party?.gstinBill || '',
-    gstinShip: ti.gstinShip || mr.gstinShip || prodOpts.party?.gstinShip || '',
-    productName: summaries.length ? getReceiptProductLabel(mr, prodOpts) : ti.productName,
-    productSummaries: summaries.length ? summaries : (ti.productSummaries || []),
-    productCharges: mergedCharges,
-    qty: savedQty > 0 ? savedQty : (liveQty || 0)
-  };
+      next = {
+        ...ti,
+        billAddress: String(ti.billAddress || '').trim() || mr.billAddress || prodOpts.party?.billAddress || '',
+        shipAddress: String(ti.shipAddress || '').trim() || mr.shipAddress || prodOpts.party?.shipAddress || '',
+        gstinBill: ti.gstinBill || mr.gstinBill || prodOpts.party?.gstinBill || '',
+        gstinShip: ti.gstinShip || mr.gstinShip || prodOpts.party?.gstinShip || '',
+        productName: summaries.length ? getReceiptProductLabel(mr, prodOpts) : ti.productName,
+        productSummaries: summaries.length ? summaries : (ti.productSummaries || []),
+        productCharges: mergedCharges,
+        qty: savedQty > 0 ? savedQty : (liveQty || 0)
+      };
+    }
+  }
+  return fillPrintPartyFields(next, appData);
 };

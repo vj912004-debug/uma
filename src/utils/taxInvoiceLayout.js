@@ -33,28 +33,67 @@ export const getSplitGstRates = (data) => {
   };
 };
 
-/** Split party address into display lines (explicit newlines or word-wrap). */
+/** Split party address into compact display lines (newlines, commas, then word-wrap). */
 export const splitPartyAddressLines = (address, charsPerLine = 48) => {
-  const text = (address || '').trim();
-  if (!text) return [];
-  const explicit = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  if (explicit.length > 1) return explicit;
-  const raw = explicit[0] || text;
-  if (raw.length <= charsPerLine) return [raw];
-  const words = raw.split(/\s+/);
-  const lines = [];
-  let cur = '';
-  words.forEach((w) => {
-    const next = cur ? `${cur} ${w}` : w;
-    if (next.length > charsPerLine && cur) {
-      lines.push(cur);
-      cur = w;
-    } else {
-      cur = next;
-    }
-  });
-  if (cur) lines.push(cur);
-  return lines.length ? lines : [raw];
+  const tidy = (s) => String(s || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*,\s*/g, ', ')
+    .replace(/[,\s]+$/g, '')
+    .trim();
+
+  const wrapLine = (raw) => {
+    const text = tidy(raw);
+    if (!text) return [];
+    if (text.length <= charsPerLine) return [text];
+    const parts = text.split(/,\s*/).filter(Boolean);
+    const lines = [];
+    let cur = '';
+    const flush = () => {
+      if (!cur) return;
+      if (cur.length <= charsPerLine) {
+        lines.push(cur);
+      } else {
+        const words = cur.split(/\s+/);
+        let buf = '';
+        words.forEach((w) => {
+          const next = buf ? `${buf} ${w}` : w;
+          if (next.length > charsPerLine && buf) {
+            lines.push(buf);
+            buf = w;
+          } else {
+            buf = next;
+          }
+        });
+        if (buf) lines.push(buf);
+      }
+      cur = '';
+    };
+    parts.forEach((part) => {
+      const next = cur ? `${cur}, ${part}` : part;
+      if (next.length > charsPerLine && cur) {
+        flush();
+        cur = part;
+      } else {
+        cur = next;
+      }
+    });
+    flush();
+    return lines.length ? lines : [text];
+  };
+
+  const chunks = String(address || '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map(tidy)
+    .filter(Boolean);
+
+  const lines = chunks.flatMap(wrapLine);
+  if (lines.length) {
+    const last = lines.length - 1;
+    lines[last] = lines[last].replace(/\b([A-Za-z][A-Za-z .]{2,})\s+(\d{6})\b/, '$1 - $2');
+  }
+  return lines;
 };
 
 /** Aligned bill/ship address rows; extra rows only when address needs multiple lines. */

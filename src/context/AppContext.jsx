@@ -50,6 +50,12 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     if (!isReady) return undefined;
 
+    try {
+      localStorage.setItem('uma_erp_data', JSON.stringify(data));
+    } catch (e) {
+      console.error('Failed to persist data to localStorage', e);
+    }
+
     if (apiMode && getAuthToken()) {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
@@ -62,11 +68,6 @@ export const AppProvider = ({ children }) => {
       };
     }
 
-    try {
-      localStorage.setItem('uma_erp_data', JSON.stringify(data));
-    } catch (e) {
-      console.error('Failed to persist data to localStorage', e);
-    }
     return undefined;
   }, [data, isReady, apiMode]);
 

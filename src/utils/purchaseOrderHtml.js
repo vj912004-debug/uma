@@ -6,7 +6,7 @@ import {
   formatPdfDateDmy,
   buildTiChargeAmounts
 } from './taxInvoiceLayout';
-import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml } from './printTheme';
+import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPrintTermsHtml, DEFAULT_PO_TERMS, DEFAULT_INVOICE_DECLARATION } from './printTheme';
 
 export const escHtml = (v) => String(v ?? '')
   .replace(/&/g, '&amp;')
@@ -22,7 +22,8 @@ export const fmtQty = (n) => {
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
 };
 
-export const buildPurchaseOrderHtml = (data, profileInput) => {
+export const buildPurchaseOrderHtml = (raw, profileInput) => {
+  const data = fillPrintPartyFields(raw, raw?.appData || loadUmaAppData());
   const profile = mergeCompanyProfile(profileInput);
 
   const chargeAmounts = buildTiChargeAmounts(data);
@@ -103,16 +104,7 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
     pushRow(cc.name || '', ccQty, rate, amt, sgstRate, cgstRate);
   });
 
-  const BLANK_ROWS = 10;
-  for (let i = 0; i < BLANK_ROWS; i++) {
-    rows.push(`
-      <tr class="filler-row">
-        <td></td><td></td><td></td><td></td>
-        <td></td><td></td><td></td>
-        <td></td><td></td><td></td><td></td>
-        <td></td>
-      </tr>`);
-  }
+  rows.push(buildFillerRowsHtml(12, 12));
 
   const roundedTotal = Math.round(totalAll);
   const roundOff = roundedTotal - totalAll;
@@ -172,14 +164,24 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
     margin: 0;
     background: #fff;
     border: none;
-    display: block;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     box-sizing: border-box;
   }
 
-  /* Outline for the whole content */
-  .content-wrapper { width: 100%; height: 100%; min-height: 0; border-collapse: collapse; border: 2px solid var(--purple); box-sizing: border-box; table-layout: fixed; }
-  .content-wrapper td { padding: 0; }
+  .content-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border: 2px solid var(--purple);
+    box-sizing: border-box;
+  }
+  .inv-top { flex: 0 0 auto; padding: 4px 10px 0; }
+  .items-row { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 0 10px 4px; }
+  .inv-bot { flex: 0 0 auto; padding: 8px 10px 0; }
 
   /* ===== HEADER ===== */
   .header{
@@ -399,16 +401,22 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
   }
   .party-head svg, .box-head svg{flex-shrink:0;}
   .party-body{
-    padding:10px 12px;
+    padding:8px 12px;
     font-size:12px;
-    line-height:1.55;
-    min-height: 80px;
+    line-height:1.4;
+    min-height:0;
+    white-space:normal;
   }
   .party-body .cname{
     color:var(--purple);
     font-weight:800;
     font-size:12px;
-    margin-bottom:4px;
+    margin:0 0 2px;
+  }
+  .party-body .addr{
+    margin:0;
+    line-height:1.4;
+    white-space:normal;
   }
   .party-foot{
     border-top:1px solid var(--lav-border);
@@ -420,6 +428,8 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
   .party-foot .fcolon{width:12px;}
 
   /* ===== TABLE ===== */
+  ${ITEMS_TABLE_FILL_CSS}
+  ${FIT_FOOTER_CSS}
   .table-container { }
   table.items{
     width:100%;
@@ -447,7 +457,6 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
   table.items tbody td.num{text-align:right;padding-right:3px;}
   table.items tbody td.center{text-align:center;}
   table.items tbody td.left{text-align:left;padding-left:3px;}
-  table.items tbody tr.filler-row td{height:14px;}
   table.items tfoot td{
     border:1px solid var(--purple);
     background:var(--lav-bg);
@@ -515,39 +524,50 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
   }
 
   /* ===== TERMS / DECLARATION / SIGNATORY ===== */
-  .footer3{
-    display:flex;
-    gap:14px;
-    margin-bottom:0;
+  table.footer3{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:10px 0;
+    margin:8px 0 0;
+    table-layout:fixed;
   }
-  .f3col{
-    flex:1;
+  table.footer3 td.f3col{
+    width:33.33%;
+    height:128px;
     border:1px solid var(--lav-border);
+    vertical-align:top;
+    padding:0;
   }
   .f3-body{
     padding:8px 10px;
-    font-size:12px;
-    line-height:1.45;
+    font-size:11px;
+    line-height:1.4;
+    white-space:normal;
+    overflow:visible;
+    overflow-wrap:break-word;
+    display:block;
   }
-  .f3-body ol{margin:0;padding-left:16px;}
-  .sig-col{
-    display:flex;
-    flex-direction:column;
-    justify-content:space-between;
+  .f3-body ol{margin:0;padding-left:18px;list-style-position:outside;}
+  .f3-body li{white-space:normal;margin:0 0 4px;padding-left:4px;}
+  .f3-body .term-line{margin:0 0 4px;white-space:normal;}
+  .sig-col .sig-body{
+    display:block;
+    padding-top:8px;
   }
-  .sig-col .for-company{
-    font-weight:800;
-    color:var(--purple);
-    padding:8px 12px 0;
-    font-size:12px;
-      text-align:center;
+  .sig-col .sig-space{
+    display:block;
+    height:56px;
+    min-height:56px;
+    max-height:56px;
   }
   .sig-col .sig-line{
-    margin:14px 12px 8px;
+    margin:0;
     border-top:1px solid #333;
     text-align:center;
     padding-top:4px;
-    font-size:12px;
+    font-size:11px;
+    color:#231f20;
+    visibility:visible;
   }
 
   /* ===== BAR FOOTER ===== */
@@ -555,25 +575,28 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
     background:var(--purple);
     color:#fff;
     margin:8px -10px 0 -10px;
-    padding:7px 14px;
+    padding:8px 14px 10px;
     display:flex;
+    align-items:center;
     justify-content:space-between;
     font-size:12px;
+    line-height:1.35;
+    min-height:32px;
+    overflow:visible;
+    flex-shrink:0;
   }
 
   @media print{
     body{background:#fff;}
-    .page {margin:0;padding: 0;width:794px;height: 1123px;max-height:1123px;overflow:hidden;}
-    .content-wrapper { width: 100%; height: 100%; min-height: 0; border-collapse: collapse; border: 2px solid var(--purple); box-sizing: border-box; table-layout: fixed; }
-  .content-wrapper td { padding: 0; }
+    .page {margin:0;padding: 0;width:794px;height: 1123px;max-height:1123px;overflow:hidden;display:flex;flex-direction:column;}
+    .content-wrapper { display:flex; flex-direction:column; width:100%; height:100%; min-height:0; border:2px solid var(--purple); box-sizing:border-box; }
   }
 </style>
 </head>
 <body>
-<div class="page">
-<table class="content-wrapper">
-  <tr>
-    <td valign="top" style="padding: 4px 10px 0;">
+<div class="page po-page">
+<div class="content-wrapper">
+  <div class="inv-top">
 
   <!-- HEADER -->
   <div class="header">
@@ -623,21 +646,18 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
   <div class="parties">
     <div class="party">
       <div class="party-head"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg> BILL TO</div>
-      <div class="party-body">
-        <div class="cname">${billName}</div>
-        ${billAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
-      </div>
+      <div class="party-body"><div class="cname">${billName}</div>${billAddr.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
       ${buildPartyFootHtml(data.gstinBill || data.gstin || '', data.billState || data.state || '', data.billStateCode || data.stateCode || '')}
     </div>
     <div class="party">
       <div class="party-head"><svg viewBox="0 0 24 24"><path d="M3 16V7h9v9"/><path d="M12 10h5l3 3v3h-8z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg> SHIP TO</div>
-      <div class="party-body">
-        <div class="cname">${shipName}</div>
-        ${shipAddr.map(line => '<div>' + escHtml(line) + '</div>').join('')}
-      </div>
+      <div class="party-body"><div class="cname">${shipName}</div>${shipAddr.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
       ${buildPartyFootHtml(data.gstinShip || data.gstin || '', data.shipState || data.state || '', data.shipStateCode || data.stateCode || '')}
     </div>
   </div>
+
+  </div>
+  <div class="items-row">
 
   <!-- ITEMS TABLE -->
   <div class="table-container">
@@ -695,13 +715,11 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
           <td class="num">${fmtMoney(totalAll)}</td>
         </tr>
       </tfoot>
-  </table>
+    </table>
   </div>
 
-      </td>
-  </tr>
-  <tr>
-    <td valign="bottom" style="padding: 8px 10px 0; height: 1px;">
+  </div>
+  <div class="inv-bot">
   <!-- BANK DETAILS + TOTALS -->
   <div class="bottom">
     <div class="bank">
@@ -732,26 +750,7 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
   </div>
 
   <!-- TERMS / DECLARATION / SIGNATORY -->
-  <div class="footer3">
-    <div class="f3col">
-      <div class="box-head"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg> TERMS &amp; CONDITIONS</div>
-      <div class="f3-body">
-        <ol>
-          ${(data.terms || '1. Delivery 10 days from the date of Purchase Order.\n2. Transportation Extra As Actual.\n3. 10 Years Warranty').split('\\n').map(line => '<li>' + escHtml(line.replace(/^\\d+\\.\\s*/, '')) + '</li>').join('')}
-        </ol>
-      </div>
-    </div>
-    <div class="f3col">
-      <div class="box-head"><svg viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5z"/><path d="M9 12l2 2 4-4"/></svg> DECLARATION</div>
-      <div class="f3-body">
-        We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
-      </div>
-    </div>
-    <div class="f3col sig-col">
-      <div class="for-company">For ${escHtml(profile.companyName || 'UMA MICRON')}</div>
-      <div class="sig-line">Authorised Signatory</div>
-    </div>
-  </div>
+  ${buildFooterTerms(profile.companyName || 'UMA MICRON', formatPrintTermsHtml(data.terms, DEFAULT_PO_TERMS), DEFAULT_INVOICE_DECLARATION)}
 
   <!-- BAR FOOTER -->
   <div class="barfoot">
@@ -761,9 +760,8 @@ export const buildPurchaseOrderHtml = (data, profileInput) => {
     <span>Page 1 of 1</span>
   </div>
 
-    </td>
-  </tr>
-</table>
+  </div>
+</div>
 </div>
 </body>
 </html>`;

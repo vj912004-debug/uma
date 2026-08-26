@@ -1056,11 +1056,12 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.overflow = 'visible';
           });
           clonedDoc.querySelectorAll('table.items thead th').forEach((el) => {
+            const fs = getComputedStyle(clonedDoc.documentElement).getPropertyValue('--print-fs').trim() || '11px';
             el.style.height = 'auto';
             el.style.padding = '4px 3px';
             el.style.verticalAlign = 'middle';
             el.style.whiteSpace = 'normal';
-            el.style.fontSize = '11px';
+            el.style.fontSize = fs;
             el.style.lineHeight = '1.15';
           });
           clonedDoc.querySelectorAll('table.g th, table.g td').forEach((el) => {
@@ -1071,7 +1072,8 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.lineHeight = '1.2';
           });
           clonedDoc.querySelectorAll('table.g .light-purple-header td, table.g tr.light-purple-header td').forEach((el) => {
-            el.style.fontSize = '10.5px';
+            const fs = getComputedStyle(clonedDoc.documentElement).getPropertyValue('--print-fs').trim() || '11px';
+            el.style.fontSize = fs;
             el.style.lineHeight = '1.25';
             el.style.padding = '5px 3px';
           });
@@ -1099,7 +1101,7 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.textOverflow = 'clip';
             el.style.whiteSpace = 'nowrap';
             el.style.lineHeight = '1.1';
-            el.style.fontSize = '11px';
+            el.style.fontSize = getComputedStyle(clonedDoc.documentElement).getPropertyValue('--print-fs').trim() || '11px';
             el.style.setProperty('background', el.classList.contains('purple-header') ? '#5a009d' : '#ffffff', 'important');
             el.style.setProperty('color', el.classList.contains('purple-header') ? '#ffffff' : '#231f20', 'important');
             el.style.setProperty('-webkit-text-fill-color', el.classList.contains('purple-header') ? '#ffffff' : '#231f20', 'important');
