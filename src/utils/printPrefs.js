@@ -694,11 +694,13 @@ export const buildPrintPrefsCss = (prefs) => {
     background: #ffffff !important;
   }
   .uma-print-root .page-p2 table.items tbody td {
-    height: 28px !important;
-    min-height: 28px !important;
-    max-height: 28px !important;
-    padding-top: 4px !important;
-    padding-bottom: 4px !important;
+    height: 18px !important;
+    min-height: 18px !important;
+    max-height: 18px !important;
+    padding-top: 1px !important;
+    padding-bottom: 1px !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
     border-top: none !important;
     border-left: none !important;
     border-right: 1px solid #7c12bd !important;
@@ -707,11 +709,11 @@ export const buildPrintPrefsCss = (prefs) => {
     margin: 0 !important;
   }
   .uma-print-root .page-p2 table.items tbody tr.filler-row td {
-    height: 28px !important;
-    min-height: 28px !important;
-    max-height: 28px !important;
-    padding-top: 4px !important;
-    padding-bottom: 4px !important;
+    height: 18px !important;
+    min-height: 18px !important;
+    max-height: 18px !important;
+    padding-top: 1px !important;
+    padding-bottom: 1px !important;
   }
   .uma-print-root .page-p2 .table-wrap {
     flex: 0 0 auto !important;
@@ -740,11 +742,13 @@ export const buildPrintPrefsCss = (prefs) => {
     -webkit-text-fill-color: #231f20 !important;
   }
   .uma-print-root .page-p2 table.items tbody tr.summary-row td {
-    height: 28px !important;
-    min-height: 28px !important;
-    max-height: 28px !important;
-    padding-top: 4px !important;
-    padding-bottom: 4px !important;
+    height: 18px !important;
+    min-height: 18px !important;
+    max-height: 18px !important;
+    padding-top: 1px !important;
+    padding-bottom: 1px !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
   }
   .uma-print-root .footer3,
   .uma-print-root .f3col,
@@ -807,8 +811,16 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root.print-density-md .page-p2 table.items thead th,
   .uma-print-root.print-density-lg .page-p2 table.items thead th,
   .uma-print-root.print-density-xl .page-p2 table.items thead th {
-    padding-top: 4px !important;
-    padding-bottom: 4px !important;
+    padding-top: 1px !important;
+    padding-bottom: 1px !important;
+  }
+  .uma-print-root .page-p2 table.items thead th,
+  .uma-print-root.print-density-md .page-p2 table.items thead th,
+  .uma-print-root.print-density-lg .page-p2 table.items thead th,
+  .uma-print-root.print-density-xl .page-p2 table.items thead th {
+    padding-top: 3px !important;
+    padding-bottom: 3px !important;
+    font-size: 10px !important;
   }
   .uma-print-root.print-density-lg .letter,
   .uma-print-root.print-density-xl .letter {
@@ -918,7 +930,15 @@ export const buildPrintPrefsCss = (prefs) => {
     overflow-wrap: normal !important;
     hyphens: none !important;
   }
-  /* BPR page-2: compact 10-row grid, sign sits under the table (sample) */
+  /* BPR page-2 weight/drum table: lock compact sample row size */
+  .uma-print-root .page-p2 table.items tbody td,
+  .uma-print-root .page-p2 table.items tbody td.wt {
+    font-size: 10px !important;
+    line-height: 1 !important;
+    height: 18px !important;
+    min-height: 18px !important;
+    max-height: 18px !important;
+  }
   .uma-print-root .page-p2 .signs {
     width: 250px !important;
     max-width: 34% !important;

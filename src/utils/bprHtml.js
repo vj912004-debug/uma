@@ -91,10 +91,12 @@ const penIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" str
 const emptyBatchRow = () => ({ batchNo: '', drumNo: '', gross: '', tare: '', net: '' });
 
 /**
- * Empty handwriting rows on Batch Packing Record page 2 (matches the sample: 10 grid rows).
+ * Empty handwriting rows on Batch Packing Record page 2.
  * Live data rows replace these; remaining slots stay blank. Do not stretch to fill A4.
  */
-export const BPR_PAGE2_BLANK_ROWS = 10;
+export const BPR_PAGE2_BLANK_ROWS = 40;
+/** Compact sample row height for page-2 weight boxes (do not let print prefs stretch this). */
+const BPR_P2_ROW_PX = 18;
 /** Form pad target for received/dispatched editors (not the print blank count). */
 export const BPR_PAGE2_ROW_COUNT = 14;
 
@@ -440,7 +442,7 @@ export const buildBprHtml = (data, profileInput) => {
             <tr class="summary-row">
               <td colspan="4" class="summary-label">${escHtml(label)}</td>
               <td class="wt">${escHtml(value)}</td>
-              <td></td><td></td><td></td><td></td><td></td>
+              <td colspan="5"></td>
             </tr>`;
   const summaryRowsHtml = [
     summaryRowHtml('Micronized Material Net Weight', dispatchedNet),
@@ -798,33 +800,33 @@ export const buildBprHtml = (data, profileInput) => {
     flex:0 0 auto;height:auto;width:100%;
     border-collapse:separate;border-spacing:0;
   }
-  table.items col.c-batch{width:16%;}
-  table.items col.c-drum{width:8%;}
-  table.items col.c-wt{width:8%;}
+  table.items col.c-batch{width:20%;}
+  table.items col.c-drum{width:7%;}
+  table.items col.c-wt{width:7%;}
   table.items thead th{
     background:#5a009d !important;color:#fff !important;font-weight:700;
-    padding:5px 3px;text-align:center;vertical-align:middle;
+    padding:3px 2px;text-align:center;vertical-align:middle;
     border:none;border-right:1px solid #7c12bd;border-bottom:1px solid #7c12bd;
     border-radius:0;margin:0;
-    font-size:11px;line-height:1.2;height:auto;max-height:none;
+    font-size:10px;line-height:1.15;height:auto;max-height:none;
     white-space:normal;word-break:break-word;
   }
   table.items thead th .eg{
-    display:block;font-size:7.5px;font-weight:500;letter-spacing:0;margin-top:1px;
+    display:block;font-size:6.5px;font-weight:500;letter-spacing:0;margin-top:0;
     white-space:nowrap;overflow:visible;
   }
   table.items tbody td{
     border:none;border-right:1px solid #7c12bd;border-bottom:1px solid #7c12bd;
-    border-radius:0;margin:0;padding:4px 3px;height:28px;min-height:28px;max-height:28px;
+    border-radius:0;margin:0;padding:1px 2px;height:${BPR_P2_ROW_PX}px;min-height:${BPR_P2_ROW_PX}px;max-height:${BPR_P2_ROW_PX}px;
     text-align:center;vertical-align:middle;color:#231f20 !important;font-weight:700;
-    font-size:11px;line-height:1.15 !important;white-space:nowrap;
+    font-size:10px;line-height:1 !important;white-space:nowrap;
     overflow:visible !important;text-overflow:clip !important;
     background:#ffffff !important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
     -webkit-text-fill-color:#231f20 !important;
   }
-  table.items tbody tr{margin:0;padding:0;border:none;height:28px;}
-  table.items tbody tr.summary-row{height:28px;}
+  table.items tbody tr{margin:0;padding:0;border:none;height:${BPR_P2_ROW_PX}px;}
+  table.items tbody tr.summary-row{height:${BPR_P2_ROW_PX}px;}
   table.items tbody td.wt{
     color:#231f20 !important;
     -webkit-text-fill-color:#231f20 !important;
@@ -832,32 +834,33 @@ export const buildBprHtml = (data, profileInput) => {
     overflow:visible !important;
   }
   table.items tbody td.lump-label{
-    font-weight:700;font-size:11px;white-space:nowrap;overflow:visible;
+    font-weight:700;font-size:10px;white-space:nowrap;overflow:visible;
   }
   table.items tbody tr.total-hl td{
     background:#e2d3f3 !important;color:#4a0080 !important;font-weight:700;height:36px;min-height:36px;
   }
   table.items tbody tr.filler-row{
-    height:28px;
+    height:${BPR_P2_ROW_PX}px;
   }
   table.items tbody tr.filler-row td{
-    height:28px;min-height:28px;max-height:28px;padding:4px 3px;
-    line-height:1.15 !important;font-size:11px;color:transparent !important;
+    height:${BPR_P2_ROW_PX}px;min-height:${BPR_P2_ROW_PX}px;max-height:${BPR_P2_ROW_PX}px;padding:1px 2px;
+    line-height:1 !important;font-size:10px;color:transparent !important;
     -webkit-text-fill-color:transparent !important;
   }
   table.items tbody tr.summary-row td{
     background:#fff !important;color:#231f20 !important;font-weight:700;
-    height:28px;min-height:28px;max-height:28px;padding:4px 3px;
+    height:${BPR_P2_ROW_PX}px;min-height:${BPR_P2_ROW_PX}px;max-height:${BPR_P2_ROW_PX}px;padding:1px 2px;
     border:none;border-right:1px solid #7c12bd;border-bottom:1px solid #7c12bd;
-    border-radius:0;margin:0;
+    border-radius:0;margin:0;font-size:10px;line-height:1;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
   table.items tbody td.summary-label{
-    text-align:left !important;padding-left:8px !important;font-weight:700;
-    white-space:nowrap;overflow:visible;
+    text-align:left !important;padding-left:6px !important;font-weight:700;
+    white-space:nowrap;overflow:visible;font-size:10px;
   }
   table.items tbody tr.batch-total-row td{
-    background:#f3eef9 !important;color:#4a0080 !important;font-weight:700;height:32px;min-height:32px;
+    background:#f3eef9 !important;color:#4a0080 !important;font-weight:700;
+    height:${BPR_P2_ROW_PX}px;min-height:${BPR_P2_ROW_PX}px;max-height:${BPR_P2_ROW_PX}px;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
   table.items tbody td.batch-total-label{
@@ -1063,17 +1066,23 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.setProperty('border-bottom', '1px solid #7c12bd', 'important');
             el.style.setProperty('border-radius', '0', 'important');
             el.style.margin = '0';
-            el.style.setProperty('height', '28px', 'important');
-            el.style.setProperty('min-height', '28px', 'important');
-            el.style.setProperty('max-height', '28px', 'important');
-            el.style.setProperty('padding-top', '4px', 'important');
-            el.style.setProperty('padding-bottom', '4px', 'important');
             el.style.boxSizing = 'border-box';
+          });
+          clonedDoc.querySelectorAll('.page.page-p2 table.items tbody td').forEach((el) => {
+            el.style.setProperty('height', `${BPR_P2_ROW_PX}px`, 'important');
+            el.style.setProperty('min-height', `${BPR_P2_ROW_PX}px`, 'important');
+            el.style.setProperty('max-height', `${BPR_P2_ROW_PX}px`, 'important');
+            el.style.setProperty('padding-top', '1px', 'important');
+            el.style.setProperty('padding-bottom', '1px', 'important');
+            el.style.setProperty('font-size', '10px', 'important');
+            el.style.setProperty('line-height', '1', 'important');
           });
           clonedDoc.querySelectorAll('.page.page-p2 table.items thead th').forEach((el) => {
             el.style.setProperty('height', 'auto', 'important');
             el.style.setProperty('min-height', '0', 'important');
             el.style.setProperty('max-height', 'none', 'important');
+            el.style.setProperty('padding', '3px 2px', 'important');
+            el.style.setProperty('font-size', '10px', 'important');
           });
           clonedDoc.querySelectorAll('.page:not(.page-p2) .table-wrap').forEach((el) => {
             el.style.flex = '0 0 auto';
@@ -1090,6 +1099,7 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.overflow = 'visible';
           });
           clonedDoc.querySelectorAll('table.items thead th').forEach((el) => {
+            if (el.closest('.page-p2')) return;
             const fs = getComputedStyle(clonedDoc.documentElement).getPropertyValue('--print-fs').trim() || '11px';
             el.style.height = 'auto';
             el.style.padding = '4px 3px';
