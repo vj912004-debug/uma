@@ -55,10 +55,49 @@ const rateDisplayHtml = (rateStr) => {
   return escHtml(rate);
 };
 
+const OPTIONAL_PRINT_CHARGES = [
+  { key: 'filterBag', label: 'Filter Bag Charges (591190)' },
+  { key: 'psdReport', label: 'PSD Report Charges (998346)' },
+  { key: 'liner', label: 'Liner (39233090)' },
+  { key: 'courier', label: 'Courier (996812)' },
+  { key: 'fiberDrum', label: 'Fiber Drum (7310)' },
+  { key: 'transportation', label: 'Transportation (996511)' },
+  { key: 'hdpeDrum', label: 'HDPE Drum (39233090)' },
+  { key: 'batchChangeover', label: 'Batch Changeover (998842)' }
+];
+
+/** Build optional service rows for print from saved rows and/or selected charge flags. */
+const resolveOptionalChargesForPrint = (data) => {
+  const fromRows = (data.optionalCharges || []).filter((c) => {
+    if (c.selected === false) return false;
+    return String(c.description || '').trim();
+  });
+
+  const fromFlags = [];
+  OPTIONAL_PRINT_CHARGES.forEach((item) => {
+    if (!data.charges?.[item.key]) return;
+    const already = fromRows.some(
+      (r) => r.sourceKey === item.key
+        || String(r.description || '').toLowerCase().includes(item.label.split(' (')[0].toLowerCase())
+    );
+    if (already) return;
+    const rate = data.rates?.[item.key] || 0;
+    fromFlags.push({
+      description: item.label,
+      rate: rate > 0 ? `₹ ${rate}` : 'NIL',
+      selected: true,
+      sourceKey: item.key
+    });
+  });
+
+  return [...fromRows, ...fromFlags];
+};
+
 export const buildQuotationHtml = (data, profileInput) => {
   const profile = mergeCompanyProfile(profileInput);
+  // Quotation print: only selected / filled rows — never dump every charge.
   const mainCharges = (data.mainCharges || []).filter((c) => String(c.description || '').trim());
-  const optionalCharges = (data.optionalCharges || []).filter((c) => String(c.description || '').trim());
+  const optionalCharges = resolveOptionalChargesForPrint(data);
   const companyName = escHtml(profile.companyName || 'UMA MICRON');
   const qtnNo = escHtml(data.quotationNo || 'N/A');
   const qtnDate = escHtml(formatQuoteDateLong(data.date) || formatPdfDateDmy(data.date) || 'N/A');
@@ -87,7 +126,7 @@ export const buildQuotationHtml = (data, profileInput) => {
             </tr>`;
           })
           .join('')
-      : `<tr><td colspan="6" style="text-align:center;color:var(--muted)">No charges applied</td></tr>`;
+      : `<tr><td colspan="6" style="text-align:center;color:var(--muted)">No charges selected</td></tr>`;
 
   const optionalRows =
     optionalCharges.length > 0
@@ -101,7 +140,7 @@ export const buildQuotationHtml = (data, profileInput) => {
             </tr>`
           )
           .join('')
-      : `<tr><td colspan="3" style="text-align:center;color:var(--muted)">No optional charges applied</td></tr>`;
+      : '';
 
   const addr1 = profile.addressLine1 || 'Plot No. 1116, G.I.D.C., Ranoli, N.H. No. 8';
   const city = profile.city || 'Vadodara';
@@ -307,8 +346,7 @@ export const buildQuotationHtml = (data, profileInput) => {
   .fac-img img{width:100%;height:100%;object-fit:cover;display:block;}
 
   /* ============ TABLES ============ */
-  .tables{display:grid;grid-template-columns:1.35fr 1fr;gap:10px;margin-top:8px;align-items:start;width:100%;}
-  .tables > div:only-child{grid-column:1 / -1;}
+  .tables{display:flex;flex-direction:column;gap:10px;margin-top:8px;align-items:stretch;width:100%;}
   .tables > div{min-width:0;display:flex;flex-direction:column;width:100%;}
   .tbl-title{display:flex;align-items:center;gap:6px;background:var(--purple);color:#fff;
     font-size:10px;font-weight:700;letter-spacing:.3px;padding:5px 10px;border-radius:6px 6px 0 0;
@@ -344,7 +382,7 @@ export const buildQuotationHtml = (data, profileInput) => {
     border:1px solid #e6e6e6;
     border-top:3px solid var(--purple);
     border-radius:6px;
-    padding:12px 10px;
+    padding:8px 8px;
     text-align:center;
     background:#fdfdfd;
     min-width:0;
@@ -353,12 +391,12 @@ export const buildQuotationHtml = (data, profileInput) => {
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    gap:8px;
+    gap:5px;
   }
-  .feat .circ{width:40px;height:40px;border-radius:50%;margin:0;display:flex;
+  .feat .circ{width:26px;height:26px;border-radius:50%;margin:0;display:flex;
     align-items:center;justify-content:center;flex-shrink:0;}
-  .feat .circ svg{width:20px;height:20px;}
-  .feat p{font-size:9px;font-weight:800;color:var(--text);line-height:1.25;letter-spacing:.05px;margin:0;}
+  .feat .circ svg{width:13px;height:13px;}
+  .feat p{font-size:8.5px;font-weight:800;color:var(--text);line-height:1.2;letter-spacing:.05px;margin:0;}
 
   /* Extra compact mode if content still tall */
   .sheet.quot-compact .header,
@@ -374,17 +412,17 @@ export const buildQuotationHtml = (data, profileInput) => {
   .sheet.quot-compact .fac-img{flex-basis:150px;height:84px;}
   .sheet.quot-compact .tables{margin-top:6px;gap:8px;}
   .sheet.quot-compact .features{margin:8px 0 4px 0;gap:8px;}
-  .sheet.quot-compact .feat{padding:10px 8px;gap:6px;}
-  .sheet.quot-compact .feat .circ{width:34px;height:34px;}
-  .sheet.quot-compact .feat .circ svg{width:17px;height:17px;}
-  .sheet.quot-compact .feat p{font-size:8.5px;}
+  .sheet.quot-compact .feat{padding:6px 6px;gap:4px;}
+  .sheet.quot-compact .feat .circ{width:22px;height:22px;}
+  .sheet.quot-compact .feat .circ svg{width:11px;height:11px;}
+  .sheet.quot-compact .feat p{font-size:8px;}
   .sheet.quot-compact-more .body-pad{padding:0 18px 2px;}
   .sheet.quot-compact-more .letter-text{font-size:9px;line-height:1.3;}
   .sheet.quot-compact-more .fac-img{display:none;}
-  .sheet.quot-compact-more .feat{padding:8px 6px;gap:5px;}
-  .sheet.quot-compact-more .feat .circ{width:28px;height:28px;margin-bottom:0;}
-  .sheet.quot-compact-more .feat .circ svg{width:14px;height:14px;}
-  .sheet.quot-compact-more .feat p{font-size:8px;}
+  .sheet.quot-compact-more .feat{padding:5px 5px;gap:3px;}
+  .sheet.quot-compact-more .feat .circ{width:20px;height:20px;margin-bottom:0;}
+  .sheet.quot-compact-more .feat .circ svg{width:10px;height:10px;}
+  .sheet.quot-compact-more .feat p{font-size:7.5px;}
   .sheet.quot-compact-more table.dt td,
   .sheet.quot-compact-more table.dt th{padding:3px 2px;font-size:8px;}
 
@@ -814,7 +852,7 @@ export const buildQuotationHtml = (data, profileInput) => {
  * Keep quotation on exactly 2 A4 pages: tighten spacing first; capture uses fitPage
  * as a last resort so nothing is clipped and no 3rd page is created.
  */
-export const fitQuotationToTwoPages = (doc, { singlePageHeight = 1123 } = {}) => {
+export const fitQuotationToTwoPages = (doc, { singlePageHeight = 1123, density = 'base' } = {}) => {
   if (!doc) return;
 
   doc.querySelectorAll('.quot-continue').forEach((el) => el.remove());
@@ -827,6 +865,9 @@ export const fitQuotationToTwoPages = (doc, { singlePageHeight = 1123 } = {}) =>
     page.style.overflow = 'visible';
     page.style.zoom = '1';
     page.classList.remove('quot-compact', 'quot-compact-more');
+    // Pre-compact for larger print fonts so layout starts tighter.
+    if (density === 'lg' || density === 'xl') page.classList.add('quot-compact');
+    if (density === 'xl') page.classList.add('quot-compact-more');
     void page.offsetHeight;
 
     if (page.scrollHeight > singlePageHeight + 2) {

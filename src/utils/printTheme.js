@@ -1,6 +1,6 @@
 /** Shared purple print theme for TI / PI / DC / DN / CN / BPR HTML PDFs. */
 
-import { applyPrintPrefsToHtml, getStoredPrintPrefs, PRINT_ROOT_CLASS } from './printPrefs';
+import { applyPrintPrefsToHtml, getStoredPrintPrefs, PRINT_ROOT_CLASS, getPrintDensity, getPrintMinFitScale, normalizePrintPrefs } from './printPrefs';
 import { DEFAULT_PRINT_LOGO_SRC } from './defaultPrintLogo';
 
 export { applyPrintPrefsToHtml } from './printPrefs';
@@ -631,9 +631,14 @@ export const renderHtmlToPdf = async (html, {
 } = {}) => {
   const { jsPDF } = await import('jspdf');
   const html2canvas = (await import('html2canvas')).default;
+  const resolvedPrefs = skipPrintPrefs
+    ? null
+    : normalizePrintPrefs(printPrefs || getStoredPrintPrefs());
   const htmlWithPrefs = skipPrintPrefs
     ? html
-    : applyPrintPrefsToHtml(html, printPrefs || getStoredPrintPrefs());
+    : applyPrintPrefsToHtml(html, resolvedPrefs);
+  const minFitScale = resolvedPrefs ? getPrintMinFitScale(resolvedPrefs) : 0.82;
+  const density = resolvedPrefs ? getPrintDensity(resolvedPrefs) : 'base';
 
   // Render inside an iframe so document <style> (e.g. * { font-size })
   // cannot leak into the live ERP UI and shrink app fonts on Preview.
@@ -646,12 +651,12 @@ export const renderHtmlToPdf = async (html, {
   idoc.open();
   idoc.write(htmlWithPrefs);
   idoc.close();
-  if (idoc.documentElement) {
-    if (!skipPrintPrefs) idoc.documentElement.classList.add(PRINT_ROOT_CLASS);
-  }
-  if (idoc.body) {
-    if (!skipPrintPrefs) idoc.body.classList.add(PRINT_ROOT_CLASS);
-  }
+  const stampRoot = (el) => {
+    if (!el || skipPrintPrefs) return;
+    el.classList.add(PRINT_ROOT_CLASS, `print-density-${density}`);
+  };
+  stampRoot(idoc.documentElement);
+  stampRoot(idoc.body);
 
   try {
     await new Promise((r) => {
@@ -667,8 +672,44 @@ export const renderHtmlToPdf = async (html, {
     const a4Ratio = 297 / 210;
     const singlePageHeight = Math.round(width * a4Ratio);
     if (typeof prepareDoc === 'function') {
-      prepareDoc(idoc, { width, singlePageHeight });
+      prepareDoc(idoc, { width, singlePageHeight, printPrefs: resolvedPrefs, density });
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    }
+
+    // If large font still overflows designed pages, escalate density before capture.
+    if (!skipPrintPrefs && resolvedPrefs) {
+      const escalate = ['md', 'lg', 'xl'];
+      let tierIdx = Math.max(0, escalate.indexOf(density));
+      for (let step = 0; step < 3; step++) {
+        const pages = [...idoc.querySelectorAll('.pdf-page')];
+        if (!pages.length) break;
+        let needsMore = false;
+        pages.forEach((page) => {
+          page.style.height = 'auto';
+          page.style.maxHeight = 'none';
+          page.style.minHeight = '0';
+          page.style.overflow = 'visible';
+          const h = Math.max(page.scrollHeight, page.offsetHeight || 0);
+          if (h > singlePageHeight + 8) needsMore = true;
+        });
+        if (!needsMore) break;
+        tierIdx = Math.min(escalate.length - 1, tierIdx + 1);
+        const nextDensity = escalate[tierIdx];
+        [idoc.documentElement, idoc.body].forEach((el) => {
+          if (!el) return;
+          el.classList.remove('print-density-base', 'print-density-sm', 'print-density-md', 'print-density-lg', 'print-density-xl');
+          el.classList.add(PRINT_ROOT_CLASS, `print-density-${nextDensity}`);
+        });
+        // Quotation-style compact helpers if present
+        pages.forEach((page) => {
+          if (page.classList.contains('sheet')) {
+            page.classList.add(nextDensity === 'xl' ? 'quot-compact-more' : 'quot-compact');
+            if (nextDensity === 'xl') page.classList.add('quot-compact-more');
+          }
+        });
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      }
     }
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -727,10 +768,9 @@ export const renderHtmlToPdf = async (html, {
       const lockThisPage = (fitPage || pageNodes.length > 0) && !(splitOverflowPages && overflows);
 
       if (lockThisPage) {
-        // Only zoom when fitPage is requested — CSS zoom shrinks content and leaves
-        // a white strip on the right of full-bleed bars (quotation header, etc.).
-        fitScale = (fitPage && overflows)
-          ? Math.max(0.82, Math.min(1, singlePageHeight / naturalH))
+        // Auto-fit any locked page that overflows (font/size changes included).
+        fitScale = overflows
+          ? Math.max(minFitScale, Math.min(1, singlePageHeight / naturalH))
           : 1;
         target.style.height = `${singlePageHeight}px`;
         target.style.minHeight = `${singlePageHeight}px`;

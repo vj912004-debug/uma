@@ -15,7 +15,8 @@ import { renderPerformaInvoicePdf } from './performaInvoiceHtml';
 import { renderPurchaseOrderPdf } from './purchaseOrderHtml';
 import { renderDebitNotePdf, renderCreditNotePdf } from './debitCreditNoteHtml';
 import { renderDeliveryChallanPdf } from './deliveryChallanHtml';
-import { renderBprPdf } from './bprHtml';
+import { renderBprPdf, BPR_PAGE2_ROW_COUNT, BPR_PAGE2_BLANK_ROWS } from './bprHtml';
+export { BPR_PAGE2_ROW_COUNT, BPR_PAGE2_BLANK_ROWS };
 import { renderPackingListPdf } from './packingListHtml';
 import { renderQuotationPdf } from './quotationPdf';
 import { getStoredPrintPrefs } from './printPrefs';
@@ -334,9 +335,6 @@ const buildPO_PI_TI = (doc, docType, data) => {
   });
 };
 
-export const BPR_PAGE2_ROW_COUNT = 35;
-const BPR_PAGE2_ROWS = BPR_PAGE2_ROW_COUNT;
-
 /** Pad received/dispatched weight tables so page 2 fills the printed form. */
 export const padBPRBatchRows = (rows, minRows = BPR_PAGE2_ROW_COUNT) => {
   const padded = [...(rows || [])];
@@ -345,6 +343,7 @@ export const padBPRBatchRows = (rows, minRows = BPR_PAGE2_ROW_COUNT) => {
   }
   return padded;
 };
+const BPR_PAGE2_ROWS = BPR_PAGE2_ROW_COUNT;
 const BPR_GRID = { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, cellPadding: 2 };
 
 const bprFmtWt = (v) => {

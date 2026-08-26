@@ -90,3 +90,25 @@ export async function importAppState(state) {
     body: JSON.stringify(state)
   });
 }
+
+export async function whatsappStatus() {
+  return apiFetch('/whatsapp/status');
+}
+
+export async function whatsappConnect() {
+  return apiFetch('/whatsapp/connect', { method: 'POST', body: '{}' });
+}
+
+export async function whatsappDisconnect(logout = false) {
+  return apiFetch('/whatsapp/disconnect', {
+    method: 'POST',
+    body: JSON.stringify({ logout })
+  });
+}
+
+export async function whatsappSend({ phone, text }) {
+  return apiFetch('/whatsapp/send', {
+    method: 'POST',
+    body: JSON.stringify({ phone, text })
+  });
+}

@@ -55,20 +55,56 @@ export const setStoredPrintPrefs = (prefs) => {
 export const getPrintScale = (prefs) =>
   normalizePrintPrefs(prefs).fontSize / PRINT_BASE_FONT_SIZE;
 
+/** Density tier used to auto-tighten layout when font/size grows. */
+export const getPrintDensity = (prefs) => {
+  const { fontSize } = normalizePrintPrefs(prefs);
+  if (fontSize >= 16) return 'xl';
+  if (fontSize >= 14) return 'lg';
+  if (fontSize >= 13) return 'md';
+  if (fontSize <= 10) return 'sm';
+  return 'base';
+};
+
+/** Minimum zoom allowed when auto-fitting a locked A4 page. */
+export const getPrintMinFitScale = (prefs) => {
+  const scale = getPrintScale(prefs);
+  if (scale >= 1.4) return 0.68;
+  if (scale >= 1.15) return 0.74;
+  if (scale >= 1) return 0.8;
+  return 0.85;
+};
+
 /** CSS override injected into every print HTML document. */
 export const buildPrintPrefsCss = (prefs) => {
   const { fontFamily, fontSize } = normalizePrintPrefs(prefs);
-  // Scoped to .uma-print-root so offscreen div hosts cannot restyle the live ERP UI.
-  // Only body/table text scales — header brand + purple doc badge keep design sizes
-  // so they never clip or create large empty gaps.
+  const scale = fontSize / PRINT_BASE_FONT_SIZE;
+  const density = getPrintDensity(prefs);
+  const bodyFs = fontSize;
+  const smallFs = Math.max(7, Math.round(fontSize * 0.88));
+  // Tighten padding/gaps as font grows so pages stay balanced.
+  const padScale = density === 'xl' ? 0.62 : density === 'lg' ? 0.72 : density === 'md' ? 0.85 : density === 'sm' ? 1.05 : 1;
+  const gapScale = padScale;
+  const lineH = density === 'xl' ? 1.2 : density === 'lg' ? 1.25 : 1.35;
+
   return `
-  /* User print font / size overrides */
+  /* User print font / size — scale-aware across all formats */
+  .uma-print-root {
+    --print-fs: ${bodyFs}px;
+    --print-fs-sm: ${smallFs}px;
+    --print-scale: ${scale};
+    --print-pad-scale: ${padScale};
+    --print-gap-scale: ${gapScale};
+    --print-lh: ${lineH};
+    --print-density: ${density};
+  }
   .uma-print-root,
   .uma-print-root *:not(svg):not(svg *),
   .uma-print-root *::before,
   .uma-print-root *::after {
     font-family: ${fontFamily} !important;
   }
+
+  /* Body / table text uses selected size; secondary uses slightly smaller */
   .uma-print-root td,
   .uma-print-root th,
   .uma-print-root p,
@@ -86,8 +122,6 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .bank-body,
   .uma-print-root .totals-body,
   .uma-print-root .terms,
-  .uma-print-root .footer-bar,
-  .uma-print-root .status-bar,
   .uma-print-root .company-info,
   .uma-print-root .reg-details,
   .uma-print-root .invoice-meta .block,
@@ -105,14 +139,11 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .note-title,
   .uma-print-root .amount-words,
   .uma-print-root .hsn-box,
-  .uma-print-root .barfoot,
   .uma-print-root .meta-item,
   .uma-print-root .sign,
   .uma-print-root .meta,
   .uma-print-root .meta .box,
   .uma-print-root .note,
-  .uma-print-root .contact-bar,
-  .uma-print-root .contact-bar .citem,
   .uma-print-root .info-table,
   .uma-print-root .info-table td,
   .uma-print-root .letter-text,
@@ -121,10 +152,8 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .card,
   .uma-print-root .card .co-name,
   .uma-print-root .card .addr,
-  .uma-print-root .pill-head,
   .uma-print-root table.dt td,
   .uma-print-root table.dt th,
-  .uma-print-root .feat p,
   .uma-print-root .fr-note,
   .uma-print-root .fr-sign p,
   .uma-print-root .fr-sign .name,
@@ -137,24 +166,34 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .bbox ol li,
   .uma-print-root .sign2 p,
   .uma-print-root .sign2 .name,
+  .uma-print-root .page2-body {
+    font-size: ${bodyFs}px !important;
+    line-height: ${lineH} !important;
+  }
+
+  .uma-print-root .contact-bar,
+  .uma-print-root .contact-bar .citem,
+  .uma-print-root .footer-bar,
+  .uma-print-root .status-bar,
+  .uma-print-root .barfoot,
+  .uma-print-root .barfoot span,
   .uma-print-root .bottom-banner,
   .uma-print-root .bottom-banner .thankyou,
   .uma-print-root .bottom-banner .items,
-  .uma-print-root .page2-header,
+  .uma-print-root .pill-head,
   .uma-print-root .tbl-title,
-  .uma-print-root .body-pad,
-  .uma-print-root .page2-body {
-    font-size: ${fontSize}px !important;
+  .uma-print-root .page2-header,
+  .uma-print-root .feat p {
+    font-size: ${smallFs}px !important;
+    line-height: ${lineH} !important;
   }
+
   /* Quotation contact bar: keep GSTIN / phone / email / web on one line */
   .uma-print-root .contact-bar .citem.c-tight span {
     white-space: nowrap !important;
     word-break: normal !important;
     overflow-wrap: normal !important;
   }
-  /* Keep body copy readable in html2canvas (esp. Quotation + Cambria).
-     Avoid non-zero word-spacing around currency/brackets — it inserts a gap
-     before ")" after symbols like ₹ (e.g. "(₹ )" in Rate (₹) / Rupees (₹)). */
   .uma-print-root .letter-text,
   .uma-print-root .letter-text p,
   .uma-print-root .term p,
@@ -180,10 +219,10 @@ export const buildPrintPrefsCss = (prefs) => {
     align-items: center !important;
     flex-wrap: nowrap !important;
     white-space: nowrap !important;
-    font-size: ${fontSize}px !important;
+    font-size: ${bodyFs}px !important;
     font-weight: 700 !important;
     color: #231f20 !important;
-    line-height: 1.3 !important;
+    line-height: ${lineH} !important;
   }
   .uma-print-root .meta-row .m-icon {
     grid-column: 1 !important;
@@ -194,10 +233,10 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .meta-row.sub .m-label,
   .uma-print-root .meta-row .m-colon,
   .uma-print-root .meta-row .m-value {
-    font-size: ${fontSize}px !important;
+    font-size: ${bodyFs}px !important;
     font-weight: 700 !important;
     color: #231f20 !important;
-    line-height: 1.3 !important;
+    line-height: ${lineH} !important;
     white-space: nowrap !important;
   }
   .uma-print-root .meta-row .m-label,
@@ -252,6 +291,7 @@ export const buildPrintPrefsCss = (prefs) => {
     column-gap: 6px !important;
     align-items: center !important;
   }
+
   /* Kill top gap + lock header / badge layout across ALL print formats */
   .uma-print-root,
   .uma-print-root html,
@@ -269,16 +309,16 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .content-wrapper > tr:first-child > td,
   .uma-print-root td[valign="top"],
   .uma-print-root .pad-top {
-    padding-top: 4px !important;
+    padding-top: ${Math.max(2, Math.round(4 * padScale))}px !important;
     vertical-align: top !important;
   }
   .uma-print-root .header {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: 12px !important;
-    margin: 0 0 8px 0 !important;
-    padding: 0 0 8px 0 !important;
+    gap: ${Math.round(12 * gapScale)}px !important;
+    margin: 0 0 ${Math.round(8 * padScale)}px 0 !important;
+    padding: 0 0 ${Math.round(8 * padScale)}px 0 !important;
     min-height: 0 !important;
     height: auto !important;
   }
@@ -321,6 +361,7 @@ export const buildPrintPrefsCss = (prefs) => {
     align-items: flex-start !important;
     gap: 2px !important;
   }
+  /* Brand + doc badge stay design-locked so they don't blow up with body size */
   .uma-print-root .brand-text h1,
   .uma-print-root .logo-text h1,
   .uma-print-root h1 {
@@ -382,7 +423,6 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .company-title {
     font-size: 26px !important;
   }
-  /* Quotation purple banner — sized to leave room for full 2-page layout */
   .uma-print-root .header:has(.quote-banner) {
     align-items: stretch !important;
     padding: 0 0 0 22px !important;
@@ -430,13 +470,12 @@ export const buildPrintPrefsCss = (prefs) => {
     flex-shrink: 0 !important;
   }
   .uma-print-root .sig-col .sig-line {
-    margin: 28px 12px 8px !important;
+    margin: ${Math.round(28 * padScale)}px 12px 8px !important;
   }
   .uma-print-root .barfoot {
     margin: 8px -10px 0 -10px !important;
-    padding: 7px 14px !important;
+    padding: ${Math.round(7 * padScale)}px 14px !important;
   }
-  /* BPR page 2: flush footer to sheet border (no white gap under the bar) */
   .uma-print-root .page-p2 .barfoot,
   .uma-print-root .page-p2 .sheet > .barfoot {
     margin: auto -10px -10px -10px !important;
@@ -449,12 +488,142 @@ export const buildPrintPrefsCss = (prefs) => {
     word-spacing: 0.02em !important;
   }
   .uma-print-root table.items tbody tr.filler-row td {
-    height: 12px !important;
+    height: ${Math.max(14, Math.round(22 * padScale))}px !important;
+    min-height: 10px !important;
+  }
+  .uma-print-root table.items tbody tr.summary-row td {
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #231f20 !important;
+    -webkit-text-fill-color: #231f20 !important;
   }
   .uma-print-root .footer3,
   .uma-print-root .f3col,
   .uma-print-root .sig-col {
     overflow: visible !important;
+  }
+
+  /* ---- Auto density: shrink spacing when larger fonts are chosen ---- */
+  .uma-print-root.print-density-md .pad-x,
+  .uma-print-root.print-density-lg .pad-x,
+  .uma-print-root.print-density-xl .pad-x {
+    padding-left: ${Math.round(12 * padScale)}px !important;
+    padding-right: ${Math.round(12 * padScale)}px !important;
+  }
+  .uma-print-root.print-density-md .pad-mid,
+  .uma-print-root.print-density-lg .pad-mid,
+  .uma-print-root.print-density-xl .pad-mid {
+    padding-top: ${Math.round(4 * padScale)}px !important;
+    padding-bottom: ${Math.round(6 * padScale)}px !important;
+  }
+  .uma-print-root.print-density-md .parties,
+  .uma-print-root.print-density-lg .parties,
+  .uma-print-root.print-density-xl .parties,
+  .uma-print-root.print-density-md .two-col,
+  .uma-print-root.print-density-lg .two-col,
+  .uma-print-root.print-density-xl .two-col,
+  .uma-print-root.print-density-md .tables,
+  .uma-print-root.print-density-lg .tables,
+  .uma-print-root.print-density-xl .tables,
+  .uma-print-root.print-density-md .features,
+  .uma-print-root.print-density-lg .features,
+  .uma-print-root.print-density-xl .features,
+  .uma-print-root.print-density-md .terms-grid,
+  .uma-print-root.print-density-lg .terms-grid,
+  .uma-print-root.print-density-xl .terms-grid,
+  .uma-print-root.print-density-md .dc-footer-grid,
+  .uma-print-root.print-density-lg .dc-footer-grid,
+  .uma-print-root.print-density-xl .dc-footer-grid {
+    gap: ${Math.round(10 * gapScale)}px !important;
+  }
+  .uma-print-root.print-density-md table.items thead th,
+  .uma-print-root.print-density-lg table.items thead th,
+  .uma-print-root.print-density-xl table.items thead th,
+  .uma-print-root.print-density-md table.items tbody td,
+  .uma-print-root.print-density-lg table.items tbody td,
+  .uma-print-root.print-density-xl table.items tbody td,
+  .uma-print-root.print-density-md table.dt th,
+  .uma-print-root.print-density-lg table.dt th,
+  .uma-print-root.print-density-xl table.dt th,
+  .uma-print-root.print-density-md table.dt td,
+  .uma-print-root.print-density-lg table.dt td,
+  .uma-print-root.print-density-xl table.dt td {
+    padding-top: ${Math.max(2, Math.round(6 * padScale))}px !important;
+    padding-bottom: ${Math.max(2, Math.round(6 * padScale))}px !important;
+  }
+  .uma-print-root.print-density-lg .letter,
+  .uma-print-root.print-density-xl .letter {
+    margin-top: ${Math.round(6 * padScale)}px !important;
+    gap: ${Math.round(8 * gapScale)}px !important;
+  }
+  .uma-print-root.print-density-lg .letter-text p,
+  .uma-print-root.print-density-xl .letter-text p {
+    margin-top: ${Math.round(4 * padScale)}px !important;
+  }
+  .uma-print-root.print-density-lg .feat,
+  .uma-print-root.print-density-xl .feat {
+    padding: ${Math.round(6 * padScale)}px !important;
+    gap: ${Math.round(4 * gapScale)}px !important;
+  }
+  .uma-print-root.print-density-lg .feat .circ,
+  .uma-print-root.print-density-xl .feat .circ {
+    width: ${density === 'xl' ? 20 : 22}px !important;
+    height: ${density === 'xl' ? 20 : 22}px !important;
+  }
+  .uma-print-root.print-density-lg .feat .circ svg,
+  .uma-print-root.print-density-xl .feat .circ svg {
+    width: ${density === 'xl' ? 10 : 11}px !important;
+    height: ${density === 'xl' ? 10 : 11}px !important;
+  }
+  .uma-print-root.print-density-lg .page2-body,
+  .uma-print-root.print-density-xl .page2-body {
+    padding: ${Math.round(10 * padScale)}px ${Math.round(18 * padScale)}px ${Math.round(8 * padScale)}px !important;
+    gap: ${Math.round(8 * gapScale)}px !important;
+  }
+  .uma-print-root.print-density-xl .fac-img {
+    display: none !important;
+  }
+  .uma-print-root.print-density-md .body-pad,
+  .uma-print-root.print-density-lg .body-pad,
+  .uma-print-root.print-density-xl .body-pad {
+    padding-left: ${Math.round(22 * padScale)}px !important;
+    padding-right: ${Math.round(22 * padScale)}px !important;
+  }
+
+  /* BPR page-2 weight/drum table: never let print font prefs clip or hide cell text */
+  .uma-print-root table.items tbody td,
+  .uma-print-root table.items tbody td.wt {
+    color: #231f20 !important;
+    -webkit-text-fill-color: #231f20 !important;
+    background: #ffffff !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    line-height: 1.15 !important;
+    font-size: ${Math.min(bodyFs, 12)}px !important;
+    white-space: nowrap !important;
+  }
+  .uma-print-root table.items thead th {
+    line-height: 1.15 !important;
+    overflow: visible !important;
+  }
+  /* BPR page-1 grids: never break words mid-letter (supervisor, need, etc.) */
+  .uma-print-root table.g th,
+  .uma-print-root table.g td {
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
+    line-height: 1.2 !important;
+    white-space: normal !important;
+  }
+  .uma-print-root table.g .light-purple-header td,
+  .uma-print-root table.g tr.light-purple-header td {
+    font-size: ${Math.min(bodyFs, 11)}px !important;
+    line-height: 1.25 !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
   }
 `;
 };
@@ -463,10 +632,37 @@ export const PRINT_ROOT_CLASS = 'uma-print-root';
 
 export const applyPrintPrefsToHtml = (html, prefs) => {
   const resolved = prefs ? normalizePrintPrefs(prefs) : getStoredPrintPrefs();
+  const density = getPrintDensity(resolved);
   const css = `<style id="uma-print-prefs">${buildPrintPrefsCss(resolved)}</style>`;
   if (!html || typeof html !== 'string') return html;
-  if (/id=["']uma-print-prefs["']/.test(html)) return html;
-  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `${css}</head>`);
-  if (/<style[\s>]/i.test(html)) return html.replace(/<style[\s>]/i, (m) => `${css}${m}`);
-  return `${css}${html}`;
+  let next = html;
+  if (!/id=["']uma-print-prefs["']/.test(next)) {
+    if (/<\/head>/i.test(next)) next = next.replace(/<\/head>/i, `${css}</head>`);
+    else if (/<style[\s>]/i.test(next)) next = next.replace(/<style[\s>]/i, (m) => `${css}${m}`);
+    else next = `${css}${next}`;
+  }
+  // Stamp density on <html> / <body> so layout CSS can react before capture.
+  if (/<html\b[^>]*>/i.test(next)) {
+    next = next.replace(/<html\b([^>]*)>/i, (full, attrs) => {
+      if (/\bclass\s*=/.test(attrs)) {
+        return full.replace(/class=(["'])(.*?)\1/i, (_, q, cls) => {
+          const parts = `${cls} ${PRINT_ROOT_CLASS} print-density-${density}`.trim().replace(/\s+/g, ' ');
+          return `class=${q}${parts}${q}`;
+        });
+      }
+      return `<html${attrs} class="${PRINT_ROOT_CLASS} print-density-${density}">`;
+    });
+  }
+  if (/<body\b[^>]*>/i.test(next)) {
+    next = next.replace(/<body\b([^>]*)>/i, (full, attrs) => {
+      if (/\bclass\s*=/.test(attrs)) {
+        return full.replace(/class=(["'])(.*?)\1/i, (_, q, cls) => {
+          const parts = `${cls} ${PRINT_ROOT_CLASS} print-density-${density}`.trim().replace(/\s+/g, ' ');
+          return `class=${q}${parts}${q}`;
+        });
+      }
+      return `<body${attrs} class="${PRINT_ROOT_CLASS} print-density-${density}">`;
+    });
+  }
+  return next;
 };

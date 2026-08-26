@@ -68,7 +68,7 @@ const PREV_BD_COLS = [
   { key: 'fp', label: 'F P' },
   { key: 'fr', label: 'F R' },
   { key: 'clearance', label: 'Clearance' },
-  { key: 'totalPassNeed', label: 'Total pass need' }
+  { key: 'totalPassNeed', label: 'Total pass<br>need' }
 ];
 
 const BD_COLS = [
@@ -90,10 +90,14 @@ const penIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" str
 
 const emptyBatchRow = () => ({ batchNo: '', drumNo: '', gross: '', tare: '', net: '' });
 
-/** Minimum blank filler rows after live data on Batch Packing Record (Page 2). */
+/**
+ * Blank handwriting rows after live drum data on Batch Packing Record (Page 2).
+ * Always appended; never removed to make room for summary rows — page fit shrinks
+ * filler height instead so Micronized / Lumps / Sample / Irrecoverable always print.
+ */
 export const BPR_PAGE2_BLANK_ROWS = 7;
-/** Empty data rows on Batch Packing Record (Page 2) so the grid fills A4. */
-export const BPR_PAGE2_ROW_COUNT = 21;
+/** Form pad target for received/dispatched editors (not the print blank count). */
+export const BPR_PAGE2_ROW_COUNT = 14;
 
 /** Blank BPR print payload — empty Page 1 (Processing) + Page 2 (Packing). */
 export const buildBlankBprPayload = ({ partyName = '', productName = '', companyProfile } = {}) => {
@@ -210,6 +214,14 @@ export const buildBprHtml = (data, profileInput) => {
   let dispatchedRaw = stripLumpRows(data.dispatchedBatches || []);
   const isLiveRow = (r) => !!(r && (r.batchNo || r.drumNo || hasWeight(r)));
   const rowKey = (r = {}) => `${String(r.batchNo || '').trim().toLowerCase()}||${String(r.drumNo ?? '').trim().toLowerCase()}`;
+  // Drop trailing empty pad rows so pairing stays aligned with real drums.
+  const trimTrailingEmpty = (rows) => {
+    const copy = [...(rows || [])];
+    while (copy.length && !isLiveRow(copy[copy.length - 1])) copy.pop();
+    return copy;
+  };
+  receivedRaw = trimTrailingEmpty(receivedRaw);
+  dispatchedRaw = trimTrailingEmpty(dispatchedRaw);
 
   // If received has drum labels but no weights, mirror matching dispatched / fill from pair
   const fillEmptyReceived = (received, dispatched) => {
@@ -266,15 +278,6 @@ export const buildBprHtml = (data, profileInput) => {
     groupMap[key].pairs.push(pair);
   });
 
-  // Always pad to a full-page grid; keep at least blank rows after live data + batch totals
-  const baseRows = livePairs.length;
-  const batchTotalRows = batchGroups.length;
-  const needLumpRow = sievingLumps > 0 ? 1 : 0;
-  const rowCount = Math.max(
-    baseRows + batchTotalRows + needLumpRow + BPR_PAGE2_BLANK_ROWS,
-    BPR_PAGE2_ROW_COUNT
-  );
-
   const parseWtNum = (v) => {
     if (v === '' || v == null) return 0;
     const n = typeof v === 'number' ? v : parseFloat(v);
@@ -307,15 +310,20 @@ export const buildBprHtml = (data, profileInput) => {
       gDGross += parseWtNum(d.gross);
       gDTare += parseWtNum(d.tare);
       gDNet += (!Number.isNaN(dNet) && dNetStr) ? dNet : 0;
+      // Always surface batch/drum from either side so page-2 never looks blank.
+      const rBatch = r.batchNo || d.batchNo || '';
+      const rDrum = (r.drumNo != null && r.drumNo !== '') ? r.drumNo : (d.drumNo ?? '');
+      const dBatch = d.batchNo || r.batchNo || '';
+      const dDrum = (d.drumNo != null && d.drumNo !== '') ? d.drumNo : (r.drumNo ?? '');
       packingRows.push(`
       <tr>
-        <td>${escHtml(r.batchNo || '')}</td>
-        <td>${escHtml(r.drumNo || '')}</td>
+        <td>${escHtml(rBatch)}</td>
+        <td>${escHtml(rDrum)}</td>
         <td class="wt">${fmtWt(r.gross)}</td>
         <td class="wt">${fmtWt(r.tare)}</td>
         <td class="wt">${calcNet(r)}</td>
-        <td>${escHtml(d.batchNo || '')}</td>
-        <td>${escHtml(d.drumNo || '')}</td>
+        <td>${escHtml(dBatch)}</td>
+        <td>${escHtml(dDrum)}</td>
         <td class="wt">${fmtWt(d.gross)}</td>
         <td class="wt">${fmtWt(d.tare)}</td>
         <td class="wt">${dNetStr}</td>
@@ -347,9 +355,10 @@ export const buildBprHtml = (data, profileInput) => {
       </tr>`);
   }
 
-  while (packingRows.length < rowCount) {
+  // Exactly N blank filler rows after live data (summary rows follow separately).
+  for (let i = 0; i < BPR_PAGE2_BLANK_ROWS; i += 1) {
     packingRows.push(`
-      <tr>
+      <tr class="filler-row">
         <td></td><td></td><td></td><td></td><td></td>
         <td></td><td></td><td></td><td></td><td></td>
       </tr>`);
@@ -359,7 +368,45 @@ export const buildBprHtml = (data, profileInput) => {
     ? data.totalDispatchedNet
     : (parseFloat(data.totalDispatchedNet) || 0);
   const finalDispatchNet = printedDispatchNet > 0 ? printedDispatchNet : savedDispatchNet;
-  const dispatchedNet = finalDispatchNet > 0 ? finalDispatchNet.toFixed(2) : '';
+  const dq = data.dispatchQty || {};
+  const micronizedPrint = (
+    finalDispatchNet > 0
+      ? finalDispatchNet.toFixed(2)
+      : (dq.micronizedNet || data.micronizedNetWeight || '')
+  );
+  const lumpsPrint = String(
+    data.lumpsNetWeight
+      || dq.lumpsNet
+      || (sievingLumps > 0 ? sievingLumps.toFixed(2) : '')
+      || ''
+  );
+  const samplePrint = String(data.sampleNetWeight || dq.sampleNet || '');
+  const irrecoverablePrint = String(
+    data.irrecoverableLoss || data.processLoss || dq.netProcessLoss || ''
+  );
+  const dispatchedNet = micronizedPrint && String(micronizedPrint) !== '0.00' ? String(micronizedPrint) : '';
+
+  const summaryRowsHtml = `
+            <tr class="summary-row">
+              <td colspan="4" class="summary-label">Micronized Material Net Weight</td>
+              <td class="wt">${escHtml(dispatchedNet)}</td>
+              <td colspan="5"></td>
+            </tr>
+            <tr class="summary-row">
+              <td colspan="4" class="summary-label">Lumps Net Weight</td>
+              <td class="wt">${escHtml(lumpsPrint)}</td>
+              <td colspan="5"></td>
+            </tr>
+            <tr class="summary-row">
+              <td colspan="4" class="summary-label">Sample Net Weight</td>
+              <td class="wt">${escHtml(samplePrint)}</td>
+              <td colspan="5"></td>
+            </tr>
+            <tr class="summary-row">
+              <td colspan="4" class="summary-label">Irrecoverable loss</td>
+              <td class="wt">${escHtml(irrecoverablePrint)}</td>
+              <td colspan="5"></td>
+            </tr>`;
 
   const prevBdRows = METRIC_ROWS.map((m) => `
     <tr>
@@ -418,11 +465,11 @@ export const buildBprHtml = (data, profileInput) => {
 
       <table class="g">
         <tr class="light-purple-header">
-          <td style="width:20%;"></td>
-          <td style="width:25%;">Material Received</td>
-          <td style="width:20%;">Committed</td>
-          <td style="width:20%;">Processing Start</td>
-          <td style="width:15%;">Processing supervisor</td>
+          <td style="width:16%;"></td>
+          <td style="width:22%;">Material<br>Received</td>
+          <td style="width:18%;">Committed</td>
+          <td style="width:22%;">Processing<br>Start</td>
+          <td style="width:22%;">Processing<br>Supervisor</td>
         </tr>
         <tr>
           <td class="left-align">Date</td>
@@ -441,9 +488,9 @@ export const buildBprHtml = (data, profileInput) => {
 
       <table class="g">
         <tr class="light-purple-header">
-          <td style="width:40%;">PARTICAL SIZE REQUIRED</td>
-          <td style="width:35%;">Sizing report require</td>
-          <td style="width:25%;">Particle size result</td>
+          <td style="width:40%;">PARTICLE SIZE REQUIRED</td>
+          <td style="width:30%;">Sizing report<br>require</td>
+          <td style="width:30%;">Particle size<br>result</td>
         </tr>
         <tr style="height:30px;">
           <td>${escHtml(data.psdRequirement || '')}</td>
@@ -492,11 +539,11 @@ export const buildBprHtml = (data, profileInput) => {
       <div class="section-badge"><span class="pill-badge">Packing Materials Used</span></div>
       <table class="g">
         <tr class="light-purple-header">
-          <td style="width:22%;">White LD Bags</td>
-          <td style="width:20%;">Black LD Bags</td>
-          <td style="width:18%;">Brow Tapes</td>
-          <td style="width:18%;">Drum Used</td>
-          <td style="width:22%;">Other Details</td>
+          <td style="width:22%;">White LD<br>Bags</td>
+          <td style="width:20%;">Black LD<br>Bags</td>
+          <td style="width:18%;">Brown<br>Tapes</td>
+          <td style="width:18%;">Drum<br>Used</td>
+          <td style="width:22%;">Other<br>Details</td>
         </tr>
         <tr style="height:25px;">
           <td>${escHtml(pc.whiteLdBags || pc.linersUsed || '')}</td>
@@ -510,18 +557,16 @@ export const buildBprHtml = (data, profileInput) => {
       <div class="section-badge"><span class="pill-badge">Dispatch Material Quantity Details</span></div>
       <table class="g">
         <tr class="light-purple-header">
-          <td style="width:22%;">Micronized Material net weight</td>
-          <td style="width:18%;">Lumps Net weight</td>
-          <td style="width:20%;">Floor Dust Net weight</td>
-          <td style="width:20%;">Net Process Loss</td>
-          <td style="width:20%;">Remark</td>
+          <td style="width:25%;">Micronized Material<br>Net Weight</td>
+          <td style="width:25%;">Lumps Net<br>Weight</td>
+          <td style="width:25%;">Sample Net<br>Weight</td>
+          <td style="width:25%;">Irrecoverable<br>loss</td>
         </tr>
         <tr style="height:25px;">
-          <td>${dispatchedNet !== '0.00' ? dispatchedNet : ''}</td>
-          <td>${escHtml(data.lumpsNetWeight || '')}</td>
-          <td>${escHtml(data.floorDustNetWeight || '')}</td>
-          <td>${escHtml(data.processLoss || data.irrecoverableLoss || '')}</td>
-          <td>${escHtml(data.remark || data.dispatchRemark || '')}</td>
+          <td>${escHtml(dispatchedNet)}</td>
+          <td>${escHtml(lumpsPrint)}</td>
+          <td>${escHtml(samplePrint)}</td>
+          <td>${escHtml(irrecoverablePrint)}</td>
         </tr>
       </table>
 
@@ -574,11 +619,21 @@ export const buildBprHtml = (data, profileInput) => {
   table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:-1px;}
   table.g th,table.g td{
     border:1px solid #7c12bd;text-align:center;vertical-align:middle;
-    font-size:12px;font-weight:700;color:#231f20 !important;padding:3px 2px;
-    word-break:break-all;overflow-wrap:break-word;white-space:pre-wrap;
+    font-size:11px;font-weight:700;color:#231f20 !important;padding:4px 3px;
+    word-break:normal;overflow-wrap:normal;white-space:normal;hyphens:none;
+    line-height:1.2;
     background:#ffffff;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
+  table.g .light-purple-header td,
+  table.g tr.light-purple-header td{
+    font-size:10.5px;line-height:1.25;padding:5px 3px;
+    word-break:normal;overflow-wrap:normal;white-space:normal;hyphens:none;
+  }
+  table.g td.left-align{
+    word-break:normal;overflow-wrap:anywhere;white-space:normal;
+  }
+  table.g td.nowrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .purple-header{background:#5a009d !important;color:#fff !important;}
   .light-purple-header td,.light-purple-header th{background:#e2d3f3 !important;color:#4a0080 !important;}
   .left-align{text-align:left !important;padding-left:6px !important;}
@@ -709,18 +764,36 @@ export const buildBprHtml = (data, profileInput) => {
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
   table.items tbody td{
-    border:1px solid #7c12bd;padding:4px 3px;height:30px;min-height:30px;
+    border:1px solid #7c12bd;padding:4px 3px;height:28px;min-height:28px;
     text-align:center;vertical-align:middle;color:#231f20 !important;font-weight:700;
-    font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    font-size:11px;line-height:1.15 !important;white-space:nowrap;
+    overflow:visible !important;text-overflow:clip !important;
     background:#ffffff !important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
+    -webkit-text-fill-color:#231f20 !important;
   }
-  table.items tbody td.wt{color:#231f20 !important;font-weight:700;}
+  table.items tbody td.wt{
+    color:#231f20 !important;
+    -webkit-text-fill-color:#231f20 !important;
+    font-weight:700;
+    overflow:visible !important;
+  }
   table.items tbody td.lump-label{
     font-weight:700;font-size:11px;white-space:nowrap;overflow:visible;
   }
   table.items tbody tr.total-hl td{
     background:#e2d3f3 !important;color:#4a0080 !important;font-weight:700;height:36px;min-height:36px;
+  }
+  table.items tbody tr.filler-row td{
+    height:26px;min-height:18px;padding:2px;
+  }
+  table.items tbody tr.summary-row td{
+    background:#fff !important;color:#231f20 !important;font-weight:700;height:28px;min-height:28px;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
+  table.items tbody td.summary-label{
+    text-align:left !important;padding-left:8px !important;font-weight:700;
+    white-space:nowrap;overflow:visible;
   }
   table.items tbody tr.batch-total-row td{
     background:#f3eef9 !important;color:#4a0080 !important;font-weight:700;height:32px;min-height:32px;
@@ -791,11 +864,7 @@ export const buildBprHtml = (data, profileInput) => {
           </thead>
           <tbody>
             ${packingRows.join('')}
-            <tr class="total-hl">
-              <td colspan="5"></td>
-              <td colspan="4" style="text-align:center;">${batchGroups.length > 1 || sievingLumps > 0 ? 'GRAND TOTAL — Micronized Net Weight' : 'Micronized Material Net Weight'}</td>
-              <td class="wt">${dispatchedNet}</td>
-            </tr>
+            ${summaryRowsHtml}
           </tbody>
         </table>
       </div>
@@ -816,8 +885,63 @@ export const buildBprHtml = (data, profileInput) => {
 </html>`;
 };
 
+/**
+ * Keep page-2 summary rows (Micronized / Lumps / Sample / Irrecoverable) on the
+ * printable A4 area by shrinking filler blank rows — never by dropping summaries.
+ */
+const fitBprPage2ToA4 = (pageEl, pageHeightPx = 1123) => {
+  if (!pageEl || !pageEl.classList.contains('page-p2')) return;
+
+  pageEl.style.height = `${pageHeightPx}px`;
+  pageEl.style.minHeight = `${pageHeightPx}px`;
+  pageEl.style.maxHeight = `${pageHeightPx}px`;
+  pageEl.style.overflow = 'hidden';
+  pageEl.style.boxSizing = 'border-box';
+
+  const overflows = () => pageEl.scrollHeight > pageHeightPx + 2;
+  if (!overflows()) return;
+
+  const setFillerHeight = (px) => {
+    pageEl.querySelectorAll('tr.filler-row td').forEach((td) => {
+      td.style.height = `${px}px`;
+      td.style.minHeight = `${px}px`;
+      td.style.maxHeight = `${px}px`;
+      td.style.paddingTop = '1px';
+      td.style.paddingBottom = '1px';
+    });
+  };
+
+  for (let h = 24; h >= 10; h -= 2) {
+    setFillerHeight(h);
+    if (!overflows()) return;
+  }
+
+  // Still overflowing: drop blank fillers from the bottom only (keep all summary rows).
+  const fillers = [...pageEl.querySelectorAll('tr.filler-row')];
+  while (overflows() && fillers.length) {
+    const row = fillers.pop();
+    if (row) row.remove();
+  }
+
+  if (!overflows()) return;
+
+  // Last resort: slight zoom so summary + footer stay visible.
+  const scale = Math.max(0.82, pageHeightPx / Math.max(pageEl.scrollHeight, 1));
+  pageEl.style.zoom = String(scale);
+};
+
 export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => {
-  const html = applyPrintPrefsToHtml(buildBprHtml(data, data.companyProfile), printPrefs);
+  let printData = data;
+  try {
+    const raw = localStorage.getItem('uma_erp_data');
+    const appData = raw ? JSON.parse(raw) : {};
+    const { enrichBPRForPrint } = await import('./receiptProducts');
+    printData = enrichBPRForPrint(data, appData) || data;
+  } catch {
+    printData = data;
+  }
+
+  const html = applyPrintPrefsToHtml(buildBprHtml(printData, printData.companyProfile || data.companyProfile), printPrefs);
   const { jsPDF } = await import('jspdf');
   const html2canvas = (await import('html2canvas')).default;
 
@@ -833,9 +957,9 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
   if (idoc.documentElement) idoc.documentElement.classList.add(PRINT_ROOT_CLASS);
   if (idoc.body) idoc.body.classList.add(PRINT_ROOT_CLASS);
 
-  const fileBase = data._blankSheet
+  const fileBase = printData._blankSheet
     ? `BPR_Blank`
-    : `BPR_${data.bprNo || 'N/A'}`;
+    : `BPR_${printData.bprNo || data.bprNo || 'N/A'}`;
   try {
     await new Promise((r) => {
       if (idoc.readyState === 'complete') {
@@ -845,6 +969,9 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
       }
     });
     await new Promise((r) => setTimeout(r, 50));
+
+    // Fit page 2 before capture so 7 blanks + 4 summary rows never clip off A4.
+    idoc.querySelectorAll('.page.page-p2').forEach((el) => fitBprPage2ToA4(el, 1123));
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageNodes = [...idoc.querySelectorAll('.page')];
@@ -884,24 +1011,64 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.display = 'flex';
             el.style.flexDirection = 'column';
             el.style.marginBottom = '10px';
+            el.style.overflow = 'visible';
           });
           clonedDoc.querySelectorAll('table.items').forEach((el) => {
             el.style.flex = '0 0 auto';
             el.style.height = 'auto';
             el.style.margin = '0';
+            el.style.overflow = 'visible';
           });
           clonedDoc.querySelectorAll('table.items thead th').forEach((el) => {
             el.style.height = 'auto';
-            el.style.padding = '5px 3px';
+            el.style.padding = '4px 3px';
             el.style.verticalAlign = 'middle';
             el.style.whiteSpace = 'normal';
+            el.style.fontSize = '11px';
+            el.style.lineHeight = '1.15';
+          });
+          clonedDoc.querySelectorAll('table.g th, table.g td').forEach((el) => {
+            el.style.wordBreak = 'normal';
+            el.style.overflowWrap = 'normal';
+            el.style.hyphens = 'none';
+            el.style.whiteSpace = 'normal';
+            el.style.lineHeight = '1.2';
+          });
+          clonedDoc.querySelectorAll('table.g .light-purple-header td, table.g tr.light-purple-header td').forEach((el) => {
+            el.style.fontSize = '10.5px';
+            el.style.lineHeight = '1.25';
+            el.style.padding = '5px 3px';
           });
           clonedDoc.querySelectorAll('table.items tbody td').forEach((el) => {
-            el.style.height = '38px';
-            el.style.minHeight = '38px';
+            const isFiller = el.closest('tr.filler-row');
+            const isSummary = el.closest('tr.summary-row');
+            el.style.height = isFiller ? (el.style.height || '22px') : '26px';
+            el.style.minHeight = isFiller ? (el.style.minHeight || '12px') : '26px';
             el.style.maxHeight = '';
-            el.style.padding = '6px 3px';
+            el.style.padding = isFiller ? '1px 2px' : '3px 2px';
             el.style.verticalAlign = 'middle';
+            el.style.overflow = 'visible';
+            el.style.textOverflow = 'clip';
+            el.style.whiteSpace = 'nowrap';
+            el.style.lineHeight = '1.1';
+            el.style.fontSize = '11px';
+            el.style.setProperty('background', el.classList.contains('purple-header') ? '#5a009d' : '#ffffff', 'important');
+            el.style.setProperty('color', el.classList.contains('purple-header') ? '#ffffff' : '#231f20', 'important');
+            el.style.setProperty('-webkit-text-fill-color', el.classList.contains('purple-header') ? '#ffffff' : '#231f20', 'important');
+            el.style.setProperty('opacity', '1', 'important');
+            el.style.setProperty('visibility', 'visible', 'important');
+            if (isSummary) {
+              el.style.height = '26px';
+              el.style.minHeight = '26px';
+            }
+          });
+          // Re-apply page-2 fit on the clone so capture matches (summary never clipped).
+          clonedDoc.querySelectorAll('.page.page-p2').forEach((el) => fitBprPage2ToA4(el, 1123));
+          clonedDoc.querySelectorAll('table.items tbody td.wt').forEach((el) => {
+            el.style.setProperty('color', '#231f20', 'important');
+            el.style.setProperty('-webkit-text-fill-color', '#231f20', 'important');
+            el.style.fontWeight = '700';
+            el.style.overflow = 'visible';
           });
           clonedDoc.querySelectorAll('table.items tbody td.lump-label').forEach((el) => {
             el.style.overflow = 'visible';
@@ -919,7 +1086,7 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.width = 'auto';
             el.style.boxSizing = 'border-box';
           });
-          clonedDoc.querySelectorAll('table.items tbody td, table.g td').forEach((el) => {
+          clonedDoc.querySelectorAll('table.g td').forEach((el) => {
             el.style.setProperty('background', el.classList.contains('purple-header') ? '#5a009d' : '#ffffff', 'important');
             el.style.setProperty('color', el.classList.contains('purple-header') ? '#ffffff' : '#231f20', 'important');
             el.style.setProperty('opacity', '1', 'important');

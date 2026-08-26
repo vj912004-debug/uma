@@ -7,6 +7,13 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   const profile = mergeCompanyProfile(profileInput);
   const appData = appDataInput || getDcAppData();
   const { lines, totalDrums, totalQty } = buildDcPrintLines(data, appData);
+  const linkedMr = (appData.materialReceipts || []).find((r) => r.id === data.receiptId) || null;
+  const deliveryNotes = (
+    data.termsAndConditions
+    || data.deliveryNotes
+    || linkedMr?.deliveryNotes
+    || ''
+  ).trim();
 
   const dcNo = escHtml(data.dcNo || 'N/A');
   const dcDate = escHtml(formatPdfDateDmy(data.date) || 'N/A');
@@ -481,6 +488,21 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
   }
   .dc-meta-card .dc-meta-row:first-of-type { margin-top: 8px; }
   .dc-meta-card .dc-meta-row:last-child { margin-bottom: 8px; }
+  .dc-notes-card {
+    border: 1px solid var(--lav-border);
+    margin-top: 10px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .dc-notes-body {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #231f20;
+    white-space: pre-wrap;
+    line-height: 1.45;
+    min-height: 28px;
+  }
 </style>
 </head>
 <body>
@@ -612,6 +634,12 @@ export const buildDeliveryChallanHtml = (data, profileInput, appDataInput) => {
           </div>
         </div>
       </div>
+
+      ${hasPrintVal(deliveryNotes) ? `
+      <div class="dc-notes-card">
+        <div class="box-head"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> DELIVERY NOTES</div>
+        <div class="dc-notes-body">${escHtml(deliveryNotes)}</div>
+      </div>` : ''}
 
       <div class="barfoot">
         <span>Thank you for your business!</span>

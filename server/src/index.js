@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from './config.js';
 import authRoutes from './routes/auth.js';
 import stateRoutes from './routes/state.js';
+import whatsappRoutes from './routes/whatsapp.js';
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/state', stateRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

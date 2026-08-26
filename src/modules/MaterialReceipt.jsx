@@ -177,6 +177,7 @@ const MaterialReceipt = () => {
     productName: '',
     nickName: '',
     value: '', // Editable value of the material
+    deliveryNotes: '', // Shown on linked Delivery Challan print
     batches: [], // Array of { batchNo, drums: 0, qty: 0, psdReq: '', psdReport: 'No', psdMethod: '', isEmptyDrums: false }
     totalDrums: 0,
     totalQty: 0,
@@ -361,12 +362,13 @@ const MaterialReceipt = () => {
       productName: '',
       nickName: '',
       value: '',
+      deliveryNotes: '',
       batches: [],
     totalDrums: 0,
     totalQty: 0,
     charges: { cleaning: false, filterBag: false, processing: false, sieving: false, psdReport: false, liner: false, courier: false, fiberDrum: false, transportation: false, hdpeDrum: false, batchChangeover: false },
     rates: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
-    qtys: { cleaning: 1, filterBag: 1, processing: 1, sieving: 1, psdReport: 1, liner: 1, courier: 1, fiberDrum: 1, transportation: 1, hdpeDrum: 1, batchChangeover: 1 },
+    qtys: { cleaning: 1, filterBag: 1, processing: 1, sieving: 1, psdReport: 1, liner: 1, courier: 1, fiberBag: 1, transportation: 1, hdpeDrum: 1, batchChangeover: 1 },
     customCharges: [],
     productSettings: {}
     });
@@ -840,6 +842,17 @@ const MaterialReceipt = () => {
                 <div>
                   <label>Material Declared Value (₹)</label>
                   <input type="number" className="input-field" placeholder="Editable" value={formData.value} onChange={e => setFormData({...formData, value: parseFloat(e.target.value) || ''})} />
+                </div>
+
+                <div style={{ gridColumn: 'span 4' }}>
+                  <label>Delivery Notes</label>
+                  <textarea
+                    className="input-field"
+                    rows="2"
+                    placeholder="Shown on Delivery Challan print (e.g. Material sent for Micronisation on Job Work basis.)"
+                    value={formData.deliveryNotes || ''}
+                    onChange={e => setFormData({ ...formData, deliveryNotes: e.target.value })}
+                  />
                 </div>
               </div>
 

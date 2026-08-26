@@ -688,8 +688,12 @@ export const enrichBPRForPrint = (bpr, appData = {}) => {
     totalDispatchedGross,
     totalReceivedNet,
     totalDispatchedNet,
-    lumpsNetWeight: bpr.lumpsNetWeight || lumpsVal || '',
+    lumpsNetWeight: bpr.lumpsNetWeight || lumpsVal || bpr.dispatchQty?.lumpsNet || '',
     sievingLumps: lumpsVal || bpr.sievingLumps || '',
+    sampleNetWeight: bpr.sampleNetWeight || bpr.dispatchQty?.sampleNet || '',
+    floorDustNetWeight: bpr.floorDustNetWeight || bpr.dispatchQty?.floorDustNet || '',
+    irrecoverableLoss: bpr.irrecoverableLoss || bpr.processLoss || bpr.dispatchQty?.netProcessLoss || '',
+    processLoss: bpr.processLoss || bpr.irrecoverableLoss || bpr.dispatchQty?.netProcessLoss || '',
     packingConsumables,
     packingMaterials: {
       ...(bpr.packingMaterials || {}),

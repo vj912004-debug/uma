@@ -88,6 +88,7 @@ const DeliveryChallan = () => {
         gstinShip: activeMR.gstinShip,
         selectedProducts: allNames,
         vehicleNo: activeMR.vehicleNo || '',
+        termsAndConditions: (activeMR.deliveryNotes || '').trim() || DEFAULT_TERMS,
         ...computed
       });
     }
@@ -361,7 +362,7 @@ const DeliveryChallan = () => {
 
                 <div style={{ gridColumn: 'span 4' }}>
                   <label>Terms & Conditions / Dispatch Description</label>
-                  <textarea className="input-field" rows="2" value={form.termsAndConditions} onChange={e => setForm({...form, termsAndConditions: e.target.value})} />
+                  <textarea className="input-field" rows="2" placeholder="From Material Receipt Delivery Notes" value={form.termsAndConditions} onChange={e => setForm({...form, termsAndConditions: e.target.value})} />
                 </div>
               </div>
 

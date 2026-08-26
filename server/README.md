@@ -58,6 +58,10 @@ API runs at **http://localhost:3001**
 | GET | `/api/state` | Full ERP state (Bearer token) |
 | PUT | `/api/state` | Save ERP state (Bearer token) |
 | POST | `/api/state/import` | Import state (Admin only) |
+| GET | `/api/whatsapp/status` | WhatsApp connection + QR (Bearer) |
+| POST | `/api/whatsapp/connect` | Start WhatsApp / show QR (Bearer) |
+| POST | `/api/whatsapp/disconnect` | Disconnect / logout (Bearer) |
+| POST | `/api/whatsapp/send` | Send text `{ phone, text }` (Bearer) |
 
 ## Frontend
 

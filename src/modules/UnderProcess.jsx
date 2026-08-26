@@ -1112,7 +1112,7 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       { sp: '', dp: '', tp: '', fp: '', fip: '' }
     ],
     packingMaterials: { whiteLdBags: '', blackLdBags: '', brownTapes: '', drumUsed: '', otherDetails: '' },
-    dispatchQty: { micronizedNet: '', lumpsNet: '', floorDustNet: '', netProcessLoss: '', remark: '' },
+    dispatchQty: { micronizedNet: '', lumpsNet: '', floorDustNet: '', sampleNet: '', netProcessLoss: '', remark: '' },
     processCompletionDate: new Date().toISOString().split('T')[0],
     processCompletionTime: '17:00',
     isFilterBagPackedStoredAfter: false,
@@ -1485,7 +1485,14 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       totalReceivedNet,
       totalDispatchedNet,
       totalReceivedGross,
-      totalDispatchedGross
+      totalDispatchedGross,
+      lumpsNetWeight: form.lumpsNetWeight || form.dispatchQty?.lumpsNet || '',
+      sampleNetWeight: form.sampleNetWeight || form.dispatchQty?.sampleNet || '',
+      floorDustNetWeight: form.floorDustNetWeight || form.dispatchQty?.floorDustNet || '',
+      irrecoverableLoss: form.irrecoverableLoss || form.dispatchQty?.netProcessLoss || form.processLoss || '',
+      processLoss: form.processLoss || form.irrecoverableLoss || form.dispatchQty?.netProcessLoss || '',
+      remark: form.remark || form.dispatchQty?.remark || '',
+      dispatchRemark: form.dispatchRemark || form.remark || form.dispatchQty?.remark || ''
     };
 
     if (editing) {
@@ -1684,24 +1691,24 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.75rem' }}>Dispatch Material Quantity Details</h4>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
           <div>
-            <label>Micronized Material net weight</label>
-            <input className="input-field" value={form.dispatchQty?.micronizedNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, micronizedNet: e.target.value } })} />
+            <label>Micronized Material Net Weight</label>
+            <input className="input-field" value={form.dispatchQty?.micronizedNet || (totalDispatchedNet > 0 ? totalDispatchedNet.toFixed(2) : '')} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, micronizedNet: e.target.value } })} />
           </div>
           <div>
-            <label>Lumps Net weight</label>
-            <input className="input-field" value={form.dispatchQty?.lumpsNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, lumpsNet: e.target.value } })} />
+            <label>Lumps Net Weight</label>
+            <input className="input-field" value={form.dispatchQty?.lumpsNet || form.lumpsNetWeight || ''} onChange={e => setForm({ ...form, lumpsNetWeight: e.target.value, dispatchQty: { ...form.dispatchQty, lumpsNet: e.target.value } })} />
           </div>
           <div>
-            <label>Floor Dust Net weight</label>
-            <input className="input-field" value={form.dispatchQty?.floorDustNet || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, floorDustNet: e.target.value } })} />
+            <label>Sample Net Weight</label>
+            <input className="input-field" value={form.sampleNetWeight || form.dispatchQty?.sampleNet || ''} onChange={e => setForm({ ...form, sampleNetWeight: e.target.value, dispatchQty: { ...form.dispatchQty, sampleNet: e.target.value } })} />
           </div>
           <div>
-            <label>Net Process Loss</label>
-            <input className="input-field" value={form.dispatchQty?.netProcessLoss || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, netProcessLoss: e.target.value } })} />
+            <label>Irrecoverable loss</label>
+            <input className="input-field" value={form.irrecoverableLoss || form.dispatchQty?.netProcessLoss || ''} onChange={e => setForm({ ...form, irrecoverableLoss: e.target.value, processLoss: e.target.value, dispatchQty: { ...form.dispatchQty, netProcessLoss: e.target.value } })} />
           </div>
           <div style={{ gridColumn: 'span 4' }}>
             <label>Remark</label>
-            <input className="input-field" value={form.dispatchQty?.remark || ''} onChange={e => setForm({ ...form, dispatchQty: { ...form.dispatchQty, remark: e.target.value } })} />
+            <input className="input-field" value={form.dispatchQty?.remark || form.remark || ''} onChange={e => setForm({ ...form, remark: e.target.value, dispatchRemark: e.target.value, dispatchQty: { ...form.dispatchQty, remark: e.target.value } })} />
           </div>
         </div>
 
@@ -2364,7 +2371,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     transporterName: '',
     driverName: '',
     driverContact: '',
-    termsAndConditions: 'Material sent for Micronisation on Job Work basis. Goods to be returned after processing.'
+    termsAndConditions: (mr.deliveryNotes || '').trim() || 'Material sent for Micronisation on Job Work basis. Goods to be returned after processing.'
   });
 
   useEffect(() => {
@@ -2398,7 +2405,8 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       selectedProducts: selected,
       ...computed,
       value: computed.value === 0 || computed.value == null ? '' : computed.value,
-      vehicleNo: mr.vehicleNo || prev.vehicleNo
+      vehicleNo: mr.vehicleNo || prev.vehicleNo,
+      termsAndConditions: (mr.deliveryNotes || '').trim() || prev.termsAndConditions
     }));
   }, [dcFormInitKey]);
 
@@ -2529,7 +2537,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
 
         <div style={{ gridColumn: 'span 4' }}>
           <label>Terms & Conditions / Dispatch Description</label>
-          <textarea className="input-field" rows="2" value={form.termsAndConditions} onChange={e => setForm({...form, termsAndConditions: e.target.value})} />
+          <textarea className="input-field" rows="2" placeholder="From Material Receipt Delivery Notes" value={form.termsAndConditions} onChange={e => setForm({...form, termsAndConditions: e.target.value})} />
         </div>
       </div>
 

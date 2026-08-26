@@ -7,6 +7,7 @@ import {
   Mail,
   Phone,
   MessageSquare,
+  MessageCircle,
   IndianRupee,
   Users,
   AlertCircle,
@@ -34,6 +35,13 @@ import {
 } from '../utils/paymentFollowUpPdf';
 import { applyPrintPrefsToHtml } from '../utils/printPrefs';
 import { promptPrintPrefs } from '../utils/promptPrintPrefs';
+import WhatsAppConnectModal from '../components/WhatsAppConnectModal';
+import {
+  checkApiHealth,
+  getAuthToken,
+  whatsappSend,
+  whatsappStatus
+} from '../api/client';
 
 const FILTER_STATUS = [
   { key: 'all', label: 'All Status' },
@@ -42,6 +50,14 @@ const FILTER_STATUS = [
   { key: 'due_tomorrow', label: 'Follow-Up Due Tomorrow' },
   { key: 'promised', label: 'Has Promise' }
 ];
+
+/** Digits for wa.me; prepends India 91 when given a 10-digit mobile. */
+const toWhatsAppDigits = (phone) => {
+  let digits = String(phone || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.length === 10) digits = `91${digits}`;
+  return digits;
+};
 
 const emptyFollowForm = (customer, invoices = []) => ({
   date: todayISO(),
@@ -98,6 +114,8 @@ const PaymentFollowUp = () => {
   const [statementPrintPrefs, setStatementPrintPrefs] = useState(null);
   const [emailOpen, setEmailOpen] = useState(false);
   const [followOpen, setFollowOpen] = useState(false);
+  const [waConnectOpen, setWaConnectOpen] = useState(false);
+  const [waSending, setWaSending] = useState(false);
   const [promiseOpen, setPromiseOpen] = useState(false);
   const [followForm, setFollowForm] = useState(emptyFollowForm());
   const [promiseForm, setPromiseForm] = useState(emptyPromiseForm());
@@ -312,6 +330,78 @@ const PaymentFollowUp = () => {
     });
     setEmailOpen(false);
     alert('Email composer opened. Attach the downloaded PDF before sending.');
+  };
+
+  const buildWhatsAppText = () => {
+    const invoices = buildStatementInvoices();
+    const total = invoices.reduce((s, i) => s + (i.outstanding || 0), 0);
+    const lines = invoices
+      .map((i) => `• ${i.invoiceNo} (${formatDate(i.invoiceDate)}): ₹ ${money(i.outstanding)}`)
+      .join('\n');
+    const company = data.companyProfile?.companyName || 'UMA MICRON';
+    return (
+      `Dear Sir/Madam,\n\n` +
+      `Payment follow-up for *${selectedCustomer.partyName}* as on ${formatDate(asOnDate)}:\n\n` +
+      `${lines}\n\n` +
+      `*Total Outstanding: ₹ ${money(total)}*\n\n` +
+      `Kindly arrange payment at the earliest.\n\n` +
+      `Regards,\n${company}`
+    );
+  };
+
+  const logWhatsAppFollowUp = (invoices) => {
+    updateData('paymentFollowUps', {
+      id: Date.now().toString(),
+      partyId: selectedCustomer.partyId,
+      partyName: selectedCustomer.partyName,
+      date: todayISO(),
+      method: 'WhatsApp',
+      status: 'WhatsApp Sent',
+      invoiceNos: invoices.map((i) => i.invoiceNo).join(', '),
+      outstandingAmount: selectedOutstanding || selectedCustomer.outstandingAmount,
+      nextFollowUpDate: addDaysISO(todayISO(), 3),
+      remarks: 'WhatsApp message sent via Uma ERP integration.'
+    });
+  };
+
+  const openWhatsApp = async () => {
+    if (!selectedCustomer) return;
+    const phone = toWhatsAppDigits(selectedCustomer.phone);
+    if (!phone) {
+      alert('No phone number on file for this customer. Add phone1 in Parties, then try again.');
+      return;
+    }
+
+    const healthy = await checkApiHealth();
+    if (!healthy || !getAuthToken()) {
+      alert('WhatsApp integration needs the backend running and API login.\n\n1. Start server: cd server && npm run dev\n2. Log in while API is online\n3. Link WhatsApp by scanning QR');
+      setWaConnectOpen(true);
+      return;
+    }
+
+    setWaSending(true);
+    try {
+      let status = await whatsappStatus();
+      if (!status?.ready && status?.status !== 'connected') {
+        setWaConnectOpen(true);
+        alert('Link WhatsApp first: scan the QR with your phone, then click WhatsApp again to send.');
+        return;
+      }
+
+      const invoices = buildStatementInvoices();
+      const text = buildWhatsAppText();
+      await whatsappSend({ phone, text });
+      logWhatsAppFollowUp(invoices);
+      alert('WhatsApp message sent successfully.');
+    } catch (err) {
+      const msg = err?.message || 'Failed to send WhatsApp message.';
+      if (/not connected/i.test(msg)) {
+        setWaConnectOpen(true);
+      }
+      alert(msg);
+    } finally {
+      setWaSending(false);
+    }
   };
 
   const openFollowModal = () => {
@@ -560,6 +650,8 @@ const PaymentFollowUp = () => {
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button type="button" className="btn" onClick={openPdfPreview} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileDown size={14} /> Generate PDF</button>
             <button type="button" className="btn" onClick={openEmailModal} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Mail size={14} /> Send Email</button>
+            <button type="button" className="btn" onClick={() => setWaConnectOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><MessageCircle size={14} /> Link WhatsApp</button>
+            <button type="button" className="btn" disabled={waSending} onClick={openWhatsApp} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#25D366', borderColor: '#25D366', color: '#fff', opacity: waSending ? 0.7 : 1 }}><MessageCircle size={14} /> {waSending ? 'Sending…' : 'WhatsApp'}</button>
             <button type="button" className="btn btn-primary" onClick={openFollowModal} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><MessageSquare size={14} /> Record Follow-Up</button>
             <button type="button" className="btn" onClick={() => setView('history')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><History size={14} /> History</button>
             <button type="button" className="btn" onClick={() => openPromiseModal(selectedCustomer)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Handshake size={14} /> Promise</button>
@@ -848,6 +940,11 @@ const PaymentFollowUp = () => {
           </form>
         </ModalShell>
       )}
+
+      <WhatsAppConnectModal
+        open={waConnectOpen}
+        onClose={() => setWaConnectOpen(false)}
+      />
     </div>
   );
 };

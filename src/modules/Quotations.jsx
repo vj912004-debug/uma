@@ -26,11 +26,14 @@ const syncValidityInTerms = (terms, isoDate) => {
   return `${terms || ''}\nValidity: ${label}`.trim();
 };
 
-const MATERIAL_CHARGES = [
+const MAIN_CHARGES = [
   { key: 'cleaning', label: 'Minimum Cleaning Charges (998842)', isQtyRate: true },
-  { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
   { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true },
-  { key: 'sieving', label: 'Sieving Charges (998842)', isQtyRate: true },
+  { key: 'sieving', label: 'Sieving Charges (998842)', isQtyRate: true }
+];
+
+const OPTIONAL_SERVICE_CHARGES = [
+  { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
   { key: 'psdReport', label: 'PSD Report Charges (998346)', isQtyRate: false },
   { key: 'liner', label: 'Liner (39233090)', isQtyRate: false },
   { key: 'courier', label: 'Courier (996812)', isQtyRate: false },
@@ -40,8 +43,9 @@ const MATERIAL_CHARGES = [
   { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
 ];
 
+/** Quotation only: nothing selected until the user checks a charge. */
 const DEFAULT_CHARGES = {
-  cleaning: true, filterBag: false, processing: true, sieving: false,
+  cleaning: false, filterBag: false, processing: false, sieving: false,
   psdReport: false, liner: false, courier: false, fiberDrum: false,
   transportation: false, hdpeDrum: false, batchChangeover: false
 };
@@ -66,8 +70,8 @@ const getDefaultForm = () => ({
   psdRequirement: '',
   charges: { ...DEFAULT_CHARGES },
   rates: { ...DEFAULT_RATES },
-  mainCharges: [{ description: '', psdRequirement: '', rate: '', dryRate: '', wetRate: '' }],
-  optionalCharges: [{ description: '', rate: '' }],
+  mainCharges: [],
+  optionalCharges: [],
   productSettings: {},
   validityDate: defaultValidityDate(),
   terms: 'Tax: GST will charge extra.\nLoss: Loss occurs during Processing is on your account.\nSame Batch: Same materials requirement of micronization separately batch wise of different specification of same materials then change over charge @ Rs. 500/- batch or per specification will be applicable.\nCharges: This is only processing charges, all other charges like Transportation, Insurance, Repacking material charges will be extra.\nPayment: 100% Advance against PI\nValidity: ' + formatValidityLabel(defaultValidityDate()) + '\nNote: If properties of material change then rate will be change and PSD will change then rate will be change.',
@@ -75,34 +79,57 @@ const getDefaultForm = () => ({
   signatoryName: 'Amit Patel'
 });
 
+const formatChargeRateLabel = (item, rate, qty) => {
+  if (item.isQtyRate && qty) return `₹ ${rate} / Kg (Qty: ${qty} Kg)`;
+  return `₹ ${rate}${item.isQtyRate ? ' / Kg' : ''}`;
+};
+
 const buildMainChargesFromMaterial = (charges, rates, qty, psdRequirement) => {
   const rows = [];
-  MATERIAL_CHARGES.forEach((item) => {
-    if (!charges[item.key]) return;
-    const rate = rates[item.key] || 0;
+  MAIN_CHARGES.forEach((item) => {
+    if (!charges?.[item.key]) return;
+    const rate = rates?.[item.key] || 0;
     if (rate <= 0) return;
-    const rateLabel = item.isQtyRate && qty
-      ? `₹ ${rate} / Kg (Qty: ${qty} Kg)`
-      : `₹ ${rate}${item.isQtyRate ? ' / Kg' : ''}`;
     rows.push({
       description: item.label,
       psdRequirement: item.key === 'processing' ? (psdRequirement || '') : '',
-      rate: rateLabel
+      rate: formatChargeRateLabel(item, rate, qty),
+      dryRate: formatChargeRateLabel(item, rate, qty),
+      wetRate: '',
+      sourceKey: item.key
     });
   });
-  return rows.length ? rows : [{ description: '', psdRequirement: '', rate: '' }];
+  return rows;
 };
+
+const buildOptionalChargesFromMaterial = (charges, rates, qty, existingOptional = []) => {
+  const autoRows = [];
+  OPTIONAL_SERVICE_CHARGES.forEach((item) => {
+    if (!charges?.[item.key]) return;
+    const rate = rates?.[item.key] || 0;
+    autoRows.push({
+      description: item.label,
+      rate: rate > 0 ? formatChargeRateLabel(item, rate, qty) : 'NIL',
+      sourceKey: item.key,
+      selected: true
+    });
+  });
+  const customRows = (existingOptional || []).filter(
+    (row) => !row.sourceKey && String(row.description || '').trim()
+  );
+  return [...autoRows, ...customRows];
+};
+
+const rebuildChargeTables = (charges, rates, qty, psdRequirement, existingOptional = []) => ({
+  mainCharges: buildMainChargesFromMaterial(charges, rates, qty, psdRequirement),
+  optionalCharges: buildOptionalChargesFromMaterial(charges, rates, qty, existingOptional)
+});
 
 const buildChargesFromPartyProduct = (prodConfig) => {
   const defaultRates = prodConfig?.charges || {};
-  const nextCharges = { ...DEFAULT_CHARGES };
-  Object.keys(defaultRates).forEach((key) => {
-    if ((defaultRates[key] || 0) > 0) nextCharges[key] = true;
-  });
-  nextCharges.cleaning = true;
-  nextCharges.processing = true;
+  // Load rates from party master, but do not auto-select any charge for quotation print.
   return {
-    charges: nextCharges,
+    charges: { ...DEFAULT_CHARGES },
     rates: { ...DEFAULT_RATES, ...defaultRates },
     psdRequirement: prodConfig?.psdReq || ''
   };
@@ -130,6 +157,13 @@ const applyProductToQuotation = (baseForm, productName, party) => {
   if (saved) {
     const charges = { ...DEFAULT_CHARGES, ...saved.charges };
     const rates = { ...DEFAULT_RATES, ...saved.rates };
+    const tables = rebuildChargeTables(
+      charges,
+      rates,
+      saved.qty,
+      saved.psdRequirement,
+      saved.optionalCharges
+    );
     return {
       ...baseForm,
       productName,
@@ -138,15 +172,16 @@ const applyProductToQuotation = (baseForm, productName, party) => {
       psdRequirement: saved.psdRequirement || '',
       charges,
       rates,
-      mainCharges: saved.mainCharges?.length
-        ? saved.mainCharges
-        : buildMainChargesFromMaterial(charges, rates, saved.qty, saved.psdRequirement)
+      // Always prefer tables rebuilt from current checkbox selection for print accuracy.
+      mainCharges: tables.mainCharges.length ? tables.mainCharges : (saved.mainCharges || []),
+      optionalCharges: tables.optionalCharges.length ? tables.optionalCharges : (saved.optionalCharges || [])
     };
   }
 
   const prodConfig = (party?.products || []).find(p => p.name === productName);
   const { charges, rates, psdRequirement } = buildChargesFromPartyProduct(prodConfig);
   const qty = baseForm.productName === productName ? baseForm.qty : '';
+  const tables = rebuildChargeTables(charges, rates, qty, psdRequirement, []);
   return {
     ...baseForm,
     productName,
@@ -155,7 +190,7 @@ const applyProductToQuotation = (baseForm, productName, party) => {
     psdRequirement,
     charges,
     rates,
-    mainCharges: buildMainChargesFromMaterial(charges, rates, qty, psdRequirement)
+    ...tables
   };
 };
 
@@ -207,7 +242,7 @@ const Quotations = () => {
       return {
         ...prev,
         charges: nextCharges,
-        mainCharges: buildMainChargesFromMaterial(nextCharges, prev.rates, prev.qty, prev.psdRequirement)
+        ...rebuildChargeTables(nextCharges, prev.rates, prev.qty, prev.psdRequirement, prev.optionalCharges)
       };
     });
   };
@@ -218,7 +253,7 @@ const Quotations = () => {
       return {
         ...prev,
         rates: nextRates,
-        mainCharges: buildMainChargesFromMaterial(prev.charges, nextRates, prev.qty, prev.psdRequirement)
+        ...rebuildChargeTables(prev.charges, nextRates, prev.qty, prev.psdRequirement, prev.optionalCharges)
       };
     });
   };
@@ -227,7 +262,7 @@ const Quotations = () => {
     setFormData(prev => ({
       ...prev,
       qty: val,
-      mainCharges: buildMainChargesFromMaterial(prev.charges, prev.rates, val, prev.psdRequirement)
+      ...rebuildChargeTables(prev.charges, prev.rates, val, prev.psdRequirement, prev.optionalCharges)
     }));
   };
 
@@ -238,9 +273,30 @@ const Quotations = () => {
     e.preventDefault();
     const productSettings = snapshotCurrentProductSettings(formData);
     const configuredProducts = Object.keys(productSettings);
+    const synced = rebuildChargeTables(
+      formData.charges,
+      formData.rates,
+      formData.qty,
+      formData.psdRequirement,
+      formData.optionalCharges
+    );
     const payload = {
       ...formData,
-      productSettings,
+      ...synced,
+      productSettings: {
+        ...productSettings,
+        ...(formData.productName
+          ? {
+              [formData.productName]: {
+                ...(productSettings[formData.productName] || {}),
+                charges: { ...formData.charges },
+                rates: { ...formData.rates },
+                mainCharges: synced.mainCharges,
+                optionalCharges: synced.optionalCharges
+              }
+            }
+          : {})
+      },
       productName: configuredProducts.length > 1
         ? configuredProducts.join(', ')
         : (formData.productName || configuredProducts[0] || '')
@@ -320,9 +376,14 @@ const Quotations = () => {
   };
 
   const addChargeRow = (type) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      [type]: [...prev[type], type === 'mainCharges' ? { description: '', psdRequirement: '', rate: '' } : { description: '', rate: '' }]
+    setFormData(prev => ({
+      ...prev,
+      [type]: [
+        ...prev[type],
+        type === 'mainCharges'
+          ? { description: '', psdRequirement: '', rate: '', dryRate: '', wetRate: '' }
+          : { description: '', rate: '', selected: true }
+      ]
     }));
   };
 
@@ -656,10 +717,12 @@ const Quotations = () => {
               {formData.productName && (
               <>
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
-                <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Material Charges (as per Party Master)</h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Rates auto-fill from party product config. Minimum cleaning &amp; processing charges are enabled by default.</p>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Main Charges (Commercial Offer)</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                  Only checked items with a rate print on the quotation. Nothing is applied by default — select what you need.
+                </p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  {MATERIAL_CHARGES.map((item) => (
+                  {MAIN_CHARGES.map((item) => (
                     <div key={item.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
                         <input type="checkbox" checked={formData.charges?.[item.key] || false} onChange={() => toggleMaterialCharge(item.key)} />
@@ -676,6 +739,35 @@ const Quotations = () => {
                             onChange={e => handleMaterialRateChange(item.key, e.target.value)}
                           />
                           {item.isQtyRate && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ Kg</span>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Optional Service Charges</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                  Selected optional services appear in the <strong>OPTIONAL SERVICES</strong> table on the quotation print only.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  {OPTIONAL_SERVICE_CHARGES.map((item) => (
+                    <div key={item.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                        <input type="checkbox" checked={formData.charges?.[item.key] || false} onChange={() => toggleMaterialCharge(item.key)} />
+                        {item.label}
+                      </label>
+                      {formData.charges?.[item.key] && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingLeft: '1.5rem' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate: ₹</span>
+                          <input
+                            type="number"
+                            className="input-field"
+                            style={{ padding: '0.25rem', width: '90px', fontSize: '0.8rem' }}
+                            value={formData.rates?.[item.key] || 0}
+                            onChange={e => handleMaterialRateChange(item.key, e.target.value)}
+                          />
                         </div>
                       )}
                     </div>
@@ -717,7 +809,7 @@ const Quotations = () => {
 
               <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.9rem', fontWeight: 600 }}>Optional / Extra Items (If Required)</label>
+                  <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.9rem', fontWeight: 600 }}>Extra Optional Items (custom rows for print)</label>
                   <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => addChargeRow('optionalCharges')}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Optional Charge
                   </button>
