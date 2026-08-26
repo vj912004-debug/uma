@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { Plus, Search, Edit2, Trash2, ShieldAlert } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
 import { useNavigate } from 'react-router-dom';
+import SearchableSelect from '../components/SearchableSelect';
 
 const displayChargeRate = (v) => (v == null || v === '' || v === 0) ? '' : v;
 const parseChargeRateInput = (val) => (val === '' ? 0 : (parseFloat(val) || 0));
@@ -340,14 +341,14 @@ const Parties = () => {
                 </div>
                 <div>
                   <label>Party Type</label>
-                  <select 
+                  <SearchableSelect 
                     className="input-field" 
                     value={formData.type}
                     onChange={e => setFormData({...formData, type: e.target.value})}
                   >
                     <option value="Customer">Customer</option>
                     <option value="Supplier">Supplier</option>
-                  </select>
+                  </SearchableSelect>
                 </div>
                 <div style={{ gridColumn: 'span 3' }}>
                   <label>Party Name *</label>
@@ -587,14 +588,14 @@ const Parties = () => {
                 </div>
                 <div>
                   <label>Default PSD Method</label>
-                  <select
+                  <SearchableSelect
                     className="input-field"
                     value={productData.psdMethodDefault || 'Dry'}
                     onChange={e => setProductData({ ...productData, psdMethodDefault: e.target.value })}
                   >
                     <option value="Dry">Dry</option>
                     <option value="Wet">Wet</option>
-                  </select>
+                  </SearchableSelect>
                 </div>
                 <div>
                   <label>PSD Note (200+ Characters)</label>

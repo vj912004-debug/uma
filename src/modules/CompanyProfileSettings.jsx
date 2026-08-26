@@ -13,6 +13,7 @@ import {
   getStoredPrintPrefs,
   setStoredPrintPrefs
 } from '../utils/printPrefs';
+import SearchableSelect from '../components/SearchableSelect';
 
 const Section = ({ title, children }) => (
   <div className="premium-card" style={{ marginBottom: '1.5rem' }}>
@@ -94,7 +95,7 @@ const CompanyProfileSettings = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'end' }}>
             <div className="form-group" style={{ margin: 0 }}>
               <label>Default Font</label>
-              <select
+              <SearchableSelect
                 className="input-field"
                 value={printPrefs.fontFamily}
                 onChange={(e) => setPrintPrefs((p) => ({ ...p, fontFamily: e.target.value }))}
@@ -103,11 +104,11 @@ const CompanyProfileSettings = () => {
                 {PRINT_FONTS.map((f) => (
                   <option key={f.value} value={f.value}>{f.label}</option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label>Default Font Size</label>
-              <select
+              <SearchableSelect
                 className="input-field"
                 value={printPrefs.fontSize}
                 onChange={(e) => setPrintPrefs((p) => ({ ...p, fontSize: Number(e.target.value) }))}
@@ -115,7 +116,7 @@ const CompanyProfileSettings = () => {
                 {PRINT_FONT_SIZES.map((s) => (
                   <option key={s} value={s}>{s} px</option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
           </div>
           <div

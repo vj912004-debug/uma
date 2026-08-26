@@ -16,6 +16,7 @@ import {
   getReceiptTotals
 } from '../utils/receiptProducts';
 import { flattenMRChargeSnapshot } from '../utils/documentCharges';
+import SearchableSelect from '../components/SearchableSelect';
 
 const CHARGE_KEYS = [
   'cleaning', 'filterBag', 'processing', 'sieving', 'psdReport',
@@ -580,7 +581,7 @@ const MaterialReceipt = () => {
         />
       </td>
       <td style={{ padding: '0.5rem' }}>
-        <select
+        <SearchableSelect
           className="input-field"
           style={{ padding: '0.3rem', fontSize: '0.825rem' }}
           value={batch.psdReport}
@@ -588,10 +589,10 @@ const MaterialReceipt = () => {
         >
           <option value="Yes">Yes</option>
           <option value="No">No</option>
-        </select>
+        </SearchableSelect>
       </td>
       <td style={{ padding: '0.5rem' }}>
-        <select
+        <SearchableSelect
           className="input-field"
           style={{ padding: '0.3rem', fontSize: '0.825rem' }}
           value={batch.psdMethod}
@@ -600,7 +601,7 @@ const MaterialReceipt = () => {
           <option value="Dry">Dry</option>
           <option value="Wet">Wet</option>
           <option value="">None</option>
-        </select>
+        </SearchableSelect>
       </td>
       <td style={{ padding: '0.5rem', textAlign: 'center' }}>
         <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }} onClick={() => handleRemoveBatchRow(idx)}>
@@ -812,7 +813,7 @@ const MaterialReceipt = () => {
                 {/* Party Selection */}
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Party Name *</label>
-                  <select 
+                  <SearchableSelect 
                     className="input-field" 
                     required 
                     value={formData.partyId}
@@ -822,7 +823,7 @@ const MaterialReceipt = () => {
                     {data.parties.map(p => (
                       <option key={p.id} value={p.id}>{p.name} ({p.vendorCode})</option>
                     ))}
-                  </select>
+                  </SearchableSelect>
                 </div>
 
                 {/* Addresses */}
@@ -877,7 +878,7 @@ const MaterialReceipt = () => {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <select
+                    <SearchableSelect
                       className="input-field"
                       style={{ minWidth: '220px' }}
                       value=""
@@ -893,7 +894,7 @@ const MaterialReceipt = () => {
                       {productsAvailableToAdd.map(prod => (
                         <option key={prod.name} value={prod.name}>{prod.name}</option>
                       ))}
-                    </select>
+                    </SearchableSelect>
                   </div>
                 </div>
               )}

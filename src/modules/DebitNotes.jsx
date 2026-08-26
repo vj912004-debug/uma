@@ -9,6 +9,7 @@ import {
   OTHER_CHARGE_ITEM
 } from '../utils/documentCharges';
 import { calcNoteLines } from '../utils/debitCreditNoteHtml';
+import SearchableSelect from '../components/SearchableSelect';
 
 const blankLine = () => ({ id: Date.now() + Math.random(), description: '', qty: 1, rate: 0 });
 
@@ -311,12 +312,12 @@ const DebitNotes = () => {
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Load from Parties (optional)</label>
-                  <select className="input-field" value={form.partyId} onChange={handlePartySelect}>
+                  <SearchableSelect className="input-field" value={form.partyId} onChange={handlePartySelect}>
                     <option value="">-- Select to auto-fill name / address --</option>
                     {data.parties.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
-                  </select>
+                  </SearchableSelect>
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Bill To Address</label>
@@ -379,7 +380,7 @@ const DebitNotes = () => {
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Reason for Debit Note</label>
-                  <select className="input-field" value={form.reason} onChange={e => setForm({...form, reason: e.target.value})}>
+                  <SearchableSelect className="input-field" value={form.reason} onChange={e => setForm({...form, reason: e.target.value})}>
                     <option value="">-- Select Reason --</option>
                     <option value="Additional Charges">Additional Charges</option>
                     <option value="Rate Revision">Rate Revision</option>
@@ -387,7 +388,7 @@ const DebitNotes = () => {
                     <option value="Freight Charges">Freight Charges</option>
                     <option value="Material Shortage">Material Shortage</option>
                     <option value="Others">Others</option>
-                  </select>
+                  </SearchableSelect>
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Particulars / Other Reason *</label>
@@ -440,12 +441,12 @@ const DebitNotes = () => {
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
                     <span>GST Rate (%):</span>
-                    <select className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
+                    <SearchableSelect className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
                       <option value="18">18%</option>
                       <option value="12">12%</option>
                       <option value="5">5%</option>
                       <option value="0">0%</option>
-                    </select>
+                    </SearchableSelect>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <span>CGST @{noteTotals.displayRate}%:</span>

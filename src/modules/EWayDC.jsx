@@ -2,6 +2,7 @@ import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Search, Edit2, ClipboardList } from 'lucide-react';
+import SearchableSelect from '../components/SearchableSelect';
 
 const EWayDC = () => {
   const { data, updateItem } = useAppContext();
@@ -131,11 +132,11 @@ const EWayDC = () => {
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>E-Way Bill Purpose *</label>
-                  <select className="input-field" value={form.ewayBillPurpose} onChange={e => setForm({...form, ewayBillPurpose: e.target.value})}>
+                  <SearchableSelect className="input-field" value={form.ewayBillPurpose} onChange={e => setForm({...form, ewayBillPurpose: e.target.value})}>
                     <option value="Others - Job Work">Others - Job Work</option>
                     <option value="Supply">Supply</option>
                     <option value="Export">Export</option>
-                  </select>
+                  </SearchableSelect>
                 </div>
                 <div>
                   <label>E-Way Bill Number *</label>

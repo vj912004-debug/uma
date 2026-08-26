@@ -42,6 +42,7 @@ import {
   whatsappSend,
   whatsappStatus
 } from '../api/client';
+import SearchableSelect from '../components/SearchableSelect';
 
 const FILTER_STATUS = [
   { key: 'all', label: 'All Status' },
@@ -571,9 +572,9 @@ const PaymentFollowUp = () => {
         </div>
         <div>
           <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Status</label>
-          <select className="input-field" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <SearchableSelect className="input-field" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             {FILTER_STATUS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
-          </select>
+          </SearchableSelect>
         </div>
         <div>
           <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>As On Date</label>
@@ -852,24 +853,24 @@ const PaymentFollowUp = () => {
             </div>
             <div>
               <label>Method</label>
-              <select className="input-field" value={followForm.method} onChange={(e) => setFollowForm({ ...followForm, method: e.target.value })}>
+              <SearchableSelect className="input-field" value={followForm.method} onChange={(e) => setFollowForm({ ...followForm, method: e.target.value })}>
                 <option>Phone</option>
                 <option>Email</option>
                 <option>Meeting</option>
                 <option>WhatsApp</option>
                 <option>Visit</option>
-              </select>
+              </SearchableSelect>
             </div>
             <div>
               <label>Status</label>
-              <select className="input-field" value={followForm.status} onChange={(e) => setFollowForm({ ...followForm, status: e.target.value })}>
+              <SearchableSelect className="input-field" value={followForm.status} onChange={(e) => setFollowForm({ ...followForm, status: e.target.value })}>
                 <option>Called</option>
                 <option>Email Sent</option>
                 <option>No Response</option>
                 <option>Promised</option>
                 <option>Partial Paid</option>
                 <option>Disputed</option>
-              </select>
+              </SearchableSelect>
             </div>
             <div>
               <label>Next Follow-Up Date</label>
@@ -901,7 +902,7 @@ const PaymentFollowUp = () => {
           <form onSubmit={savePromise} style={{ display: 'grid', gap: '0.85rem' }}>
             <div>
               <label>Customer</label>
-              <select
+              <SearchableSelect
                 className="input-field"
                 required
                 value={promiseForm.partyId}
@@ -919,7 +920,7 @@ const PaymentFollowUp = () => {
                 {customers.map((c) => (
                   <option key={c.partyId} value={c.partyId}>{c.partyName}</option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
             <div>
               <label>Promise Date</label>

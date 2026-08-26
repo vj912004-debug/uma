@@ -21,6 +21,7 @@ import {
   hasSheetOverride
 } from '../utils/paymentTotals';
 import { getFYOfDate } from '../utils/financialYear';
+import SearchableSelect from '../components/SearchableSelect';
 
 const DATE_COLUMNS = new Set(['date', 'bprDate', 'dcDate', 'invoiceDate']);
 
@@ -432,23 +433,23 @@ const ProcessingSheet = () => {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 1rem', minWidth: '220px' }}>
           <Building2 size={18} color="#5b1c85" />
-          <select 
+          <SearchableSelect 
             style={{ border: 'none', background: 'transparent', padding: '0.85rem', width: '100%', outline: 'none', fontSize: '0.9rem', color: '#475569' }}
             value={partyFilter} onChange={e => setPartyFilter(e.target.value)}
           >
             <option value="">All Parties</option>
             {partyOptions.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+          </SearchableSelect>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 1rem', minWidth: '220px' }}>
           <Package size={18} color="#5b1c85" />
-          <select 
+          <SearchableSelect 
             style={{ border: 'none', background: 'transparent', padding: '0.85rem', width: '100%', outline: 'none', fontSize: '0.9rem', color: '#475569' }}
             value={productFilter} onChange={e => setProductFilter(e.target.value)}
           >
             <option value="">All Products</option>
             {productOptions.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+          </SearchableSelect>
         </div>
       </div>
 

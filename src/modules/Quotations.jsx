@@ -4,6 +4,7 @@ import {Eye,  Plus, Search, Download, Trash2, Edit2 } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import { formatDate } from '../utils/dateUtils';
+import SearchableSelect from '../components/SearchableSelect';
 
 const defaultValidityDate = () => {
   const d = new Date();
@@ -542,12 +543,12 @@ const Quotations = () => {
                 </div>
                 <div>
                   <label>Select Party *</label>
-                  <select className="input-field" required value={formData.partyId} onChange={handlePartySelect}>
+                  <SearchableSelect className="input-field" required value={formData.partyId} onChange={handlePartySelect}>
                     <option value="">-- Select --</option>
                     {data.parties.filter(p => p.type === 'Customer').map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
-                  </select>
+                  </SearchableSelect>
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Contact Person / Attn</label>
@@ -647,7 +648,7 @@ const Quotations = () => {
                     <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem' }}>
                       Which product do you want to edit?
                     </label>
-                    <select
+                    <SearchableSelect
                       className="input-field"
                       value={formData.productName || ''}
                       onChange={e => handleSelectProductFromTable(e.target.value)}
@@ -655,7 +656,7 @@ const Quotations = () => {
                       {partyProducts.map(p => (
                         <option key={p.name} value={p.name}>{p.name}</option>
                       ))}
-                    </select>
+                    </SearchableSelect>
                   </div>
                 )}
                 <div>

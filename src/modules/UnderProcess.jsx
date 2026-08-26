@@ -4,7 +4,8 @@ import { useAppContext } from '../context/AppContext';
 import { generateDocNumber, nextAvailableDocNumber } from '../utils/numbering';
 import { 
   FileText, Activity, UploadCloud, Package, Truck, 
-  FileSpreadsheet, FileCheck, CheckCircle, Clock, X, Plus, Edit2, Download, Trash2 
+  FileSpreadsheet, FileCheck, CheckCircle, Clock, X, Plus, Edit2, Download, Trash2,
+  Search, Building2
 } from 'lucide-react';
 import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
 import { copyChargeQtysFromSettings, enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, getLinkedPITermsForTI, applyProformaFinancialsToTaxInvoice, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges } from '../utils/documentCharges';
@@ -29,6 +30,7 @@ import {
   getPartyProductForMR,
   enrichBPRForPrint
 } from '../utils/receiptProducts';
+import SearchableSelect from '../components/SearchableSelect';
 
 const CHARGE_KEYS = [
   'cleaning', 'filterBag', 'processing', 'sieving', 'psdReport',
@@ -319,6 +321,22 @@ const UnderProcess = () => {
   const [modalContext, setModalContext] = useState(null); // Active M.R. record
   const [editingDoc, setEditingDoc] = useState(null); // If editing an existing doc
   const [showDocPopover, setShowDocPopover] = useState(null); // { cellType, doc, mrId } for blue click
+  const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
+
+  const processRows = useMemo(
+    () => buildUnderProcessRows(data.materialReceipts, data),
+    [data]
+  );
+  const partyOptions = useMemo(() => (
+    [...new Set(processRows.map((r) => r.mr?.partyName).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b))
+  ), [processRows]);
+  const productOptions = useMemo(() => (
+    [...new Set(processRows.map((r) => r.productName || r.mr?.productName).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b))
+  ), [processRows]);
 
   // ----------------------------------------------------
   // Document Search & Helper Helpers
@@ -329,6 +347,37 @@ const UnderProcess = () => {
   const getPL = (mrId, productName = '') => findPL(data, mrId, productName);
   const getDC = (mrId, productName = '') => findDC(data, mrId, productName);
   const getTI = (mrId, productName = '') => findTI(data, mrId, productName);
+
+  const filteredProcessRows = useMemo(() => (
+    processRows.filter(({ mr, productName }) => {
+      const partyName = mr.partyName || '';
+      const prodName = productName || mr.productName || '';
+      if (partyFilter && partyName !== partyFilter) return false;
+      if (productFilter && prodName !== productFilter) return false;
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        const hay = `${partyName} ${prodName} ${mr.receiptNo || ''} ${mr.partyDocNo || ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      const pi = getPI(mr.id);
+      const bpr = getBPR(mr.id, productName);
+      const psd = getPSD(mr.id, productName);
+      const pl = getPL(mr.id, productName);
+      const dc = getDC(mr.id, productName);
+      const ti = getTI(mr.id, productName);
+      const isComplete = pi && bpr && psd && pl && dc && ti && dc.ewayBillNo && ti.ewayBillNo;
+      if (activeTab === 'Done') return isComplete;
+      if (activeTab === 'PI') return !pi;
+      if (activeTab === 'BPR') return !bpr;
+      if (activeTab === 'PSD') return !psd;
+      if (activeTab === 'PL') return !pl;
+      if (activeTab === 'DC') return !dc;
+      if (activeTab === 'EWDC') return !(dc && dc.ewayBillNo);
+      if (activeTab === 'TI') return !ti;
+      if (activeTab === 'EWTI') return !(ti && ti.ewayBillNo);
+      return true;
+    })
+  ), [processRows, partyFilter, productFilter, searchTerm, activeTab, data]);
 
   const handlePendingClick = (mr, type, productName = '') => {
     if (type === 'PI') {
@@ -449,6 +498,48 @@ const UnderProcess = () => {
         ))}
       </div>
 
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', flex: 1, minWidth: '220px', padding: '0 0.75rem' }}>
+          <Search size={16} color="#94a3b8" />
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Search party, product or receipt…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ border: 'none', background: 'transparent', boxShadow: 'none', padding: '0.7rem 0.5rem' }}
+          />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.75rem', minWidth: '220px', flex: '0 1 240px' }}>
+          <Building2 size={16} color="#5b1c85" />
+          <SearchableSelect
+            className="input-field"
+            style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}
+            value={partyFilter}
+            onChange={(e) => setPartyFilter(e.target.value)}
+          >
+            <option value="">All Parties</option>
+            {partyOptions.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </SearchableSelect>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.75rem', minWidth: '220px', flex: '0 1 240px' }}>
+          <Package size={16} color="#5b1c85" />
+          <SearchableSelect
+            className="input-field"
+            style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}
+            value={productFilter}
+            onChange={(e) => setProductFilter(e.target.value)}
+          >
+            <option value="">All Products</option>
+            {productOptions.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </SearchableSelect>
+        </div>
+      </div>
+
       <div className="premium-card data-table-container" style={{ padding: '1.5rem', background: '#ffffff' }}>
         <div style={{ marginBottom: '1.25rem' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#5b1c85', margin: 0 }}>Material Processing Status</h2>
@@ -478,26 +569,14 @@ const UnderProcess = () => {
                   No material receipts yet. Add one from Material Receipt.
                 </td>
               </tr>
+            ) : filteredProcessRows.length === 0 ? (
+              <tr>
+                <td colSpan="12" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  No materials match this search or filter.
+                </td>
+              </tr>
             ) : (
-              buildUnderProcessRows(data.materialReceipts, data).filter(({ mr, productName }) => {
-                  const pi = getPI(mr.id);
-                  const bpr = getBPR(mr.id, productName);
-                  const psd = getPSD(mr.id, productName);
-                  const pl = getPL(mr.id, productName);
-                  const dc = getDC(mr.id, productName);
-                  const ti = getTI(mr.id, productName);
-                  const isComplete = pi && bpr && psd && pl && dc && ti;
-                  if (activeTab === 'Done') return isComplete;
-                  if (activeTab === 'PI') return !pi;
-                  if (activeTab === 'BPR') return !bpr;
-                  if (activeTab === 'PSD') return !psd;
-                  if (activeTab === 'PL') return !pl;
-                  if (activeTab === 'DC') return !dc;
-                  if (activeTab === 'EWDC') return !(dc && dc.ewayBillNo);
-                  if (activeTab === 'TI') return !ti;
-                  if (activeTab === 'EWTI') return !(ti && ti.ewayBillNo);
-                  return true;
-                }).map(({ mr, productName, prodOpts }) => {
+              filteredProcessRows.map(({ mr, productName, prodOpts }) => {
                 const party = data.parties.find(p => p.id === mr.partyId);
                 const settings = productName ? getMRProductSettings(mr, party, productName) : null;
                 const pi = getPI(mr.id);
@@ -1031,12 +1110,12 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
             <span>GST Rate (%):</span>
-            <select className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
+            <SearchableSelect className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
               <option value="18">18%</option>
               <option value="12">12%</option>
               <option value="5">5%</option>
               <option value="0">0%</option>
-            </select>
+            </SearchableSelect>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
             <span>GST Amount:</span>
@@ -1527,11 +1606,35 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           </div>
           <div>
             <label>Customer Name</label>
-            <input type="text" className="input-field" value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} />
+            <SearchableSelect
+              className="input-field"
+              value={form.customerName}
+              onChange={(e) => setForm({ ...form, customerName: e.target.value })}
+            >
+              <option value="">Select party</option>
+              {form.customerName && !(data.parties || []).some((p) => p.name === form.customerName) && (
+                <option value={form.customerName}>{form.customerName}</option>
+              )}
+              {(data.parties || []).map((p) => (
+                <option key={p.id} value={p.name}>{p.name}</option>
+              ))}
+            </SearchableSelect>
           </div>
           <div>
             <label>Product Name</label>
-            <input type="text" className="input-field" value={form.productName} onChange={e => setForm({ ...form, productName: e.target.value })} />
+            <SearchableSelect
+              className="input-field"
+              value={form.productName}
+              onChange={(e) => setForm({ ...form, productName: e.target.value })}
+            >
+              <option value="">Select product</option>
+              {form.productName && !productNames.includes(form.productName) && (
+                <option value={form.productName}>{form.productName}</option>
+              )}
+              {productNames.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </SearchableSelect>
           </div>
           <div>
             <label>Total Quantity (kg)</label>
@@ -1575,14 +1678,26 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           </div>
           <div>
             <label>Processing Supervisor</label>
-            <input type="text" className="input-field" value={form.processingSupervisor} onChange={e => setForm({ ...form, processingSupervisor: e.target.value })} />
+            <SearchableSelect
+              className="input-field"
+              value={form.processingSupervisor}
+              onChange={(e) => setForm({ ...form, processingSupervisor: e.target.value })}
+            >
+              <option value="">Select supervisor</option>
+              {form.processingSupervisor && !(data.users || []).some((u) => u.name === form.processingSupervisor) && (
+                <option value={form.processingSupervisor}>{form.processingSupervisor}</option>
+              )}
+              {(data.users || []).filter((u) => u.active !== false).map((u) => (
+                <option key={u.id} value={u.name}>{u.name}</option>
+              ))}
+            </SearchableSelect>
           </div>
           <div>
             <label>Sizing report require</label>
-            <select className="input-field" value={form.sizingReportRequired} onChange={e => setForm({ ...form, sizingReportRequired: e.target.value })}>
+            <SearchableSelect className="input-field" value={form.sizingReportRequired} onChange={e => setForm({ ...form, sizingReportRequired: e.target.value })}>
               <option value="Yes">Yes</option>
               <option value="No">No</option>
-            </select>
+            </SearchableSelect>
           </div>
           <div style={{ gridColumn: 'span 3' }}>
             <label>Particle size result</label>
@@ -1931,19 +2046,19 @@ const PSDGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                       <div>
                         <label>Batch No *</label>
-                        <select className="input-field" required value={r.batchNo} onChange={e => updateReport(idx, { batchNo: e.target.value })}>
+                        <SearchableSelect className="input-field" required value={r.batchNo} onChange={e => updateReport(idx, { batchNo: e.target.value })}>
                           <option value="">-- Select Batch --</option>
                           {prodBatches.map((b, bIdx) => (
                             <option key={bIdx} value={b.batchNo}>{b.batchNo}</option>
                           ))}
-                        </select>
+                        </SearchableSelect>
                       </div>
                       <div>
                         <label>Method</label>
-                        <select className="input-field" value={r.method} onChange={e => updateReport(idx, { method: e.target.value })}>
+                        <SearchableSelect className="input-field" value={r.method} onChange={e => updateReport(idx, { method: e.target.value })}>
                           <option value="Dry">Dry</option>
                           <option value="Wet">Wet</option>
-                        </select>
+                        </SearchableSelect>
                       </div>
                       <div>
                         <label>PSD Requirement *</label>
@@ -2472,39 +2587,70 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         {availableProducts.length > 1 && (
           <div style={{ gridColumn: 'span 4', marginBottom: '0.5rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Select Product(s) for Dispatch</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {availableProducts.map((p, idx) => {
-                const checked = (form.selectedProducts || []).some(n => n.trim().toLowerCase() === p.prodName.trim().toLowerCase());
+            <SearchableSelect
+              className="input-field"
+              value=""
+              onChange={(e) => {
+                if (e.target.value) toggleProductSelection(e.target.value);
+              }}
+            >
+              <option value="">Search and add / remove a product…</option>
+              {availableProducts.map((p) => {
+                const checked = (form.selectedProducts || []).some((n) => n.trim().toLowerCase() === p.prodName.trim().toLowerCase());
                 return (
-                  <label
-                    key={p.prodName}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.85rem',
-                      background: checked ? 'rgba(91, 28, 133, 0.08)' : 'var(--input-bg)',
-                      border: `1px solid ${checked ? 'var(--accent-primary)' : 'var(--border-color)'}`,
-                      borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem'
-                    }}
-                  >
-                    <input type="checkbox" checked={checked} onChange={() => toggleProductSelection(p.prodName)} />
-                    <span style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>Product {idx + 1}:</span>
-                    <span style={{ fontWeight: 600 }}>{p.prodName}</span>
-                    <span style={{ color: 'var(--text-muted)', marginLeft: 'auto' }}>
-                      {parseFloat(p.qty || 0).toFixed(2)} Kg · {p.drums || 0} drum{(p.drums || 0) !== 1 ? 's' : ''}
-                    </span>
-                  </label>
+                  <option key={p.prodName} value={p.prodName}>
+                    {checked ? '✓ ' : ''}{p.prodName} ({parseFloat(p.qty || 0).toFixed(2)} Kg)
+                  </option>
                 );
               })}
+            </SearchableSelect>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.65rem' }}>
+              {(form.selectedProducts || []).map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  className="btn"
+                  onClick={() => toggleProductSelection(name)}
+                  style={{ padding: '0.3rem 0.65rem', fontSize: '0.8rem' }}
+                >
+                  {name} ×
+                </button>
+              ))}
             </div>
           </div>
         )}
 
         <div>
           <label>Party Name</label>
-          <input type="text" className="input-field" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
+          <SearchableSelect
+            className="input-field"
+            value={form.partyName}
+            onChange={(e) => setForm({ ...form, partyName: e.target.value })}
+          >
+            <option value="">Select party</option>
+            {form.partyName && !(data.parties || []).some((p) => p.name === form.partyName) && (
+              <option value={form.partyName}>{form.partyName}</option>
+            )}
+            {(data.parties || []).map((p) => (
+              <option key={p.id} value={p.name}>{p.name}</option>
+            ))}
+          </SearchableSelect>
         </div>
         <div>
           <label>Product Name</label>
-          <input type="text" className="input-field" readOnly={availableProducts.length > 0} value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
+          <SearchableSelect
+            className="input-field"
+            value={form.productName}
+            onChange={(e) => setForm({ ...form, productName: e.target.value })}
+          >
+            <option value="">Select product</option>
+            {form.productName && !availableProducts.some((p) => p.prodName === form.productName) && (
+              <option value={form.productName}>{form.productName}</option>
+            )}
+            {availableProducts.map((p) => (
+              <option key={p.prodName} value={p.prodName}>{p.prodName}</option>
+            ))}
+          </SearchableSelect>
         </div>
         <div>
           <label>Received Qty (Kg)</label>
@@ -2586,11 +2732,11 @@ const EWayDCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         </div>
         <div>
           <label>E-Way Bill Purpose *</label>
-          <select className="input-field" value={form.ewayBillPurpose} onChange={e => setForm({...form, ewayBillPurpose: e.target.value})}>
+          <SearchableSelect className="input-field" value={form.ewayBillPurpose} onChange={e => setForm({...form, ewayBillPurpose: e.target.value})}>
             <option value="Others - Job Work">Others - Job Work</option>
             <option value="Supply">Supply</option>
             <option value="Export">Export</option>
-          </select>
+          </SearchableSelect>
         </div>
         <div>
           <label>E-Way Bill Number *</label>
@@ -2893,12 +3039,12 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
           </div>
           <div className="summary-row" style={{ alignItems: 'center' }}>
             <span>GST Rate</span>
-            <select className="input-field input-compact" style={{ width: '100px' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
+            <SearchableSelect className="input-field input-compact" style={{ width: '100px' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
               <option value="18">18%</option>
               <option value="12">12%</option>
               <option value="5">5%</option>
               <option value="0">0%</option>
-            </select>
+            </SearchableSelect>
           </div>
           <div className="summary-row">
             <span>CGST @{(form.taxRate / 2)}%</span>

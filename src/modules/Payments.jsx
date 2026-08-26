@@ -2,6 +2,7 @@ import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, CreditCard, Banknote, Calendar, Search } from 'lucide-react';
+import SearchableSelect from '../components/SearchableSelect';
 
 const Payments = () => {
   const { data, updateData, updateItem } = useAppContext();
@@ -198,12 +199,12 @@ const Payments = () => {
                 </div>
                 <div>
                   <label>Payment Mode</label>
-                  <select className="input-field" value={formData.paymentMode} onChange={e => setFormData({...formData, paymentMode: e.target.value})}>
+                  <SearchableSelect className="input-field" value={formData.paymentMode} onChange={e => setFormData({...formData, paymentMode: e.target.value})}>
                     <option value="Bank Transfer">Bank Transfer</option>
                     <option value="Cheque">Cheque</option>
                     <option value="Cash">Cash</option>
                     <option value="UPI">UPI</option>
-                  </select>
+                  </SearchableSelect>
                 </div>
                 <div>
                   <label>Reference No (UTR / Cheque No)</label>

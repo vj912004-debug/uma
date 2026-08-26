@@ -5,6 +5,7 @@ import {
   PRINT_FONT_SIZES,
   normalizePrintPrefs
 } from '../utils/printPrefs';
+import SearchableSelect from './SearchableSelect';
 
 const DOC_LABELS = {
   TI: 'Tax Invoice',
@@ -60,7 +61,7 @@ const PrintPrefsModal = ({ mode, docType, initial, onCancel, onConfirm }) => {
 
         <div className="form-group" style={{ marginBottom: '1rem' }}>
           <label>Font</label>
-          <select
+          <SearchableSelect
             className="input-field"
             value={fontFamily}
             onChange={(e) => setFontFamily(e.target.value)}
@@ -71,12 +72,12 @@ const PrintPrefsModal = ({ mode, docType, initial, onCancel, onConfirm }) => {
                 {f.label}
               </option>
             ))}
-          </select>
+          </SearchableSelect>
         </div>
 
         <div className="form-group" style={{ marginBottom: '1rem' }}>
           <label>Font Size</label>
-          <select
+          <SearchableSelect
             className="input-field"
             value={fontSize}
             onChange={(e) => setFontSize(Number(e.target.value))}
@@ -86,7 +87,7 @@ const PrintPrefsModal = ({ mode, docType, initial, onCancel, onConfirm }) => {
                 {s} px{s === 12 ? ' (default)' : ''}
               </option>
             ))}
-          </select>
+          </SearchableSelect>
         </div>
 
         <div

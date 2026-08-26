@@ -2,6 +2,7 @@ import { formatDate } from '../utils/dateUtils';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Bell, Calendar, Clock, RotateCw, CheckCircle, Trash2, Edit2 } from 'lucide-react';
+import SearchableSelect from '../components/SearchableSelect';
 
 const TaskManager = () => {
   const { data, updateData, updateItem, setData } = useAppContext();
@@ -236,13 +237,13 @@ const TaskManager = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'center' }}>
                   <div>
                     <label>Repeat alarm</label>
-                    <select className="input-field" value={form.repeat} onChange={e => setForm({...form, repeat: e.target.value})}>
+                    <SearchableSelect className="input-field" value={form.repeat} onChange={e => setForm({...form, repeat: e.target.value})}>
                       <option value="None">Once Only (None)</option>
                       <option value="Daily">Daily</option>
                       <option value="Weekly">Weekly</option>
                       <option value="Monthly">Monthly</option>
                       <option value="Yearly">Yearly</option>
-                    </select>
+                    </SearchableSelect>
                   </div>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
                     <input type="checkbox" checked={form.alarmEnabled} onChange={e => setForm({...form, alarmEnabled: e.target.checked})} />

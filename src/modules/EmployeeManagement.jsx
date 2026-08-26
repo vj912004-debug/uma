@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { hashPassword, generatePassword, generateEmployeeId } from '../utils/auth';
 import { Plus, Edit2, KeyRound, UserX, UserCheck, Copy, Check, RefreshCw } from 'lucide-react';
+import SearchableSelect from '../components/SearchableSelect';
 
 const DEPARTMENTS = ['Management', 'Production', 'Packaging', 'Quality Control', 'Accounts', 'General'];
 
@@ -311,24 +312,24 @@ const EmployeeManagement = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div className="form-group">
                       <label>Department</label>
-                      <select
+                      <SearchableSelect
                         className="input-field"
                         value={form.department}
                         onChange={(e) => setForm({ ...form, department: e.target.value })}
                       >
                         {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
-                      </select>
+                      </SearchableSelect>
                     </div>
                     <div className="form-group">
                       <label>Role</label>
-                      <select
+                      <SearchableSelect
                         className="input-field"
                         value={form.role}
                         onChange={(e) => setForm({ ...form, role: e.target.value })}
                       >
                         <option value="Staff">Staff</option>
                         <option value="Admin">Admin</option>
-                      </select>
+                      </SearchableSelect>
                     </div>
                   </div>
 

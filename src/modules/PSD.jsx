@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import {Eye,  Search, UploadCloud, Trash2, Calendar, ClipboardList, CheckCircle } from 'lucide-react';
+import SearchableSelect from '../components/SearchableSelect';
 
 const PSD = () => {
   const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
@@ -265,7 +266,7 @@ const PSD = () => {
                     </div>
                     <div>
                       <label>Batch No *</label>
-                      <select className="input-field" required value={rep.batchNo} onChange={e => {
+                      <SearchableSelect className="input-field" required value={rep.batchNo} onChange={e => {
                         const newReps = [...form.reports];
                         newReps[idx].batchNo = e.target.value;
                         setForm({ ...form, reports: newReps});
@@ -274,18 +275,18 @@ const PSD = () => {
                         {(activeMR?.batches || []).filter(b => !b.isEmptyDrums).map((b, bIdx) => (
                           <option key={bIdx} value={b.batchNo}>{b.batchNo}</option>
                         ))}
-                      </select>
+                      </SearchableSelect>
                     </div>
                     <div>
                       <label>Method</label>
-                      <select className="input-field" value={rep.method} onChange={e => {
+                      <SearchableSelect className="input-field" value={rep.method} onChange={e => {
                         const newReps = [...form.reports];
                         newReps[idx].method = e.target.value;
                         setForm({ ...form, reports: newReps});
                       }}>
                         <option value="Dry">Dry</option>
                         <option value="Wet">Wet</option>
-                      </select>
+                      </SearchableSelect>
                     </div>
                     <div>
                       <label>PSD Requirement *</label>

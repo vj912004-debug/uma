@@ -16,6 +16,7 @@ import {
   parseChargeFieldValue,
   isMaterialQtyCharge
 } from '../utils/documentCharges';
+import SearchableSelect from '../components/SearchableSelect';
 
 const PurchaseOrders = () => {
   const { data, updateData, updateItem, deleteItemSoftly, incrementSerial } = useAppContext();
@@ -480,12 +481,12 @@ const PurchaseOrders = () => {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
                     <span>GST Rate (%):</span>
-                    <select className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
+                    <SearchableSelect className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
                       <option value="18">18%</option>
                       <option value="12">12%</option>
                       <option value="5">5%</option>
                       <option value="0">0%</option>
-                    </select>
+                    </SearchableSelect>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <span>CGST @{(form.taxRate / 2)}%:</span>

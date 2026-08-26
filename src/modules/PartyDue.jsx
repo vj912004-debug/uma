@@ -6,6 +6,7 @@ import { formatDate } from '../utils/dateUtils';
 import { getReceiptOutstanding, hasSheetOverride } from '../utils/paymentTotals';
 import { getCurrentFYKey, getFYKeysThroughCurrent, getFYOfDate } from '../utils/financialYear';
 import { useNavigate } from 'react-router-dom';
+import SearchableSelect from '../components/SearchableSelect';
 
 const PartyDue = () => {
   const { data, updateData, updateItem } = useAppContext();
@@ -305,7 +306,7 @@ const PartyDue = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Select Party Customer *</label>
-                  <select 
+                  <SearchableSelect 
                     className="input-field" 
                     required 
                     value={paymentForm.partyId}
@@ -315,12 +316,12 @@ const PartyDue = () => {
                     {data.parties.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
-                  </select>
+                  </SearchableSelect>
                 </div>
 
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Select Invoiced Material Receipt *</label>
-                  <select 
+                  <SearchableSelect 
                     className="input-field" 
                     required 
                     disabled={!paymentForm.partyId}
@@ -339,7 +340,7 @@ const PartyDue = () => {
                         </option>
                       );
                     })}
-                  </select>
+                  </SearchableSelect>
                 </div>
 
                 <div>

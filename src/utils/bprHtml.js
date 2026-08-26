@@ -436,27 +436,18 @@ export const buildBprHtml = (data, profileInput) => {
   );
   const dispatchedNet = micronizedPrint && String(micronizedPrint) !== '0.00' ? String(micronizedPrint) : '';
 
-  const summaryRowsHtml = `
+  const summaryRowHtml = (label, value) => `
             <tr class="summary-row">
-              <td colspan="4" class="summary-label">Micronized Material Net Weight</td>
-              <td class="wt">${escHtml(dispatchedNet)}</td>
-              <td colspan="5"></td>
-            </tr>
-            <tr class="summary-row">
-              <td colspan="4" class="summary-label">Lumps Net Weight</td>
-              <td class="wt">${escHtml(lumpsPrint)}</td>
-              <td colspan="5"></td>
-            </tr>
-            <tr class="summary-row">
-              <td colspan="4" class="summary-label">Sample Net Weight</td>
-              <td class="wt">${escHtml(samplePrint)}</td>
-              <td colspan="5"></td>
-            </tr>
-            <tr class="summary-row">
-              <td colspan="4" class="summary-label">Irrecoverable loss</td>
-              <td class="wt">${escHtml(irrecoverablePrint)}</td>
-              <td colspan="5"></td>
+              <td colspan="4" class="summary-label">${escHtml(label)}</td>
+              <td class="wt">${escHtml(value)}</td>
+              <td></td><td></td><td></td><td></td><td></td>
             </tr>`;
+  const summaryRowsHtml = [
+    summaryRowHtml('Micronized Material Net Weight', dispatchedNet),
+    summaryRowHtml('Lumps Net Weight', lumpsPrint),
+    summaryRowHtml('Sample Net Weight', samplePrint),
+    summaryRowHtml('Irrecoverable loss', irrecoverablePrint)
+  ].join('');
 
   const prevBdRows = METRIC_ROWS.map((m) => `
     <tr>
@@ -796,14 +787,16 @@ export const buildBprHtml = (data, profileInput) => {
   .meta-item{padding:4px 8px;border-right:1px solid #e2d3f3;border-bottom:1px solid #e2d3f3;font-size:12px;width:32%;box-sizing:border-box;color:#4a0080;font-weight:600;}
   .meta-item.label{color:#5a009d;font-weight:700;background:#e2d3f3;width:18%;}
   table.items{
-    width:100%;border-collapse:collapse;margin:0;font-size:12px;
+    width:100%;border-collapse:separate;border-spacing:0;empty-cells:show;margin:0;font-size:12px;
     flex:0 0 auto;height:auto;table-layout:fixed;background:#fff;
+    border-top:1px solid #7c12bd;border-left:1px solid #7c12bd;
   }
   .page-p2 .table-wrap{
-    flex:0 0 auto;min-height:0;display:flex;flex-direction:column;margin-bottom:6px;
+    flex:0 0 auto;min-height:0;display:block;margin-bottom:6px;
   }
   .page-p2 table.items{
     flex:0 0 auto;height:auto;width:100%;
+    border-collapse:separate;border-spacing:0;
   }
   table.items col.c-batch{width:16%;}
   table.items col.c-drum{width:8%;}
@@ -811,7 +804,8 @@ export const buildBprHtml = (data, profileInput) => {
   table.items thead th{
     background:#5a009d !important;color:#fff !important;font-weight:700;
     padding:5px 3px;text-align:center;vertical-align:middle;
-    border:1px solid #7c12bd;
+    border:none;border-right:1px solid #7c12bd;border-bottom:1px solid #7c12bd;
+    border-radius:0;margin:0;
     font-size:11px;line-height:1.2;height:auto;max-height:none;
     white-space:normal;word-break:break-word;
   }
@@ -820,7 +814,8 @@ export const buildBprHtml = (data, profileInput) => {
     white-space:nowrap;overflow:visible;
   }
   table.items tbody td{
-    border:1px solid #7c12bd;padding:4px 3px;height:28px;min-height:28px;max-height:28px;
+    border:none;border-right:1px solid #7c12bd;border-bottom:1px solid #7c12bd;
+    border-radius:0;margin:0;padding:4px 3px;height:28px;min-height:28px;max-height:28px;
     text-align:center;vertical-align:middle;color:#231f20 !important;font-weight:700;
     font-size:11px;line-height:1.15 !important;white-space:nowrap;
     overflow:visible !important;text-overflow:clip !important;
@@ -828,6 +823,8 @@ export const buildBprHtml = (data, profileInput) => {
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
     -webkit-text-fill-color:#231f20 !important;
   }
+  table.items tbody tr{margin:0;padding:0;border:none;height:28px;}
+  table.items tbody tr.summary-row{height:28px;}
   table.items tbody td.wt{
     color:#231f20 !important;
     -webkit-text-fill-color:#231f20 !important;
@@ -849,7 +846,10 @@ export const buildBprHtml = (data, profileInput) => {
     -webkit-text-fill-color:transparent !important;
   }
   table.items tbody tr.summary-row td{
-    background:#fff !important;color:#231f20 !important;font-weight:700;height:28px;min-height:28px;
+    background:#fff !important;color:#231f20 !important;font-weight:700;
+    height:28px;min-height:28px;max-height:28px;padding:4px 3px;
+    border:none;border-right:1px solid #7c12bd;border-bottom:1px solid #7c12bd;
+    border-radius:0;margin:0;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
   table.items tbody td.summary-label{
@@ -867,7 +867,7 @@ export const buildBprHtml = (data, profileInput) => {
     flex:0 0 auto;min-height:0;display:flex;flex-direction:column;margin-bottom:8px;
   }
   .page-p2 .table-wrap{
-    flex:0 0 auto;min-height:0;
+    flex:0 0 auto;min-height:0;display:block;
   }
   .barfoot{
     background:#5a009d;color:#fff;padding:7px 14px;display:flex;justify-content:space-between;align-items:center;
@@ -1042,8 +1042,7 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.flex = '0 0 auto';
             el.style.minHeight = '0';
             el.style.height = 'auto';
-            el.style.display = 'flex';
-            el.style.flexDirection = 'column';
+            el.style.display = 'block';
             el.style.marginBottom = '6px';
             el.style.overflow = 'visible';
           });
@@ -1052,11 +1051,29 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.height = 'auto';
             el.style.margin = '0';
             el.style.overflow = 'visible';
+            el.style.setProperty('border-collapse', 'separate', 'important');
+            el.style.setProperty('border-spacing', '0', 'important');
+            el.style.setProperty('border-top', '1px solid #7c12bd', 'important');
+            el.style.setProperty('border-left', '1px solid #7c12bd', 'important');
           });
-          clonedDoc.querySelectorAll('.page.page-p2 table.items tbody td').forEach((el) => {
+          clonedDoc.querySelectorAll('.page.page-p2 table.items thead th, .page.page-p2 table.items tbody td').forEach((el) => {
+            el.style.setProperty('border-top', 'none', 'important');
+            el.style.setProperty('border-left', 'none', 'important');
+            el.style.setProperty('border-right', '1px solid #7c12bd', 'important');
+            el.style.setProperty('border-bottom', '1px solid #7c12bd', 'important');
+            el.style.setProperty('border-radius', '0', 'important');
+            el.style.margin = '0';
             el.style.setProperty('height', '28px', 'important');
             el.style.setProperty('min-height', '28px', 'important');
             el.style.setProperty('max-height', '28px', 'important');
+            el.style.setProperty('padding-top', '4px', 'important');
+            el.style.setProperty('padding-bottom', '4px', 'important');
+            el.style.boxSizing = 'border-box';
+          });
+          clonedDoc.querySelectorAll('.page.page-p2 table.items thead th').forEach((el) => {
+            el.style.setProperty('height', 'auto', 'important');
+            el.style.setProperty('min-height', '0', 'important');
+            el.style.setProperty('max-height', 'none', 'important');
           });
           clonedDoc.querySelectorAll('.page:not(.page-p2) .table-wrap').forEach((el) => {
             el.style.flex = '0 0 auto';
@@ -1095,6 +1112,7 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.padding = '5px 3px';
           });
           clonedDoc.querySelectorAll('table.items tbody td').forEach((el) => {
+            if (el.closest('.page-p2')) return;
             const isFiller = el.closest('tr.filler-row');
             const isSummary = el.closest('tr.summary-row');
             if (isFiller) {

@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import ExportButton from '../components/ExportButton';
 import { formatDate } from '../utils/dateUtils';
 import { Plus, Search, Edit2, Trash2, Fingerprint, Filter } from 'lucide-react';
+import SearchableSelect from '../components/SearchableSelect';
 
 // Shift Configurations
 const SHIFTS = {
@@ -228,18 +229,18 @@ const Attendance = () => {
           </div>
           <input type="date" className="input-field" style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} value={filters.date} onChange={e => setFilters({...filters, date: e.target.value})} />
           <input type="text" className="input-field" placeholder="Employee Name..." style={{ width: '150px', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} value={filters.employee} onChange={e => setFilters({...filters, employee: e.target.value})} />
-          <select className="input-field" style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} value={filters.department} onChange={e => setFilters({...filters, department: e.target.value})}>
+          <SearchableSelect className="input-field" style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} value={filters.department} onChange={e => setFilters({...filters, department: e.target.value})}>
             <option value="">All Departments</option>
             {uniqueDepartments.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <select className="input-field" style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} value={filters.shift} onChange={e => setFilters({...filters, shift: e.target.value})}>
+          </SearchableSelect>
+          <SearchableSelect className="input-field" style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} value={filters.shift} onChange={e => setFilters({...filters, shift: e.target.value})}>
             <option value="">All Shifts</option>
             {Object.keys(SHIFTS).map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select className="input-field" style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} value={filters.status} onChange={e => setFilters({...filters, status: e.target.value})}>
+          </SearchableSelect>
+          <SearchableSelect className="input-field" style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} value={filters.status} onChange={e => setFilters({...filters, status: e.target.value})}>
             <option value="">All Statuses</option>
             {Object.entries(STATUS_CODES).map(([k, v]) => <option key={k} value={k}>{v} ({k})</option>)}
-          </select>
+          </SearchableSelect>
           <button className="btn" style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} onClick={() => setFilters({date: '', employee: '', department: '', shift: '', status: ''})}>Clear</button>
         </div>
       </div>
@@ -334,7 +335,7 @@ const Attendance = () => {
                 </div>
                 <div>
                   <label>Employee *</label>
-                  <select
+                  <SearchableSelect
                     className="input-field"
                     required
                     disabled={userRole !== 'Admin'}
@@ -344,28 +345,28 @@ const Attendance = () => {
                     {users.map(u => (
                       <option key={u.id} value={String(u.id)}>{u.username} ({u.employeeId})</option>
                     ))}
-                  </select>
+                  </SearchableSelect>
                 </div>
                 
                 <div>
                   <label>Status Code *</label>
-                  <select className="input-field" value={form.statusCode} onChange={e => setForm({ ...form, statusCode: e.target.value })}>
+                  <SearchableSelect className="input-field" value={form.statusCode} onChange={e => setForm({ ...form, statusCode: e.target.value })}>
                     {Object.entries(STATUS_CODES).map(([k, v]) => (
                       <option key={k} value={k}>{v} ({k})</option>
                     ))}
-                  </select>
+                  </SearchableSelect>
                 </div>
                 
                 <div>
                   <label>Shift Timing</label>
-                  <select className="input-field" value={form.shift} onChange={e => {
+                  <SearchableSelect className="input-field" value={form.shift} onChange={e => {
                     const shift = e.target.value;
                     setForm({ ...form, shift, inTime: SHIFTS[shift].start, outTime: SHIFTS[shift].end });
                   }}>
                     {Object.entries(SHIFTS).map(([k, v]) => (
                       <option key={k} value={k}>{k} ({v.start} - {v.end})</option>
                     ))}
-                  </select>
+                  </SearchableSelect>
                 </div>
 
                 {['P', 'HD'].includes(form.statusCode) && (

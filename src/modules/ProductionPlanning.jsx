@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Search, Edit2, Trash2, Calendar, Clock } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
+import SearchableSelect from '../components/SearchableSelect';
 
 const buildPlansFromReceipt = (receipt, parties) => {
   const party = parties.find(p => p.id === receipt.partyId);
@@ -454,12 +455,12 @@ const ProductionPlanning = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
                   <label>Select Party</label>
-                  <select className="input-field" value={formData.partyId || ''} onChange={handlePartySelect}>
+                  <SearchableSelect className="input-field" value={formData.partyId || ''} onChange={handlePartySelect}>
                     <option value="">-- Select Party --</option>
                     {(data.parties || []).filter(p => p.type === 'Customer').map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
-                  </select>
+                  </SearchableSelect>
                 </div>
                 <div>
                   <label>Customer</label>
@@ -471,12 +472,12 @@ const ProductionPlanning = () => {
                     const party = data.parties.find(p => p.id === formData.partyId);
                     const products = party?.products || [];
                     return products.length > 0 ? (
-                      <select className="input-field" value={formData.productName} onChange={handleProductSelect}>
+                      <SearchableSelect className="input-field" value={formData.productName} onChange={handleProductSelect}>
                         <option value="">-- Select Product --</option>
                         {products.map((p, idx) => (
                           <option key={idx} value={p.name}>{p.name}{p.nickname ? ` (${p.nickname})` : ''}</option>
                         ))}
-                      </select>
+                      </SearchableSelect>
                     ) : (
                       <input type="text" className="input-field" value={formData.productName} onChange={e => setFormData({...formData, productName: e.target.value})} />
                     );
@@ -499,13 +500,13 @@ const ProductionPlanning = () => {
                 </div>
                 <div>
                   <label>Priority Level</label>
-                  <select className="input-field" value={formData.priorityLevel} onChange={e => setFormData({...formData, priorityLevel: e.target.value})}>
+                  <SearchableSelect className="input-field" value={formData.priorityLevel} onChange={e => setFormData({...formData, priorityLevel: e.target.value})}>
                     <option value="">-- Select --</option>
                     <option value="Normal">Normal</option>
                     <option value="High">High</option>
                     <option value="Urgent">Urgent</option>
                     <option value="Super Urgent">Super Urgent</option>
-                  </select>
+                  </SearchableSelect>
                 </div>
                 <div style={{ gridColumn: 'span 3' }}>
                   <label>PSD Note / Material Requirement</label>
@@ -521,11 +522,11 @@ const ProductionPlanning = () => {
                 </div>
                 <div>
                   <label>Supervisor</label>
-                  <select className="input-field" value={formData.supervisor} onChange={e => setFormData({...formData, supervisor: e.target.value})}>
+                  <SearchableSelect className="input-field" value={formData.supervisor} onChange={e => setFormData({...formData, supervisor: e.target.value})}>
                     <option value="">-- Select --</option>
                     <option value="Supervisor 1">Supervisor 1</option>
                     <option value="Supervisor 2">Supervisor 2</option>
-                  </select>
+                  </SearchableSelect>
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Delay Reason (If Any)</label>
@@ -542,13 +543,13 @@ const ProductionPlanning = () => {
                 </div>
                 <div>
                   <label>Planning Status</label>
-                  <select className="input-field" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                  <SearchableSelect className="input-field" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
                     <option value="">-- Select --</option>
                     <option value="Pending">Pending</option>
                     <option value="In Progress">In Progress</option>
                     <option value="Done">Done</option>
                     <option value="Cancel">Cancel</option>
-                  </select>
+                  </SearchableSelect>
                 </div>
 
                 <div>

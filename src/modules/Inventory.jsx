@@ -2,6 +2,7 @@ import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Package, History, SlidersHorizontal, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import SearchableSelect from '../components/SearchableSelect';
 
 const Inventory = () => {
   const { data, setData } = useAppContext();
@@ -107,20 +108,20 @@ const Inventory = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div>
                 <label>Select Item</label>
-                <select className="input-field" required value={adjustForm.item} onChange={e => setAdjustForm({...adjustForm, item: e.target.value})}>
+                <SearchableSelect className="input-field" required value={adjustForm.item} onChange={e => setAdjustForm({...adjustForm, item: e.target.value})}>
                   <option value="">Select Item</option>
                   {[...new Set([...data.items, ...data.materials, ...Object.keys(currentStock)])].map(i => (
                     <option key={i} value={i}>{i}</option>
                   ))}
-                </select>
+                </SearchableSelect>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label>Adjustment Type</label>
-                  <select className="input-field" value={adjustForm.type} onChange={e => setAdjustForm({...adjustForm, type: e.target.value})}>
+                  <SearchableSelect className="input-field" value={adjustForm.type} onChange={e => setAdjustForm({...adjustForm, type: e.target.value})}>
                     <option value="Increase">Increase (+)</option>
                     <option value="Decrease">Decrease (-)</option>
-                  </select>
+                  </SearchableSelect>
                 </div>
                 <div>
                   <label>Quantity</label>

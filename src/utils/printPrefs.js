@@ -699,6 +699,12 @@ export const buildPrintPrefsCss = (prefs) => {
     max-height: 28px !important;
     padding-top: 4px !important;
     padding-bottom: 4px !important;
+    border-top: none !important;
+    border-left: none !important;
+    border-right: 1px solid #7c12bd !important;
+    border-bottom: 1px solid #7c12bd !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
   }
   .uma-print-root .page-p2 table.items tbody tr.filler-row td {
     height: 28px !important;
@@ -710,16 +716,35 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .page-p2 .table-wrap {
     flex: 0 0 auto !important;
     min-height: 0 !important;
+    display: block !important;
   }
   .uma-print-root .page-p2 table.items {
     flex: 0 0 auto !important;
     height: auto !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    border-top: 1px solid #7c12bd !important;
+    border-left: 1px solid #7c12bd !important;
+  }
+  .uma-print-root .page-p2 table.items thead th {
+    border-top: none !important;
+    border-left: none !important;
+    border-right: 1px solid #7c12bd !important;
+    border-bottom: 1px solid #7c12bd !important;
+    border-radius: 0 !important;
   }
   .uma-print-root table.items tbody tr.summary-row td {
     visibility: visible !important;
     opacity: 1 !important;
     color: #231f20 !important;
     -webkit-text-fill-color: #231f20 !important;
+  }
+  .uma-print-root .page-p2 table.items tbody tr.summary-row td {
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
   }
   .uma-print-root .footer3,
   .uma-print-root .f3col,
@@ -774,6 +799,16 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root.print-density-xl table.dt td {
     padding-top: ${Math.max(2, Math.round(6 * padScale))}px !important;
     padding-bottom: ${Math.max(2, Math.round(6 * padScale))}px !important;
+  }
+  .uma-print-root .page-p2 table.items tbody td,
+  .uma-print-root.print-density-md .page-p2 table.items tbody td,
+  .uma-print-root.print-density-lg .page-p2 table.items tbody td,
+  .uma-print-root.print-density-xl .page-p2 table.items tbody td,
+  .uma-print-root.print-density-md .page-p2 table.items thead th,
+  .uma-print-root.print-density-lg .page-p2 table.items thead th,
+  .uma-print-root.print-density-xl .page-p2 table.items thead th {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
   }
   .uma-print-root.print-density-lg .letter,
   .uma-print-root.print-density-xl .letter {

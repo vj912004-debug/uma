@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import { Plus, Trash2, Calculator, Save, FileText } from 'lucide-react';
+import SearchableSelect from '../components/SearchableSelect';
 
 const STANDARD_CHARGES = [
   { name: 'Cleaning Charges', hsn: '9988', rate: 500 },
@@ -174,10 +175,10 @@ const Invoices = () => {
                 <p style={{ color: 'var(--text-muted)' }}>Billing for {formData.partyName}</p>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <select className="input-field" style={{ width: 'auto' }} value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
+                <SearchableSelect className="input-field" style={{ width: 'auto' }} value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
                   <option value="Tax Invoice">Tax Invoice</option>
                   <option value="Proforma Invoice">Proforma Invoice</option>
-                </select>
+                </SearchableSelect>
                 <button className="btn btn-primary" onClick={handleSubmit}><Save size={18} /> Save Invoice</button>
                 <button className="btn" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} onClick={() => setIsModalOpen(false)}>Cancel</button>
               </div>
