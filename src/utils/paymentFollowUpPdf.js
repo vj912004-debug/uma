@@ -1,14 +1,13 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { formatPdfDateDmy } from './taxInvoiceLayout';
-import { renderHtmlToPdf, buildPrintBrandHtml } from './printTheme';
+import {
+  escHtml,
+  buildPrintBrandHtml,
+  buildFillerRowsHtml,
+  renderHtmlToPdf
+} from './printTheme';
 import { applyPrintPrefsToHtml } from './printPrefs';
 import { money } from './paymentFollowUpData';
-
-const esc = (v) => String(v ?? '')
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;');
 
 export const buildPaymentFollowUpStatementHtml = ({
   customer,
@@ -17,115 +16,224 @@ export const buildPaymentFollowUpStatementHtml = ({
   profileInput
 }) => {
   const profile = mergeCompanyProfile(profileInput);
-  const rows = (invoices || []).map((inv, i) => `
+  const list = invoices || [];
+  const asOn = formatPdfDateDmy(asOnDate) || asOnDate || '';
+  const companyName = profile.companyName || 'UMA MICRON';
+
+  const rows = list.map((inv, i) => `
     <tr>
       <td class="c">${i + 1}</td>
-      <td>${esc(inv.invoiceNo)}</td>
-      <td class="c">${esc(formatPdfDateDmy(inv.invoiceDate) || '')}</td>
-      <td class="r">${money(inv.invoiceAmount)}</td>
-      <td class="r">${money(inv.paidAmount)}</td>
-      <td class="r">${money(inv.tdsAmount)}</td>
-      <td class="r"><strong>${money(inv.outstanding)}</strong></td>
+      <td class="left">${escHtml(inv.invoiceNo)}</td>
+      <td class="c">${escHtml(formatPdfDateDmy(inv.invoiceDate) || '')}</td>
+      <td class="num">${money(inv.invoiceAmount)}</td>
+      <td class="num">${money(inv.paidAmount)}</td>
+      <td class="num">${money(inv.tdsAmount)}</td>
+      <td class="num"><strong>${money(inv.outstanding)}</strong></td>
       <td class="c">${inv.ageDays ?? ''}</td>
     </tr>`).join('');
 
-  const totalOutstanding = (invoices || []).reduce((s, i) => s + (parseFloat(i.outstanding) || 0), 0);
+  const totalOutstanding = list.reduce((s, i) => s + (parseFloat(i.outstanding) || 0), 0);
+  const fillerCount = Math.max(0, 10 - list.length);
+  const fillerRowsHtml = fillerCount > 0 ? buildFillerRowsHtml(8, fillerCount) : '';
 
   return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Payment Follow-Up Statement</title>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UMA MICRON - Payment Follow-Up Statement</title>
 <style>
-  *{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;}
-  html,body{margin:0;padding:0;background:#fff;color:#111;width:794px;}
-  .page{width:794px;padding:28px 32px;box-sizing:border-box;}
-  .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #3d2b7d;padding-bottom:12px;margin-bottom:16px;}
-  .brand{max-width:420px;}
-  .brand-lockup{width:280px;height:70px;display:flex;align-items:center;}
+  :root{
+    --purple:#3d2b7d;
+    --purple-dark:#2f2263;
+    --lav-bg:#efeaf7;
+    --lav-border:#c9bce8;
+    --green:#2fa84f;
+    --text:#231f20;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:Cambria,Georgia,serif;}
+  html,body{margin:0;padding:0;background:#fff;color:var(--text);}
+  .page{
+    width:794px;min-height:1123px;height:auto;padding:8px;margin:0;background:#fff;
+    display:flex;flex-direction:column;box-sizing:border-box;overflow:visible;
+  }
+  .sheet{
+    flex:1;border:2px solid var(--purple);padding:12px 14px 0;
+    display:flex;flex-direction:column;box-sizing:border-box;min-height:1090px;
+  }
+
+  .header{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+    margin:0 0 12px;padding:0 0 10px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;min-width:0;}
+  .logo{width:64px;height:64px;flex-shrink:0;}
+  .logo img,.logo svg{width:100%;height:100%;object-fit:contain;display:block;}
+  .brand-lockup{width:280px;height:70px;flex-shrink:0;display:flex;align-items:center;}
   .brand-lockup img{width:100%;height:100%;object-fit:contain;object-position:left center;display:block;}
-  .brand h1{margin:0;color:#3d2b7d;font-size:22px;}
-  .brand p{margin:4px 0 0;font-size:11px;color:#444;line-height:1.4;}
-  .doc-title{text-align:right;}
-  .doc-title h2{margin:0;color:#3d2b7d;font-size:16px;}
-  .doc-title p{margin:4px 0 0;font-size:11px;}
-  .meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;font-size:12px;}
-  .box{border:1px solid #c9bce8;border-radius:6px;padding:10px 12px;background:#faf8ff;}
-  .box strong{color:#3d2b7d;}
-  table{width:100%;border-collapse:collapse;font-size:11px;}
-  th{background:#3d2b7d;color:#fff;padding:8px 6px;text-align:center;}
-  td{border:1px solid #c9bce8;padding:7px 6px;}
-  td.c,th.c{text-align:center;}
-  td.r{text-align:right;}
-  tfoot td{background:#efeaf7;font-weight:700;border:1px solid #3d2b7d;}
-  .note{margin-top:14px;font-size:11px;color:#444;line-height:1.5;}
-  .sign{margin-top:36px;display:flex;justify-content:flex-end;font-size:12px;}
-  .sign .line{width:200px;text-align:center;border-top:1px solid #333;padding-top:6px;}
-</style></head><body>
-<div class="page pdf-page print-host">
-  <div class="head">
-    <div class="brand">
-      ${buildPrintBrandHtml(profile, {
-        companyName: profile.companyName || 'UMA MICRON',
-        tagline: profile.tagline || "Micronization of API's"
-      })}
-      <p style="margin-top:8px;">${esc(profile.addressLine1 || '')}<br>
-      ${esc(profile.city || '')} - ${esc(profile.pincode || '')}, ${esc(profile.state || '')}<br>
-      GSTIN: ${esc(profile.gstNumber || '')}<br>
-      ${esc(profile.phone || '')} | ${esc(profile.email || '')}</p>
-    </div>
-    <div class="doc-title">
-      <h2>PAYMENT FOLLOW-UP STATEMENT</h2>
-      <p>As On: <strong>${esc(formatPdfDateDmy(asOnDate) || asOnDate)}</strong></p>
+  .brand-text h1{
+    margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;
+    letter-spacing:.5px;color:var(--purple);line-height:1;text-transform:uppercase;
+  }
+  .brand-text .tagline{
+    color:var(--green);font-weight:700;font-size:13px;margin-top:2px;line-height:1.15;
+  }
+  .tax-invoice-box{
+    background:var(--purple);color:#fff;text-align:center;padding:10px 20px;
+    min-width:200px;min-height:64px;border-radius:6px;box-sizing:border-box;
+    display:flex;flex-direction:column;justify-content:center;align-items:center;
+  }
+  .tax-invoice-box .ti-title{
+    font-size:18px;font-weight:800;letter-spacing:.4px;margin:0;line-height:1.1;white-space:nowrap;
+  }
+  .tax-invoice-box .ti-sub{
+    margin-top:5px;background:#fff;color:var(--purple);font-size:10px;font-weight:700;
+    letter-spacing:.4px;padding:2px 8px;border-radius:3px;
+  }
+
+  .parties{display:flex;gap:12px;margin-bottom:12px;}
+  .party{flex:1;border:1px solid var(--lav-border);}
+  .party-head{
+    background:var(--lav-bg);color:var(--purple);font-weight:800;font-size:12px;
+    letter-spacing:.4px;padding:7px 12px;border-bottom:1px solid var(--lav-border);
+  }
+  .party-body{padding:8px 12px;font-size:12px;line-height:1.45;}
+  .party-body .cname{color:var(--purple);font-weight:800;font-size:14px;margin:0 0 4px;}
+  .party-body .addr{margin:0 0 4px;white-space:normal;}
+  .party-foot{
+    border-top:1px solid var(--lav-border);padding:8px 12px;font-size:12px;
+  }
+  .party-foot .frow{display:flex;gap:6px;margin-bottom:2px;}
+  .party-foot .flabel{font-weight:700;min-width:88px;color:var(--text);}
+
+  .table-wrap{flex:1 1 auto;min-height:0;margin-bottom:10px;display:flex;flex-direction:column;}
+  table.items{
+    width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px;background:#fff;
+    flex:1 1 auto;height:100%;
+  }
+  table.items thead th{
+    background:var(--purple);color:#fff;font-weight:700;padding:8px 6px;
+    text-align:center;vertical-align:middle;border:1px solid rgba(255,255,255,.55);
+    line-height:1.25;
+  }
+  table.items tbody td{
+    border:1px solid var(--lav-border);padding:6px 6px;text-align:center;
+    vertical-align:middle;background:#fff;color:var(--text);height:28px;font-weight:600;
+  }
+  table.items tbody td.left{text-align:left;}
+  table.items tbody td.num{text-align:right;}
+  table.items tbody td.c{text-align:center;}
+  table.items tbody tr.filler-row{height:1%;}
+  table.items tbody tr.filler-row td{height:auto;min-height:18px;padding:2px 4px;}
+  table.items tfoot td{
+    border:1px solid var(--purple);background:var(--lav-bg);font-weight:800;
+    padding:8px 6px;color:var(--purple-dark);
+  }
+  table.items tfoot td.num{text-align:right;}
+  table.items tfoot td.c{text-align:center;}
+
+  .note{margin:0 0 12px;font-size:12px;color:var(--text);line-height:1.5;}
+  .sign{display:flex;justify-content:flex-end;margin:8px 0 12px;}
+  .sign .line{
+    width:220px;text-align:center;border-top:1px solid #333;padding-top:6px;
+    font-size:12px;color:var(--purple);font-weight:700;
+  }
+  .sign .line span{display:block;font-weight:600;color:var(--text);margin-top:2px;}
+
+  .barfoot{
+    background:var(--purple);color:#fff;margin:auto -14px 0 -14px;padding:8px 14px;
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:12px;flex-shrink:0;
+  }
+</style>
+</head>
+<body>
+  <div class="page pfu-page pdf-page print-host">
+    <div class="sheet">
+      <div class="header">
+        <div class="brand">
+          ${buildPrintBrandHtml(profile, {
+            companyName,
+            tagline: profile.tagline || "Micronization of API's"
+          })}
+        </div>
+        <div class="tax-invoice-box">
+          <div class="ti-title">PAYMENT FOLLOW-UP</div>
+          <div class="ti-sub">STATEMENT</div>
+        </div>
+      </div>
+
+      <div class="parties">
+        <div class="party">
+          <div class="party-head">CUSTOMER</div>
+          <div class="party-body">
+            <div class="cname">${escHtml(customer?.partyName || '')}</div>
+            <div class="addr">${escHtml(customer?.address || '')}</div>
+          </div>
+          ${customer?.gstin ? `
+          <div class="party-foot">
+            <div class="frow"><span class="flabel">GSTIN</span><span>: ${escHtml(customer.gstin)}</span></div>
+          </div>` : ''}
+        </div>
+        <div class="party">
+          <div class="party-head">STATEMENT DETAILS</div>
+          <div class="party-body">
+            <div class="frow" style="display:flex;gap:6px;margin-bottom:3px;"><span class="flabel" style="font-weight:700;min-width:88px;">As On</span><span>: ${escHtml(asOn)}</span></div>
+            <div class="frow" style="display:flex;gap:6px;margin-bottom:3px;"><span class="flabel" style="font-weight:700;min-width:88px;">Phone</span><span>: ${escHtml(customer?.phone || '—')}</span></div>
+            <div class="frow" style="display:flex;gap:6px;"><span class="flabel" style="font-weight:700;min-width:88px;">Email</span><span>: ${escHtml(customer?.email || '—')}</span></div>
+          </div>
+          <div class="party-foot">
+            <div class="frow"><span class="flabel">Invoices</span><span>: ${list.length}</span></div>
+            <div class="frow"><span class="flabel">Outstanding</span><span>: ₹ ${money(totalOutstanding)}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="items">
+          <thead>
+            <tr>
+              <th style="width:7%">No.</th>
+              <th style="width:18%">Invoice No.</th>
+              <th style="width:12%">Date</th>
+              <th style="width:13%">Amount</th>
+              <th style="width:12%">Paid</th>
+              <th style="width:10%">TDS</th>
+              <th style="width:16%">Outstanding</th>
+              <th style="width:12%">Days</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || `<tr><td colspan="8" class="c">No outstanding invoices</td></tr>`}
+            ${fillerRowsHtml}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="6" class="num">GRAND TOTAL OUTSTANDING</td>
+              <td class="num">₹ ${money(totalOutstanding)}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <p class="note">
+        Kindly arrange payment of the outstanding amount at the earliest. For any discrepancy,
+        please contact us within 7 days of receipt of this statement.
+      </p>
+
+      <div class="sign">
+        <div class="line">For ${escHtml(companyName)}<span>Authorized Signatory</span></div>
+      </div>
+
+      <div class="barfoot">
+        <span>Thank you for your business!</span>
+        <span>E. &amp; O.E.</span>
+        <span>Page 1 of 1</span>
+      </div>
     </div>
   </div>
-
-  <div class="meta">
-    <div class="box">
-      <div><strong>Customer</strong></div>
-      <div style="margin-top:4px;font-weight:700;">${esc(customer?.partyName || '')}</div>
-      <div style="margin-top:4px;">${esc(customer?.address || '')}</div>
-      ${customer?.gstin ? `<div style="margin-top:4px;">GSTIN: ${esc(customer.gstin)}</div>` : ''}
-    </div>
-    <div class="box">
-      <div><strong>Contact</strong></div>
-      <div style="margin-top:4px;">Phone: ${esc(customer?.phone || '—')}</div>
-      <div style="margin-top:4px;">Email: ${esc(customer?.email || '—')}</div>
-      <div style="margin-top:8px;">Pending Invoices: <strong>${(invoices || []).length}</strong></div>
-      <div>Total Outstanding: <strong>₹ ${money(totalOutstanding)}</strong></div>
-    </div>
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th style="width:6%">No.</th>
-        <th style="width:18%">Invoice No.</th>
-        <th style="width:12%">Date</th>
-        <th style="width:13%">Amount</th>
-        <th style="width:12%">Paid</th>
-        <th style="width:10%">TDS</th>
-        <th style="width:15%">Outstanding</th>
-        <th style="width:10%">Days</th>
-      </tr>
-    </thead>
-    <tbody>${rows || `<tr><td colspan="8" class="c">No outstanding invoices</td></tr>`}</tbody>
-    <tfoot>
-      <tr>
-        <td colspan="6" class="r">GRAND TOTAL OUTSTANDING</td>
-        <td class="r">₹ ${money(totalOutstanding)}</td>
-        <td></td>
-      </tr>
-    </tfoot>
-  </table>
-
-  <p class="note">
-    Kindly arrange payment of the outstanding amount at the earliest. For any discrepancy,
-    please contact us within 7 days of receipt of this statement.
-  </p>
-
-  <div class="sign">
-    <div class="line">For ${esc(profile.companyName || 'UMA MICRON')}<br>Authorized Signatory</div>
-  </div>
-</div>
-</body></html>`;
+</body>
+</html>`;
 };
 
 export const renderPaymentFollowUpStatementPdf = async ({
@@ -136,19 +244,22 @@ export const renderPaymentFollowUpStatementPdf = async ({
   mode = 'save',
   printPrefs
 }) => {
-  const html = buildPaymentFollowUpStatementHtml({
-    customer,
-    invoices,
-    asOnDate,
-    profileInput: companyProfile
-  });
+  const html = applyPrintPrefsToHtml(
+    buildPaymentFollowUpStatementHtml({
+      customer,
+      invoices,
+      asOnDate,
+      profileInput: companyProfile
+    }),
+    printPrefs
+  );
   await renderHtmlToPdf(html, {
     mode,
     filePrefix: 'Payment_FollowUp',
     docNo: (customer?.partyName || 'Statement').replace(/[^\w\-]+/g, '_').slice(0, 40),
     width: 794,
     fitPage: true,
+    splitOverflowPages: true,
     printPrefs
   });
-  return applyPrintPrefsToHtml(html, printPrefs);
 };

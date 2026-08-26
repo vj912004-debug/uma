@@ -270,10 +270,11 @@ export const buildQuotationHtml = (data, profileInput) => {
   /* ============ CONTACT BAR ============ */
   .contact-bar{
     display:grid;
-    grid-template-columns:minmax(190px,2.4fr) minmax(118px,1.15fr) minmax(100px,0.95fr) minmax(118px,1.2fr) minmax(110px,1fr);
-    gap:8px 10px;
-    align-items:start;
-    padding:8px 20px;
+    grid-template-columns:minmax(160px,1fr) max-content max-content;
+    grid-template-rows:auto auto;
+    gap:4px 18px;
+    align-items:center;
+    padding:8px 18px;
     font-size:9px;
     color:var(--text);
     background:var(--purple-light);
@@ -281,17 +282,26 @@ export const buildQuotationHtml = (data, profileInput) => {
     width:100%;
     box-sizing:border-box;
     flex-shrink:0;
+    overflow:visible;
   }
   .contact-bar .citem{
-    display:flex;align-items:flex-start;gap:6px;min-width:0;
+    display:flex;align-items:flex-start;gap:6px;min-width:0;overflow:visible;
   }
+  .contact-bar .citem:nth-child(1){grid-column:1;grid-row:1 / span 2;align-self:start;}
+  .contact-bar .citem:nth-child(2){grid-column:2;grid-row:1;}
+  .contact-bar .citem:nth-child(3){grid-column:3;grid-row:1;}
+  .contact-bar .citem:nth-child(4){grid-column:2;grid-row:2;}
+  .contact-bar .citem:nth-child(5){grid-column:3;grid-row:2;}
   .contact-bar .citem span{
     line-height:1.35;color:var(--purple-dark);font-weight:600;
     word-break:normal;overflow-wrap:normal;hyphens:none;
   }
   .contact-bar .citem.c-addr span{word-break:normal;overflow-wrap:break-word;}
+  .contact-bar .citem.c-tight{
+    flex:0 0 auto;min-width:max-content;
+  }
   .contact-bar .citem.c-tight span{
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;
+    white-space:nowrap;overflow:visible;text-overflow:clip;max-width:none;
   }
   .ic{width:12px;height:12px;flex-shrink:0;fill:var(--purple);margin-top:2px;}
 

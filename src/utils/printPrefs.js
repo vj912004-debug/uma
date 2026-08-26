@@ -186,6 +186,7 @@ export const buildPrintPrefsCss = (prefs) => {
 
   .uma-print-root .contact-bar,
   .uma-print-root .contact-bar .citem,
+  .uma-print-root .contact-bar .citem span,
   .uma-print-root .footer-bar,
   .uma-print-root .status-bar,
   .uma-print-root .barfoot,
@@ -201,11 +202,24 @@ export const buildPrintPrefsCss = (prefs) => {
     line-height: ${lineH} !important;
   }
 
-  /* Quotation contact bar: keep GSTIN / phone / email / web on one line */
+  /* Quotation contact bar: never clip GSTIN / phone / email / website */
+  .uma-print-root .contact-bar {
+    display: grid !important;
+    grid-template-columns: minmax(140px, 1fr) max-content max-content !important;
+    overflow: visible !important;
+  }
+  .uma-print-root .contact-bar .citem.c-tight {
+    min-width: max-content !important;
+    overflow: visible !important;
+    flex: 0 0 auto !important;
+  }
   .uma-print-root .contact-bar .citem.c-tight span {
     white-space: nowrap !important;
     word-break: normal !important;
     overflow-wrap: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    max-width: none !important;
   }
   .uma-print-root .letter-text,
   .uma-print-root .letter-text p,
@@ -657,7 +671,7 @@ export const buildPrintPrefsCss = (prefs) => {
   }
   .uma-print-root .page-p2 .barfoot,
   .uma-print-root .page-p2 .sheet > .barfoot {
-    margin: 6px -10px -10px -10px !important;
+    margin: auto -10px -10px -10px !important;
     border-radius: 0 !important;
     width: auto !important;
   }
@@ -679,20 +693,27 @@ export const buildPrintPrefsCss = (prefs) => {
     visibility: visible !important;
     background: #ffffff !important;
   }
+  .uma-print-root .page-p2 table.items tbody td {
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+  }
   .uma-print-root .page-p2 table.items tbody tr.filler-row td {
-    height: auto !important;
-    min-height: 16px !important;
-    max-height: none !important;
-    padding-top: 2px !important;
-    padding-bottom: 2px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
   }
   .uma-print-root .page-p2 .table-wrap {
-    flex: 1 1 auto !important;
+    flex: 0 0 auto !important;
     min-height: 0 !important;
   }
   .uma-print-root .page-p2 table.items {
-    flex: 1 1 auto !important;
-    height: 100% !important;
+    flex: 0 0 auto !important;
+    height: auto !important;
   }
   .uma-print-root table.items tbody tr.summary-row td {
     visibility: visible !important;
@@ -861,6 +882,27 @@ export const buildPrintPrefsCss = (prefs) => {
     word-break: normal !important;
     overflow-wrap: normal !important;
     hyphens: none !important;
+  }
+  /* BPR page-2: compact 10-row grid, sign sits under the table (sample) */
+  .uma-print-root .page-p2 .signs {
+    width: 250px !important;
+    max-width: 34% !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    max-height: 32px !important;
+    margin: 8px 0 0 0 !important;
+    flex: 0 0 32px !important;
+    align-self: flex-start !important;
+    overflow: hidden !important;
+  }
+  .uma-print-root .page-p2 .sign {
+    height: 32px !important;
+    min-height: 0 !important;
+    max-height: 32px !important;
+    padding: 4px 10px !important;
+    line-height: 1 !important;
+    font-size: 12px !important;
+    align-items: center !important;
   }
 `;
 };

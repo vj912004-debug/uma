@@ -259,7 +259,7 @@ const PaymentFollowUp = () => {
         profileInput: data.companyProfile
       }),
       printPrefs
-    ).replace('<body', '<body class="uma-print-root"');
+    );
     setPdfHtml(html);
     setPdfOpen(true);
   };

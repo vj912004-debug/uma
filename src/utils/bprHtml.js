@@ -91,10 +91,10 @@ const penIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" str
 const emptyBatchRow = () => ({ batchNo: '', drumNo: '', gross: '', tare: '', net: '' });
 
 /**
- * Blank grid rows on Batch Packing Record page 2. CSS stretches them to fill
- * leftover A4 space so the sheet does not look empty.
+ * Empty handwriting rows on Batch Packing Record page 2 (matches the sample: 10 grid rows).
+ * Live data rows replace these; remaining slots stay blank. Do not stretch to fill A4.
  */
-export const BPR_PAGE2_BLANK_ROWS = 18;
+export const BPR_PAGE2_BLANK_ROWS = 10;
 /** Form pad target for received/dispatched editors (not the print blank count). */
 export const BPR_PAGE2_ROW_COUNT = 14;
 
@@ -407,7 +407,8 @@ export const buildBprHtml = (data, profileInput) => {
       </tr>`);
   }
 
-  const fillerRowsHtml = Array.from({ length: BPR_PAGE2_BLANK_ROWS }, () => `
+  const fillerCount = Math.max(0, BPR_PAGE2_BLANK_ROWS - packingRows.length);
+  const fillerRowsHtml = Array.from({ length: fillerCount }, () => `
             <tr class="filler-row">
               <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
               <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
@@ -799,13 +800,10 @@ export const buildBprHtml = (data, profileInput) => {
     flex:0 0 auto;height:auto;table-layout:fixed;background:#fff;
   }
   .page-p2 .table-wrap{
-    flex:1 1 auto;min-height:0;display:flex;flex-direction:column;margin-bottom:6px;
+    flex:0 0 auto;min-height:0;display:flex;flex-direction:column;margin-bottom:6px;
   }
   .page-p2 table.items{
-    flex:1 1 auto;height:100%;width:100%;
-  }
-  .page-p2 .barfoot{
-    margin:6px -10px -10px -10px !important;
+    flex:0 0 auto;height:auto;width:100%;
   }
   table.items col.c-batch{width:16%;}
   table.items col.c-drum{width:8%;}
@@ -813,16 +811,16 @@ export const buildBprHtml = (data, profileInput) => {
   table.items thead th{
     background:#5a009d !important;color:#fff !important;font-weight:700;
     padding:5px 3px;text-align:center;vertical-align:middle;
-    border:1px solid rgba(255,255,255,0.55);
+    border:1px solid #7c12bd;
     font-size:11px;line-height:1.2;height:auto;max-height:none;
     white-space:normal;word-break:break-word;
   }
   table.items thead th .eg{
     display:block;font-size:7.5px;font-weight:500;letter-spacing:0;margin-top:1px;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;overflow:visible;
   }
   table.items tbody td{
-    border:1px solid #7c12bd;padding:4px 3px;height:28px;min-height:28px;
+    border:1px solid #7c12bd;padding:4px 3px;height:28px;min-height:28px;max-height:28px;
     text-align:center;vertical-align:middle;color:#231f20 !important;font-weight:700;
     font-size:11px;line-height:1.15 !important;white-space:nowrap;
     overflow:visible !important;text-overflow:clip !important;
@@ -843,11 +841,11 @@ export const buildBprHtml = (data, profileInput) => {
     background:#e2d3f3 !important;color:#4a0080 !important;font-weight:700;height:36px;min-height:36px;
   }
   table.items tbody tr.filler-row{
-    height:1%;
+    height:28px;
   }
   table.items tbody tr.filler-row td{
-    height:auto;min-height:16px;max-height:none;padding:2px 3px;
-    line-height:1 !important;font-size:10px;color:transparent !important;
+    height:28px;min-height:28px;max-height:28px;padding:4px 3px;
+    line-height:1.15 !important;font-size:11px;color:transparent !important;
     -webkit-text-fill-color:transparent !important;
   }
   table.items tbody tr.summary-row td{
@@ -869,7 +867,7 @@ export const buildBprHtml = (data, profileInput) => {
     flex:0 0 auto;min-height:0;display:flex;flex-direction:column;margin-bottom:8px;
   }
   .page-p2 .table-wrap{
-    flex:1 1 auto;min-height:0;
+    flex:0 0 auto;min-height:0;
   }
   .barfoot{
     background:#5a009d;color:#fff;padding:7px 14px;display:flex;justify-content:space-between;align-items:center;
@@ -877,13 +875,26 @@ export const buildBprHtml = (data, profileInput) => {
     letter-spacing:0.01px;word-spacing:normal;
   }
   .page-p2 .barfoot{
-    margin:6px -10px -10px -10px !important;
+    margin:auto -10px -10px -10px !important;
   }
   .barfoot span{white-space:nowrap;letter-spacing:0.01px;word-spacing:0.02em;}
-  .signs{display:flex;border:1px solid #7c12bd;margin-top:4px;margin-bottom:0;border-radius:4px;overflow:hidden;flex:0 0 auto;height:auto;align-self:flex-start;}
-  .sign{flex:1;padding:4px 10px;min-height:0;height:auto;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#4a0080;line-height:1.2;}
+  .page-p2 .signs{
+    display:flex;border:1px solid #7c12bd;margin:8px 0 0 0;border-radius:4px;overflow:hidden;
+    flex:0 0 32px;width:250px;max-width:34%;height:32px;min-height:32px;max-height:32px;
+    box-sizing:border-box;align-self:flex-start;
+  }
+  .page-p2 .sign{flex:1;padding:4px 10px;min-height:0;height:32px;max-height:32px;display:flex;align-items:center;gap:6px;font-size:12px;line-height:1;font-weight:700;color:#4a0080;box-sizing:border-box;}
+  .page-p2 .sign svg{width:14px;height:14px;flex-shrink:0;}
+  .page-p2 .sign .line{flex:1;border-bottom:1px solid #777;margin-left:4px;min-height:0;height:1px;align-self:center;}
+  .signs{
+    display:flex;border:1px solid #7c12bd;margin:0;border-radius:4px;overflow:hidden;
+    flex:0 0 32px;width:250px;max-width:34%;height:32px;min-height:32px;max-height:32px;
+    box-sizing:border-box;align-self:flex-start;
+  }
+  .sign{flex:1;padding:4px 10px;min-height:0;height:32px;max-height:32px;display:flex;align-items:center;gap:6px;font-size:12px;line-height:1;font-weight:700;color:#4a0080;box-sizing:border-box;}
   .sign + .sign{border-left:1px solid #7c12bd;}
-  .sign .line{flex:1;border-bottom:1px solid #777;margin-left:6px;min-height:0;height:1px;align-self:flex-end;margin-bottom:2px;}
+  .sign svg{width:14px;height:14px;flex-shrink:0;}
+  .sign .line{flex:1;border-bottom:1px solid #777;margin-left:4px;min-height:0;height:1px;align-self:center;}
   .page-p2 .sheet{height:100%;}
 </style>
 </head>
@@ -939,7 +950,7 @@ export const buildBprHtml = (data, profileInput) => {
         </table>
       </div>
 
-      <div class="signs" style="width:40%;">
+      <div class="signs">
         <div class="sign">${penIcon} Plant Supervisor Sign<span class="line"></span></div>
       </div>
 
@@ -1028,18 +1039,24 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.boxSizing = 'border-box';
           });
           clonedDoc.querySelectorAll('.page.page-p2 .table-wrap').forEach((el) => {
-            el.style.flex = '1 1 auto';
+            el.style.flex = '0 0 auto';
             el.style.minHeight = '0';
+            el.style.height = 'auto';
             el.style.display = 'flex';
             el.style.flexDirection = 'column';
             el.style.marginBottom = '6px';
             el.style.overflow = 'visible';
           });
           clonedDoc.querySelectorAll('.page.page-p2 table.items').forEach((el) => {
-            el.style.flex = '1 1 auto';
-            el.style.height = '100%';
+            el.style.flex = '0 0 auto';
+            el.style.height = 'auto';
             el.style.margin = '0';
             el.style.overflow = 'visible';
+          });
+          clonedDoc.querySelectorAll('.page.page-p2 table.items tbody td').forEach((el) => {
+            el.style.setProperty('height', '28px', 'important');
+            el.style.setProperty('min-height', '28px', 'important');
+            el.style.setProperty('max-height', '28px', 'important');
           });
           clonedDoc.querySelectorAll('.page:not(.page-p2) .table-wrap').forEach((el) => {
             el.style.flex = '0 0 auto';
@@ -1124,22 +1141,29 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.overflow = 'visible';
             el.style.whiteSpace = 'nowrap';
           });
-          clonedDoc.querySelectorAll('.signs').forEach((el) => {
-            el.style.marginTop = '4px';
-            el.style.marginBottom = '0';
-            el.style.flex = '0 0 auto';
-            el.style.height = 'auto';
-            el.style.minHeight = '0';
-            el.style.alignSelf = 'flex-start';
+          clonedDoc.querySelectorAll('.page-p2 .signs').forEach((el) => {
+            el.style.setProperty('margin', '8px 0 0 0', 'important');
+            el.style.setProperty('flex', '0 0 32px', 'important');
+            el.style.setProperty('width', '250px', 'important');
+            el.style.setProperty('max-width', '34%', 'important');
+            el.style.setProperty('height', '32px', 'important');
+            el.style.setProperty('min-height', '32px', 'important');
+            el.style.setProperty('max-height', '32px', 'important');
+            el.style.setProperty('align-self', 'flex-start', 'important');
+            el.style.setProperty('overflow', 'hidden', 'important');
+            el.style.boxSizing = 'border-box';
           });
-          clonedDoc.querySelectorAll('.sign').forEach((el) => {
-            el.style.padding = '4px 10px';
-            el.style.minHeight = '0';
-            el.style.height = 'auto';
+          clonedDoc.querySelectorAll('.page-p2 .sign').forEach((el) => {
+            el.style.setProperty('padding', '4px 10px', 'important');
+            el.style.setProperty('height', '32px', 'important');
+            el.style.setProperty('min-height', '0', 'important');
+            el.style.setProperty('max-height', '32px', 'important');
+            el.style.setProperty('line-height', '1', 'important');
             el.style.alignItems = 'center';
+            el.style.boxSizing = 'border-box';
           });
           clonedDoc.querySelectorAll('.page.page-p2 .barfoot').forEach((el) => {
-            el.style.margin = '6px -10px -10px -10px';
+            el.style.margin = 'auto -10px -10px -10px';
             el.style.borderRadius = '0';
             el.style.flexShrink = '0';
             el.style.width = 'auto';

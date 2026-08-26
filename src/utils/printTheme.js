@@ -1319,6 +1319,19 @@ export const renderHtmlToPdf = async (html, {
             el.style.width = '100%';
             el.style.boxSizing = 'border-box';
             el.style.margin = '0';
+            el.style.overflow = 'visible';
+          });
+          clonedDoc.querySelectorAll('.contact-bar .citem, .contact-bar .citem span').forEach((el) => {
+            el.style.overflow = 'visible';
+            el.style.maxWidth = 'none';
+            el.style.textOverflow = 'clip';
+          });
+          clonedDoc.querySelectorAll('.contact-bar .citem.c-tight').forEach((el) => {
+            el.style.minWidth = 'max-content';
+            el.style.flex = '0 0 auto';
+          });
+          clonedDoc.querySelectorAll('.contact-bar .citem.c-tight span').forEach((el) => {
+            el.style.whiteSpace = 'nowrap';
           });
           clonedDoc.querySelectorAll('.quote-banner h2').forEach((el) => {
             const scaleRaw = getComputedStyle(clonedDoc.documentElement).getPropertyValue('--print-scale');
