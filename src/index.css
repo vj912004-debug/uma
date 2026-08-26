@@ -190,8 +190,9 @@ label {
 .searchable-select {
   position: relative;
   width: 100%;
-  min-width: 0;
+  min-width: 8rem;
   display: block;
+  flex: 1 1 auto;
 }
 .searchable-select-native {
   position: absolute;

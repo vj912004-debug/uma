@@ -5,7 +5,7 @@ import { generateDocNumber, nextAvailableDocNumber } from '../utils/numbering';
 import { 
   FileText, Activity, UploadCloud, Package, Truck, 
   FileSpreadsheet, FileCheck, CheckCircle, Clock, X, Plus, Edit2, Download, Trash2,
-  Search, Building2
+  Search
 } from 'lucide-react';
 import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
 import { copyChargeQtysFromSettings, enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, getLinkedPITermsForTI, applyProformaFinancialsToTaxInvoice, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges } from '../utils/documentCharges';
@@ -471,8 +471,36 @@ const UnderProcess = () => {
   return (
     <div>
       <header className="page-header">
-        <h1 className="page-title">Under Process</h1>
-        <p className="page-subtitle">Track document generation status for materials in process</p>
+        <div>
+          <h1 className="page-title">Under Process</h1>
+          <p className="page-subtitle">Track document generation status for materials in process</p>
+        </div>
+        <div className="page-toolbar" style={{ flex: '1 1 460px', justifyContent: 'flex-end', minWidth: 0 }}>
+          <div style={{ minWidth: 200, maxWidth: 280, flex: '1 1 220px' }}>
+            <SearchableSelect
+              className="input-field"
+              value={partyFilter}
+              onChange={(e) => setPartyFilter(e.target.value)}
+            >
+              <option value="">All Parties</option>
+              {partyOptions.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </SearchableSelect>
+          </div>
+          <div style={{ minWidth: 200, maxWidth: 280, flex: '1 1 220px' }}>
+            <SearchableSelect
+              className="input-field"
+              value={productFilter}
+              onChange={(e) => setProductFilter(e.target.value)}
+            >
+              <option value="">All Products</option>
+              {productOptions.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </SearchableSelect>
+          </div>
+        </div>
       </header>
 
       <div className="tab-bar">
@@ -498,46 +526,15 @@ const UnderProcess = () => {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', flex: 1, minWidth: '220px', padding: '0 0.75rem' }}>
-          <Search size={16} color="#94a3b8" />
-          <input
-            type="text"
-            className="input-field"
-            placeholder="Search party, product or receipt…"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ border: 'none', background: 'transparent', boxShadow: 'none', padding: '0.7rem 0.5rem' }}
-          />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.75rem', minWidth: '220px', flex: '0 1 240px' }}>
-          <Building2 size={16} color="#5b1c85" />
-          <SearchableSelect
-            className="input-field"
-            style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}
-            value={partyFilter}
-            onChange={(e) => setPartyFilter(e.target.value)}
-          >
-            <option value="">All Parties</option>
-            {partyOptions.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </SearchableSelect>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.75rem', minWidth: '220px', flex: '0 1 240px' }}>
-          <Package size={16} color="#5b1c85" />
-          <SearchableSelect
-            className="input-field"
-            style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}
-            value={productFilter}
-            onChange={(e) => setProductFilter(e.target.value)}
-          >
-            <option value="">All Products</option>
-            {productOptions.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </SearchableSelect>
-        </div>
+      <div className="search-bar" style={{ marginBottom: '1rem' }}>
+        <Search size={16} color="#94a3b8" />
+        <input
+          type="text"
+          className="input-field"
+          placeholder="Search party, product or receipt…"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       <div className="premium-card data-table-container" style={{ padding: '1.5rem', background: '#ffffff' }}>

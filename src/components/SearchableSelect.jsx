@@ -218,7 +218,6 @@ const SearchableSelect = ({
     <div
       ref={wrapRef}
       className={`searchable-select${disabled ? ' is-disabled' : ''}${open ? ' is-open' : ''}`}
-      style={style}
       title={title}
     >
       <select
