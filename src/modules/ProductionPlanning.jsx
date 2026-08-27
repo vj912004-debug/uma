@@ -93,6 +93,8 @@ const ProductionPlanning = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
 
   const userRole = data.settings?.userRole || 'Admin';
@@ -259,11 +261,26 @@ const ProductionPlanning = () => {
     () => plansList.map(p => resolvePlan(p, data.materialReceipts, data.parties)),
     [plansList, data.materialReceipts, data.parties]
   );
-  const filteredPlans = resolvedPlans.filter(p =>
-    (p.productNickName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.customer || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.batchNo || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const partyOptions = useMemo(() => (
+    [...new Set(resolvedPlans.map((p) => p.customer).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b))
+  ), [resolvedPlans]);
+  const productOptions = useMemo(() => (
+    [...new Set(resolvedPlans.map((p) => p.productName).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b))
+  ), [resolvedPlans]);
+  const filteredPlans = resolvedPlans.filter((p) => {
+    if (partyFilter && (p.customer || '') !== partyFilter) return false;
+    if (productFilter && (p.productName || '') !== productFilter) return false;
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (p.productNickName || '').toLowerCase().includes(q) ||
+      (p.customer || '').toLowerCase().includes(q) ||
+      (p.productName || '').toLowerCase().includes(q) ||
+      (p.batchNo || '').toLowerCase().includes(q)
+    );
+  });
 
   const exportColumns = [
     { label: 'Customer Name', key: 'customer' },
@@ -292,12 +309,36 @@ const ProductionPlanning = () => {
 
   return (
     <div>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+      <header className="page-header">
         <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Production Planning</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Schedule milling batches and track processing.</p>
+          <h1 className="page-title">Production Planning</h1>
+          <p className="page-subtitle">Schedule milling batches and track processing.</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div className="page-toolbar" style={{ flex: '1 1 460px', justifyContent: 'flex-end', minWidth: 0 }}>
+          <div style={{ minWidth: 200, maxWidth: 280, flex: '1 1 220px' }}>
+            <SearchableSelect
+              className="input-field"
+              value={partyFilter}
+              onChange={(e) => setPartyFilter(e.target.value)}
+            >
+              <option value="">All Parties</option>
+              {partyOptions.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </SearchableSelect>
+          </div>
+          <div style={{ minWidth: 200, maxWidth: 280, flex: '1 1 220px' }}>
+            <SearchableSelect
+              className="input-field"
+              value={productFilter}
+              onChange={(e) => setProductFilter(e.target.value)}
+            >
+              <option value="">All Products</option>
+              {productOptions.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </SearchableSelect>
+          </div>
           <ExportButton data={filteredPlans} columns={visibleExportColumns} filename="Production_Plan" title="Production Plan Report" />
           {userRole === 'Admin' && (
             <button className="btn" onClick={() => setIsColumnModalOpen(true)}>
@@ -315,10 +356,10 @@ const ProductionPlanning = () => {
       <div className="premium-card">
         <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
           <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-          <input 
-            type="text" 
-            className="input-field" 
-            placeholder="Search by customer, batch no, or nickname..." 
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Search by customer, batch no, or nickname..."
             style={{ paddingLeft: '3rem' }}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}

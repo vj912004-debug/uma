@@ -475,32 +475,6 @@ const UnderProcess = () => {
           <h1 className="page-title">Under Process</h1>
           <p className="page-subtitle">Track document generation status for materials in process</p>
         </div>
-        <div className="page-toolbar" style={{ flex: '1 1 460px', justifyContent: 'flex-end', minWidth: 0 }}>
-          <div style={{ minWidth: 200, maxWidth: 280, flex: '1 1 220px' }}>
-            <SearchableSelect
-              className="input-field"
-              value={partyFilter}
-              onChange={(e) => setPartyFilter(e.target.value)}
-            >
-              <option value="">All Parties</option>
-              {partyOptions.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </SearchableSelect>
-          </div>
-          <div style={{ minWidth: 200, maxWidth: 280, flex: '1 1 220px' }}>
-            <SearchableSelect
-              className="input-field"
-              value={productFilter}
-              onChange={(e) => setProductFilter(e.target.value)}
-            >
-              <option value="">All Products</option>
-              {productOptions.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </SearchableSelect>
-          </div>
-        </div>
       </header>
 
       <div className="tab-bar">
@@ -535,6 +509,30 @@ const UnderProcess = () => {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
+        <div style={{ minWidth: 200, maxWidth: 280, flex: '1 1 220px' }}>
+          <SearchableSelect
+            className="input-field"
+            value={partyFilter}
+            onChange={(e) => setPartyFilter(e.target.value)}
+          >
+            <option value="">All Parties</option>
+            {partyOptions.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </SearchableSelect>
+        </div>
+        <div style={{ minWidth: 200, maxWidth: 280, flex: '1 1 220px' }}>
+          <SearchableSelect
+            className="input-field"
+            value={productFilter}
+            onChange={(e) => setProductFilter(e.target.value)}
+          >
+            <option value="">All Products</option>
+            {productOptions.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </SearchableSelect>
+        </div>
       </div>
 
       <div className="premium-card data-table-container" style={{ padding: '1.5rem', background: '#ffffff' }}>
