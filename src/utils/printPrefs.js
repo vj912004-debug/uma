@@ -315,7 +315,28 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .pfu-page .frow,
   .uma-print-root .pfu-page .party-foot .frow,
   .uma-print-root .pfu-page .party-body .frow {
-    grid-template-columns: max-content 10px minmax(0, 1fr) !important;
+    display: grid !important;
+    grid-template-columns: 7.4em 8px minmax(0, 1fr) !important;
+    column-gap: 8px !important;
+    align-items: baseline !important;
+    margin: 0 0 4px !important;
+    padding: 0 !important;
+    white-space: nowrap !important;
+  }
+  .uma-print-root .pfu-page .party-body .frow:last-child {
+    margin-bottom: 0 !important;
+  }
+  .uma-print-root .pfu-page .party-body {
+    padding: 10px 12px !important;
+  }
+  .uma-print-root .pfu-page .party-body .addr {
+    margin: 0 0 8px !important;
+  }
+  .uma-print-root .pfu-page .flabel {
+    width: auto !important;
+  }
+  .uma-print-root .pfu-page .fval {
+    text-align: left !important;
   }
   .uma-print-root .flabel,
   .uma-print-root .fcolon {

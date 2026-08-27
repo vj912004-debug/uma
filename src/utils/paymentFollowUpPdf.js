@@ -90,26 +90,28 @@ export const buildPaymentFollowUpStatementHtml = ({
     letter-spacing:.4px;padding:2px 8px;border-radius:3px;
   }
 
-  .parties{display:flex;gap:12px;margin-bottom:12px;}
-  .party{flex:1;border:1px solid var(--lav-border);}
+  .parties{display:flex;align-items:stretch;gap:12px;margin-bottom:12px;}
+  .party{flex:1;border:1px solid var(--lav-border);display:flex;flex-direction:column;}
   .party-head{
     background:var(--lav-bg);color:var(--purple);font-weight:800;font-size:12px;
     letter-spacing:.4px;padding:7px 12px;border-bottom:1px solid var(--lav-border);
   }
-  .party-body{padding:8px 12px;font-size:12px;line-height:1.45;}
-  .party-body .cname{color:var(--purple);font-weight:800;font-size:14px;margin:0 0 4px;}
-  .party-body .addr{margin:0 0 4px;white-space:normal;}
-  .party-foot .frow, .party-body .frow{
-    display:grid;grid-template-columns:max-content 10px minmax(0,1fr);
-    column-gap:6px;align-items:baseline;margin-bottom:3px;
+  .party-body{
+    padding:10px 12px;font-size:12px;line-height:1.45;flex:1;
   }
-  .party-foot .frow:last-child, .party-body .frow:last-child{margin-bottom:0;}
-  .party-foot .flabel, .party-body .flabel{
+  .party-body .cname{color:var(--purple);font-weight:800;font-size:14px;margin:0 0 4px;}
+  .party-body .addr{margin:0 0 8px;white-space:normal;}
+  .party-body .frow{
+    display:grid;grid-template-columns:7.4em 8px minmax(0,1fr);
+    column-gap:8px;align-items:baseline;margin:0 0 4px;padding:0;
+  }
+  .party-body .frow:last-child{margin-bottom:0;}
+  .party-body .flabel{
     font-weight:700;color:var(--text);white-space:nowrap;
   }
-  .party-foot .fcolon, .party-body .fcolon{font-weight:700;}
-  .party-foot .fval, .party-body .fval{
-    min-width:0;white-space:nowrap;overflow:visible;font-weight:600;
+  .party-body .fcolon{font-weight:700;text-align:left;}
+  .party-body .fval{
+    min-width:0;white-space:nowrap;overflow:visible;font-weight:600;text-align:left;
   }
 
   .table-wrap{flex:0 0 auto;min-height:0;margin-bottom:8px;display:block;}
@@ -176,11 +178,8 @@ export const buildPaymentFollowUpStatementHtml = ({
           <div class="party-body">
             <div class="cname">${escHtml(customer?.partyName || '')}</div>
             <div class="addr">${escHtml(customer?.address || '')}</div>
+            ${customer?.gstin ? `<div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span class="fval">${escHtml(customer.gstin)}</span></div>` : ''}
           </div>
-          ${customer?.gstin ? `
-          <div class="party-foot">
-            <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span class="fval">${escHtml(customer.gstin)}</span></div>
-          </div>` : ''}
         </div>
         <div class="party">
           <div class="party-head">STATEMENT DETAILS</div>
@@ -188,8 +187,6 @@ export const buildPaymentFollowUpStatementHtml = ({
             <div class="frow"><span class="flabel">As On</span><span class="fcolon">:</span><span class="fval">${escHtml(asOn)}</span></div>
             <div class="frow"><span class="flabel">Phone</span><span class="fcolon">:</span><span class="fval">${escHtml(customer?.phone || '—')}</span></div>
             <div class="frow"><span class="flabel">Email</span><span class="fcolon">:</span><span class="fval">${escHtml(customer?.email || '—')}</span></div>
-          </div>
-          <div class="party-foot">
             <div class="frow"><span class="flabel">Invoices</span><span class="fcolon">:</span><span class="fval">${list.length}</span></div>
             <div class="frow"><span class="flabel">Outstanding</span><span class="fcolon">:</span><span class="fval">₹ ${money(totalOutstanding)}</span></div>
           </div>
