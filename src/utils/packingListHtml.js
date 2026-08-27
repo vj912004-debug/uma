@@ -203,30 +203,32 @@ export const buildPackingListHtml = (data, profileInput) => {
   .meta-field .colon{font-weight:700;color:var(--purple);}
   .meta-field .val{font-weight:600;color:var(--text);}
 
-  .table-wrap{flex:1 1 auto;min-height:0;margin-bottom:10px;display:flex;flex-direction:column;}
+  .table-wrap{flex:0 0 auto;min-height:0;margin-bottom:8px;display:block;}
   table.items{
-    width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px;background:#fff;
-    flex:1 1 auto;height:100%;
+    width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px;background:#fff;
+    flex:0 0 auto;height:auto;
   }
   table.items thead th{
-    background:var(--purple);color:#fff;font-weight:700;padding:8px 6px;
+    background:var(--purple);color:#fff;font-weight:700;padding:5px 4px;
     text-align:center;vertical-align:middle;border:1px solid rgba(255,255,255,.55);
-    line-height:1.25;font-size:12px;
+    line-height:1.2;font-size:11px;
   }
   table.items tbody td{
-    border:1px solid var(--lav-border);padding:6px 4px;text-align:center;
-    vertical-align:middle;background:#fff;color:var(--text);height:28px;font-weight:600;
+    border:1px solid var(--lav-border);padding:1px 4px;text-align:center;
+    vertical-align:middle;background:#fff;color:var(--text);
+    height:18px;min-height:18px;max-height:18px;font-weight:600;font-size:11px;line-height:1;
   }
   table.items tbody td.num{text-align:center;}
-  table.items tbody tr.filler-row { height: 1%; }
+  table.items tbody tr.filler-row { height: 18px; }
   table.items tbody tr.filler-row td {
-    height: auto; min-height: 18px; padding: 2px 4px;
+    height: 18px; min-height: 18px; max-height: 18px; padding: 1px 4px;
   }
   table.items tbody tr.special-row td,
   table.items tbody tr.batch-total-row td,
   table.items tbody tr.total-row td{
     background:var(--lav-bg);color:var(--purple-dark);font-weight:800;
     border-color:var(--purple);
+    height:18px;min-height:18px;max-height:18px;padding:1px 4px;
   }
   table.items tbody tr.batch-total-row td{
     background:#f3eef9;
@@ -237,14 +239,14 @@ export const buildPackingListHtml = (data, profileInput) => {
   }
 
   .barfoot{
-    background:var(--purple);color:#fff;margin:0 -14px 0 -14px;padding:8px 14px;
+    background:var(--purple);color:#fff;margin:auto -14px 0 -14px;padding:8px 14px;
     display:flex;justify-content:space-between;align-items:center;
     font-size:12px;flex-shrink:0;
   }
 </style>
 </head>
 <body>
-  <div class="page">
+  <div class="page pl-page">
     <div class="sheet">
       <div class="header">
         <div class="brand">

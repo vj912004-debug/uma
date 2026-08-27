@@ -99,34 +99,42 @@ export const buildPaymentFollowUpStatementHtml = ({
   .party-body{padding:8px 12px;font-size:12px;line-height:1.45;}
   .party-body .cname{color:var(--purple);font-weight:800;font-size:14px;margin:0 0 4px;}
   .party-body .addr{margin:0 0 4px;white-space:normal;}
-  .party-foot{
-    border-top:1px solid var(--lav-border);padding:8px 12px;font-size:12px;
+  .party-foot .frow, .party-body .frow{
+    display:grid;grid-template-columns:max-content 10px minmax(0,1fr);
+    column-gap:6px;align-items:baseline;margin-bottom:3px;
   }
-  .party-foot .frow{display:flex;gap:6px;margin-bottom:2px;}
-  .party-foot .flabel{font-weight:700;min-width:88px;color:var(--text);}
+  .party-foot .frow:last-child, .party-body .frow:last-child{margin-bottom:0;}
+  .party-foot .flabel, .party-body .flabel{
+    font-weight:700;color:var(--text);white-space:nowrap;
+  }
+  .party-foot .fcolon, .party-body .fcolon{font-weight:700;}
+  .party-foot .fval, .party-body .fval{
+    min-width:0;white-space:nowrap;overflow:visible;font-weight:600;
+  }
 
-  .table-wrap{flex:1 1 auto;min-height:0;margin-bottom:10px;display:flex;flex-direction:column;}
+  .table-wrap{flex:0 0 auto;min-height:0;margin-bottom:8px;display:block;}
   table.items{
-    width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px;background:#fff;
-    flex:1 1 auto;height:100%;
+    width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px;background:#fff;
+    flex:0 0 auto;height:auto;
   }
   table.items thead th{
-    background:var(--purple);color:#fff;font-weight:700;padding:8px 6px;
+    background:var(--purple);color:#fff;font-weight:700;padding:5px 4px;
     text-align:center;vertical-align:middle;border:1px solid rgba(255,255,255,.55);
-    line-height:1.25;
+    line-height:1.2;font-size:11px;
   }
   table.items tbody td{
-    border:1px solid var(--lav-border);padding:6px 6px;text-align:center;
-    vertical-align:middle;background:#fff;color:var(--text);height:28px;font-weight:600;
+    border:1px solid var(--lav-border);padding:1px 4px;text-align:center;
+    vertical-align:middle;background:#fff;color:var(--text);
+    height:18px;min-height:18px;max-height:18px;font-weight:600;font-size:11px;line-height:1;
   }
-  table.items tbody td.left{text-align:left;}
+  table.items tbody td.left{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   table.items tbody td.num{text-align:right;}
   table.items tbody td.c{text-align:center;}
-  table.items tbody tr.filler-row{height:1%;}
-  table.items tbody tr.filler-row td{height:auto;min-height:18px;padding:2px 4px;}
+  table.items tbody tr.filler-row{height:18px;}
+  table.items tbody tr.filler-row td{height:18px;min-height:18px;max-height:18px;padding:1px 4px;}
   table.items tfoot td{
     border:1px solid var(--purple);background:var(--lav-bg);font-weight:800;
-    padding:8px 6px;color:var(--purple-dark);
+    padding:3px 4px;color:var(--purple-dark);height:20px;font-size:11px;
   }
   table.items tfoot td.num{text-align:right;}
   table.items tfoot td.c{text-align:center;}
@@ -171,19 +179,19 @@ export const buildPaymentFollowUpStatementHtml = ({
           </div>
           ${customer?.gstin ? `
           <div class="party-foot">
-            <div class="frow"><span class="flabel">GSTIN</span><span>: ${escHtml(customer.gstin)}</span></div>
+            <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span class="fval">${escHtml(customer.gstin)}</span></div>
           </div>` : ''}
         </div>
         <div class="party">
           <div class="party-head">STATEMENT DETAILS</div>
           <div class="party-body">
-            <div class="frow" style="display:flex;gap:6px;margin-bottom:3px;"><span class="flabel" style="font-weight:700;min-width:88px;">As On</span><span>: ${escHtml(asOn)}</span></div>
-            <div class="frow" style="display:flex;gap:6px;margin-bottom:3px;"><span class="flabel" style="font-weight:700;min-width:88px;">Phone</span><span>: ${escHtml(customer?.phone || '—')}</span></div>
-            <div class="frow" style="display:flex;gap:6px;"><span class="flabel" style="font-weight:700;min-width:88px;">Email</span><span>: ${escHtml(customer?.email || '—')}</span></div>
+            <div class="frow"><span class="flabel">As On</span><span class="fcolon">:</span><span class="fval">${escHtml(asOn)}</span></div>
+            <div class="frow"><span class="flabel">Phone</span><span class="fcolon">:</span><span class="fval">${escHtml(customer?.phone || '—')}</span></div>
+            <div class="frow"><span class="flabel">Email</span><span class="fcolon">:</span><span class="fval">${escHtml(customer?.email || '—')}</span></div>
           </div>
           <div class="party-foot">
-            <div class="frow"><span class="flabel">Invoices</span><span>: ${list.length}</span></div>
-            <div class="frow"><span class="flabel">Outstanding</span><span>: ₹ ${money(totalOutstanding)}</span></div>
+            <div class="frow"><span class="flabel">Invoices</span><span class="fcolon">:</span><span class="fval">${list.length}</span></div>
+            <div class="frow"><span class="flabel">Outstanding</span><span class="fcolon">:</span><span class="fval">₹ ${money(totalOutstanding)}</span></div>
           </div>
         </div>
       </div>

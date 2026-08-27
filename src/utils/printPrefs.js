@@ -308,9 +308,23 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .party-foot .frow,
   .uma-print-root .frow {
     display: grid !important;
-    grid-template-columns: 50px 12px minmax(0, 1fr) !important;
-    column-gap: 4px !important;
-    align-items: center !important;
+    grid-template-columns: max-content 12px minmax(0, 1fr) !important;
+    column-gap: 6px !important;
+    align-items: baseline !important;
+  }
+  .uma-print-root .pfu-page .frow,
+  .uma-print-root .pfu-page .party-foot .frow,
+  .uma-print-root .pfu-page .party-body .frow {
+    grid-template-columns: max-content 10px minmax(0, 1fr) !important;
+  }
+  .uma-print-root .flabel,
+  .uma-print-root .fcolon {
+    white-space: nowrap !important;
+  }
+  .uma-print-root .fval {
+    white-space: nowrap !important;
+    overflow: visible !important;
+    min-width: 0 !important;
   }
   .uma-print-root .meta-field {
     display: grid !important;
@@ -929,6 +943,62 @@ export const buildPrintPrefsCss = (prefs) => {
     word-break: normal !important;
     overflow-wrap: normal !important;
     hyphens: none !important;
+  }
+  /* Packing List: compact rows, do not stretch boxes to fill A4 */
+  .uma-print-root .pl-page .table-wrap,
+  .uma-print-root .pfu-page .table-wrap {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    display: block !important;
+  }
+  .uma-print-root .pl-page table.items,
+  .uma-print-root .pfu-page table.items {
+    flex: 0 0 auto !important;
+    height: auto !important;
+  }
+  .uma-print-root .pl-page table.items thead th,
+  .uma-print-root .pfu-page table.items thead th {
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+    font-size: 11px !important;
+  }
+  .uma-print-root .pl-page table.items tbody td,
+  .uma-print-root .pl-page table.items tbody td.num,
+  .uma-print-root.print-density-md .pl-page table.items tbody td,
+  .uma-print-root.print-density-lg .pl-page table.items tbody td,
+  .uma-print-root.print-density-xl .pl-page table.items tbody td,
+  .uma-print-root .pfu-page table.items tbody td,
+  .uma-print-root .pfu-page table.items tbody td.num,
+  .uma-print-root.print-density-md .pfu-page table.items tbody td,
+  .uma-print-root.print-density-lg .pfu-page table.items tbody td,
+  .uma-print-root.print-density-xl .pfu-page table.items tbody td {
+    height: 18px !important;
+    min-height: 18px !important;
+    max-height: 18px !important;
+    padding-top: 1px !important;
+    padding-bottom: 1px !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+  }
+  .uma-print-root .pl-page table.items tbody tr.filler-row td,
+  .uma-print-root .pfu-page table.items tbody tr.filler-row td {
+    height: 18px !important;
+    min-height: 18px !important;
+    max-height: 18px !important;
+    padding-top: 1px !important;
+    padding-bottom: 1px !important;
+  }
+  .uma-print-root .pfu-page table.items tfoot td {
+    padding-top: 3px !important;
+    padding-bottom: 3px !important;
+    height: 20px !important;
+    font-size: 11px !important;
+  }
+  .uma-print-root .pl-page .barfoot,
+  .uma-print-root .pl-page .sheet > .barfoot,
+  .uma-print-root .pfu-page .barfoot,
+  .uma-print-root .pfu-page .sheet > .barfoot {
+    margin: auto -14px 0 -14px !important;
   }
   /* BPR page-2 weight/drum table: lock compact sample row size */
   .uma-print-root .page-p2 table.items tbody td,
