@@ -53,6 +53,132 @@ const partyDueOverrideTotal = (party) => {
   }, 0);
 };
 
+const realInvoiceNo = (...vals) => {
+  for (const v of vals) {
+    const n = String(v || '').trim();
+    if (!n) continue;
+    if (/^pending/i.test(n) || n === '—' || /^party due/i.test(n)) continue;
+    return n;
+  }
+  return '';
+};
+
+const sameParty = (party, partyId, partyName) => {
+  if (!party) return false;
+  if (party.id && partyId !== undefined && partyId !== null && String(partyId) !== '') {
+    if (String(party.id) === String(partyId)) return true;
+  }
+  const a = String(party.name || '').trim().toLowerCase();
+  const b = String(partyName || '').trim().toLowerCase();
+  return Boolean(a && b && a === b);
+};
+
+const applyOverrideOutstanding = (invoices, overrideTotal) => {
+  if (!invoices.length) return invoices;
+  const sum = invoices.reduce((s, i) => s + (parseFloat(i.outstanding) || 0), 0);
+  if (sum > 0.01) return invoices;
+  if (invoices.length === 1) {
+    const inv = invoices[0];
+    return [{
+      ...inv,
+      outstanding: overrideTotal,
+      invoiceAmount: (parseFloat(inv.invoiceAmount) || 0) > 0.01 ? inv.invoiceAmount : overrideTotal
+    }];
+  }
+  const billSum = invoices.reduce((s, i) => s + (parseFloat(i.invoiceAmount) || 0), 0);
+  if (billSum < 0.01) {
+    const share = overrideTotal / invoices.length;
+    return invoices.map((inv, idx) => ({
+      ...inv,
+      outstanding: idx === invoices.length - 1
+        ? overrideTotal - share * (invoices.length - 1)
+        : share
+    }));
+  }
+  let left = overrideTotal;
+  return invoices.map((inv, idx) => {
+    const part = idx === invoices.length - 1
+      ? left
+      : overrideTotal * ((parseFloat(inv.invoiceAmount) || 0) / billSum);
+    left -= part;
+    return { ...inv, outstanding: part };
+  });
+};
+
+/** All tax invoices / sheet TI numbers for a party (even if calculated outstanding is 0). */
+export const collectPartyInvoiceRows = (data, party, asOnDate = todayISO()) => {
+  if (!party) return [];
+  const payments = data.payments || [];
+  const rows = [];
+  const mrsCovered = new Set();
+
+  (data.invoices || []).filter(isTaxInvoiceDoc).forEach((ti) => {
+    const mr = (data.materialReceipts || []).find(
+      (m) => !m.isDeleted && String(m.id) === String(ti.receiptId)
+    );
+    const baseMr = mr || {
+      id: ti.receiptId || `orphan-${ti.id}`,
+      partyId: ti.partyId || '',
+      partyName: ti.partyName || '',
+      date: ti.date || '',
+      sheetOverrides: {}
+    };
+    if (!sameParty(party, ti.partyId || baseMr.partyId, ti.partyName || baseMr.partyName)) return;
+    const invoiceNo = realInvoiceNo(ti.invoiceNo);
+    if (!invoiceNo) return;
+    if (mr) mrsCovered.add(String(mr.id));
+
+    const noteNet = getInvoiceDebitCreditNet(data, invoiceNo);
+    const outstanding = getReceiptOutstanding(baseMr, ti, payments) + noteNet;
+    const invoiceDate = ti.date || baseMr.date || '';
+    const ageDays = daysBetween(invoiceDate, asOnDate);
+    rows.push({
+      id: ti.id || `${baseMr.id}-${invoiceNo}`,
+      invoiceId: ti.id,
+      receiptId: baseMr.id,
+      partyId: party.id || baseMr.partyId || '',
+      partyName: party.name || ti.partyName || baseMr.partyName || '',
+      invoiceNo,
+      invoiceDate,
+      invoiceAmount: getReceiptBillAmount(baseMr, ti),
+      paidAmount: getReceiptEffectivePaid(baseMr, payments, ti.id),
+      tdsAmount: getReceiptEffectiveTds(baseMr, payments, ti.id),
+      outstanding: outstanding > 0 ? outstanding : 0,
+      ageDays,
+      overdue: (ageDays ?? 0) >= 30
+    });
+  });
+
+  (data.materialReceipts || [])
+    .filter((mr) => !mr.isDeleted && !mrsCovered.has(String(mr.id)))
+    .forEach((mr) => {
+      if (!sameParty(party, mr.partyId, mr.partyName)) return;
+      const o = mr.sheetOverrides || {};
+      const invoiceNo = realInvoiceNo(o.tiNo, o.invoiceNo);
+      if (!invoiceNo) return;
+      const outstanding = getReceiptOutstanding(mr, null, payments);
+      const invoiceDate = o.invoiceDate || mr.date || '';
+      const ageDays = daysBetween(invoiceDate, asOnDate);
+      rows.push({
+        id: `mr-${mr.id}`,
+        invoiceId: null,
+        receiptId: mr.id,
+        partyId: party.id || mr.partyId || '',
+        partyName: party.name || mr.partyName || '',
+        invoiceNo,
+        invoiceDate,
+        invoiceAmount: getReceiptBillAmount(mr, null),
+        paidAmount: getReceiptEffectivePaid(mr, payments),
+        tdsAmount: getReceiptEffectiveTds(mr, payments),
+        outstanding: outstanding > 0 ? outstanding : 0,
+        ageDays,
+        overdue: (ageDays ?? 0) >= 30
+      });
+    });
+
+  return rows;
+};
+
 /** Build invoice-level outstanding rows (aligned with Processing Sheet). */
 export const buildOutstandingInvoices = (data, asOnDate = todayISO()) => {
   const rows = [];
@@ -198,6 +324,13 @@ export const buildCustomerOutstanding = (data, asOnDate = todayISO()) => {
         if (overrideTotal > 0.01) {
           existing.outstandingAmount = overrideTotal;
           existing.fromDueOverride = true;
+          if (!(existing.invoices || []).length) {
+            existing.invoices = applyOverrideOutstanding(
+              collectPartyInvoiceRows(data, party, asOnDate),
+              overrideTotal
+            );
+            existing.pendingInvoices = existing.invoices.length;
+          }
         } else {
           existing.outstandingAmount = existing.invoiceOutstanding;
         }
@@ -208,6 +341,10 @@ export const buildCustomerOutstanding = (data, asOnDate = todayISO()) => {
       }
 
       if (overrideTotal > 0.01) {
+        const invoices = applyOverrideOutstanding(
+          collectPartyInvoiceRows(data, party, asOnDate),
+          overrideTotal
+        );
         byParty.set(key, {
           partyId: party.id,
           partyName: party.name,
@@ -215,11 +352,11 @@ export const buildCustomerOutstanding = (data, asOnDate = todayISO()) => {
           email: party.email1 || party.email || '',
           address: party.billAddress || '',
           gstin: party.gstinBill || '',
-          pendingInvoices: 0,
+          pendingInvoices: invoices.length,
           invoiceOutstanding: 0,
           outstandingAmount: overrideTotal,
           overdueAmount: 0,
-          invoices: [],
+          invoices,
           fromDueOverride: true
         });
       }

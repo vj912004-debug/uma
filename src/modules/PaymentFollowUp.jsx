@@ -22,6 +22,7 @@ import ExportButton from '../components/ExportButton';
 import {
   buildCustomerOutstanding,
   buildOutstandingInvoices,
+  collectPartyInvoiceRows,
   followUpsDueOn,
   promisesDueOnOrBefore,
   moneyINR,
@@ -188,22 +189,23 @@ const PaymentFollowUp = () => {
   const customerInvoices = useMemo(() => {
     if (!selectedCustomer) return [];
     if ((selectedCustomer.invoices || []).length > 0) return selectedCustomer.invoices;
-    // Party Due override-only: show one synthetic pending line so amounts are visible
-    if ((selectedCustomer.outstandingAmount || 0) > 0.01) {
-      return [{
-        id: `override-${selectedCustomer.partyId}`,
-        invoiceNo: 'Party Due (Manual)',
-        invoiceDate: asOnDate,
-        invoiceAmount: selectedCustomer.outstandingAmount,
-        paidAmount: 0,
-        tdsAmount: 0,
-        outstanding: selectedCustomer.outstandingAmount,
-        ageDays: 0,
-        overdue: false
-      }];
+    const party = (data.parties || []).find((p) => String(p.id) === String(selectedCustomer.partyId))
+      || { id: selectedCustomer.partyId, name: selectedCustomer.partyName };
+    const linked = collectPartyInvoiceRows(data, party, asOnDate);
+    if (linked.length) {
+      const total = selectedCustomer.outstandingAmount || 0;
+      const sum = linked.reduce((s, i) => s + (parseFloat(i.outstanding) || 0), 0);
+      if (total > 0.01 && sum < 0.01 && linked.length === 1) {
+        return [{
+          ...linked[0],
+          outstanding: total,
+          invoiceAmount: (parseFloat(linked[0].invoiceAmount) || 0) > 0.01 ? linked[0].invoiceAmount : total
+        }];
+      }
+      return linked;
     }
     return [];
-  }, [selectedCustomer, asOnDate]);
+  }, [selectedCustomer, asOnDate, data]);
 
   const selectedInvoices = customerInvoices.filter((i) => selectedInvoiceIds.includes(i.id));
   const selectedOutstanding = selectedInvoices.reduce((s, i) => s + i.outstanding, 0);
@@ -784,7 +786,7 @@ const PaymentFollowUp = () => {
       {/* PDF Preview Modal */}
       {pdfOpen && (
         <ModalShell title="Payment Follow-Up Statement — Preview" onClose={() => setPdfOpen(false)} width="860px">
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
             <button type="button" className="btn btn-primary" onClick={downloadStatementPdf} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <FileDown size={14} /> Download PDF
             </button>
@@ -803,6 +805,18 @@ const PaymentFollowUp = () => {
               }}
             >
               <Printer size={14} /> Print
+            </button>
+            <button type="button" className="btn" onClick={openEmailModal} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Mail size={14} /> Email
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={waSending}
+              onClick={openWhatsApp}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#25D366', borderColor: '#25D366', color: '#fff', opacity: waSending ? 0.7 : 1 }}
+            >
+              <MessageCircle size={14} /> {waSending ? 'Sending…' : 'WhatsApp'}
             </button>
           </div>
           <div style={{ border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>

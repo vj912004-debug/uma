@@ -33,7 +33,7 @@ export const buildPaymentFollowUpStatementHtml = ({
     </tr>`).join('');
 
   const totalOutstanding = list.reduce((s, i) => s + (parseFloat(i.outstanding) || 0), 0);
-  const fillerCount = Math.max(0, 10 - list.length);
+  const fillerCount = Math.max(0, 34 - Math.max(list.length, 1));
   const fillerRowsHtml = fillerCount > 0 ? buildFillerRowsHtml(8, fillerCount) : '';
 
   return `<!DOCTYPE html>
@@ -241,6 +241,46 @@ export const buildPaymentFollowUpStatementHtml = ({
 </html>`;
 };
 
+const fillPfuBlankRows = (idoc, { singlePageHeight }) => {
+  const page = idoc.querySelector('.pfu-page');
+  const sheet = idoc.querySelector('.pfu-page .sheet');
+  const tbody = idoc.querySelector('.pfu-page table.items tbody');
+  const barfoot = idoc.querySelector('.pfu-page .barfoot');
+  if (!page || !sheet || !tbody) return;
+
+  const prevPageMin = page.style.minHeight;
+  const prevSheetMin = sheet.style.minHeight;
+  const prevBarMargin = barfoot ? barfoot.style.marginTop : '';
+  page.style.minHeight = '0';
+  page.style.height = 'auto';
+  sheet.style.minHeight = '0';
+  if (barfoot) barfoot.style.marginTop = '8px';
+
+  const rowH = 18;
+  let extra = Math.floor((singlePageHeight - page.scrollHeight) / rowH);
+  extra = Math.max(0, Math.min(extra, 40));
+  for (let i = 0; i < extra; i += 1) {
+    const tr = idoc.createElement('tr');
+    tr.className = 'filler-row';
+    for (let c = 0; c < 8; c += 1) {
+      const td = idoc.createElement('td');
+      td.innerHTML = '&nbsp;';
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  while (page.scrollHeight > singlePageHeight) {
+    const last = tbody.querySelector('tr.filler-row:last-child');
+    if (!last) break;
+    last.remove();
+  }
+
+  page.style.minHeight = prevPageMin;
+  page.style.height = '';
+  sheet.style.minHeight = prevSheetMin;
+  if (barfoot) barfoot.style.marginTop = prevBarMargin;
+};
+
 export const renderPaymentFollowUpStatementPdf = async ({
   customer,
   invoices,
@@ -265,6 +305,7 @@ export const renderPaymentFollowUpStatementPdf = async ({
     width: 794,
     fitPage: true,
     splitOverflowPages: true,
-    printPrefs
+    printPrefs,
+    prepareDoc: fillPfuBlankRows
   });
 };
