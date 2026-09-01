@@ -670,14 +670,55 @@ export const buildPrintPrefsCss = (prefs) => {
   }
   .uma-print-root .pi-page .content-wrapper tr.inv-bot > td,
   .uma-print-root .ti-page .content-wrapper tr.inv-bot > td,
-  .uma-print-root .cn-page .content-wrapper tr.inv-bot > td,
-  .uma-print-root .dn-page .content-wrapper tr.inv-bot > td,
   .uma-print-root .po-page .content-wrapper tr.inv-bot > td {
     height: auto !important;
     min-height: 280px !important;
     padding-bottom: 0 !important;
     vertical-align: bottom !important;
     overflow: visible !important;
+  }
+  .uma-print-root .cn-page .items-row,
+  .uma-print-root .dn-page .items-row {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+  .uma-print-root .cn-page .inv-bot,
+  .uma-print-root .dn-page .inv-bot {
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  .uma-print-root .cn-page .content-wrapper tr.inv-bot > td,
+  .uma-print-root .dn-page .content-wrapper tr.inv-bot > td {
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  .uma-print-root .cn-page .bottom,
+  .uma-print-root .dn-page .bottom,
+  .uma-print-root .cn-page .bank,
+  .uma-print-root .dn-page .bank,
+  .uma-print-root .cn-page .totals,
+  .uma-print-root .dn-page .totals {
+    overflow: visible !important;
+    flex-shrink: 0 !important;
+  }
+  .uma-print-root .cn-page table.items,
+  .uma-print-root .dn-page table.items {
+    height: 100% !important;
+    max-height: 100% !important;
+  }
+  .uma-print-root .cn-page table.items tbody tr.filler-row td,
+  .uma-print-root .dn-page table.items tbody tr.filler-row td {
+    height: auto !important;
+    min-height: 12px !important;
+    max-height: none !important;
+  }
+  .uma-print-root .cn-page table.footer3 td.f3col,
+  .uma-print-root .dn-page table.footer3 td.f3col {
+    height: 100px !important;
   }
   .uma-print-root .barfoot {
     margin: 8px -10px 0 -10px !important;
@@ -965,29 +1006,175 @@ export const buildPrintPrefsCss = (prefs) => {
     overflow-wrap: normal !important;
     hyphens: none !important;
   }
-  /* Packing List: compact rows, do not stretch boxes to fill A4 */
-  .uma-print-root .pl-page .table-wrap,
+  /* Packing List: match sample layout — no overlapping, table fills page */
+  .uma-print-root .pl-page .header {
+    align-items: center !important;
+    gap: 16px !important;
+    overflow: visible !important;
+    min-width: 0 !important;
+  }
+  .uma-print-root .pl-page .brand {
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: 1 1 auto !important;
+  }
+  .uma-print-root .pl-page .brand-lockup {
+    width: auto !important;
+    max-width: 280px !important;
+    height: auto !important;
+    max-height: 80px !important;
+    min-width: 0 !important;
+  }
+  .uma-print-root .pl-page .brand-text h1,
+  .uma-print-root .pl-page .tagline {
+    white-space: normal !important;
+    letter-spacing: 0.4px !important;
+    word-spacing: normal !important;
+  }
+  .uma-print-root .pl-page .tax-invoice-box {
+    min-width: 210px !important;
+    max-width: 240px !important;
+    width: 210px !important;
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 10px 18px 12px !important;
+    gap: 8px !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+  .uma-print-root .pl-page .tax-invoice-box .ti-title {
+    white-space: nowrap !important;
+    line-height: 1.2 !important;
+    letter-spacing: 0.5px !important;
+    word-spacing: 0.12em !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .uma-print-root .pl-page .tax-invoice-box .ti-sub {
+    margin: 0 !important;
+    padding: 4px 12px !important;
+    line-height: 1.3 !important;
+    letter-spacing: normal !important;
+    word-spacing: normal !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+  }
+  .uma-print-root .pl-page .pl-meta {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px 28px !important;
+    align-items: start !important;
+  }
+  .uma-print-root.print-density-xl .pl-page .pl-meta {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .uma-print-root .pl-page .meta-field {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: baseline !important;
+    column-gap: 0 !important;
+    grid-template-columns: none !important;
+    min-width: 0 !important;
+  }
+  .uma-print-root .pl-page .meta-field .lbl {
+    min-width: auto !important;
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+    letter-spacing: normal !important;
+    word-spacing: 0.15em !important;
+    overflow: visible !important;
+  }
+  .uma-print-root.print-density-lg .pl-page .meta-field .lbl,
+  .uma-print-root.print-density-xl .pl-page .meta-field .lbl {
+    white-space: nowrap !important;
+  }
+  .uma-print-root .pl-page .meta-field .colon {
+    flex: 0 0 auto !important;
+    padding: 0 8px !important;
+    letter-spacing: normal !important;
+  }
+  .uma-print-root .pl-page .meta-field .val {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    letter-spacing: normal !important;
+    word-spacing: 0.12em !important;
+    overflow: visible !important;
+  }
+  .uma-print-root .pl-page .table-wrap {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: hidden !important;
+  }
+  .uma-print-root .pl-page table.items {
+    flex: 0 0 auto !important;
+    height: auto !important;
+  }
+  .uma-print-root .pl-page table.items thead th {
+    padding: 8px 10px !important;
+    font-size: ${bodyFs}px !important;
+    line-height: 1.25 !important;
+    white-space: nowrap !important;
+    letter-spacing: normal !important;
+  }
+  .uma-print-root .pl-page table.items tbody td,
+  .uma-print-root .pl-page table.items tbody td.num,
+  .uma-print-root .pl-page table.items tbody td.batch,
+  .uma-print-root .pl-page table.items tfoot td,
+  .uma-print-root.print-density-md .pl-page table.items tbody td,
+  .uma-print-root.print-density-lg .pl-page table.items tbody td,
+  .uma-print-root.print-density-xl .pl-page table.items tbody td {
+    height: auto !important;
+    min-height: 24px !important;
+    max-height: none !important;
+    padding: 7px 10px !important;
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+    letter-spacing: normal !important;
+    word-spacing: normal !important;
+  }
+  .uma-print-root .pl-page table.items tbody td.batch {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  .uma-print-root .pl-page table.items td.total-label {
+    white-space: nowrap !important;
+  }
+  .uma-print-root .pl-page table.items tbody tr.filler-row td {
+    height: ${Math.max(16, Math.round(bodyFs * 1.35))}px !important;
+    min-height: ${Math.max(16, Math.round(bodyFs * 1.35))}px !important;
+    max-height: ${Math.max(16, Math.round(bodyFs * 1.35))}px !important;
+    padding-top: 1px !important;
+    padding-bottom: 1px !important;
+  }
+  .uma-print-root .pl-page .barfoot span {
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
   .uma-print-root .pfu-page .table-wrap {
     flex: 0 0 auto !important;
     height: auto !important;
     display: block !important;
   }
-  .uma-print-root .pl-page table.items,
   .uma-print-root .pfu-page table.items {
     flex: 0 0 auto !important;
     height: auto !important;
   }
-  .uma-print-root .pl-page table.items thead th,
   .uma-print-root .pfu-page table.items thead th {
     padding-top: 5px !important;
     padding-bottom: 5px !important;
     font-size: 11px !important;
   }
-  .uma-print-root .pl-page table.items tbody td,
-  .uma-print-root .pl-page table.items tbody td.num,
-  .uma-print-root.print-density-md .pl-page table.items tbody td,
-  .uma-print-root.print-density-lg .pl-page table.items tbody td,
-  .uma-print-root.print-density-xl .pl-page table.items tbody td,
   .uma-print-root .pfu-page table.items tbody td,
   .uma-print-root .pfu-page table.items tbody td.num,
   .uma-print-root.print-density-md .pfu-page table.items tbody td,
@@ -1001,7 +1188,6 @@ export const buildPrintPrefsCss = (prefs) => {
     font-size: 11px !important;
     line-height: 1 !important;
   }
-  .uma-print-root .pl-page table.items tbody tr.filler-row td,
   .uma-print-root .pfu-page table.items tbody tr.filler-row td {
     height: 18px !important;
     min-height: 18px !important;

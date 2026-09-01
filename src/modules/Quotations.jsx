@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import {Eye,  Plus, Search, Download, Trash2, Edit2 } from 'lucide-react';
+import { Eye, Plus, Search, Download, Trash2, Edit2, GripVertical } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import { formatDate } from '../utils/dateUtils';
@@ -44,6 +44,48 @@ const OPTIONAL_SERVICE_CHARGES = [
   { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
 ];
 
+const ALL_CHARGE_DEFS = [...MAIN_CHARGES, ...OPTIONAL_SERVICE_CHARGES];
+const ALL_CHARGE_KEYS = ALL_CHARGE_DEFS.map((item) => item.key);
+
+const defaultChargeSection = (key) =>
+  MAIN_CHARGES.some((item) => item.key === key) ? 'main' : 'optional';
+
+const getChargeSection = (chargeSection, key) =>
+  chargeSection?.[key] || defaultChargeSection(key);
+
+const CHARGE_NOTE_SUGGESTIONS = [
+  'Nil if Qty is more than 500kg',
+  'if applicable',
+  'If Required',
+  'Dry Method',
+  'Wet Method',
+  'Each',
+  'Lump Sum'
+];
+
+const emptyChargeNotes = () => Object.fromEntries(ALL_CHARGE_KEYS.map((key) => [key, '']));
+
+const ChargeNoteDatalist = () => (
+  <datalist id="quote-charge-note-options">
+    {CHARGE_NOTE_SUGGESTIONS.map((opt) => (
+      <option key={opt} value={opt} />
+    ))}
+  </datalist>
+);
+
+const ChargeNoteInput = ({ value, onChange, placeholder = 'Note e.g. Nil if Qty is more than 500kg' }) => (
+  <input
+    type="text"
+    className="input-field"
+    list="quote-charge-note-options"
+    placeholder={placeholder}
+    value={value || ''}
+    onChange={(e) => onChange(e.target.value)}
+    style={{ padding: '0.25rem 0.4rem', fontSize: '0.75rem', width: '100%' }}
+    title="Optional print note — type or pick a suggestion"
+  />
+);
+
 /** Quotation only: nothing selected until the user checks a charge. */
 const DEFAULT_CHARGES = {
   cleaning: false, filterBag: false, processing: false, sieving: false,
@@ -71,6 +113,8 @@ const getDefaultForm = () => ({
   psdRequirement: '',
   charges: { ...DEFAULT_CHARGES },
   rates: { ...DEFAULT_RATES },
+  chargeNotes: emptyChargeNotes(),
+  chargeSection: {},
   mainCharges: [],
   optionalCharges: [],
   productSettings: {},
@@ -85,46 +129,87 @@ const formatChargeRateLabel = (item, rate, qty) => {
   return `₹ ${rate}${item.isQtyRate ? ' / Kg' : ''}`;
 };
 
-const buildMainChargesFromMaterial = (charges, rates, qty, psdRequirement) => {
+const customChargeRows = (rows = []) =>
+  (rows || []).filter((row) => !row.sourceKey && String(row.description || '').trim());
+
+const buildAutoChargeRows = (section, charges, rates, qty, psdRequirement, chargeNotes = {}, chargeSection = {}) => {
   const rows = [];
-  MAIN_CHARGES.forEach((item) => {
+  ALL_CHARGE_DEFS.forEach((item) => {
+    if (getChargeSection(chargeSection, item.key) !== section) return;
     if (!charges?.[item.key]) return;
     const rate = rates?.[item.key] || 0;
-    if (rate <= 0) return;
-    rows.push({
-      description: item.label,
-      psdRequirement: item.key === 'processing' ? (psdRequirement || '') : '',
-      rate: formatChargeRateLabel(item, rate, qty),
-      dryRate: formatChargeRateLabel(item, rate, qty),
-      wetRate: '',
-      sourceKey: item.key
-    });
+    if (section === 'main' && rate <= 0 && defaultChargeSection(item.key) === 'main') return;
+    if (section === 'main') {
+      rows.push({
+        description: item.label,
+        psdRequirement: item.key === 'processing' ? (psdRequirement || '') : '',
+        rate: rate > 0 ? formatChargeRateLabel(item, rate, qty) : 'NIL',
+        dryRate: rate > 0 ? formatChargeRateLabel(item, rate, qty) : 'NIL',
+        wetRate: '',
+        sourceKey: item.key,
+        note: chargeNotes?.[item.key] || ''
+      });
+    } else {
+      rows.push({
+        description: item.label,
+        rate: rate > 0 ? formatChargeRateLabel(item, rate, qty) : 'NIL',
+        sourceKey: item.key,
+        selected: true,
+        note: chargeNotes?.[item.key] || ''
+      });
+    }
   });
   return rows;
 };
 
-const buildOptionalChargesFromMaterial = (charges, rates, qty, existingOptional = []) => {
-  const autoRows = [];
-  OPTIONAL_SERVICE_CHARGES.forEach((item) => {
-    if (!charges?.[item.key]) return;
-    const rate = rates?.[item.key] || 0;
-    autoRows.push({
-      description: item.label,
-      rate: rate > 0 ? formatChargeRateLabel(item, rate, qty) : 'NIL',
-      sourceKey: item.key,
-      selected: true
-    });
-  });
-  const customRows = (existingOptional || []).filter(
-    (row) => !row.sourceKey && String(row.description || '').trim()
+const rebuildChargeTables = (
+  charges,
+  rates,
+  qty,
+  psdRequirement,
+  existingOptional = [],
+  chargeNotes = {},
+  chargeSection = {},
+  existingMain = []
+) => ({
+  mainCharges: [
+    ...buildAutoChargeRows('main', charges, rates, qty, psdRequirement, chargeNotes, chargeSection),
+    ...customChargeRows(existingMain)
+  ],
+  optionalCharges: [
+    ...buildAutoChargeRows('optional', charges, rates, qty, psdRequirement, chargeNotes, chargeSection),
+    ...customChargeRows(existingOptional)
+  ]
+});
+
+const tablesFromForm = (form, patch = {}) => {
+  const next = { ...form, ...patch };
+  return rebuildChargeTables(
+    next.charges,
+    next.rates,
+    next.qty,
+    next.psdRequirement,
+    next.optionalCharges,
+    next.chargeNotes,
+    next.chargeSection,
+    next.mainCharges
   );
-  return [...autoRows, ...customRows];
 };
 
-const rebuildChargeTables = (charges, rates, qty, psdRequirement, existingOptional = []) => ({
-  mainCharges: buildMainChargesFromMaterial(charges, rates, qty, psdRequirement),
-  optionalCharges: buildOptionalChargesFromMaterial(charges, rates, qty, existingOptional)
-});
+const inferChargeSection = (saved) => {
+  const section = { ...(saved?.chargeSection || {}) };
+  (saved?.mainCharges || []).forEach((row) => {
+    if (row?.sourceKey && defaultChargeSection(row.sourceKey) === 'optional') {
+      section[row.sourceKey] = 'main';
+    }
+  });
+  (saved?.optionalCharges || []).forEach((row) => {
+    if (row?.sourceKey && defaultChargeSection(row.sourceKey) === 'main') {
+      section[row.sourceKey] = 'optional';
+    }
+  });
+  return section;
+};
 
 const buildChargesFromPartyProduct = (prodConfig) => {
   const defaultRates = prodConfig?.charges || {};
@@ -145,6 +230,8 @@ const snapshotCurrentProductSettings = (form) => {
       psdRequirement: form.psdRequirement || '',
       charges: { ...form.charges },
       rates: { ...form.rates },
+      chargeNotes: { ...emptyChargeNotes(), ...(form.chargeNotes || {}) },
+      chargeSection: { ...(form.chargeSection || {}) },
       mainCharges: JSON.parse(JSON.stringify(form.mainCharges || [])),
       optionalCharges: JSON.parse(JSON.stringify(form.optionalCharges || []))
     }
@@ -158,12 +245,21 @@ const applyProductToQuotation = (baseForm, productName, party) => {
   if (saved) {
     const charges = { ...DEFAULT_CHARGES, ...saved.charges };
     const rates = { ...DEFAULT_RATES, ...saved.rates };
+    const notesFromRows = {};
+    [...(saved.mainCharges || []), ...(saved.optionalCharges || [])].forEach((row) => {
+      if (row?.sourceKey && row.note) notesFromRows[row.sourceKey] = row.note;
+    });
+    const chargeNotes = { ...emptyChargeNotes(), ...notesFromRows, ...(saved.chargeNotes || {}) };
+    const chargeSection = inferChargeSection(saved);
     const tables = rebuildChargeTables(
       charges,
       rates,
       saved.qty,
       saved.psdRequirement,
-      saved.optionalCharges
+      saved.optionalCharges,
+      chargeNotes,
+      chargeSection,
+      saved.mainCharges
     );
     return {
       ...baseForm,
@@ -173,7 +269,8 @@ const applyProductToQuotation = (baseForm, productName, party) => {
       psdRequirement: saved.psdRequirement || '',
       charges,
       rates,
-      // Always prefer tables rebuilt from current checkbox selection for print accuracy.
+      chargeNotes,
+      chargeSection,
       mainCharges: tables.mainCharges.length ? tables.mainCharges : (saved.mainCharges || []),
       optionalCharges: tables.optionalCharges.length ? tables.optionalCharges : (saved.optionalCharges || [])
     };
@@ -182,7 +279,7 @@ const applyProductToQuotation = (baseForm, productName, party) => {
   const prodConfig = (party?.products || []).find(p => p.name === productName);
   const { charges, rates, psdRequirement } = buildChargesFromPartyProduct(prodConfig);
   const qty = baseForm.productName === productName ? baseForm.qty : '';
-  const tables = rebuildChargeTables(charges, rates, qty, psdRequirement, []);
+  const tables = rebuildChargeTables(charges, rates, qty, psdRequirement, [], emptyChargeNotes(), {}, []);
   return {
     ...baseForm,
     productName,
@@ -191,6 +288,8 @@ const applyProductToQuotation = (baseForm, productName, party) => {
     psdRequirement,
     charges,
     rates,
+    chargeNotes: emptyChargeNotes(),
+    chargeSection: {},
     ...tables
   };
 };
@@ -203,6 +302,7 @@ const Quotations = () => {
   const [pendingEditData, setPendingEditData] = useState(null);
   
   const [formData, setFormData] = useState(getDefaultForm());
+  const [dropTarget, setDropTarget] = useState(null);
 
   useEffect(() => {
     if (isModalOpen && !formData.id) {
@@ -223,7 +323,9 @@ const Quotations = () => {
         gstNumber: party.gstinBill || '',
         productName: '',
         psdRequirement: '',
-        productSettings: {}
+        productSettings: {},
+        chargeNotes: emptyChargeNotes(),
+        chargeSection: {}
       }));
     }
   };
@@ -243,7 +345,7 @@ const Quotations = () => {
       return {
         ...prev,
         charges: nextCharges,
-        ...rebuildChargeTables(nextCharges, prev.rates, prev.qty, prev.psdRequirement, prev.optionalCharges)
+        ...tablesFromForm(prev, { charges: nextCharges })
       };
     });
   };
@@ -254,7 +356,18 @@ const Quotations = () => {
       return {
         ...prev,
         rates: nextRates,
-        ...rebuildChargeTables(prev.charges, nextRates, prev.qty, prev.psdRequirement, prev.optionalCharges)
+        ...tablesFromForm(prev, { rates: nextRates })
+      };
+    });
+  };
+
+  const handleChargeNoteChange = (key, val) => {
+    setFormData(prev => {
+      const chargeNotes = { ...emptyChargeNotes(), ...(prev.chargeNotes || {}), [key]: val };
+      return {
+        ...prev,
+        chargeNotes,
+        ...tablesFromForm(prev, { chargeNotes })
       };
     });
   };
@@ -263,7 +376,7 @@ const Quotations = () => {
     setFormData(prev => ({
       ...prev,
       qty: val,
-      ...rebuildChargeTables(prev.charges, prev.rates, val, prev.psdRequirement, prev.optionalCharges)
+      ...tablesFromForm(prev, { qty: val })
     }));
   };
 
@@ -274,13 +387,7 @@ const Quotations = () => {
     e.preventDefault();
     const productSettings = snapshotCurrentProductSettings(formData);
     const configuredProducts = Object.keys(productSettings);
-    const synced = rebuildChargeTables(
-      formData.charges,
-      formData.rates,
-      formData.qty,
-      formData.psdRequirement,
-      formData.optionalCharges
-    );
+    const synced = tablesFromForm(formData);
     const payload = {
       ...formData,
       ...synced,
@@ -292,6 +399,8 @@ const Quotations = () => {
                 ...(productSettings[formData.productName] || {}),
                 charges: { ...formData.charges },
                 rates: { ...formData.rates },
+                chargeNotes: { ...emptyChargeNotes(), ...(formData.chargeNotes || {}) },
+                chargeSection: { ...(formData.chargeSection || {}) },
                 mainCharges: synced.mainCharges,
                 optionalCharges: synced.optionalCharges
               }
@@ -335,6 +444,8 @@ const Quotations = () => {
       ...q,
       charges: { ...DEFAULT_CHARGES, ...(q.charges || {}) },
       rates: { ...DEFAULT_RATES, ...(q.rates || {}) },
+      chargeNotes: { ...emptyChargeNotes(), ...(q.chargeNotes || {}) },
+      chargeSection: inferChargeSection(q),
       productSettings: { ...(q.productSettings || {}) }
     };
 
@@ -346,6 +457,8 @@ const Quotations = () => {
           psdRequirement: q.psdRequirement || '',
           charges: baseForm.charges,
           rates: baseForm.rates,
+          chargeNotes: baseForm.chargeNotes,
+          chargeSection: baseForm.chargeSection || {},
           mainCharges: q.mainCharges || [],
           optionalCharges: q.optionalCharges || []
         };
@@ -382,21 +495,130 @@ const Quotations = () => {
       [type]: [
         ...prev[type],
         type === 'mainCharges'
-          ? { description: '', psdRequirement: '', rate: '', dryRate: '', wetRate: '' }
-          : { description: '', rate: '', selected: true }
+          ? { description: '', psdRequirement: '', rate: '', dryRate: '', wetRate: '', note: '' }
+          : { description: '', rate: '', selected: true, note: '' }
       ]
     }));
   };
 
   const updateChargeRow = (type, index, field, value) => {
-    const newCharges = [...formData[type]];
-    newCharges[index][field] = value;
-    setFormData(prev => ({ ...prev, [type]: newCharges }));
+    setFormData(prev => {
+      const newCharges = [...prev[type]];
+      const row = { ...newCharges[index], [field]: value };
+      newCharges[index] = row;
+      const next = { ...prev, [type]: newCharges };
+      if (field === 'note' && row.sourceKey) {
+        next.chargeNotes = { ...emptyChargeNotes(), ...(prev.chargeNotes || {}), [row.sourceKey]: value };
+      }
+      return next;
+    });
   };
 
   const removeChargeRow = (type, index) => {
     setFormData(prev => ({ ...prev, [type]: prev[type].filter((_, i) => i !== index) }));
   };
+
+  const parseChargeDrag = (e) => {
+    try {
+      return JSON.parse(e.dataTransfer.getData('text/plain') || '');
+    } catch {
+      return null;
+    }
+  };
+
+  const startChargeDrag = (e, payload) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', JSON.stringify(payload));
+  };
+
+  const allowChargeDrop = (e, zone) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dropTarget !== zone) setDropTarget(zone);
+  };
+
+  const moveCatalogCharge = (key, section) => {
+    if (!key || (section !== 'main' && section !== 'optional')) return;
+    setFormData((prev) => {
+      const chargeSection = { ...(prev.chargeSection || {}), [key]: section };
+      return {
+        ...prev,
+        chargeSection,
+        ...tablesFromForm(prev, { chargeSection })
+      };
+    });
+  };
+
+  const moveTableCharge = (fromType, fromIndex, toType) => {
+    if (!fromType || fromIndex == null || !toType) return;
+    setFormData((prev) => {
+      const fromList = [...(prev[fromType] || [])];
+      const item = fromList[fromIndex];
+      if (!item) return prev;
+      if (fromType === toType) return prev;
+      if (item.sourceKey) {
+        const chargeSection = {
+          ...(prev.chargeSection || {}),
+          [item.sourceKey]: toType === 'mainCharges' ? 'main' : 'optional'
+        };
+        return {
+          ...prev,
+          chargeSection,
+          ...tablesFromForm(prev, { chargeSection })
+        };
+      }
+      fromList.splice(fromIndex, 1);
+      const converted = toType === 'mainCharges'
+        ? {
+            description: item.description || '',
+            psdRequirement: item.psdRequirement || '',
+            rate: item.rate || item.dryRate || '',
+            dryRate: item.dryRate || item.rate || '',
+            wetRate: item.wetRate || '',
+            note: item.note || ''
+          }
+        : {
+            description: item.description || '',
+            rate: item.dryRate || item.rate || '',
+            selected: true,
+            note: item.note || ''
+          };
+      const toList = [...(prev[toType] || []), converted];
+      return {
+        ...prev,
+        [fromType]: fromList,
+        [toType]: toList
+      };
+    });
+  };
+
+  const handleChargeDrop = (e, zone) => {
+    e.preventDefault();
+    setDropTarget(null);
+    const payload = parseChargeDrag(e);
+    if (!payload) return;
+    const section = zone === 'mainCatalog' || zone === 'mainTable' ? 'main' : 'optional';
+    if (payload.kind === 'catalog') {
+      moveCatalogCharge(payload.key, section);
+      return;
+    }
+    if (payload.kind === 'row') {
+      const toType = section === 'main' ? 'mainCharges' : 'optionalCharges';
+      moveTableCharge(payload.from, payload.index, toType);
+    }
+  };
+
+  const catalogItemsFor = (section) =>
+    ALL_CHARGE_DEFS.filter((item) => getChargeSection(formData.chargeSection, item.key) === section);
+
+  const dropZoneStyle = (zone) => ({
+    borderRadius: '8px',
+    border: dropTarget === zone ? '2px dashed var(--accent-primary)' : '2px dashed transparent',
+    background: dropTarget === zone ? 'rgba(91, 28, 133, 0.06)' : 'transparent',
+    padding: dropTarget === zone ? '0.5rem' : '0',
+    minHeight: '48px',
+    transition: 'border-color 0.15s ease, background 0.15s ease'
+  });
 
   const quotationsList = data.quotations?.filter(q => !q.isDeleted) || [];
   const filtered = quotationsList.filter(q => 
@@ -532,6 +754,7 @@ const Quotations = () => {
           <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>{formData.id ? 'Edit Quotation' : 'Create Quotation'}</h2>
             <form onSubmit={handleSubmit}>
+              <ChargeNoteDatalist />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label>Quotation No</label>
@@ -717,19 +940,38 @@ const Quotations = () => {
 
               {formData.productName && (
               <>
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
+              <div
+                style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}
+                onDragOver={(e) => allowChargeDrop(e, 'mainCatalog')}
+                onDrop={(e) => handleChargeDrop(e, 'mainCatalog')}
+              >
                 <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Main Charges (Commercial Offer)</h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                  Only checked items with a rate print on the quotation. Nothing is applied by default — select what you need.
+                  Drag optional charges here to print them in the main commercial table. Use the grip handle on the left.
                 </p>
+                <div style={dropZoneStyle('mainCatalog')}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  {MAIN_CHARGES.map((item) => (
-                    <div key={item.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  {catalogItemsFor('main').map((item) => (
+                    <div
+                      key={item.key}
+                      style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+                    >
+                      <span
+                        draggable
+                        title="Drag to Optional Services"
+                        onDragStart={(e) => startChargeDrag(e, { kind: 'catalog', key: item.key })}
+                        onDragEnd={() => setDropTarget(null)}
+                        style={{ cursor: 'grab', color: 'var(--text-muted)', display: 'flex', alignItems: 'flex-start', paddingTop: '0.15rem', flexShrink: 0 }}
+                      >
+                        <GripVertical size={16} />
+                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: 0 }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
                         <input type="checkbox" checked={formData.charges?.[item.key] || false} onChange={() => toggleMaterialCharge(item.key)} />
                         {item.label}
                       </label>
                       {formData.charges?.[item.key] && (
+                        <>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingLeft: '1.5rem' }}>
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate: ₹</span>
                           <input
@@ -741,25 +983,57 @@ const Quotations = () => {
                           />
                           {item.isQtyRate && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ Kg</span>}
                         </div>
+                        <div style={{ paddingLeft: '1.5rem' }}>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Print note</span>
+                          <ChargeNoteInput
+                            value={formData.chargeNotes?.[item.key] || ''}
+                            onChange={(val) => handleChargeNoteChange(item.key, val)}
+                          />
+                        </div>
+                        </>
                       )}
+                      </div>
                     </div>
                   ))}
                 </div>
+                {catalogItemsFor('main').length === 0 && (
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', padding: '0.75rem' }}>Drop optional charges here to make them main charges.</div>
+                )}
+                </div>
               </div>
 
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
+              <div
+                style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}
+                onDragOver={(e) => allowChargeDrop(e, 'optionalCatalog')}
+                onDrop={(e) => handleChargeDrop(e, 'optionalCatalog')}
+              >
                 <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Optional Service Charges</h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                  Selected optional services appear in the <strong>OPTIONAL SERVICES</strong> table on the quotation print only.
+                  Drag a charge onto <strong>Main Charges</strong> above to print it on the commercial offer instead of OPTIONAL SERVICES.
                 </p>
+                <div style={dropZoneStyle('optionalCatalog')}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  {OPTIONAL_SERVICE_CHARGES.map((item) => (
-                    <div key={item.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  {catalogItemsFor('optional').map((item) => (
+                    <div
+                      key={item.key}
+                      style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+                    >
+                      <span
+                        draggable
+                        title="Drag to Main Charges"
+                        onDragStart={(e) => startChargeDrag(e, { kind: 'catalog', key: item.key })}
+                        onDragEnd={() => setDropTarget(null)}
+                        style={{ cursor: 'grab', color: 'var(--text-muted)', display: 'flex', alignItems: 'flex-start', paddingTop: '0.15rem', flexShrink: 0 }}
+                      >
+                        <GripVertical size={16} />
+                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: 0 }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
                         <input type="checkbox" checked={formData.charges?.[item.key] || false} onChange={() => toggleMaterialCharge(item.key)} />
                         {item.label}
                       </label>
                       {formData.charges?.[item.key] && (
+                        <>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingLeft: '1.5rem' }}>
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate: ₹</span>
                           <input
@@ -770,22 +1044,43 @@ const Quotations = () => {
                             onChange={e => handleMaterialRateChange(item.key, e.target.value)}
                           />
                         </div>
+                        <div style={{ paddingLeft: '1.5rem' }}>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Print note</span>
+                          <ChargeNoteInput
+                            value={formData.chargeNotes?.[item.key] || ''}
+                            onChange={(val) => handleChargeNoteChange(item.key, val)}
+                            placeholder="Note e.g. if applicable"
+                          />
+                        </div>
+                        </>
                       )}
+                      </div>
                     </div>
                   ))}
                 </div>
+                {catalogItemsFor('optional').length === 0 && (
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', padding: '0.75rem' }}>All service charges are in Main Charges. Drag one back here if needed.</div>
+                )}
+                </div>
               </div>
 
-              <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginBottom: '1.5rem' }}>
+              <div
+                style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginBottom: '1.5rem' }}
+                onDragOver={(e) => allowChargeDrop(e, 'mainTable')}
+                onDrop={(e) => handleChargeDrop(e, 'mainTable')}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                   <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.9rem', fontWeight: 600 }}>Main Charges Table</label>
                   <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => addChargeRow('mainCharges')}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Main Charge
                   </button>
                 </div>
+                <div style={dropZoneStyle('mainTable')}>
                 {formData.mainCharges.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '22px 1.5fr 1.2fr 1fr 0.85fr 0.85fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                    <div></div>
                     <div>Charge Description</div>
+                    <div>Print note</div>
                     <div>PSD Requirement</div>
                     <div>Dry Rate</div>
                     <div>Wet Rate</div>
@@ -793,8 +1088,18 @@ const Quotations = () => {
                   </div>
                 )}
                 {formData.mainCharges.map((charge, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                  <div key={charge.sourceKey || `main-${idx}`} style={{ display: 'grid', gridTemplateColumns: '22px 1.5fr 1.2fr 1fr 0.85fr 0.85fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                    <span
+                      draggable
+                      title="Drag to Optional table"
+                      onDragStart={(e) => startChargeDrag(e, { kind: 'row', from: 'mainCharges', index: idx })}
+                      onDragEnd={() => setDropTarget(null)}
+                      style={{ cursor: 'grab', color: 'var(--text-muted)', display: 'flex' }}
+                    >
+                      <GripVertical size={16} />
+                    </span>
                     <input type="text" className="input-field" placeholder="Charge Description (e.g. Processing Charges)" value={charge.description} onChange={e => updateChargeRow('mainCharges', idx, 'description', e.target.value)} />
+                    <ChargeNoteInput value={charge.note || ''} onChange={(val) => updateChargeRow('mainCharges', idx, 'note', val)} />
                     <input type="text" className="input-field" placeholder="PSD Requirement (optional)" value={charge.psdRequirement || ''} onChange={e => updateChargeRow('mainCharges', idx, 'psdRequirement', e.target.value)} />
                     <input type="text" className="input-field" placeholder="Dry Rate (e.g. 5 / Kg)" value={charge.dryRate !== undefined ? charge.dryRate : (charge.rate || '')} onChange={e => updateChargeRow('mainCharges', idx, 'dryRate', e.target.value)} />
                     <input type="text" className="input-field" placeholder="Wet Rate (e.g. 6 / Kg)" value={charge.wetRate || ''} onChange={e => updateChargeRow('mainCharges', idx, 'wetRate', e.target.value)} />
@@ -804,27 +1109,49 @@ const Quotations = () => {
                   </div>
                 ))}
                 {formData.mainCharges.length === 0 && (
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No main charges added.</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No main charges yet. Drop an optional charge here.</div>
                 )}
+                </div>
               </div>
 
-              <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginBottom: '1.5rem' }}>
+              <div
+                style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginBottom: '1.5rem' }}
+                onDragOver={(e) => allowChargeDrop(e, 'optionalTable')}
+                onDrop={(e) => handleChargeDrop(e, 'optionalTable')}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                   <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.9rem', fontWeight: 600 }}>Extra Optional Items (custom rows for print)</label>
                   <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => addChargeRow('optionalCharges')}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Optional Charge
                   </button>
                 </div>
+                <div style={dropZoneStyle('optionalTable')}>
                 {formData.optionalCharges.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '22px 1.6fr 1.2fr 1fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                    <div></div>
                     <div>Description</div>
+                    <div>Print note</div>
                     <div>Rate</div>
                     <div></div>
                   </div>
                 )}
                 {formData.optionalCharges.map((charge, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                  <div key={charge.sourceKey || `opt-${idx}`} style={{ display: 'grid', gridTemplateColumns: '22px 1.6fr 1.2fr 1fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                    <span
+                      draggable
+                      title="Drag to Main Charges table"
+                      onDragStart={(e) => startChargeDrag(e, { kind: 'row', from: 'optionalCharges', index: idx })}
+                      onDragEnd={() => setDropTarget(null)}
+                      style={{ cursor: 'grab', color: 'var(--text-muted)', display: 'flex' }}
+                    >
+                      <GripVertical size={16} />
+                    </span>
                     <input type="text" className="input-field" placeholder="Description (e.g. HDPE Drums)" value={charge.description} onChange={e => updateChargeRow('optionalCharges', idx, 'description', e.target.value)} />
+                    <ChargeNoteInput
+                      value={charge.note || ''}
+                      onChange={(val) => updateChargeRow('optionalCharges', idx, 'note', val)}
+                      placeholder="Note e.g. If Required"
+                    />
                     <input type="text" className="input-field" placeholder="Rate (e.g. ₹ 500 / PC)" value={charge.rate} onChange={e => updateChargeRow('optionalCharges', idx, 'rate', e.target.value)} />
                     <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeChargeRow('optionalCharges', idx)}>
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
@@ -832,8 +1159,9 @@ const Quotations = () => {
                   </div>
                 ))}
                 {formData.optionalCharges.length === 0 && (
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No optional charges added.</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No optional charges added. Drop a main charge here if needed.</div>
                 )}
+                </div>
               </div>
 
               <div>
@@ -860,5 +1188,3 @@ const Quotations = () => {
 };
 
 export default Quotations;
-
-// Force HMR reload

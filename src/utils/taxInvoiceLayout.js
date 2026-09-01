@@ -152,21 +152,31 @@ const getPdfChargeLineQty = (data, key, materialQty) => {
 
 export { getPdfChargeLineQty };
 
-export const buildTiChargeAmounts = (data) => {
-  const amounts = {};
+const addAggLine = (amounts, key, qty, rate, amt) => {
+  if (!amounts[key]) amounts[key] = { qty: 0, rate: 0, amt: 0 };
+  const lineQty = parseFloat(qty) || 0;
+  const lineRate = parseFloat(rate) || 0;
+  const lineAmt = parseFloat(amt) || 0;
+  amounts[key].qty += lineQty;
+  amounts[key].amt += lineAmt;
+  if (lineRate) amounts[key].rate = lineRate;
+};
+
+const pushProcessingLine = (lines, qty, rate) => {
+  const lineQty = parseFloat(qty) || 0;
+  const lineRate = parseFloat(rate) || 0;
+  const amt = lineQty * lineRate;
+  if (lineQty <= 0 || lineRate <= 0 || amt <= 0) return;
+  lines.push({ qty: lineQty, rate: lineRate, amt });
+};
+
+/** Collect aggregated charges plus one processing line per product. */
+const collectTiChargeLines = (data) => {
+  const aggregated = {};
+  const processingLines = [];
   const materialQty = parseFloat(data.qty) || 0;
   const productLines = getPdfProductLines(data);
   const normName = (s) => (s || '').trim().toLowerCase();
-
-  const addLine = (key, qty, rate, amt) => {
-    if (!amounts[key]) amounts[key] = { qty: 0, rate: 0, amt: 0 };
-    const lineQty = parseFloat(qty) || 0;
-    const lineRate = parseFloat(rate) || 0;
-    const lineAmt = parseFloat(amt) || 0;
-    amounts[key].qty += lineQty;
-    amounts[key].amt += lineAmt;
-    if (lineRate) amounts[key].rate = lineRate;
-  };
 
   if (data.productCharges && Object.keys(data.productCharges).length > 0) {
     const pcMap = data.productCharges;
@@ -191,11 +201,8 @@ export const buildTiChargeAmounts = (data) => {
       const prodQty = summary?.qty || 0;
       if (pc.charges?.processing) {
         const rate = parseFloat(pc.rates?.processing || 0);
-        // Match form: processing qty = product material qty
-        const lineQty = prodQty || 0;
-        if (lineQty > 0 && rate > 0) {
-          addLine('processing', lineQty, rate, lineQty * rate);
-        }
+        const lineQty = prodQty || parseFloat(pc.qtys?.processing) || 0;
+        pushProcessingLine(processingLines, lineQty, rate);
       }
       TI_CHARGES_LIST.forEach((c) => {
         if (c.key === 'processing') return;
@@ -205,22 +212,20 @@ export const buildTiChargeAmounts = (data) => {
             : 1;
           const rate = parseFloat(pc.rates?.[c.key] || 0);
           const amt = rowQty * rate;
-          if (amt > 0) addLine(c.key, rowQty, rate, amt);
+          if (amt > 0) addAggLine(aggregated, c.key, rowQty, rate, amt);
         }
       });
     });
   } else {
     if (data.charges?.processing) {
+      const procRate = parseFloat(data.rates?.processing || 0);
       if (productLines.length) {
         productLines.forEach(({ qty: lineQtyVal }) => {
-          const procRate = parseFloat(data.rates?.processing || 0);
-          const lineQty = lineQtyVal || materialQty;
-          addLine('processing', lineQty, procRate, lineQty * procRate);
+          const lineQty = lineQtyVal || (productLines.length === 1 ? materialQty : 0);
+          pushProcessingLine(processingLines, lineQty, procRate);
         });
       } else {
-        const procQty = getPdfChargeLineQty(data, 'processing', materialQty);
-        const procRate = parseFloat(data.rates?.processing || 0);
-        addLine('processing', procQty, procRate, procQty * procRate);
+        pushProcessingLine(processingLines, getPdfChargeLineQty(data, 'processing', materialQty), procRate);
       }
     }
     TI_CHARGES_LIST.forEach((c) => {
@@ -228,11 +233,38 @@ export const buildTiChargeAmounts = (data) => {
       if (data.charges?.[c.key]) {
         const rowQty = getPdfChargeLineQty(data, c.key, materialQty);
         const rate = parseFloat(data.rates?.[c.key] || 0);
-        addLine(c.key, rowQty, rate, rowQty * rate);
+        addAggLine(aggregated, c.key, rowQty, rate, rowQty * rate);
       }
     });
   }
 
+  return { aggregated, processingLines };
+};
+
+/** Print rows: one processing line per product (qty/rate kept separate). */
+export const buildTiPrintChargeRows = (data) => {
+  const { aggregated, processingLines } = collectTiChargeLines(data);
+  const rows = [];
+  TI_CHARGES_LIST.forEach((charge) => {
+    if (charge.key === 'processing') {
+      processingLines.forEach((line) => {
+        rows.push({ key: charge.key, label: charge.label, ...line });
+      });
+      return;
+    }
+    const line = aggregated[charge.key];
+    if (line?.amt > 0) {
+      rows.push({ key: charge.key, label: charge.label, qty: line.qty, rate: line.rate, amt: line.amt });
+    }
+  });
+  return rows;
+};
+
+export const buildTiChargeAmounts = (data) => {
+  const amounts = {};
+  buildTiPrintChargeRows(data).forEach((row) => {
+    addAggLine(amounts, row.key, row.qty, row.rate, row.amt);
+  });
   return amounts;
 };
 

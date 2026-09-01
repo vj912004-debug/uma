@@ -369,7 +369,7 @@ export const getPLProductDrums = (pl, prodName) => {
 /** Material value entered on the Material Receipt (₹). */
 export const getMRMaterialValue = (mr) => {
   const v = parseFloat(mr?.value);
-  return Number.isFinite(v) ? v : 0;
+  return Number.isFinite(v) && v > 0 ? v : 0;
 };
 
 /** Build DC qty/drums/value/labels from Material Receipt for selected products.
@@ -415,7 +415,10 @@ export const buildDCFieldsFromProducts = (mr, pl, prodOpts, selectedProductNames
     productName,
     qty,
     totalDrums,
-    value: getMRMaterialValue(mr)
+    value: (() => {
+      const v = getMRMaterialValue(mr);
+      return v > 0 ? v : '';
+    })()
   };
 };
 

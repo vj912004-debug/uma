@@ -45,14 +45,6 @@ const resolveParty = (data, partyId, partyName) => {
   return parties.find((p) => (p.name || '').trim().toLowerCase() === name) || null;
 };
 
-const partyDueOverrideTotal = (party) => {
-  const o = party?.dueOverrides || {};
-  return Object.values(o).reduce((sum, v) => {
-    if (v === undefined || v === '') return sum;
-    return sum + (parseFloat(v) || 0);
-  }, 0);
-};
-
 const realInvoiceNo = (...vals) => {
   for (const v of vals) {
     const n = String(v || '').trim();
@@ -71,38 +63,6 @@ const sameParty = (party, partyId, partyName) => {
   const a = String(party.name || '').trim().toLowerCase();
   const b = String(partyName || '').trim().toLowerCase();
   return Boolean(a && b && a === b);
-};
-
-const applyOverrideOutstanding = (invoices, overrideTotal) => {
-  if (!invoices.length) return invoices;
-  const sum = invoices.reduce((s, i) => s + (parseFloat(i.outstanding) || 0), 0);
-  if (sum > 0.01) return invoices;
-  if (invoices.length === 1) {
-    const inv = invoices[0];
-    return [{
-      ...inv,
-      outstanding: overrideTotal,
-      invoiceAmount: (parseFloat(inv.invoiceAmount) || 0) > 0.01 ? inv.invoiceAmount : overrideTotal
-    }];
-  }
-  const billSum = invoices.reduce((s, i) => s + (parseFloat(i.invoiceAmount) || 0), 0);
-  if (billSum < 0.01) {
-    const share = overrideTotal / invoices.length;
-    return invoices.map((inv, idx) => ({
-      ...inv,
-      outstanding: idx === invoices.length - 1
-        ? overrideTotal - share * (invoices.length - 1)
-        : share
-    }));
-  }
-  let left = overrideTotal;
-  return invoices.map((inv, idx) => {
-    const part = idx === invoices.length - 1
-      ? left
-      : overrideTotal * ((parseFloat(inv.invoiceAmount) || 0) / billSum);
-    left -= part;
-    return { ...inv, outstanding: part };
-  });
 };
 
 /** All tax invoices / sheet TI numbers for a party (even if calculated outstanding is 0). */
@@ -235,7 +195,8 @@ export const buildOutstandingInvoices = (data, asOnDate = todayISO()) => {
     .filter((mr) => !mr.isDeleted && !mrsCovered.has(mr.id))
     .forEach((mr) => {
       if (!hasSheetOverride(mr.sheetOverrides || {}, 'totalBill')
-        && !hasSheetOverride(mr.sheetOverrides || {}, 'outstanding')) {
+        && !hasSheetOverride(mr.sheetOverrides || {}, 'outstanding')
+        && !hasSheetOverride(mr.sheetOverrides || {}, 'manualPaid')) {
         return;
       }
       const outstanding = getReceiptOutstanding(mr, null, payments);
@@ -277,7 +238,7 @@ const latestFollowUp = (followUps, partyId) => {
   return list[0] || null;
 };
 
-/** Aggregate customer-wise outstanding + Party Due overrides + follow-up dates. */
+/** Aggregate customer-wise outstanding from Processing Sheet / invoices + follow-up dates. */
 export const buildCustomerOutstanding = (data, asOnDate = todayISO()) => {
   const invoices = buildOutstandingInvoices(data, asOnDate);
   const byParty = new Map();
@@ -311,59 +272,20 @@ export const buildCustomerOutstanding = (data, asOnDate = todayISO()) => {
     row.invoices.push(inv);
   });
 
-  // Merge Party Master dueOverrides — never wipe invoice dues with zeroed Party Due cells
+  // Fill contact details from Party Master; outstanding comes from Processing Sheet / invoices
   (data.parties || [])
     .filter((p) => !p.isDeleted)
     .forEach((party) => {
       const key = partyKey(party.id, party.name, party.id);
-      const overrideTotal = partyDueOverrideTotal(party);
       const existing = byParty.get(key);
-
-      if (existing) {
-        // Prefer invoice outstanding; only replace when Party Due has a positive override total
-        if (overrideTotal > 0.01) {
-          existing.outstandingAmount = overrideTotal;
-          existing.fromDueOverride = true;
-          if (!(existing.invoices || []).length) {
-            existing.invoices = applyOverrideOutstanding(
-              collectPartyInvoiceRows(data, party, asOnDate),
-              overrideTotal
-            );
-            existing.pendingInvoices = existing.invoices.length;
-          }
-        } else {
-          existing.outstandingAmount = existing.invoiceOutstanding;
-        }
-        if (!existing.phone) existing.phone = party.phone1 || party.mobile || '';
-        if (!existing.email) existing.email = party.email1 || party.email || '';
-        if (!existing.partyId) existing.partyId = party.id;
-        return;
-      }
-
-      if (overrideTotal > 0.01) {
-        const invoices = applyOverrideOutstanding(
-          collectPartyInvoiceRows(data, party, asOnDate),
-          overrideTotal
-        );
-        byParty.set(key, {
-          partyId: party.id,
-          partyName: party.name,
-          phone: party.phone1 || party.mobile || '',
-          email: party.email1 || party.email || '',
-          address: party.billAddress || '',
-          gstin: party.gstinBill || '',
-          pendingInvoices: invoices.length,
-          invoiceOutstanding: 0,
-          outstandingAmount: overrideTotal,
-          overdueAmount: 0,
-          invoices,
-          fromDueOverride: true
-        });
-      }
+      if (!existing) return;
+      existing.outstandingAmount = existing.invoiceOutstanding;
+      if (!existing.phone) existing.phone = party.phone1 || party.mobile || '';
+      if (!existing.email) existing.email = party.email1 || party.email || '';
+      if (!existing.partyId) existing.partyId = party.id;
     });
 
   byParty.forEach((row) => {
-    if (row.fromDueOverride) return;
     const party = { id: row.partyId, name: row.partyName };
     const invoiceNoteNet = (row.invoices || []).reduce(
       (s, inv) => s + getInvoiceDebitCreditNet(data, inv.invoiceNo),

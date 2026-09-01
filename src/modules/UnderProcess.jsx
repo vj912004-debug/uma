@@ -2494,7 +2494,9 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         ...editing,
         selectedProducts: selected,
         ...computed,
-        value: editing.value === '' || editing.value == null ? '' : editing.value,
+        qty: editing.qty,
+        totalDrums: editing.totalDrums,
+        value: parseFloat(editing.value) > 0 ? editing.value : (computed.value || ''),
         transporterName: editing.transporterName || '',
         driverContact: editing.driverContact || ''
       });
@@ -2533,7 +2535,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         ...prev,
         selectedProducts: next,
         ...computed,
-        value: prev.value === '' ? '' : (computed.value === 0 || computed.value == null ? '' : computed.value)
+        value: parseFloat(prev.value) > 0 ? prev.value : (computed.value || '')
       };
     });
   };
@@ -2543,8 +2545,11 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     const computed = buildDCFieldsFromProducts(mr, pl, prodOpts, form.selectedProducts);
     const finalDoc = {
       ...form,
-      ...computed,
-      value: form.value,
+      productSummaries: computed.productSummaries,
+      productName: computed.productName || form.productName,
+      qty: form.qty,
+      totalDrums: form.totalDrums,
+      value: form.value === '' || form.value == null ? '' : form.value,
       receiptId: mr.id
     };
 
@@ -2657,7 +2662,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         </div>
         <div>
           <label>Value of Goods (₹)</label>
-          <input type="number" className="input-field" min="0" step="0.01" placeholder="Leave blank if not required on print" value={form.value} onChange={e => setForm({...form, value: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0)})} />
+          <input type="number" className="input-field" min="0" step="0.01" placeholder="Taken from Material Receipt" value={form.value} onChange={e => setForm({...form, value: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0)})} />
         </div>
         <div>
           <label>Vehicle No</label>

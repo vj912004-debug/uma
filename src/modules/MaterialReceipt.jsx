@@ -4,7 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import ExportButton from '../components/ExportButton';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
-import {Eye,  Plus, Search, FileDown, Edit2, Trash2, ShieldAlert } from 'lucide-react';
+import {Eye,  Plus, Search, FileDown, Edit2, Trash2, ShieldAlert, FileText } from 'lucide-react';
 import {
   getReceiptProductNames,
   getProductBatches,
@@ -88,6 +88,46 @@ const CHARGE_ITEMS = [
   { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },
   { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
 ];
+
+const parseChargeMeta = (label) => {
+  const m = String(label).match(/^(.*?)\s*\((\d+)\)\s*$/);
+  return m ? { name: m[1].trim(), code: m[2] } : { name: label, code: '' };
+};
+
+const COMMON_CHARGE_KEYS = CHARGE_KEYS.filter((k) => k !== 'processing');
+const COMMON_CHARGE_ITEMS = CHARGE_ITEMS
+  .filter((i) => i.key !== 'processing')
+  .map((i) => ({ ...i, ...parseChargeMeta(i.label) }));
+
+const emptyChargeNotes = () => Object.fromEntries(CHARGE_KEYS.map((k) => [k, '']));
+
+const CHARGE_NOTE_SUGGESTIONS = [
+  'Nil if Qty is more than 500kg',
+  'if applicable',
+  'If Required',
+  'Dry Method',
+  'Wet Method',
+  'Each',
+  'Lump Sum'
+];
+
+const applyCommonChargesToProductSettings = (productSettings, charges, rates, qtys) => {
+  const next = { ...(productSettings || {}) };
+  Object.keys(next).forEach((name) => {
+    const block = next[name] || {};
+    next[name] = {
+      ...block,
+      charges: { ...emptyChargeFlags(), ...(block.charges || {}), ...Object.fromEntries(COMMON_CHARGE_KEYS.map((k) => [k, !!charges?.[k]])) },
+      rates: { ...emptyChargeRates(), ...(block.rates || {}), ...Object.fromEntries(COMMON_CHARGE_KEYS.map((k) => [k, parseFloat(rates?.[k]) || 0])) },
+      qtys: { ...emptyChargeQtys(), ...(block.qtys || {}), ...Object.fromEntries(COMMON_CHARGE_KEYS.map((k) => [k, parseFloat(qtys?.[k]) || 1])) }
+    };
+    // Keep per-product processing
+    next[name].charges.processing = block.charges?.processing || false;
+    next[name].rates.processing = parseFloat(block.rates?.processing) || 0;
+    next[name].qtys.processing = parseFloat(block.qtys?.processing) || 1;
+  });
+  return next;
+};
 
 const getProductSettings = (formData, party, prodName) =>
   formData.productSettings?.[prodName]
@@ -186,7 +226,8 @@ const MaterialReceipt = () => {
     rates: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
     qtys: { cleaning: 1, filterBag: 1, processing: 1, sieving: 1, psdReport: 1, liner: 1, courier: 1, fiberDrum: 1, transportation: 1, hdpeDrum: 1, batchChangeover: 1 },
     customCharges: [],
-    productSettings: {}
+    productSettings: {},
+    chargeNotes: emptyChargeNotes()
   });
 
   // Keep serial code synced on open modal or date changes
@@ -255,6 +296,32 @@ const MaterialReceipt = () => {
     });
   };
 
+  const patchCommonCharges = (patch) => {
+    setFormData(prev => {
+      const charges = { ...emptyChargeFlags(), ...(prev.charges || {}), ...(patch.charges || {}) };
+      const rates = { ...emptyChargeRates(), ...(prev.rates || {}), ...(patch.rates || {}) };
+      const qtys = { ...emptyChargeQtys(), ...(prev.qtys || {}), ...(patch.qtys || {}) };
+      const chargeNotes = { ...emptyChargeNotes(), ...(prev.chargeNotes || {}), ...(patch.chargeNotes || {}) };
+      return {
+        ...prev,
+        charges,
+        rates,
+        qtys,
+        chargeNotes,
+        productSettings: applyCommonChargesToProductSettings(prev.productSettings, charges, rates, qtys)
+      };
+    });
+  };
+
+  const handleRemoveAllReceivedProducts = () => {
+    if (!formData.batches.some(b => !b.isEmptyDrums)) return;
+    if (!window.confirm('Remove all received products and their batches from this receipt?')) return;
+    setFormData(prev => ({
+      ...prev,
+      batches: prev.batches.filter(b => b.isEmptyDrums)
+    }));
+  };
+
   const handleAddBatchForProduct = (prodName) => {
     setFormData(prev => {
       const party = data.parties.find(p => p.id === prev.partyId);
@@ -264,7 +331,26 @@ const MaterialReceipt = () => {
         productSettings[prodName] = buildProductSettingsFromParty(prodConfig);
       }
       const defaultBatch = makeDefaultBatch(prodName, party, productSettings);
-      return { ...prev, productSettings, batches: [...prev.batches, defaultBatch] };
+      const hasCommon = COMMON_CHARGE_KEYS.some(k => prev.charges?.[k] || (parseFloat(prev.rates?.[k]) || 0) > 0);
+      let charges = { ...emptyChargeFlags(), ...(prev.charges || {}) };
+      let rates = { ...emptyChargeRates(), ...(prev.rates || {}) };
+      let qtys = { ...emptyChargeQtys(), ...(prev.qtys || {}) };
+      if (!hasCommon) {
+        const seed = productSettings[prodName] || {};
+        COMMON_CHARGE_KEYS.forEach((k) => {
+          charges[k] = !!seed.charges?.[k];
+          rates[k] = parseFloat(seed.rates?.[k]) || 0;
+          qtys[k] = parseFloat(seed.qtys?.[k]) || 1;
+        });
+      }
+      return {
+        ...prev,
+        charges,
+        rates,
+        qtys,
+        productSettings: applyCommonChargesToProductSettings(productSettings, charges, rates, qtys),
+        batches: [...prev.batches, defaultBatch]
+      };
     });
   };
 
@@ -320,17 +406,30 @@ const MaterialReceipt = () => {
         productSettings[prod.name] = buildProductSettingsFromParty(prod);
       }
     });
+    const firstSettings = Object.values(productSettings)[0];
+    const seededCharges = { ...emptyChargeFlags(), ...(prepared.baseForm.charges || {}) };
+    const seededRates = { ...emptyChargeRates(), ...(prepared.baseForm.rates || {}) };
+    const seededQtys = { ...emptyChargeQtys(), ...(prepared.baseForm.qtys || {}) };
+    const hasCommon = COMMON_CHARGE_KEYS.some(k => seededCharges[k] || (parseFloat(seededRates[k]) || 0) > 0);
+    if (!hasCommon && firstSettings) {
+      COMMON_CHARGE_KEYS.forEach((k) => {
+        seededCharges[k] = !!firstSettings.charges?.[k];
+        seededRates[k] = parseFloat(firstSettings.rates?.[k]) || 0;
+        seededQtys[k] = parseFloat(firstSettings.qtys?.[k]) || 1;
+      });
+    }
     setFormData({
       ...prepared.baseForm,
-      productSettings,
+      productSettings: applyCommonChargesToProductSettings(productSettings, seededCharges, seededRates, seededQtys),
       productName: prepared.baseForm.productName || '',
       nickName: '',
       totalDrums: prepared.baseForm.totalDrums || 0,
       totalQty: prepared.baseForm.totalQty || 0,
-      charges: { ...emptyChargeFlags(), ...(prepared.baseForm.charges || {}) },
-      rates: { ...emptyChargeRates(), ...(prepared.baseForm.rates || {}) },
-      qtys: { ...emptyChargeQtys(), ...(prepared.baseForm.qtys || {}) },
-      customCharges: prepared.baseForm.customCharges || []
+      charges: seededCharges,
+      rates: seededRates,
+      qtys: seededQtys,
+      customCharges: prepared.baseForm.customCharges || [],
+      chargeNotes: { ...emptyChargeNotes(), ...(prepared.baseForm.chargeNotes || {}) }
     });
     setIsEditing(mr.id);
     setIsModalOpen(true);
@@ -371,7 +470,8 @@ const MaterialReceipt = () => {
     rates: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
     qtys: { cleaning: 1, filterBag: 1, processing: 1, sieving: 1, psdReport: 1, liner: 1, courier: 1, fiberBag: 1, transportation: 1, hdpeDrum: 1, batchChangeover: 1 },
     customCharges: [],
-    productSettings: {}
+    productSettings: {},
+    chargeNotes: emptyChargeNotes()
     });
     setIsEditing(null);
     setIsModalOpen(true);
@@ -451,10 +551,23 @@ const MaterialReceipt = () => {
         const live = getProductSettings(formData, selectedPartyObj, prod.name);
         syncedProductSettings[prod.name] = {
           nickName: live.nickName || '',
-          charges: { ...emptyChargeFlags(), ...(live.charges || {}) },
-          rates: { ...emptyChargeRates(), ...(live.rates || {}) },
-          qtys: { ...emptyChargeQtys(), ...(live.qtys || {}) },
-          customCharges: JSON.parse(JSON.stringify(live.customCharges || []))
+          charges: {
+            ...emptyChargeFlags(),
+            ...(formData.charges || {}),
+            processing: live.charges?.processing || false
+          },
+          rates: {
+            ...emptyChargeRates(),
+            ...(formData.rates || {}),
+            processing: parseFloat(live.rates?.processing) || 0
+          },
+          qtys: {
+            ...emptyChargeQtys(),
+            ...(formData.qtys || {}),
+            processing: parseFloat(live.qtys?.processing) || 1
+          },
+          customCharges: JSON.parse(JSON.stringify(live.customCharges || [])),
+          chargeNotes: { ...emptyChargeNotes(), ...(formData.chargeNotes || {}) }
         };
       });
 
@@ -469,6 +582,7 @@ const MaterialReceipt = () => {
         receiptPayload.qtys = chargeFlatten.qtys;
         receiptPayload.customCharges = chargeFlatten.customCharges;
       }
+      receiptPayload.chargeNotes = { ...emptyChargeNotes(), ...(formData.chargeNotes || {}) };
 
       const processingFields = ['startDate', 'startTime', 'endDate', 'endTime', 'hours', 'supervisor', 'delayReason', 'status', 'priorityLevel', 'specialInstructions', 'notes'];
       const isAutoFilledProcessing = (plan) => {
@@ -545,8 +659,7 @@ const MaterialReceipt = () => {
         <input
           type="text"
           className="input-field"
-          style={{ padding: '0.3rem', fontSize: '0.825rem' }}
-          required
+          style={{ padding: '0.3rem', fontSize: '0.825rem', width: '100%', boxSizing: 'border-box' }}
           value={batch.batchNo}
           onChange={e => handleBatchCellChange(idx, 'batchNo', e.target.value)}
         />
@@ -555,7 +668,7 @@ const MaterialReceipt = () => {
         <input
           type="number"
           className="input-field"
-          style={{ padding: '0.3rem', fontSize: '0.825rem' }}
+          style={{ padding: '0.3rem', fontSize: '0.825rem', width: '100%', boxSizing: 'border-box' }}
           value={batch.drums === 0 || batch.drums === '' ? '' : batch.drums}
           onChange={e => handleBatchCellChange(idx, 'drums', e.target.value === '' ? '' : parseInt(e.target.value, 10) || '')}
         />
@@ -564,7 +677,7 @@ const MaterialReceipt = () => {
         <input
           type="number"
           className="input-field"
-          style={{ padding: '0.3rem', fontSize: '0.825rem' }}
+          style={{ padding: '0.3rem', fontSize: '0.825rem', width: '100%', boxSizing: 'border-box' }}
           value={batch.qty === 0 || batch.qty === '' ? '' : batch.qty}
           onChange={e => handleBatchCellChange(idx, 'qty', e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
         />
@@ -574,7 +687,7 @@ const MaterialReceipt = () => {
           type="text"
           list="psdReqOptions"
           className="input-field"
-          style={{ padding: '0.3rem', fontSize: '0.825rem' }}
+          style={{ padding: '0.3rem', fontSize: '0.825rem', width: '100%', boxSizing: 'border-box' }}
           required
           value={batch.psdReq}
           onChange={e => handleBatchCellChange(idx, 'psdReq', e.target.value)}
@@ -620,6 +733,86 @@ const MaterialReceipt = () => {
     { key: 'totalQty', label: 'Total Qty' },
     { key: 'status', label: 'Status' }
   ];
+
+  const thStyle = { padding: '0.45rem 0.4rem', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap', textAlign: 'left', borderBottom: '1px solid var(--border-color)' };
+  const tdStyle = { padding: '0.4rem 0.35rem', fontSize: '0.8rem', verticalAlign: 'middle', borderBottom: '1px solid var(--border-color)' };
+  const renderCommonChargeTable = (items, startIndex) => (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '560px' }}>
+        <thead>
+          <tr>
+            <th style={{ ...thStyle, width: '36px' }}>#</th>
+            <th style={thStyle}>Material / Service Name</th>
+            <th style={{ ...thStyle, width: '88px' }}>Code</th>
+            <th style={{ ...thStyle, width: '78px', textAlign: 'center' }}>Applicable</th>
+            <th style={{ ...thStyle, width: '72px' }}>Qty</th>
+            <th style={{ ...thStyle, width: '92px' }}>Rate (₹)</th>
+            <th style={{ ...thStyle, width: '100px' }}>Amount (₹)</th>
+            <th style={{ ...thStyle, minWidth: '140px' }}>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, idx) => {
+            const applicable = !!formData.charges?.[item.key];
+            const qty = parseFloat(formData.qtys?.[item.key]) || 0;
+            const rate = parseFloat(formData.rates?.[item.key]) || 0;
+            const amount = applicable ? qty * rate : 0;
+            return (
+              <tr key={item.key}>
+                <td style={tdStyle}>{startIndex + idx}</td>
+                <td style={{ ...tdStyle, fontWeight: 600 }}>{item.name}</td>
+                <td style={tdStyle}>{item.code || '—'}</td>
+                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={applicable}
+                    onChange={() => patchCommonCharges({ charges: { [item.key]: !applicable } })}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-primary)' }}
+                  />
+                </td>
+                <td style={tdStyle}>
+                  <input
+                    type="number"
+                    className="input-field"
+                    min="0"
+                    step="any"
+                    value={formData.qtys?.[item.key] ?? 1}
+                    onChange={(e) => patchCommonCharges({ qtys: { [item.key]: parseFloat(e.target.value) || 0 } })}
+                    style={{ padding: '0.25rem', fontSize: '0.8rem', width: '100%', boxSizing: 'border-box' }}
+                  />
+                </td>
+                <td style={tdStyle}>
+                  <input
+                    type="number"
+                    className="input-field"
+                    min="0"
+                    step="any"
+                    value={formData.rates?.[item.key] || 0}
+                    onChange={(e) => patchCommonCharges({ rates: { [item.key]: parseFloat(e.target.value) || 0 } })}
+                    style={{ padding: '0.25rem', fontSize: '0.8rem', width: '100%', boxSizing: 'border-box' }}
+                  />
+                </td>
+                <td style={{ ...tdStyle, fontWeight: 600 }}>
+                  {applicable ? amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+                </td>
+                <td style={tdStyle}>
+                  <input
+                    type="text"
+                    className="input-field"
+                    list="mr-charge-note-options"
+                    placeholder="Note e.g. if applicable"
+                    value={formData.chargeNotes?.[item.key] || ''}
+                    onChange={(e) => patchCommonCharges({ chargeNotes: { [item.key]: e.target.value } })}
+                    style={{ padding: '0.25rem 0.35rem', fontSize: '0.75rem', width: '100%', boxSizing: 'border-box' }}
+                  />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div>
@@ -783,14 +976,14 @@ const MaterialReceipt = () => {
 
       {/* Main Material Receipt Modal */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', overflowY: 'auto', padding: '2rem 0' }}>
-          <div className="premium-card" style={{ width: '1050px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'stretch', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '0.75rem' }}>
+          <div className="premium-card" style={{ width: '100%', maxWidth: '100%', height: '100%', maxHeight: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
             <h2 style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>{isEditing ? 'Modify Material Receipt' : 'Register Material Receipt'}</span>
               <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>M.R.: {formData.receiptNo}</span>
             </h2>
             <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label>M.R. Date *</label>
                   <input type="date" className="input-field" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
@@ -862,6 +1055,11 @@ const MaterialReceipt = () => {
                   <option key={idx} value={r} />
                 ))}
               </datalist>
+              <datalist id="mr-charge-note-options">
+                {CHARGE_NOTE_SUGGESTIONS.map((opt) => (
+                  <option key={opt} value={opt} />
+                ))}
+              </datalist>
 
               {formData.partyId && partyProducts.length === 0 && (
                 <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--input-bg)', borderRadius: '8px', marginBottom: '1.5rem', border: '1px dashed var(--border-color)' }}>
@@ -870,128 +1068,134 @@ const MaterialReceipt = () => {
               )}
 
               {formData.partyId && partyProducts.length > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem', padding: '0.85rem 1rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Received Products</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                      Only materials you add below appear on this receipt.
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <SearchableSelect
-                      className="input-field"
-                      style={{ minWidth: '220px' }}
-                      value=""
-                      disabled={productsAvailableToAdd.length === 0}
-                      onChange={e => {
-                        const name = e.target.value;
-                        if (name) handleAddBatchForProduct(name);
-                      }}
-                    >
-                      <option value="">
-                        {productsAvailableToAdd.length === 0 ? 'All party products added' : 'Add received product…'}
-                      </option>
-                      {productsAvailableToAdd.map(prod => (
-                        <option key={prod.name} value={prod.name}>{prod.name}</option>
-                      ))}
-                    </SearchableSelect>
-                  </div>
-                </div>
-              )}
-
-              {formData.partyId && partyProducts.length > 0 && receivedProducts.length === 0 && (
-                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--input-bg)', borderRadius: '8px', marginBottom: '1.5rem', border: '1px dashed var(--border-color)' }}>
-                  No material received yet. Use &quot;Add received product&quot; to enter only the materials that arrived.
-                </div>
-              )}
-
-              {formData.partyId && receivedProducts.map((prod, pIdx) => {
-                const settings = getProductSettings(formData, selectedPartyObj, prod.name);
-                const productBatchEntries = formData.batches
-                  .map((batch, idx) => ({ batch, idx }))
-                  .filter(({ batch }) => !batch.isEmptyDrums && batch.productName === prod.name);
-                const productDrums = productBatchEntries.reduce((sum, { batch }) => sum + (parseInt(batch.drums) || 0), 0);
-                const productQty = productBatchEntries.reduce((sum, { batch }) => sum + (parseFloat(batch.qty) || 0), 0);
-
-                return (
-                  <div key={prod.name} style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginBottom: '1.5rem', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1.25rem', background: 'var(--input-bg)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                      <div>
-                        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--accent-primary)' }}>
-                          Product {pIdx + 1}: {prod.name}
-                        </h3>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.35rem 0 0' }}>
-                          PSD Req: {prod.psdReq || '—'} · Cleaning ₹{settings.rates?.cleaning ?? prod.charges?.cleaning ?? 0} · Processing ₹{settings.rates?.processing ?? prod.charges?.processing ?? 0} · Filter Bag ₹{settings.rates?.filterBag ?? prod.charges?.filterBag ?? 0}
-                        </p>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '1rem' }}>Products ({receivedProducts.length})</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                        Only materials you add below appear on this receipt.
                       </div>
-                      <button
-                        type="button"
-                        className="btn"
-                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', color: 'rgba(239, 68, 68, 0.95)' }}
-                        onClick={() => {
-                          if (!window.confirm(`Remove all batches for "${prod.name}" from this receipt?`)) return;
-                          setFormData(prev => ({
-                            ...prev,
-                            batches: prev.batches.filter(
-                              b => b.isEmptyDrums || (b.productName || '').trim().toLowerCase() !== prod.name.trim().toLowerCase()
-                            )
-                          }));
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <SearchableSelect
+                        className="input-field"
+                        style={{ minWidth: '200px' }}
+                        value=""
+                        disabled={productsAvailableToAdd.length === 0}
+                        onChange={e => {
+                          const name = e.target.value;
+                          if (name) handleAddBatchForProduct(name);
                         }}
                       >
-                        Remove Product
+                        <option value="">
+                          {productsAvailableToAdd.length === 0 ? 'All party products added' : '+ Add Product'}
+                        </option>
+                        {productsAvailableToAdd.map(prod => (
+                          <option key={prod.name} value={prod.name}>{prod.name}</option>
+                        ))}
+                      </SearchableSelect>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem' }}
+                        disabled={receivedProducts.length === 0}
+                        onClick={handleRemoveAllReceivedProducts}
+                      >
+                        Remove All
                       </button>
                     </div>
+                  </div>
 
-                    <div style={{ marginBottom: '1.25rem' }}>
-                      <label>Nickname</label>
-                      <input type="text" className="input-field" value={settings.nickName || ''} onChange={e => patchProductSettings(prod.name, s => ({ ...s, nickName: e.target.value }))} />
+                  {receivedProducts.length === 0 && (
+                    <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--input-bg)', borderRadius: '8px', border: '1px dashed var(--border-color)' }}>
+                      No material received yet. Use &quot;Add Product&quot; to enter only the materials that arrived.
                     </div>
+                  )}
 
-                    <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '0.75rem' }}>Pre-defined Applicable Charges</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
-                      {CHARGE_ITEMS.map(item => (
-                        <div key={item.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'var(--glass-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
-                            <input
-                              type="checkbox"
-                              checked={settings.charges?.[item.key] || false}
-                              onChange={() => patchProductSettings(prod.name, s => ({ ...s, charges: { ...s.charges, [item.key]: !s.charges[item.key] } }))}
-                            />
-                            {item.label}
-                          </label>
-                          {settings.charges?.[item.key] && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingLeft: '1.5rem' }}>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Qty:</span>
-                              <input
-                                type="number"
-                                className="input-field"
-                                style={{ padding: '0.2rem', width: '60px', height: 'auto', fontSize: '0.8rem' }}
-                                value={settings.qtys?.[item.key] || 1}
-                                onChange={e => patchProductSettings(prod.name, s => ({ ...s, qtys: { ...s.qtys, [item.key]: parseFloat(e.target.value) || 0 } }))}
-                              />
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate: ₹</span>
-                              <input
-                                type="number"
-                                className="input-field"
-                                style={{ padding: '0.2rem', width: '80px', height: 'auto', fontSize: '0.8rem' }}
-                                value={settings.rates?.[item.key] || 0}
-                                onChange={e => patchProductSettings(prod.name, s => ({ ...s, rates: { ...s.rates, [item.key]: parseFloat(e.target.value) || 0 } }))}
-                              />
+                  {receivedProducts.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {receivedProducts.map((prod, pIdx) => {
+                        const settings = getProductSettings(formData, selectedPartyObj, prod.name);
+                        const productBatchEntries = formData.batches
+                          .map((batch, idx) => ({ batch, idx }))
+                          .filter(({ batch }) => !batch.isEmptyDrums && batch.productName === prod.name);
+                        const productDrums = productBatchEntries.reduce((sum, { batch }) => sum + (parseInt(batch.drums) || 0), 0);
+                        const productQty = productBatchEntries.reduce((sum, { batch }) => sum + (parseFloat(batch.qty) || 0), 0);
+
+                        return (
+                          <div key={prod.name} style={{ border: '1px solid var(--border-color)', borderRadius: '10px', background: 'var(--bg-card)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 0.9rem', background: 'rgba(91, 28, 133, 0.08)', borderBottom: '1px solid var(--border-color)' }}>
+                              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--accent-primary)', minWidth: 0 }}>
+                                {pIdx + 1}. Product: {prod.name}
+                              </div>
+                              <button
+                                type="button"
+                                style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.95)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, padding: 0, flexShrink: 0 }}
+                                onClick={() => {
+                                  if (!window.confirm(`Remove all batches for "${prod.name}" from this receipt?`)) return;
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    batches: prev.batches.filter(
+                                      b => b.isEmptyDrums || (b.productName || '').trim().toLowerCase() !== prod.name.trim().toLowerCase()
+                                    )
+                                  }));
+                                }}
+                              >
+                                Remove
+                              </button>
                             </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
 
-                    <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginBottom: '1.25rem' }}>
+                            <div style={{ padding: '0.9rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
+                                PSD Req: {prod.psdReq || '—'} · Cleaning ₹{settings.rates?.cleaning ?? prod.charges?.cleaning ?? 0} · Processing ₹{settings.rates?.processing ?? prod.charges?.processing ?? 0} · Filter Bag ₹{settings.rates?.filterBag ?? prod.charges?.filterBag ?? 0}
+                              </p>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+                              <div>
+                                <label>Nick Name</label>
+                                <input type="text" className="input-field" value={settings.nickName || ''} onChange={e => patchProductSettings(prod.name, s => ({ ...s, nickName: e.target.value }))} />
+                              </div>
+                              <div>
+                                <label>Processing Charges (₹)</label>
+                                <input
+                                  type="number"
+                                  className="input-field"
+                                  min="0"
+                                  step="any"
+                                  value={settings.rates?.processing || 0}
+                                  onChange={e => patchProductSettings(prod.name, s => ({
+                                    ...s,
+                                    rates: { ...s.rates, processing: parseFloat(e.target.value) || 0 },
+                                    charges: { ...s.charges, processing: (parseFloat(e.target.value) || 0) > 0 ? true : s.charges.processing }
+                                  }))}
+                                />
+                                <input
+                                  type="text"
+                                  className="input-field"
+                                  list="mr-charge-note-options"
+                                  placeholder="Note e.g. Nil if Qty is more than 500kg"
+                                  value={formData.chargeNotes?.processing || ''}
+                                  onChange={e => patchCommonCharges({ chargeNotes: { processing: e.target.value } })}
+                                  style={{ marginTop: '0.35rem', padding: '0.3rem 0.4rem', fontSize: '0.75rem' }}
+                                />
+                              </div>
+                              <div>
+                                <label>Quantity</label>
+                                <div style={{ position: 'relative' }}>
+                                  <input type="text" className="input-field" readOnly value={productQty.toFixed(2)} style={{ paddingRight: '2.5rem' }} />
+                                  <span style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Kg</span>
+                                </div>
+                              </div>
+                              </div>
+
+                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                        <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.9rem', fontWeight: 600 }}>Manual Custom Charges</label>
+                        <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.85rem', fontWeight: 600 }}>Manual Custom Charges</label>
                         <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => patchProductSettings(prod.name, s => ({ ...s, customCharges: [...(s.customCharges || []), { id: Date.now() + Math.random(), name: '', hsn: '', rate: 0, qty: 1, checked: true }] }))}>
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Row
                         </button>
                       </div>
                       {(settings.customCharges || []).map((charge, cIdx) => (
-                        <div key={charge.id || cIdx} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 100px 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                        <div key={charge.id || cIdx} style={{ display: 'grid', gridTemplateColumns: 'auto minmax(140px, 1.4fr) minmax(70px, 0.6fr) 64px 80px minmax(120px, 1fr) 28px', gap: '0.4rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                           <input type="checkbox" checked={charge.checked !== false} onChange={e => patchProductSettings(prod.name, s => {
                             const newC = [...(s.customCharges || [])];
                             newC[cIdx] = { ...newC[cIdx], checked: e.target.checked };
@@ -1017,6 +1221,11 @@ const MaterialReceipt = () => {
                             newC[cIdx] = { ...newC[cIdx], rate: e.target.value };
                             return { ...s, customCharges: newC };
                           })} min="0" step="any" />
+                          <input type="text" className="input-field" list="mr-charge-note-options" placeholder="Note" value={charge.note || ''} onChange={e => patchProductSettings(prod.name, s => {
+                            const newC = [...(s.customCharges || [])];
+                            newC[cIdx] = { ...newC[cIdx], note: e.target.value };
+                            return { ...s, customCharges: newC };
+                          })} />
                           <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => patchProductSettings(prod.name, s => ({ ...s, customCharges: (s.customCharges || []).filter((_, i) => i !== cIdx) }))}>
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                           </button>
@@ -1034,11 +1243,11 @@ const MaterialReceipt = () => {
                       </button>
                     </div>
                     <div style={{ overflowX: 'auto', background: 'var(--glass-bg)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                      <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', fontSize: '0.85rem', tableLayout: 'auto' }}>
                         <thead>
                           <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
                             <th style={{ padding: '0.5rem', width: '60px' }}>Sr No</th>
-                            <th style={{ padding: '0.5rem' }}>Batch Number *</th>
+                            <th style={{ padding: '0.5rem' }}>Batch Number</th>
                             <th style={{ padding: '0.5rem', width: '120px' }}>No of Drums</th>
                             <th style={{ padding: '0.5rem', width: '150px' }}>Quantity (Kg)</th>
                             <th style={{ padding: '0.5rem' }}>PSD Req *</th>
@@ -1071,9 +1280,30 @@ const MaterialReceipt = () => {
                         )}
                       </table>
                     </div>
-                  </div>
-                );
-              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {receivedProducts.length > 0 && (
+                    <div style={{ marginTop: '1.25rem', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden', background: 'var(--bg-card)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1rem', background: 'rgba(91, 28, 133, 0.08)', borderBottom: '1px solid var(--border-color)' }}>
+                        <FileText size={16} color="var(--accent-primary)" />
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Applicable Charges (Common for All Products except Processing)</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Each row has its own note box. Processing stays on the product card above.</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(520px, 1fr))', gap: '0.75rem', padding: '0.85rem' }}>
+                        {renderCommonChargeTable(COMMON_CHARGE_ITEMS.slice(0, Math.ceil(COMMON_CHARGE_ITEMS.length / 2)), 1)}
+                        {renderCommonChargeTable(COMMON_CHARGE_ITEMS.slice(Math.ceil(COMMON_CHARGE_ITEMS.length / 2)), Math.ceil(COMMON_CHARGE_ITEMS.length / 2) + 1)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {formData.partyId && (
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>

@@ -36,7 +36,7 @@ const runHtmlPdf = async (docType, data, mode, options = {}) => {
   const withParty = docType === 'BPR'
     ? data
     : fillPrintPartyFields(data, appData);
-  const enriched = { ...withParty, companyProfile: data?.companyProfile || getStoredCompanyProfile() };
+  const enriched = { ...withParty, companyProfile: data?.companyProfile || getStoredCompanyProfile(), appData };
   const printPrefs = await resolvePrintPrefs(docType, mode, options);
   if (!printPrefs) return;
   const opts = { mode, printPrefs };

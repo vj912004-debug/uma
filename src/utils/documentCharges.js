@@ -701,6 +701,23 @@ export const enrichTIForPrint = (ti, appData = {}) => {
       const savedQty = parseFloat(ti.qty) || 0;
       const liveQty = getMRReceivedQty(mr, prodOpts);
 
+      let hsnCode = String(ti.hsnCode || ti.hsn || '').trim();
+      if (!hsnCode) {
+        const names = [
+          ...(summaries.length ? summaries : (ti.productSummaries || [])).map((p) => p.prodName),
+          ti.productName
+        ].filter(Boolean);
+        for (const name of names) {
+          const prod = (prodOpts.party?.products || []).find(
+            (p) => String(p.name || '').trim().toLowerCase() === String(name).trim().toLowerCase()
+          );
+          if (prod?.hsn) {
+            hsnCode = String(prod.hsn).trim();
+            break;
+          }
+        }
+      }
+
       next = {
         ...ti,
         billAddress: String(ti.billAddress || '').trim() || mr.billAddress || prodOpts.party?.billAddress || '',
@@ -710,6 +727,7 @@ export const enrichTIForPrint = (ti, appData = {}) => {
         productName: summaries.length ? getReceiptProductLabel(mr, prodOpts) : ti.productName,
         productSummaries: summaries.length ? summaries : (ti.productSummaries || []),
         productCharges: mergedCharges,
+        hsnCode,
         qty: savedQty > 0 ? savedQty : (liveQty || 0)
       };
     }

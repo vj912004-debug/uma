@@ -159,8 +159,8 @@ const getCommonStyle = () => `
     box-sizing: border-box;
   }
   .inv-top { flex: 0 0 auto; padding: 4px 10px 0; }
-  .items-row { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 0 10px 4px; }
-  .inv-bot { flex: 0 0 auto; padding: 8px 10px 0; }
+  .items-row { flex: 1 1 0; min-height: 0; overflow: hidden; padding: 0 10px 4px; }
+  .inv-bot { flex: 0 0 auto; padding: 6px 10px 0; min-height: 0; overflow: visible; }
 
   /* ===== HEADER ===== */
   .header{
@@ -451,7 +451,10 @@ const getCommonStyle = () => `
   .cn-page .content-wrapper tr.inv-bot,
   .dn-page .content-wrapper tr.inv-bot { height: auto; }
   .cn-page .content-wrapper tr.inv-bot > td,
-  .dn-page .content-wrapper tr.inv-bot > td { height: auto; min-height: 280px; overflow: visible; }
+  .dn-page .content-wrapper tr.inv-bot > td { height: auto; min-height: 0; overflow: visible; }
+  .cn-page .inv-bot, .dn-page .inv-bot { flex: 0 0 auto; min-height: 0; overflow: visible; }
+  .cn-page .items-row, .dn-page .items-row { flex: 1 1 0; min-height: 0; overflow: hidden; }
+  .cn-page table.items, .dn-page table.items { height: 100%; max-height: 100%; }
   .content-wrapper tr.items-row > td { padding: 0 10px 4px; }
   .table-container { }
   table.items tbody tr.filler-row { height: 18px; }
@@ -459,6 +462,14 @@ const getCommonStyle = () => `
     height: 18px !important;
     min-height: 18px !important;
     max-height: 18px !important;
+  }
+  .cn-page table.items tbody tr.filler-row,
+  .dn-page table.items tbody tr.filler-row { height: 1%; }
+  .cn-page table.items tbody tr.filler-row td,
+  .dn-page table.items tbody tr.filler-row td {
+    height: auto !important;
+    min-height: 12px !important;
+    max-height: none !important;
   }
   table.items{
     width:100%;
@@ -517,6 +528,13 @@ const getCommonStyle = () => `
     margin-bottom:8px;
     align-items:stretch;
   }
+  .cn-page .bottom, .dn-page .bottom {
+    flex-shrink: 0;
+    overflow: visible;
+  }
+  .cn-page table.footer3 td.f3col, .dn-page table.footer3 td.f3col {
+    height: 100px;
+  }
   .bank{
     flex:1;
     border:1px solid var(--purple); border-radius:6px; overflow:hidden;
@@ -533,7 +551,7 @@ const getCommonStyle = () => `
     border-bottom:1px solid var(--purple);
   }
   .bank-body{
-    padding:10px 12px;
+    padding:8px 12px;
     font-size:12px;
   }
   .bank-row{display:flex;margin-bottom:5px;}
@@ -548,22 +566,22 @@ const getCommonStyle = () => `
   .totals-body{
     border:1px solid var(--purple);
     border-bottom:none; border-radius:6px 6px 0 0;
-    padding:10px 14px;
+    padding:6px 12px;
     font-size:12px;
     flex:1;
   }
-  .trow{display:flex;justify-content:space-between;padding:2px 0;}
+  .trow{display:flex;justify-content:space-between;padding:1px 0;}
   .trow .tlabel{}
   .trow .tval{font-variant-numeric:tabular-nums;min-width:90px;text-align:right;}
-  .trow.rule{border-top:1px solid var(--grey-line);margin-top:4px;padding-top:5px;}
+  .trow.rule{border-top:1px solid var(--grey-line);margin-top:3px;padding-top:4px;}
   .grand{
     background:var(--purple);
     color:#fff;
     display:flex;
     justify-content:space-between;
     align-items:center;
-    padding:10px 14px; border-radius:0 0 6px 6px;
-    font-size:17px;
+    padding:8px 12px; border-radius:0 0 6px 6px;
+    font-size:16px;
     font-weight:800;
   }
 
@@ -699,7 +717,7 @@ const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
       </tr>`;
   }).join('');
 
-  const blanks = buildFillerRowsHtml(12, 10);
+  const blanks = buildFillerRowsHtml(12, noteType === 'Credit Note' ? 12 : 10);
   const totalTaxAmount = totalSgst + totalCgst + totalIgst;
   
   let reasonBar = '';
@@ -728,7 +746,7 @@ const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
 <style>${getCommonStyle()}</style>
 </head>
 <body>
-<div class="page ${noteType === 'Debit Note' ? 'dn-page' : 'cn-page'}">
+<div class="page pdf-page ${noteType === 'Debit Note' ? 'dn-page' : 'cn-page'}">
 <div class="content-wrapper">
   <div class="inv-top">
 
@@ -799,19 +817,19 @@ const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
   <!-- ITEMS TABLE -->
   <div class="table-container">
     <table class="items">
-    <colgroup>
-        <col style="width: 3%;">
-        <col style="width: 26%;">
-        <col style="width: 6%;">
-        <col style="width: 6%;">
-        <col style="width: 8%;">
-        <col style="width: 5%;">
-        <col style="width: 8%;">
-        <col style="width: 5%;">
-        <col style="width: 8%;">
-        <col style="width: 5%;">
-        <col style="width: 8%;">
-        <col style="width: 12%;">
+      <colgroup>
+          <col style="width: 3%;">
+          <col style="width: 26%;">
+          <col style="width: 6%;">
+          <col style="width: 6%;">
+          <col style="width: 8%;">
+          <col style="width: 5%;">
+          <col style="width: 8%;">
+          <col style="width: 5%;">
+          <col style="width: 8%;">
+          <col style="width: 5%;">
+          <col style="width: 8%;">
+          <col style="width: 12%;">
       </colgroup>
       <thead>
         <tr>

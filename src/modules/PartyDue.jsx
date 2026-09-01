@@ -3,8 +3,8 @@ import { useAppContext } from '../context/AppContext';
 import { Search, Plus, CreditCard } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 import { formatDate } from '../utils/dateUtils';
-import { getReceiptOutstanding, hasSheetOverride } from '../utils/paymentTotals';
-import { getCurrentFYKey, getFYKeysThroughCurrent, getFYOfDate } from '../utils/financialYear';
+import { getReceiptOutstanding, getPartyOutstandingByFY } from '../utils/paymentTotals';
+import { getCurrentFYKey, getFYKeysThroughCurrent } from '../utils/financialYear';
 import { useNavigate } from 'react-router-dom';
 import SearchableSelect from '../components/SearchableSelect';
 
@@ -34,18 +34,6 @@ const PartyDue = () => {
     (data.invoices || []).some(inv => inv.receiptId === mr.id && inv.invoiceNo?.includes('/IN/'))
   );
 
-  const handleCellChange = (partyId, fy, value) => {
-    const party = data.parties.find(p => p.id === partyId);
-    if (!party) return;
-    const currentOverrides = party.dueOverrides || {};
-    // Empty input = explicit 0 so clearing a cell does not snap back to invoice-calculated dues
-    const nextVal = value === '' || value === null || value === undefined ? '0' : value;
-    updateItem('parties', partyId, {
-      ...party,
-      dueOverrides: { ...currentOverrides, [fy]: nextVal }
-    });
-  };
-
   const recordPayment = (e) => {
     e.preventDefault();
     if (!paymentForm.partyId || !paymentForm.receiptId || !paymentForm.amount) {
@@ -54,7 +42,6 @@ const PartyDue = () => {
     }
 
     const party = data.parties.find(p => p.id === paymentForm.partyId);
-    const mr = data.materialReceipts.find(m => m.id === paymentForm.receiptId);
 
     const newPayment = {
       ...paymentForm,
@@ -65,18 +52,8 @@ const PartyDue = () => {
 
     updateData('payments', newPayment);
 
-    // Clear stale manual overrides so balances recalculate from payments
     if (party?.dueOverrides && Object.keys(party.dueOverrides).length > 0) {
       updateItem('parties', party.id, { ...party, dueOverrides: {} });
-    }
-    if (mr?.sheetOverrides) {
-      const nextOverrides = { ...mr.sheetOverrides };
-      ['outstanding', 'manualPaid', 'dueStatus', 'tdsDeduction', 'paymentDates', 'paymentAmounts'].forEach((key) => {
-        delete nextOverrides[key];
-      });
-      if (Object.keys(nextOverrides).length !== Object.keys(mr.sheetOverrides).length) {
-        updateItem('materialReceipts', mr.id, { ...mr, sheetOverrides: nextOverrides });
-      }
     }
 
     setIsModalOpen(false);
@@ -92,51 +69,13 @@ const PartyDue = () => {
     });
   };
 
-  // Compile Aging Data by Party
+  // Same outstanding as Excel Processing Sheet rows for this party (no extra debit notes)
   const partyRows = data.parties.map(party => {
-    const partyReceipts = data.materialReceipts.filter(r => r.partyId === party.id);
-    const invoiceDuesByFY = Object.fromEntries(fyKeys.map((k) => [k, 0]));
-
-    partyReceipts.forEach(mr => {
-      // Find TI for this receipt
-      const ti = (data.invoices || []).find(inv => inv.receiptId === mr.id && inv.invoiceNo?.includes('/IN/'));
-      const hasBillOverride = hasSheetOverride(mr.sheetOverrides || {}, 'totalBill');
-      if (!ti && !hasBillOverride) return;
-
-      // Processing Sheet "Total Recd (Manual)" / Outstanding feed Party Due automatically
-      const invoiceOutstanding = getReceiptOutstanding(mr, ti, data.payments);
-      const fy = getFYOfDate(ti?.date || mr.date || mr.sheetOverrides?.invoiceDate);
-
-      // Add to aging bucket (overflow → current FY)
-      if (Object.prototype.hasOwnProperty.call(invoiceDuesByFY, fy)) {
-        invoiceDuesByFY[fy] += invoiceOutstanding;
-      } else {
-        invoiceDuesByFY[currentFY] += invoiceOutstanding;
-      }
-    });
-
-    const applyNoteToFy = (note, sign) => {
-      if (note?.isDeleted) return;
-      const sameParty = (party.id && note.partyId && String(note.partyId) === String(party.id))
-        || (party.name && note.partyName && String(note.partyName).trim().toLowerCase() === String(party.name).trim().toLowerCase());
-      if (!sameParty) return;
-      const amt = (parseFloat(note.amount) || 0) * sign;
-      if (!amt) return;
-      const fy = getFYOfDate(note.date);
-      if (Object.prototype.hasOwnProperty.call(invoiceDuesByFY, fy)) {
-        invoiceDuesByFY[fy] += amt;
-      } else {
-        invoiceDuesByFY[currentFY] += amt;
-      }
-    };
-    (data.debitNotes || []).forEach((n) => applyNoteToFy(n, 1));
-    (data.creditNotes || []).forEach((n) => applyNoteToFy(n, -1));
-
-    const o = party.dueOverrides || {};
+    const invoiceDuesByFY = getPartyOutstandingByFY(data, party, fyKeys, currentFY);
     const finals = {};
     let totalDue = 0;
     fyKeys.forEach((fy) => {
-      const amount = hasSheetOverride(o, fy) ? (parseFloat(o[fy]) || 0) : invoiceDuesByFY[fy];
+      const amount = invoiceDuesByFY[fy] || 0;
       finals[fy] = amount;
       totalDue += amount;
     });
@@ -173,32 +112,12 @@ const PartyDue = () => {
     { key: 'totalDue', label: 'Total Outstanding Dues' }
   ];
 
-  const renderInput = (partyId, fy, value, isTotal = false) => {
-    if (isTotal) return `₹${parseFloat(value || 0).toFixed(2)}`;
+  const renderAmount = (value, isTotal = false) => {
+    const n = parseFloat(value || 0) || 0;
     return (
-      <input
-        type="number"
-        min="0"
-        step="0.01"
-        value={Number.isFinite(Number(value)) ? value : 0}
-        placeholder="0.00"
-        onChange={(e) => handleCellChange(partyId, fy, e.target.value)}
-        style={{
-          background: 'transparent',
-          border: '1px solid transparent',
-          color: 'inherit',
-          width: '100%',
-          textAlign: 'right',
-          fontSize: 'inherit',
-          outline: 'none',
-          fontFamily: 'inherit',
-          fontWeight: 'inherit',
-          padding: '0.2rem',
-          transition: 'all 0.2s ease',
-        }}
-        onFocus={(e) => e.target.style.borderBottom = '1px solid var(--accent-primary)'}
-        onBlur={(e) => e.target.style.borderBottom = '1px solid transparent'}
-      />
+      <span style={{ fontWeight: isTotal ? 700 : (n > 0 ? 600 : 400) }}>
+        ₹{n.toFixed(2)}
+      </span>
     );
   };
 
@@ -207,7 +126,7 @@ const PartyDue = () => {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Party Wise Outstanding</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Financial Year-wise aging report. Track unpaid commercial invoices and outstanding balances.</p>
+          <p style={{ color: 'var(--text-muted)' }}>These totals match the Processing Sheet outstanding for each party. Enter Total Recd / TDS / Outstanding on the sheet — this page updates automatically.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <ExportButton data={filteredDues} columns={tableCols} filename="Party_Outstanding_Dues" title="Party Wise Outstanding" />
@@ -281,11 +200,11 @@ const PartyDue = () => {
                           fontWeight: party[fy] > 0 ? 600 : 400
                         }}
                       >
-                        {renderInput(party.id, fy, party[fy])}
+                        {renderAmount(party[fy])}
                       </td>
                     ))}
                     <td style={{ padding: '1rem', textAlign: 'right', color: party.totalDue > 0 ? '#ef4444' : 'var(--status-done-text)', fontWeight: 700, fontSize: '0.95rem' }}>
-                      {renderInput(party.id, 'totalDue', party.totalDue, true)}
+                      {renderAmount(party.totalDue, true)}
                     </td>
                   </tr>
                 ))
@@ -331,9 +250,7 @@ const PartyDue = () => {
                     <option value="">Choose Invoiced Batch</option>
                     {selectedPartyReceipts.map(mr => {
                       const ti = (data.invoices || []).find(inv => inv.receiptId === mr.id && inv.invoiceNo?.includes('/IN/'));
-                      const paidTotal = getReceiptPaymentTotal(data.payments, mr.id);
-                      let due = (parseFloat(ti?.total) || 0) - paidTotal;
-                      if (due < 0.01) due = 0;
+                      const due = getReceiptOutstanding(mr, ti, data.payments);
                       return (
                         <option key={mr.id} value={mr.id}>
                           {mr.receiptNo} - {mr.productName} ({formatDate(mr.date)}) - Balance Due: ₹{due.toFixed(2)}

@@ -167,6 +167,68 @@ export const buildFillerRowsHtml = (colCount, rowCount = 12) => {
   return Array.from({ length: rowCount }, () => `<tr class="filler-row">${cells}</tr>`).join('');
 };
 
+/** Add or remove 18px blank item rows until the table fills leftover A4 space. */
+const fillItemsBlankRowsToFit = (page, itemsRow, rowPx = 18) => {
+  const doc = page.ownerDocument;
+  const table = page.querySelector('table.items');
+  const tbody = table?.querySelector('tbody');
+  if (!table || !tbody || !itemsRow) return;
+
+  const first = tbody.querySelector('tr');
+  let colCount = 0;
+  if (first) {
+    [...first.children].forEach((cell) => {
+      colCount += Number(cell.colSpan) || 1;
+    });
+  }
+  if (!colCount) colCount = 12;
+  table.style.setProperty('height', 'auto', 'important');
+  table.style.setProperty('max-height', '100%', 'important');
+  table.style.setProperty('margin-bottom', '0', 'important');
+
+  const applyRowPx = (tr) => {
+    tr.style.setProperty('height', `${rowPx}px`, 'important');
+    [...tr.children].forEach((td) => {
+      td.style.setProperty('height', `${rowPx}px`, 'important');
+      td.style.setProperty('min-height', `${rowPx}px`, 'important');
+      td.style.setProperty('max-height', `${rowPx}px`, 'important');
+    });
+  };
+  tbody.querySelectorAll('tr.filler-row').forEach(applyRowPx);
+
+  const leftover = () => {
+    void page.offsetHeight;
+    const rowBox = itemsRow.getBoundingClientRect();
+    const tableBox = table.getBoundingClientRect();
+    return Math.floor(rowBox.bottom - tableBox.bottom);
+  };
+
+  let guard = 0;
+  while (leftover() < 0 && guard < 60) {
+    const last = tbody.querySelector('tr.filler-row:last-child');
+    if (!last) break;
+    last.remove();
+    guard += 1;
+  }
+  guard = 0;
+  while (leftover() >= rowPx && guard < 60) {
+    const tr = doc.createElement('tr');
+    tr.className = 'filler-row';
+    for (let i = 0; i < colCount; i += 1) {
+      const td = doc.createElement('td');
+      td.innerHTML = '&nbsp;';
+      tr.appendChild(td);
+    }
+    applyRowPx(tr);
+    tbody.appendChild(tr);
+    guard += 1;
+  }
+  if (leftover() < 0) {
+    const last = tbody.querySelector('tr.filler-row:last-child');
+    if (last) last.remove();
+  }
+};
+
 /** Pages that pin Terms/Declaration/Signatory inside A4 without html2canvas flex clipping. */
 export const FIT_FOOTER_PAGE_SEL = '.ti-page, .pi-page, .cn-page, .dn-page, .po-page';
 
@@ -281,13 +343,25 @@ export const layoutFitFooterPages = (doc, pageHeight) => {
       el.style.setProperty('height', 'auto', 'important');
       el.style.setProperty('max-height', 'none', 'important');
     });
+    const isCnDn = page.classList.contains('cn-page') || page.classList.contains('dn-page');
+    const isTiPi = page.classList.contains('ti-page') || page.classList.contains('pi-page');
     page.querySelectorAll('tr.filler-row').forEach((tr) => {
-      tr.style.height = '16px';
-      [...tr.children].forEach((td) => {
-        td.style.height = '16px';
-        td.style.minHeight = '16px';
-        td.style.maxHeight = '16px';
-      });
+      if (isCnDn) {
+        tr.style.height = '1%';
+        [...tr.children].forEach((td) => {
+          td.style.height = 'auto';
+          td.style.minHeight = '8px';
+          td.style.maxHeight = 'none';
+        });
+      } else {
+        const rowPx = isTiPi ? '18px' : '16px';
+        tr.style.height = rowPx;
+        [...tr.children].forEach((td) => {
+          td.style.height = rowPx;
+          td.style.minHeight = rowPx;
+          td.style.maxHeight = rowPx;
+        });
+      }
     });
     page.querySelectorAll('table.items tbody tr:not(.filler-row) td').forEach((td) => {
       td.style.height = 'auto';
@@ -305,23 +379,28 @@ export const layoutFitFooterPages = (doc, pageHeight) => {
 
     const topH = topRow ? Math.ceil(topRow.offsetHeight) : 0;
     let botH = Math.ceil(Math.max(botRow.offsetHeight, botRow.scrollHeight, 0));
-    if (botH < 80) botH = 320;
+    if (isCnDn) botH = Math.max(botH, 360);
+    else if (botH < 80) botH = 320;
     const itemsH = Math.max(80, pageHeight - topH - botH - 4);
 
     wrap.style.setProperty('height', `${pageHeight}px`, 'important');
     wrap.style.setProperty('max-height', `${pageHeight}px`, 'important');
+    wrap.style.setProperty('overflow', 'hidden', 'important');
     itemsRow.style.setProperty('height', `${itemsH}px`, 'important');
     itemsRow.style.setProperty('max-height', `${itemsH}px`, 'important');
-    itemsRow.style.setProperty('flex', `0 0 ${itemsH}px`, 'important');
+    itemsRow.style.setProperty('flex', isCnDn ? '1 1 0' : `0 0 ${itemsH}px`, 'important');
+    itemsRow.style.setProperty('min-height', '0', 'important');
     itemsRow.style.setProperty('overflow', 'hidden', 'important');
     botRow.style.setProperty('flex', '0 0 auto', 'important');
+    botRow.style.setProperty('min-height', '0', 'important');
+    botRow.style.setProperty('overflow', 'visible', 'important');
     page.querySelectorAll('.table-container').forEach((el) => {
-      el.style.setProperty('height', 'auto', 'important');
+      el.style.setProperty('height', isCnDn ? '100%' : 'auto', 'important');
       el.style.setProperty('max-height', '100%', 'important');
-      el.style.setProperty('overflow', 'visible', 'important');
+      el.style.setProperty('overflow', isCnDn ? 'hidden' : 'visible', 'important');
     });
     page.querySelectorAll('table.items').forEach((el) => {
-      el.style.setProperty('height', 'auto', 'important');
+      el.style.setProperty('height', isCnDn ? '100%' : 'auto', 'important');
       el.style.setProperty('max-height', '100%', 'important');
     });
 
@@ -339,6 +418,72 @@ export const layoutFitFooterPages = (doc, pageHeight) => {
       itemsRow.style.setProperty('max-height', `${nextH}px`, 'important');
       itemsRow.style.setProperty('flex', `0 0 ${nextH}px`, 'important');
     }
+
+    if (page.classList.contains('ti-page') || page.classList.contains('pi-page')) {
+      page.querySelectorAll('table.items').forEach((el) => {
+        el.style.setProperty('height', 'auto', 'important');
+        el.style.setProperty('max-height', '100%', 'important');
+      });
+      fillItemsBlankRowsToFit(page, itemsRow, 18);
+    }
+  });
+};
+
+export const layoutPackingListPages = (doc, pageHeight) => {
+  if (!doc) return;
+  doc.querySelectorAll('.pl-page').forEach((page) => {
+    const sheet = page.querySelector('.sheet') || page;
+    const header = page.querySelector('.header');
+    const meta = page.querySelector('.pl-meta');
+    const wrap = page.querySelector('.table-wrap');
+    const foot = page.querySelector('.barfoot');
+    const table = page.querySelector('table.items');
+    if (!wrap || !table) return;
+
+    page.style.setProperty('height', `${pageHeight}px`, 'important');
+    page.style.setProperty('max-height', `${pageHeight}px`, 'important');
+    page.style.setProperty('overflow', 'hidden', 'important');
+    sheet.style.setProperty('display', 'flex', 'important');
+    sheet.style.setProperty('flex-direction', 'column', 'important');
+    sheet.style.setProperty('height', '100%', 'important');
+    sheet.style.setProperty('min-height', '0', 'important');
+
+    const cols = [...table.querySelectorAll('colgroup col')];
+    if (cols.length >= 6) {
+      table.style.setProperty('table-layout', 'auto', 'important');
+      let batchNeed = 0;
+      table.querySelectorAll('td.batch').forEach((td) => {
+        td.style.whiteSpace = 'nowrap';
+        batchNeed = Math.max(batchNeed, Math.ceil(td.scrollWidth) + 16);
+        td.style.whiteSpace = '';
+      });
+      void table.offsetWidth;
+      const tableW = Math.max(1, Math.floor(table.getBoundingClientRect().width));
+      const batchPct = Math.min(34, Math.max(18, Math.round((batchNeed / tableW) * 100)));
+      const srPct = 10;
+      const drumPct = 12;
+      const wtPct = Math.max(14, (100 - srPct - batchPct - drumPct) / 3);
+      cols[0].style.width = `${srPct}%`;
+      cols[1].style.width = `${batchPct}%`;
+      cols[2].style.width = `${drumPct}%`;
+      cols[3].style.width = `${wtPct}%`;
+      cols[4].style.width = `${wtPct}%`;
+      cols[5].style.width = `${wtPct}%`;
+      table.style.setProperty('table-layout', 'fixed', 'important');
+    }
+
+    void page.offsetHeight;
+    const used = (header?.offsetHeight || 0) + (meta?.offsetHeight || 0) + (foot?.offsetHeight || 0) + 28;
+    const tableH = Math.max(140, pageHeight - used);
+    wrap.style.setProperty('flex', `1 1 ${tableH}px`, 'important');
+    wrap.style.setProperty('height', `${tableH}px`, 'important');
+    wrap.style.setProperty('max-height', `${tableH}px`, 'important');
+    wrap.style.setProperty('min-height', '0', 'important');
+    wrap.style.setProperty('overflow', 'hidden', 'important');
+    table.style.setProperty('height', 'auto', 'important');
+    table.style.setProperty('max-height', '100%', 'important');
+
+    fillItemsBlankRowsToFit(page, wrap, 22);
   });
 };
 
@@ -372,15 +517,15 @@ export const ITEMS_TABLE_FILL_CSS = `
   table.items thead,
   table.items tfoot { height: 1px; }
   table.items tbody tr.filler-row { height: 1%; }
-  table.items tbody tr.filler-row td {
-    height: auto !important;
-    min-height: 18px;
-    padding: 2px 3px !important;
-    border: 1px solid var(--lav-border) !important;
-    line-height: 1;
-    background: #fff;
-    vertical-align: middle;
-  }
+    table.items tbody tr.filler-row td {
+      height: auto !important;
+      min-height: 18px;
+      padding: 2px 3px !important;
+      border: 1px solid var(--lav-border) !important;
+      line-height: 1;
+      background: #fff;
+      vertical-align: middle;
+    }
 `;
 
 
@@ -1201,6 +1346,7 @@ export const renderHtmlToPdf = async (html, {
       target.style.margin = '0';
       target.style.zoom = '1';
       layoutFitFooterPages(idoc, singlePageHeight);
+      layoutPackingListPages(idoc, singlePageHeight);
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const naturalH = Math.max(target.scrollHeight, target.offsetHeight || 0);
@@ -1236,6 +1382,7 @@ export const renderHtmlToPdf = async (html, {
       }
 
       layoutFitFooterPages(idoc, singlePageHeight);
+      layoutPackingListPages(idoc, singlePageHeight);
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
@@ -1352,7 +1499,8 @@ export const renderHtmlToPdf = async (html, {
           });
           clonedDoc.querySelectorAll('table.footer3 td.f3col').forEach((el) => {
             el.style.display = 'table-cell';
-            el.style.height = '128px';
+            const notePage = clonedDoc.querySelector('.cn-page, .dn-page');
+            el.style.height = notePage ? '100px' : '128px';
             el.style.maxHeight = 'none';
             el.style.overflow = 'visible';
             el.style.verticalAlign = 'top';
@@ -1391,6 +1539,7 @@ export const renderHtmlToPdf = async (html, {
             el.style.paddingBottom = '10px';
           });
           layoutFitFooterPages(clonedDoc, singlePageHeight);
+          layoutPackingListPages(clonedDoc, singlePageHeight);
         }
       });
 

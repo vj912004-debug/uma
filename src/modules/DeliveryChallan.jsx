@@ -66,7 +66,10 @@ const DeliveryChallan = () => {
       setForm({
         ...editingDoc,
         selectedProducts: selected,
-        ...computed
+        ...computed,
+        qty: editingDoc.qty,
+        totalDrums: editingDoc.totalDrums,
+        value: parseFloat(editingDoc.value) > 0 ? editingDoc.value : (computed.value || '')
       });
       return;
     }
@@ -104,7 +107,12 @@ const DeliveryChallan = () => {
         : [...current, prodName];
       if (next.length === 0) return prev;
       const computed = buildDCFieldsFromProducts(activeMR, activePL, prodOpts, next);
-      return { ...prev, selectedProducts: next, ...computed };
+      return {
+        ...prev,
+        selectedProducts: next,
+        ...computed,
+        value: parseFloat(prev.value) > 0 ? prev.value : (computed.value || '')
+      };
     });
   };
 
@@ -144,7 +152,11 @@ const DeliveryChallan = () => {
 
     const finalDoc = {
       ...form,
-      ...(computed || {}),
+      productSummaries: computed?.productSummaries ?? form.productSummaries,
+      productName: computed?.productName || form.productName,
+      qty: form.qty,
+      totalDrums: form.totalDrums,
+      value: form.value === '' || form.value == null ? '' : form.value,
       receiptId: editingDoc?.receiptId || activeMR?.id || activePL?.receiptId || ''
     };
 
@@ -340,7 +352,7 @@ const DeliveryChallan = () => {
                 </div>
                 <div>
                   <label>Value of Goods (₹)</label>
-                  <input type="number" className="input-field" min="0" step="0.01" placeholder="Leave blank if not required on print" value={form.value} onChange={e => setForm({...form, value: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0)})} />
+                  <input type="number" className="input-field" min="0" step="0.01" placeholder="Taken from Material Receipt" value={form.value} onChange={e => setForm({...form, value: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0)})} />
                 </div>
 
                 <div>

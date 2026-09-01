@@ -87,7 +87,7 @@ export const buildPackingListHtml = (data, profileInput) => {
       return `
       <tr>
         <td>${sr}</td>
-        <td>${escHtml(batch.batchNo || '')}</td>
+        <td class="batch">${escHtml(batch.batchNo || '')}</td>
         <td>${escHtml(batch.drumNo ?? '')}</td>
         <td class="num">${gross > 0 ? fmtMoney(gross) : ''}</td>
         <td class="num">${tare > 0 ? fmtMoney(tare) : ''}</td>
@@ -97,8 +97,7 @@ export const buildPackingListHtml = (data, profileInput) => {
 
     const batchTotalHtml = `
       <tr class="batch-total-row">
-        <td></td>
-        <td colspan="2" class="total-label">TOTAL — Batch ${escHtml(group.batchNo)}</td>
+        <td colspan="3" class="total-label">TOTAL — Batch ${escHtml(group.batchNo)}</td>
         <td class="num">${fmtMoney(group.gross)}</td>
         <td class="num">${fmtMoney(group.tare)}</td>
         <td class="num">${fmtMoney(group.net)}</td>
@@ -107,15 +106,12 @@ export const buildPackingListHtml = (data, profileInput) => {
     return `${rowHtml}${batchTotalHtml}`;
   }).join('');
 
-  const fillerRowsHtml = buildFillerRowsHtml(6, 12);
+  const fillerRowsHtml = buildFillerRowsHtml(6, 14);
 
-  // Sample layout: Sieving Lumps under Gross, value under Net
   const sievingLumpsHtml = sievingLumps > 0 ? `
       <tr class="special-row">
+        <td colspan="3" class="special-label">Sieving Lumps</td>
         <td></td>
-        <td></td>
-        <td></td>
-        <td class="special-label">Sieving Lumps</td>
         <td></td>
         <td class="num">${fmtMoney(sievingLumps)}</td>
       </tr>` : '';
@@ -127,8 +123,7 @@ export const buildPackingListHtml = (data, profileInput) => {
   // Always show overall total when there is data (align Gross / Tare / Net with batch totals)
   const overallTotalHtml = (batchGroups.length > 0 || sievingLumps > 0) ? `
       <tr class="total-row">
-        <td></td>
-        <td colspan="2" class="total-label">GRAND TOTAL</td>
+        <td colspan="3" class="total-label">GRAND TOTAL</td>
         <td class="num">${fmtMoney(grandGross)}</td>
         <td class="num">${fmtMoney(grandTare)}</td>
         <td class="num">${fmtMoney(finalNet)}</td>
@@ -151,7 +146,7 @@ export const buildPackingListHtml = (data, profileInput) => {
     --green:#2fa84f;
     --text:#231f20;
   }
-  *{box-sizing:border-box;margin:0;padding:0;font-family:Cambria,Georgia,serif;}
+  *{box-sizing:border-box;margin:0;padding:0;}
   html,body{margin:0;padding:0;background:#fff;color:var(--text);}
   .page{
     width:794px;height:1123px;padding:8px;margin:0;background:#fff;
@@ -159,80 +154,96 @@ export const buildPackingListHtml = (data, profileInput) => {
   }
   .sheet{
     flex:1;border:2px solid var(--purple);padding:12px 14px 0;
-    display:flex;flex-direction:column;box-sizing:border-box;min-height:0;
+    display:flex;flex-direction:column;box-sizing:border-box;min-height:0;overflow:hidden;
   }
 
   .header{
-    display:flex;justify-content:space-between;align-items:center;gap:12px;
-    margin:0 0 12px;padding:0 0 10px;
+    display:flex;justify-content:space-between;align-items:center;gap:16px;
+    margin:0 0 10px;padding:0;flex:0 0 auto;min-width:0;
   }
-  .brand{display:flex;align-items:center;gap:10px;min-width:0;}
+  .brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 auto;}
   .logo{width:64px;height:64px;flex-shrink:0;}
   .logo img,.logo svg{width:100%;height:100%;object-fit:contain;display:block;}
-
-  .brand-lockup{width:280px;height:70px;flex-shrink:0;display:flex;align-items:center;}
+  .brand-lockup{width:100%;max-width:280px;height:70px;flex-shrink:1;min-width:0;display:flex;align-items:center;}
   .brand-lockup img{width:100%;height:100%;object-fit:contain;object-position:left center;display:block;}
-
+  .brand-text{min-width:0;}
   .brand-text h1{
-    margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;
-    letter-spacing:.5px;color:var(--purple);line-height:1;text-transform:uppercase;
+    margin:0;font-size:30px;letter-spacing:.4px;color:var(--purple);
+    line-height:1.1;text-transform:uppercase;
   }
   .brand-text .tagline{
-    color:var(--green);font-weight:700;font-size:13px;margin-top:2px;line-height:1.15;
+    color:var(--green);font-weight:700;font-size:13px;margin-top:2px;line-height:1.2;
   }
   .tax-invoice-box{
-    background:var(--purple);color:#fff;text-align:center;padding:10px 20px;
-    min-width:200px;min-height:64px;border-radius:6px;box-sizing:border-box;
-    display:flex;flex-direction:column;justify-content:center;align-items:center;
+    background:var(--purple);color:#fff;text-align:center;padding:10px 18px 12px;
+    flex:0 0 auto;width:210px;border-radius:8px;box-sizing:border-box;
+    display:flex;flex-direction:column;align-items:center;gap:8px;
   }
   .tax-invoice-box .ti-title{
-    font-size:22px;font-weight:800;letter-spacing:.5px;margin:0;line-height:1.1;white-space:nowrap;
+    font-size:22px;font-weight:800;margin:0;padding:0;line-height:1.2;
+    letter-spacing:.5px;white-space:nowrap;
   }
   .tax-invoice-box .ti-sub{
-    margin-top:5px;background:#fff;color:var(--purple);font-size:10px;font-weight:700;
-    letter-spacing:.4px;padding:2px 8px;border-radius:3px;
+    margin:0;background:#fff;color:#111;font-size:11px;font-weight:700;
+    padding:4px 12px;border-radius:999px;line-height:1.3;white-space:nowrap;
+    border:1px solid #111;
   }
 
   .pl-meta{
-    display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;
-    margin-bottom:14px;padding:10px 12px;
+    display:grid;grid-template-columns:1fr 1fr;gap:8px 28px;
+    margin-bottom:10px;padding:10px 14px;flex:0 0 auto;
     border:1px solid var(--lav-border);border-radius:6px;background:var(--lav-bg);
   }
-  .meta-field{display:flex;gap:8px;align-items:baseline;font-size:13px;line-height:1.5;}
-  .meta-field .lbl{font-weight:700;color:var(--purple);white-space:nowrap;min-width:120px;}
-  .meta-field .colon{font-weight:700;color:var(--purple);}
-  .meta-field .val{font-weight:600;color:var(--text);}
+  .meta-field{
+    display:flex;align-items:baseline;min-width:0;font-size:13px;line-height:1.45;
+  }
+  .meta-field .lbl{
+    font-weight:700;color:var(--purple);white-space:nowrap;flex:0 0 auto;
+  }
+  .meta-field .colon{
+    font-weight:700;color:var(--purple);flex:0 0 auto;padding:0 8px;
+  }
+  .meta-field .val{
+    font-weight:600;color:var(--text);flex:1 1 auto;min-width:0;
+    overflow-wrap:break-word;word-break:break-word;
+  }
 
-  .table-wrap{flex:0 0 auto;min-height:0;margin-bottom:8px;display:block;}
+  .table-wrap{
+    flex:1 1 auto;min-height:0;margin-bottom:0;overflow:hidden;
+    display:flex;flex-direction:column;
+  }
   table.items{
-    width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px;background:#fff;
-    flex:0 0 auto;height:auto;
+    width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px;
+    background:#fff;height:100%;
   }
+  table.items thead,
+  table.items tfoot{height:1px;}
   table.items thead th{
-    background:var(--purple);color:#fff;font-weight:700;padding:5px 4px;
+    background:var(--purple);color:#fff;font-weight:700;padding:8px 10px;
     text-align:center;vertical-align:middle;border:1px solid rgba(255,255,255,.55);
-    line-height:1.2;font-size:11px;
+    line-height:1.25;white-space:nowrap;
   }
-  table.items tbody td{
-    border:1px solid var(--lav-border);padding:1px 4px;text-align:center;
+  table.items tbody td,
+  table.items tfoot td{
+    border:1px solid var(--lav-border);padding:7px 10px;text-align:center;
     vertical-align:middle;background:#fff;color:var(--text);
-    height:18px;min-height:18px;max-height:18px;font-weight:600;font-size:11px;line-height:1;
+    height:auto;min-height:24px;font-weight:600;line-height:1.3;
+    overflow-wrap:break-word;word-break:break-word;white-space:normal;
   }
-  table.items tbody td.num{text-align:center;}
-  table.items tbody tr.filler-row { height: 18px; }
-  table.items tbody tr.filler-row td {
-    height: 18px; min-height: 18px; max-height: 18px; padding: 1px 4px;
+  table.items tbody td.batch{padding:7px 12px;}
+  table.items tbody td.num,
+  table.items tfoot td.num{text-align:center;font-variant-numeric:tabular-nums;}
+  table.items tbody tr.filler-row{height:1%;}
+  table.items tbody tr.filler-row td{
+    height:auto;min-height:18px;padding:2px 10px;background:#fff;
   }
-  table.items tbody tr.special-row td,
   table.items tbody tr.batch-total-row td,
-  table.items tbody tr.total-row td{
+  table.items tbody tr.special-row td,
+  table.items tfoot tr.total-row td{
     background:var(--lav-bg);color:var(--purple-dark);font-weight:800;
-    border-color:var(--purple);
-    height:18px;min-height:18px;max-height:18px;padding:1px 4px;
+    border-color:var(--purple);padding:7px 10px;
   }
-  table.items tbody tr.batch-total-row td{
-    background:#f3eef9;
-  }
+  table.items tbody tr.batch-total-row td{background:#f3eef9;}
   table.items td.special-label,
   table.items td.total-label{
     font-weight:800;text-align:center;white-space:nowrap;color:var(--purple);
@@ -240,13 +251,14 @@ export const buildPackingListHtml = (data, profileInput) => {
 
   .barfoot{
     background:var(--purple);color:#fff;margin:auto -14px 0 -14px;padding:8px 14px;
-    display:flex;justify-content:space-between;align-items:center;
-    font-size:12px;flex-shrink:0;
+    display:flex;justify-content:space-between;align-items:center;gap:8px;
+    font-size:12px;flex-shrink:0;min-width:0;
   }
+  .barfoot span{min-width:0;overflow-wrap:anywhere;}
 </style>
 </head>
 <body>
-  <div class="page pl-page">
+  <div class="page pdf-page pl-page">
     <div class="sheet">
       <div class="header">
         <div class="brand">
@@ -270,22 +282,32 @@ export const buildPackingListHtml = (data, profileInput) => {
 
       <div class="table-wrap">
         <table class="items">
+          <colgroup>
+            <col style="width:10%">
+            <col style="width:20%">
+            <col style="width:12%">
+            <col style="width:19.34%">
+            <col style="width:19.33%">
+            <col style="width:19.33%">
+          </colgroup>
           <thead>
             <tr>
-              <th style="width:10%;">Sr. No.</th>
-              <th style="width:18%;">Batch No.</th>
-              <th style="width:12%;">Drum No.</th>
-              <th style="width:20%;">Gross Wt. (kg)</th>
-              <th style="width:20%;">Tare Wt. (kg)</th>
-              <th style="width:20%;">Net Wt. (kg)</th>
+              <th>Sr. No.</th>
+              <th>Batch No.</th>
+              <th>Drum No.</th>
+              <th>Gross Wt. (kg)</th>
+              <th>Tare Wt. (kg)</th>
+              <th>Net Wt. (kg)</th>
             </tr>
           </thead>
           <tbody>
             ${tableRowsHtml}
             ${fillerRowsHtml}
+          </tbody>
+          <tfoot>
             ${sievingLumpsHtml}
             ${overallTotalHtml}
-          </tbody>
+          </tfoot>
         </table>
       </div>
 

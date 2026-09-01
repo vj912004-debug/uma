@@ -1,10 +1,9 @@
 import { mergeCompanyProfile } from './companyProfile';
 import {
-  TI_CHARGES_LIST,
   TI_EMPTY_ROWS,
   splitPartyAddressLines,
   formatPdfDateDmy,
-  buildTiChargeAmounts,
+  buildTiPrintChargeRows,
   getSplitGstRates
 } from './taxInvoiceLayout';
 import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPrintTermsHtml, DEFAULT_INVOICE_TERMS, DEFAULT_INVOICE_DECLARATION } from './printTheme';
@@ -26,7 +25,7 @@ export const buildTaxInvoiceHtml = (raw, profileInput) => {
   const data = fillPrintPartyFields(raw, raw?.appData || loadUmaAppData());
   const profile = mergeCompanyProfile(profileInput);
 
-  const chargeAmounts = buildTiChargeAmounts(data);
+  const chargeRows = buildTiPrintChargeRows(data);
   const { taxRate, displayRate, sgst: sgstCalc, cgst: cgstCalc, igst: igstCalc } = getSplitGstRates(data);
   // Print RATE + tax amounts both use full form GST (e.g. 18).
   const printGstRate = displayRate;
@@ -40,6 +39,39 @@ export const buildTaxInvoiceHtml = (raw, profileInput) => {
 
   const rows = [];
   let sr = 1;
+
+  const withHsn = (name, hsn) => {
+    const label = String(name || '').trim();
+    const code = String(hsn || '').trim();
+    if (!code) return label;
+    if (new RegExp(`\\(\\s*${code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\)\\s*$`).test(label)) {
+      return label;
+    }
+    return label ? `${label} (${code})` : `HSN CODE : ${code}`;
+  };
+
+  const emptyAmtCells = `
+        <td class="center"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>`;
+
+  const pushHsnNote = (hsn) => {
+    const code = String(hsn || '').trim();
+    if (!code) return;
+    rows.push(`
+      <tr>
+        <td class="center"></td>
+        <td class="left">HSN CODE : ${escHtml(code)}</td>
+        ${emptyAmtCells}
+      </tr>`);
+  };
 
   const pushRow = (desc, qty, rate, amt) => {
     const lineAmt = parseFloat(amt) || 0;
@@ -57,19 +89,13 @@ export const buildTaxInvoiceHtml = (raw, profileInput) => {
     totalAll += rowTotal;
     totalQty += parseFloat(qty) || 0;
 
-    let cleanDesc = desc;
-    const match = desc.match(/(.*?)\(\d+\)$/);
-    if (match) {
-      cleanDesc = match[1].trim();
-    }
-
     const rateCell = lineAmt > 0 ? printGstRate : '';
     const igstRateCell = lineAmt > 0 && igstCalc ? printGstRate : '';
 
     rows.push(`
       <tr>
         <td class="center">${sr++}</td>
-        <td class="left">${escHtml(cleanDesc)}</td>
+        <td class="left">${escHtml(desc)}</td>
         <td class="center">${fmtQty(qty)}</td>
         <td class="num">${rate ? escHtml(parseFloat(rate).toFixed(2)) : ''}</td>
         <td class="num">${fmtMoney(lineAmt)}</td>
@@ -83,10 +109,8 @@ export const buildTaxInvoiceHtml = (raw, profileInput) => {
       </tr>`);
   };
 
-  TI_CHARGES_LIST.forEach((charge) => {
-    const line = chargeAmounts[charge.key];
-    if (!line || !(line.amt > 0)) return;
-    pushRow(charge.label, line.qty, line.rate, line.amt);
+  chargeRows.forEach((row) => {
+    pushRow(row.label, row.qty, row.rate, row.amt);
   });
 
   (data.customCharges || []).forEach((cc) => {
@@ -95,8 +119,10 @@ export const buildTaxInvoiceHtml = (raw, profileInput) => {
     const rate = parseFloat(cc.rate) || 0;
     const amt = ccQty * rate;
     if (amt <= 0) return;
-    pushRow(cc.name || '', ccQty, rate, amt);
+    pushRow(withHsn(cc.name || '', cc.hsn), ccQty, rate, amt);
   });
+
+  pushHsnNote(data.hsnCode || data.hsn);
 
   // Apply discount the same way as the form (taxable = subtotal - discount)
   const discount = parseFloat(data.discount) || 0;
@@ -110,7 +136,7 @@ export const buildTaxInvoiceHtml = (raw, profileInput) => {
     totalAll = totalAmt + totalSgst + totalCgst + totalIgst;
   }
 
-  rows.push(buildFillerRowsHtml(12, 6));
+  rows.push(buildFillerRowsHtml(12, 2));
 
   const roundedTotal = Math.round(totalAll);
   const roundOff = roundedTotal - totalAll;
@@ -690,18 +716,18 @@ export const buildTaxInvoiceHtml = (raw, profileInput) => {
   <div class="table-container">
     <table class="items">
       <colgroup>
-        <col style="width: 3%;">
-        <col style="width: 26%;">
-        <col style="width: 6%;">
-        <col style="width: 6%;">
-        <col style="width: 8%;">
-        <col style="width: 5%;">
-        <col style="width: 8%;">
-        <col style="width: 5%;">
-        <col style="width: 8%;">
-        <col style="width: 5%;">
-        <col style="width: 8%;">
-        <col style="width: 12%;">
+          <col style="width: 3%;">
+          <col style="width: 26%;">
+          <col style="width: 6%;">
+          <col style="width: 6%;">
+          <col style="width: 8%;">
+          <col style="width: 5%;">
+          <col style="width: 8%;">
+          <col style="width: 5%;">
+          <col style="width: 8%;">
+          <col style="width: 5%;">
+          <col style="width: 8%;">
+          <col style="width: 12%;">
       </colgroup>
       <thead>
         <tr>

@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { buildUnderProcessRows, getProductQty, receiptProductOptions } from '../utils/receiptProducts';
-import { getReceiptOutstanding } from '../utils/paymentTotals';
+import { listProcessingSheetDueRows } from '../utils/paymentTotals';
 import { getCurrentFYKey, getFYOfDate } from '../utils/financialYear';
 
 const StatCard = ({ title, value, icon: Icon, color, subtext, subtextColor, path }) => {
@@ -53,29 +53,12 @@ const Dashboard = () => {
     }));
   }, [data]);
 
-  // Outstanding for the current financial year
+  // Outstanding for the current financial year (same rows as Processing Sheet / Party Due)
   const totalOutstanding = useMemo(() => {
-    let sum = 0;
-    (data.parties || []).forEach(party => {
-      const partyReceipts = (data.materialReceipts || []).filter(r => r.partyId === party.id);
-      let partyDuesCurrent = 0;
-      partyReceipts.forEach(mr => {
-        const ti = (data.invoices || []).find(inv => inv.receiptId === mr.id && inv.invoiceNo?.includes('/IN/'));
-        if (ti) {
-          const fy = getFYOfDate(ti.date);
-          if (fy === currentFY) {
-            partyDuesCurrent += getReceiptOutstanding(mr, ti, data.payments);
-          }
-        }
-      });
-      const overrides = party.dueOverrides || {};
-      if (overrides[currentFY] !== undefined && overrides[currentFY] !== '') {
-        sum += parseFloat(overrides[currentFY]) || 0;
-      } else {
-        sum += partyDuesCurrent;
-      }
-    });
-    return sum;
+    return listProcessingSheetDueRows(data).reduce((sum, row) => {
+      if (getFYOfDate(row.fyDate) !== currentFY) return sum;
+      return sum + (parseFloat(row.outstanding) || 0);
+    }, 0);
   }, [data, currentFY]);
 
   const pendingTasksCount = useMemo(() => {

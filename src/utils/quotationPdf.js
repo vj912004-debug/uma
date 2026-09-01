@@ -47,6 +47,17 @@ const extractRate = (rateStr) => {
   return rate || 'Nil';
 };
 
+const formatChargeDescriptionHtml = (c) => {
+  const base = String(c?.description || '').trim();
+  const note = String(c?.note || c?.chargeNote || '').trim();
+  if (!base && !note) return '';
+  if (!note) return escHtml(base);
+  const wrapped = /^\(.*\)$/.test(note) ? note : `(${note})`;
+  if (base && base.toLowerCase().includes(note.toLowerCase())) return escHtml(base);
+  const prefix = base ? `${escHtml(base)} ` : '';
+  return `${prefix}<b>${escHtml(wrapped)}</b>`;
+};
+
 const rateDisplayHtml = (rateStr) => {
   const rate = extractRate(rateStr);
   if (!rate || rate === '-' || /^nil$/i.test(rate)) {
@@ -68,14 +79,25 @@ const OPTIONAL_PRINT_CHARGES = [
 
 /** Build optional service rows for print from saved rows and/or selected charge flags. */
 const resolveOptionalChargesForPrint = (data) => {
-  const fromRows = (data.optionalCharges || []).filter((c) => {
-    if (c.selected === false) return false;
-    return String(c.description || '').trim();
-  });
+  const section = data.chargeSection || {};
+  const mainKeys = new Set(
+    (data.mainCharges || []).map((c) => c.sourceKey).filter(Boolean)
+  );
+  const fromRows = (data.optionalCharges || [])
+    .filter((c) => {
+      if (c.selected === false) return false;
+      if (c.sourceKey && (section[c.sourceKey] === 'main' || mainKeys.has(c.sourceKey))) return false;
+      return String(c.description || '').trim();
+    })
+    .map((c) => ({
+      ...c,
+      note: c.note || data.chargeNotes?.[c.sourceKey] || ''
+    }));
 
   const fromFlags = [];
   OPTIONAL_PRINT_CHARGES.forEach((item) => {
     if (!data.charges?.[item.key]) return;
+    if (section[item.key] === 'main' || mainKeys.has(item.key)) return;
     const already = fromRows.some(
       (r) => r.sourceKey === item.key
         || String(r.description || '').toLowerCase().includes(item.label.split(' (')[0].toLowerCase())
@@ -86,7 +108,8 @@ const resolveOptionalChargesForPrint = (data) => {
       description: item.label,
       rate: rate > 0 ? `₹ ${rate}` : 'NIL',
       selected: true,
-      sourceKey: item.key
+      sourceKey: item.key,
+      note: data.chargeNotes?.[item.key] || ''
     });
   });
 
@@ -96,7 +119,12 @@ const resolveOptionalChargesForPrint = (data) => {
 export const buildQuotationHtml = (data, profileInput) => {
   const profile = mergeCompanyProfile(profileInput);
   // Quotation print: only selected / filled rows — never dump every charge.
-  const mainCharges = (data.mainCharges || []).filter((c) => String(c.description || '').trim());
+  const mainCharges = (data.mainCharges || [])
+    .filter((c) => String(c.description || '').trim())
+    .map((c) => ({
+      ...c,
+      note: c.note || data.chargeNotes?.[c.sourceKey] || ''
+    }));
   const optionalCharges = resolveOptionalChargesForPrint(data);
   const companyName = escHtml(profile.companyName || 'UMA MICRON');
   const qtnNo = escHtml(data.quotationNo || 'N/A');
@@ -118,7 +146,7 @@ export const buildQuotationHtml = (data, profileInput) => {
             return `
             <tr>
               <td>${i + 1}</td>
-              <td class="left">${escHtml(c.description)}</td>
+              <td class="left">${formatChargeDescriptionHtml(c)}</td>
               <td>${c.psdRequirement ? escHtml(c.psdRequirement) : ''}</td>
               <td>${extractUnit(rateSrc)}</td>
               <td>${rateDisplayHtml(rateSrc)}</td>
@@ -135,7 +163,7 @@ export const buildQuotationHtml = (data, profileInput) => {
             (c, i) => `
             <tr>
               <td>${i + 1}</td>
-              <td class="left">${escHtml(c.description)}</td>
+              <td class="left">${formatChargeDescriptionHtml(c)}</td>
               <td>${rateDisplayHtml(c.rate)} / ${extractUnit(c.rate)}</td>
             </tr>`
           )

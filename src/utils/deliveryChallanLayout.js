@@ -4,6 +4,7 @@ import {
   getProductBatches,
   getProductQty,
   getProductDrums,
+  getMRMaterialValue,
   receiptProductOptions
 } from './receiptProducts';
 
@@ -56,12 +57,10 @@ export const buildDcPrintLines = (dc, appData = {}) => {
 
     if (batches.length) {
       const batchQtySum = batches.reduce((s, b) => s + (parseFloat(b.qty) || 0), 0);
-      // Prefer MR totalQty when this DC has a single product (authoritative received qty)
-      const displayProdQty = (products.length === 1 && (parseFloat(mr.totalQty) || 0) > 0)
-        ? parseFloat(mr.totalQty)
-        : (prodQty > 0 ? prodQty : batchQtySum);
+      const displayProdQty = prodQty > 0 ? prodQty : batchQtySum;
 
       batches.forEach((b) => {
+        if (b.isEmptyDrums || /^empty\s*drums$/i.test(String(b.batchNo || '').trim())) return;
         const d = parseInt(b.drums, 10) || 0;
         let q = parseFloat(b.qty) || 0;
         if (batches.length === 1 && displayProdQty > 0) q = displayProdQty;
@@ -81,35 +80,54 @@ export const buildDcPrintLines = (dc, appData = {}) => {
           qty: displayProdQty.toFixed(2)
         });
       }
-    } else if (prodQty > 0 || prodDrums > 0 || ((parseFloat(mr.totalQty) || 0) > 0 && products.length === 1)) {
-      const q = (products.length === 1 && (parseFloat(mr.totalQty) || 0) > 0)
-        ? parseFloat(mr.totalQty)
-        : prodQty;
+    } else if (prodQty > 0 || prodDrums > 0) {
       lines.push({
         kind: 'batch',
         text: 'Received Qty',
         drums: prodDrums > 0 ? prodDrums : '',
-        qty: q > 0 ? q.toFixed(2) : ''
+        qty: prodQty > 0 ? prodQty.toFixed(2) : ''
       });
     }
   });
 
-  (mr?.batches || []).filter((b) => b.isEmptyDrums).forEach((b) => {
-    const d = parseInt(b.drums, 10) || 0;
+  const isMrEmptyDrumsEntry = (b) =>
+    !!b?.isEmptyDrums
+    || (
+      /^empty\s*drums$/i.test(String(b?.batchNo || '').trim())
+      && !String(b?.productName || '').trim()
+    );
+  const emptyDrumsCount = (mr?.batches || [])
+    .filter(isMrEmptyDrumsEntry)
+    .reduce((sum, b) => sum + (parseInt(b.drums, 10) || 0), 0);
+
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const l = lines[i];
+    if (
+      l.kind === 'batch'
+      && /^empty\s*drums$/i.test(String(l.text || '').replace(/^BATCH NO:?\s*/i, '').trim())
+    ) {
+      lines.splice(i, 1);
+    }
+  }
+  if (emptyDrumsCount > 0) {
     lines.push({
-      kind: 'empty',
-      text: 'EMPTY DRUM',
-      drums: d > 0 ? d : '',
+      kind: 'batch',
+      text: 'Empty Drums',
+      drums: emptyDrumsCount,
       qty: ''
     });
-  });
+  }
 
   if (!lines.length && dc.productName) {
     lines.push({ kind: 'product', text: dc.productName, drums: '', qty: '' });
   }
 
-  const value = parseFloat(dc.value);
-  if (!Number.isNaN(value) && value > 0) {
+  const mrValue = getMRMaterialValue(mr);
+  const dcValue = parseFloat(dc.value);
+  const value = mrValue > 0
+    ? mrValue
+    : (Number.isFinite(dcValue) && dcValue > 0 ? dcValue : 0);
+  if (value > 0) {
     lines.push({
       kind: 'value',
       text: `Total goods value Rs : ${fmtMoney(value)}`,
@@ -118,18 +136,18 @@ export const buildDcPrintLines = (dc, appData = {}) => {
     });
   }
 
-  // Prefer MR received totalQty (e.g. 50) over packing-list / stale dc.qty (e.g. 49.57)
-  const mrTotalQty = parseFloat(mr?.totalQty) || 0;
-  const mrTotalDrums = parseInt(mr?.totalDrums, 10) || 0;
+  const formQty = parseFloat(dc.qty) || 0;
+  const formDrums = parseInt(dc.totalDrums, 10) || 0;
   const linesQty = lines.reduce((s, l) => s + (parseFloat(l.qty) || 0), 0);
   const linesDrums = lines.reduce((s, l) => s + (parseInt(l.drums, 10) || 0), 0);
 
-  const totalQty = mrTotalQty > 0
-    ? mrTotalQty
-    : (receivedQtyTotal > 0 ? receivedQtyTotal : (linesQty > 0 ? linesQty : (parseFloat(dc.qty) || 0)));
-  const totalDrums = mrTotalDrums > 0
-    ? mrTotalDrums
-    : (receivedDrumsTotal > 0 ? receivedDrumsTotal : (linesDrums > 0 ? linesDrums : (parseInt(dc.totalDrums, 10) || 0)));
+  const totalQty = formQty > 0
+    ? formQty
+    : (receivedQtyTotal > 0 ? receivedQtyTotal : linesQty);
+  const printedDrums = receivedDrumsTotal + emptyDrumsCount;
+  const totalDrums = printedDrums > 0
+    ? printedDrums
+    : (formDrums > 0 ? formDrums : linesDrums);
 
   return { lines, totalDrums, totalQty };
 };

@@ -662,19 +662,19 @@ export const buildPurchaseOrderHtml = (raw, profileInput) => {
   <!-- ITEMS TABLE -->
   <div class="table-container">
     <table class="items">
-    <colgroup>
-        <col style="width: 3%;">
-        <col style="width: 22%;">
-        <col style="width: 8%;">
-        <col style="width: 8%;">
-        <col style="width: 9%;">
-        <col style="width: 4%;">
-        <col style="width: 9%;">
-        <col style="width: 4%;">
-        <col style="width: 9%;">
-        <col style="width: 4%;">
-        <col style="width: 9%;">
-        <col style="width: 11%;">
+      <colgroup>
+          <col style="width: 3%;">
+          <col style="width: 22%;">
+          <col style="width: 8%;">
+          <col style="width: 8%;">
+          <col style="width: 9%;">
+          <col style="width: 4%;">
+          <col style="width: 9%;">
+          <col style="width: 4%;">
+          <col style="width: 9%;">
+          <col style="width: 4%;">
+          <col style="width: 9%;">
+          <col style="width: 11%;">
       </colgroup>
       <thead>
         <tr>

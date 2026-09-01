@@ -1,9 +1,8 @@
 import { mergeCompanyProfile } from './companyProfile';
 import {
-  TI_CHARGES_LIST,
   splitPartyAddressLines,
   formatPdfDateDmy,
-  buildTiChargeAmounts,
+  buildTiPrintChargeRows,
   getSplitGstRates
 } from './taxInvoiceLayout';
 import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPrintTermsHtml, DEFAULT_INVOICE_TERMS, DEFAULT_INVOICE_DECLARATION } from './printTheme';
@@ -25,7 +24,7 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
   const data = fillPrintPartyFields(raw, raw?.appData || loadUmaAppData());
   const profile = mergeCompanyProfile(profileInput);
 
-  const chargeAmounts = buildTiChargeAmounts(data);
+  const chargeRows = buildTiPrintChargeRows(data);
   const { taxRate, displayRate, sgst: sgstCalc, cgst: cgstCalc, igst: igstCalc } = getSplitGstRates(data);
   // Print RATE + tax amounts both use full form GST (e.g. 18).
   const printGstRate = displayRate;
@@ -82,10 +81,8 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
       </tr>`);
   };
 
-  TI_CHARGES_LIST.forEach((charge) => {
-    const line = chargeAmounts[charge.key];
-    if (!line || !(line.amt > 0)) return;
-    pushRow(charge.label, line.qty, line.rate, line.amt);
+  chargeRows.forEach((row) => {
+    pushRow(row.label, row.qty, row.rate, row.amt);
   });
 
   (data.customCharges || []).forEach((cc) => {
@@ -109,7 +106,7 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
     totalAll = totalAmt + totalSgst + totalCgst + totalIgst;
   }
 
-  rows.push(buildFillerRowsHtml(12, 10));
+  rows.push(buildFillerRowsHtml(12, 2));
 
   const roundedTotal = Math.round(totalAll);
   const roundOff = roundedTotal - totalAll;
@@ -684,18 +681,18 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
   <div class="table-container">
     <table class="items">
       <colgroup>
-        <col style="width: 3%;">
-        <col style="width: 26%;">
-        <col style="width: 6%;">
-        <col style="width: 6%;">
-        <col style="width: 8%;">
-        <col style="width: 5%;">
-        <col style="width: 8%;">
-        <col style="width: 5%;">
-        <col style="width: 8%;">
-        <col style="width: 5%;">
-        <col style="width: 8%;">
-        <col style="width: 12%;">
+          <col style="width: 3%;">
+          <col style="width: 26%;">
+          <col style="width: 6%;">
+          <col style="width: 6%;">
+          <col style="width: 8%;">
+          <col style="width: 5%;">
+          <col style="width: 8%;">
+          <col style="width: 5%;">
+          <col style="width: 8%;">
+          <col style="width: 5%;">
+          <col style="width: 8%;">
+          <col style="width: 12%;">
       </colgroup>
       <thead>
         <tr>

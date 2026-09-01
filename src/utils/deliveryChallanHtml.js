@@ -9,7 +9,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   const profile = mergeCompanyProfile(profileInput);
   const { lines, totalDrums, totalQty } = buildDcPrintLines(data, appData);
   const linkedMr = (appData.materialReceipts || []).find((r) => r.id === data.receiptId) || null;
-  const deliveryNotes = (
+  const deliveryNote = (
     data.termsAndConditions
     || data.deliveryNotes
     || linkedMr?.deliveryNotes
@@ -54,10 +54,13 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
          curGroup = { isProduct: true, sr: globalSr++, productName: '', batches: [], totalDrums: 0, totalQty: 0 };
          groups.push(curGroup);
        }
-       const batchText = line.text.replace(/^BATCH NO:?\s*/i, '');
-       curGroup.batches.push(batchText);
-       curGroup.totalDrums += parseInt(line.drums, 10) || 0;
-       curGroup.totalQty += parseFloat(line.qty) || 0;
+      const batchText = line.text.replace(/^BATCH NO:?\s*/i, '');
+      curGroup.batches.push({
+        text: batchText,
+        drums: parseInt(line.drums, 10) || 0
+      });
+      curGroup.totalDrums += parseInt(line.drums, 10) || 0;
+      curGroup.totalQty += parseFloat(line.qty) || 0;
     } else {
        groups.push({
          isProduct: false,
@@ -71,12 +74,17 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
 
   groups.forEach((g) => {
     if (g.isProduct) {
-      const d = g.totalDrums > 0 ? g.totalDrums : '';
       const q = g.totalQty > 0 ? fmtQty(g.totalQty) : '';
       const numBatches = g.batches.length;
+      const batchLabel = (b) => (typeof b === 'string' ? b : (b?.text || ''));
+      const batchDrums = (b) => {
+        const n = typeof b === 'string' ? (g.totalDrums || 0) : (parseInt(b?.drums, 10) || 0);
+        return n > 0 ? n : '';
+      };
 
       if (numBatches <= 1) {
-        const batchText = numBatches === 1 ? g.batches[0] : '';
+        const batchText = numBatches === 1 ? batchLabel(g.batches[0]) : '';
+        const d = numBatches === 1 ? batchDrums(g.batches[0]) : (g.totalDrums > 0 ? g.totalDrums : '');
         bodyRows.push(`
           <tr>
             <td class="num">${g.sr}</td>
@@ -90,14 +98,15 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
           <tr>
             <td class="num" rowspan="${numBatches}">${g.sr}</td>
             <td class="left" rowspan="${numBatches}"><strong>${escHtml(g.productName)}</strong></td>
-            <td class="num">${escHtml(g.batches[0])}</td>
-            <td class="num" rowspan="${numBatches}">${d}</td>
+            <td class="num">${escHtml(batchLabel(g.batches[0]))}</td>
+            <td class="num">${batchDrums(g.batches[0])}</td>
             <td class="num" rowspan="${numBatches}">${q}</td>
           </tr>`);
         for (let i = 1; i < numBatches; i++) {
           bodyRows.push(`
           <tr>
-            <td class="num">${escHtml(g.batches[i])}</td>
+            <td class="num">${escHtml(batchLabel(g.batches[i]))}</td>
+            <td class="num">${batchDrums(g.batches[i])}</td>
           </tr>`);
         }
       }
@@ -113,13 +122,24 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
     }
   });
 
-  // Blank handwriting rows — equal height via CSS (table fills middle of page)
-  const DC_BLANK_ROWS = 14;
-  for (let i = 0; i < DC_BLANK_ROWS; i++) {
-    bodyRows.push(`
+  const blankRow = `
       <tr class="empty">
         <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+      </tr>`;
+  for (let i = 0; i < 4; i++) bodyRows.push(blankRow);
+
+  if (deliveryNote) {
+    bodyRows.push(`
+      <tr class="dc-delivery-note">
+        <td></td>
+        <td class="left" colspan="4"><strong>${escHtml(deliveryNote)}</strong></td>
       </tr>`);
+  }
+
+  // Remaining blank handwriting rows — table still fills the page
+  const DC_BLANK_ROWS = 9;
+  for (let i = 0; i < DC_BLANK_ROWS; i++) {
+    bodyRows.push(blankRow);
   }
 
   const drumsTotal = parseInt(totalDrums, 10) > 0 ? String(parseInt(totalDrums, 10)) : '';
@@ -412,6 +432,21 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   }
   table.items tbody td.num { text-align: center; }
   table.items tbody td.left { text-align: left; }
+  table.items tbody tr.dc-delivery-note td {
+    height: auto;
+    padding: 6px 8px;
+    font-size: 12px;
+    line-height: 1.35;
+    vertical-align: top;
+    white-space: pre-wrap;
+  }
+  table.items tbody tr.dc-delivery-note td.left {
+    text-align: left;
+    font-weight: 700;
+  }
+  table.items tbody tr.dc-delivery-note strong {
+    font-weight: 700;
+  }
   /* Blank rows: no fixed height so they split remaining space equally */
   table.items tbody tr.empty td {
     height: auto;
@@ -495,21 +530,6 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   }
   .dc-meta-card .dc-meta-row:first-of-type { margin-top: 8px; }
   .dc-meta-card .dc-meta-row:last-child { margin-bottom: 8px; }
-  .dc-notes-card {
-    border: 1px solid var(--lav-border);
-    margin-top: 10px;
-    width: 100%;
-    box-sizing: border-box;
-  }
-  .dc-notes-body {
-    padding: 8px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    color: #231f20;
-    white-space: pre-wrap;
-    line-height: 1.45;
-    min-height: 28px;
-  }
 </style>
 </head>
 <body>
@@ -577,14 +597,14 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
               <span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
               <span class="m-label">Challan Date</span><span class="m-colon">:</span><span class="m-value">&nbsp;${dcDate}</span>
             </div>
-            <div class="meta-row" style="margin-top:8px;">
+            ${hasPrintVal(poNo) ? `<div class="meta-row" style="margin-top:8px;">
               <span class="m-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
               <span class="m-label">PO No.</span><span class="m-colon">:</span><span class="m-value">&nbsp;${poNo}</span>
-            </div>
-            <div class="meta-row">
+            </div>` : ''}
+            ${hasPrintVal(poDate) ? `<div class="meta-row">
               <span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
               <span class="m-label">PO Date</span><span class="m-colon">:</span><span class="m-value">&nbsp;${poDate}</span>
-            </div>
+            </div>` : ''}
           </div>
         </div>
       </div>
@@ -620,10 +640,10 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
       <div class="dc-footer-grid">
         <div class="dc-meta-card">
           <div class="box-head"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> TRANSPORT DETAILS</div>
-          ${hasPrintVal(data.vehicleNo) ? `<div class="dc-meta-row"><div class="dc-meta-label">Vehicle No.</div><div class="data-value">: &nbsp;${escHtml(data.vehicleNo)}</div></div>` : ''}
-          ${hasPrintVal(data.driverName) ? `<div class="dc-meta-row"><div class="dc-meta-label">Drivers name</div><div class="data-value">: &nbsp;${escHtml(data.driverName)}</div></div>` : ''}
-          ${hasPrintVal(data.driverContact || data.driverPhone) ? `<div class="dc-meta-row"><div class="dc-meta-label">Driver's Contact</div><div class="data-value">: &nbsp;${escHtml(data.driverContact || data.driverPhone)}</div></div>` : ''}
-          ${hasPrintVal(data.transporterName || data.transporter) ? `<div class="dc-meta-row"><div class="dc-meta-label">Transporter's Name</div><div class="data-value">: &nbsp;${escHtml(data.transporterName || data.transporter)}</div></div>` : ''}
+          <div class="dc-meta-row"><div class="dc-meta-label">Vehicle No.</div><div class="data-value">: &nbsp;${escHtml(data.vehicleNo || '')}</div></div>
+          <div class="dc-meta-row"><div class="dc-meta-label">Drivers name</div><div class="data-value">: &nbsp;${escHtml(data.driverName || '')}</div></div>
+          <div class="dc-meta-row"><div class="dc-meta-label">Driver's Contact</div><div class="data-value">: &nbsp;${escHtml(data.driverContact || data.driverPhone || '')}</div></div>
+          <div class="dc-meta-row"><div class="dc-meta-label">Transporter's Name</div><div class="data-value">: &nbsp;${escHtml(data.transporterName || data.transporter || '')}</div></div>
         </div>
         <div class="dc-sign-stack">
           <div class="dc-sign-card">
@@ -638,12 +658,6 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
           </div>
         </div>
       </div>
-
-      ${hasPrintVal(deliveryNotes) ? `
-      <div class="dc-notes-card">
-        <div class="box-head"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> DELIVERY NOTES</div>
-        <div class="dc-notes-body">${escHtml(deliveryNotes)}</div>
-      </div>` : ''}
 
       <div class="barfoot">
         <span>Thank you for your business!</span>

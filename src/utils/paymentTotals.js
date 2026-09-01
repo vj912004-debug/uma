@@ -1,3 +1,21 @@
+import { getFYOfDate } from './financialYear';
+
+/** Merge material-receipt sheet fields with per-invoice payment fields. */
+export const getMergedSheetOverrides = (mr, invoiceId) => {
+  const o = mr?.sheetOverrides || {};
+  if (!invoiceId) return o;
+  const per = o.byInvoice?.[invoiceId] || o.byInvoice?.[String(invoiceId)];
+  if (!per || typeof per !== 'object') return o;
+  const rest = { ...o };
+  delete rest.byInvoice;
+  delete rest.outstanding;
+  delete rest.manualPaid;
+  delete rest.tdsDeduction;
+  delete rest.totalBill;
+  delete rest.dueStatus;
+  return { ...rest, ...per };
+};
+
 /** Total received against a material receipt (cheque amount + TDS). */
 export const getReceiptPaymentTotal = (payments, receiptId, invoiceId) =>
   (payments || [])
@@ -35,7 +53,7 @@ export const hasSheetOverride = (overrides, key) =>
 
 /** Bill amount for a receipt: Processing Sheet override wins over Tax Invoice total. */
 export const getReceiptBillAmount = (mr, ti) => {
-  const o = mr?.sheetOverrides || {};
+  const o = getMergedSheetOverrides(mr, ti?.id);
   if (hasSheetOverride(o, 'totalBill')) return parseFloat(o.totalBill) || 0;
   const fromTi = parseFloat(ti?.total);
   if (Number.isFinite(fromTi) && fromTi > 0) return fromTi;
@@ -51,14 +69,14 @@ export const getReceiptBillAmount = (mr, ti) => {
  * Processing Sheet "Total Recd (Manual)" overrides payment cheque totals.
  */
 export const getReceiptEffectivePaid = (mr, payments, invoiceId) => {
-  const o = mr?.sheetOverrides || {};
+  const o = getMergedSheetOverrides(mr, invoiceId);
   if (hasSheetOverride(o, 'manualPaid')) return parseFloat(o.manualPaid) || 0;
   return getReceiptChequeTotal(payments, mr?.id, invoiceId);
 };
 
 /** TDS deducted: Processing Sheet override wins over payment TDS. */
 export const getReceiptEffectiveTds = (mr, payments, invoiceId) => {
-  const o = mr?.sheetOverrides || {};
+  const o = getMergedSheetOverrides(mr, invoiceId);
   if (hasSheetOverride(o, 'tdsDeduction')) return parseFloat(o.tdsDeduction) || 0;
   return getReceiptTdsTotal(payments, mr?.id, invoiceId);
 };
@@ -68,16 +86,14 @@ export const getReceiptEffectiveTds = (mr, payments, invoiceId) => {
  * Used by Processing Sheet + Party Due + Payment Follow-Up.
  */
 export const getReceiptOutstanding = (mr, ti, payments) => {
-  const o = mr?.sheetOverrides || {};
-  const hasBill = !!ti || hasSheetOverride(o, 'totalBill');
-  if (!hasBill) {
-    // No invoice/bill yet — allow manual outstanding from Processing Sheet
-    if (hasSheetOverride(o, 'outstanding')) {
-      const v = parseFloat(o.outstanding);
-      return Number.isFinite(v) && v > 0 ? v : 0;
-    }
-    return 0;
+  const o = getMergedSheetOverrides(mr, ti?.id);
+  // Manual Processing Sheet outstanding is the source of truth when typed
+  if (hasSheetOverride(o, 'outstanding')) {
+    const v = parseFloat(o.outstanding);
+    return Number.isFinite(v) && v > 0 ? v : 0;
   }
+  const hasBill = !!ti || hasSheetOverride(o, 'totalBill');
+  if (!hasBill) return 0;
   let outstanding =
     getReceiptBillAmount(mr, ti) -
     getReceiptEffectivePaid(mr, payments, ti?.id) -
@@ -124,4 +140,81 @@ export const getInvoiceDebitCreditNet = (data, invoiceNo) => {
   const dn = (data?.debitNotes || []).filter((n) => noteMatchesInvoice(n, invoiceNo)).reduce((s, n) => s + noteAmount(n), 0);
   const cn = (data?.creditNotes || []).filter((n) => noteMatchesInvoice(n, invoiceNo)).reduce((s, n) => s + noteAmount(n), 0);
   return dn - cn;
+};
+
+export const samePartyRef = (party, partyId, partyName) => {
+  if (!party) return false;
+  const nameA = String(party.name || '').trim().toLowerCase();
+  const nameB = String(partyName || '').trim().toLowerCase();
+  if (nameA && nameB) return nameA === nameB;
+  if (party.id != null && partyId != null && String(partyId) !== '') {
+    return String(party.id) === String(partyId);
+  }
+  return false;
+};
+
+/**
+ * One outstanding row per Processing Sheet line (each Tax Invoice + pending MRs).
+ * Party Due must sum these — not first-TI-only receipts, and not extra debit notes.
+ */
+export const listProcessingSheetDueRows = (data) => {
+  const payments = data?.payments || [];
+  const rows = [];
+  const mrsCovered = new Set();
+
+  (data?.invoices || [])
+    .filter((inv) => String(inv.invoiceNo || '').includes('/IN/'))
+    .forEach((ti) => {
+      const mr = (data.materialReceipts || []).find(
+        (m) => String(m.id) === String(ti.receiptId)
+      );
+      const baseMr = mr || {
+        id: ti.receiptId || `orphan-${ti.id}`,
+        partyId: ti.partyId || '',
+        partyName: ti.partyName || '',
+        date: ti.date || '',
+        sheetOverrides: {}
+      };
+      if (mr) mrsCovered.add(String(mr.id));
+      const o = getMergedSheetOverrides(baseMr, ti.id);
+      const partyName = hasSheetOverride(o, 'partyName')
+        ? o.partyName
+        : (baseMr.partyName || ti.partyName || '');
+      rows.push({
+        receiptId: baseMr.id,
+        invoiceId: ti.id,
+        partyId: baseMr.partyId || ti.partyId || '',
+        partyName,
+        outstanding: getReceiptOutstanding(baseMr, ti, payments),
+        fyDate: hasSheetOverride(o, 'invoiceDate') ? o.invoiceDate : (ti.date || baseMr.date)
+      });
+    });
+
+  (data?.materialReceipts || []).forEach((mr) => {
+    if (mrsCovered.has(String(mr.id))) return;
+    const o = mr.sheetOverrides || {};
+    rows.push({
+      receiptId: mr.id,
+      invoiceId: null,
+      partyId: mr.partyId || '',
+      partyName: hasSheetOverride(o, 'partyName') ? o.partyName : (mr.partyName || ''),
+      outstanding: getReceiptOutstanding(mr, null, payments),
+      fyDate: o.invoiceDate || mr.date
+    });
+  });
+
+  return rows;
+};
+
+/** FY buckets of Processing Sheet outstanding for one party. */
+export const getPartyOutstandingByFY = (data, party, fyKeys, currentFY) => {
+  const byFy = Object.fromEntries((fyKeys || []).map((k) => [k, 0]));
+  listProcessingSheetDueRows(data).forEach((row) => {
+    if (!samePartyRef(party, row.partyId, row.partyName)) return;
+    const fy = getFYOfDate(row.fyDate);
+    const amt = parseFloat(row.outstanding) || 0;
+    if (Object.prototype.hasOwnProperty.call(byFy, fy)) byFy[fy] += amt;
+    else if (currentFY && Object.prototype.hasOwnProperty.call(byFy, currentFY)) byFy[currentFY] += amt;
+  });
+  return byFy;
 };

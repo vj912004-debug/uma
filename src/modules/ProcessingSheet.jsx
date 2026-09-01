@@ -18,9 +18,9 @@ import {
   getReceiptPayments,
   getReceiptBillAmount,
   getReceiptOutstanding,
-  hasSheetOverride
+  hasSheetOverride,
+  getMergedSheetOverrides
 } from '../utils/paymentTotals';
-import { getFYOfDate } from '../utils/financialYear';
 import SearchableSelect from '../components/SearchableSelect';
 
 const DATE_COLUMNS = new Set(['date', 'bprDate', 'dcDate', 'invoiceDate']);
@@ -99,21 +99,49 @@ const ProcessingSheet = () => {
     const numericFields = new Set([
       'receivedQty', 'bprNetQty', 'dcNetQty', 'totalBill', 'manualPaid', 'tdsDeduction', 'outstanding'
     ]);
+    const paymentFields = new Set(['totalBill', 'manualPaid', 'tdsDeduction', 'outstanding']);
     // Empty numeric cells save as 0 so clearing does not snap back to auto-calculated values
     const nextVal = numericFields.has(field) && (value === '' || value === null || value === undefined)
       ? '0'
       : value;
-    currentOverrides[field] = nextVal;
 
-    // Received / TDS / bill drive outstanding → Party Due
-    if (field === 'manualPaid' || field === 'totalBill' || field === 'tdsDeduction') {
-      delete currentOverrides.outstanding;
-      const ti = invoiceId
-        ? (data.invoices || []).find((inv) => inv.id === invoiceId)
-        : getTI(mrId);
-      const nextMr = { ...mr, sheetOverrides: currentOverrides };
+    const ti = invoiceId
+      ? (data.invoices || []).find((inv) => inv.id === invoiceId)
+      : getTI(mrId);
+
+    const persistComputedOutstanding = (bucket, nextMr) => {
       const outstanding = getReceiptOutstanding(nextMr, ti, data.payments);
-      currentOverrides.dueStatus = outstanding <= 0 ? '0' : 'Due';
+      bucket.outstanding = outstanding < 0.01 ? '0' : String(Math.round(outstanding * 100) / 100);
+      bucket.dueStatus = outstanding <= 0 ? '0' : 'Due';
+    };
+
+    if (invoiceId && paymentFields.has(field)) {
+      const byInvoice = { ...(currentOverrides.byInvoice || {}) };
+      const invO = { ...(byInvoice[invoiceId] || {}) };
+      invO[field] = nextVal;
+      if (field === 'manualPaid' || field === 'totalBill' || field === 'tdsDeduction') {
+        delete invO.outstanding;
+        const nextMr = {
+          ...mr,
+          sheetOverrides: { ...currentOverrides, byInvoice: { ...byInvoice, [invoiceId]: invO } }
+        };
+        persistComputedOutstanding(invO, nextMr);
+      } else if (field === 'outstanding') {
+        invO.dueStatus = (parseFloat(nextVal) || 0) <= 0 ? '0' : 'Due';
+      }
+      byInvoice[invoiceId] = invO;
+      currentOverrides.byInvoice = byInvoice;
+      // Stale receipt-level outstanding must not leak onto other invoices / Party Due
+      delete currentOverrides.outstanding;
+    } else {
+      currentOverrides[field] = nextVal;
+      if (field === 'manualPaid' || field === 'totalBill' || field === 'tdsDeduction') {
+        delete currentOverrides.outstanding;
+        const nextMr = { ...mr, sheetOverrides: currentOverrides };
+        persistComputedOutstanding(currentOverrides, nextMr);
+      } else if (field === 'outstanding') {
+        currentOverrides.dueStatus = (parseFloat(nextVal) || 0) <= 0 ? '0' : 'Due';
+      }
     }
 
     updateItem('materialReceipts', mrId, {
@@ -121,20 +149,13 @@ const ProcessingSheet = () => {
       sheetOverrides: currentOverrides
     });
 
-    // Clear party FY dueOverrides so Party Due recalculates from Processing Sheet
-    if (field === 'manualPaid' || field === 'totalBill' || field === 'outstanding' || field === 'tdsDeduction') {
+    // Clear stale typed Party Due so this page is the only source of outstanding
+    if (paymentFields.has(field)) {
       const party = data.parties.find(p => p.id === mr.partyId)
-        || data.parties.find(p => p.name === (currentOverrides.partyName || mr.partyName));
+        || data.parties.find(p => String(p.name || '').trim().toLowerCase()
+          === String((currentOverrides.partyName || mr.partyName) || '').trim().toLowerCase());
       if (party?.dueOverrides && Object.keys(party.dueOverrides).length > 0) {
-        const ti = invoiceId
-          ? (data.invoices || []).find((inv) => inv.id === invoiceId)
-          : getTI(mrId);
-        const fy = getFYOfDate(ti?.date || currentOverrides.invoiceDate || mr.date);
-        if (fy && Object.prototype.hasOwnProperty.call(party.dueOverrides, fy)) {
-          const nextDue = { ...party.dueOverrides };
-          delete nextDue[fy];
-          updateItem('parties', party.id, { ...party, dueOverrides: nextDue });
-        }
+        updateItem('parties', party.id, { ...party, dueOverrides: {} });
       }
     }
   };
@@ -147,7 +168,7 @@ const ProcessingSheet = () => {
     const paid = getPaymentsReceived(mr.id);
     const tdsTotal = getTdsReceived(mr.id);
     const paymentHistory = getPaymentHistory(mr.id);
-    const o = mr.sheetOverrides || {};
+    const o = getMergedSheetOverrides(mr, ti?.id);
 
     const finalTotalBill = getReceiptBillAmount(mr, ti);
     const compOutstanding = getReceiptOutstanding(mr, ti, data.payments);
@@ -372,11 +393,12 @@ const ProcessingSheet = () => {
           color: value === 'Overdue' ? '#ef4444' : value === '0' ? '#10b981' : '#f59e0b'
         });
       case 'outstanding':
-        return (
-          <span style={{ fontWeight: 700, color: parseFloat(value) > 0 ? '#ef4444' : 'inherit', whiteSpace: 'nowrap' }}>
-            ₹{parseFloat(value || 0).toFixed(2)}
-          </span>
-        );
+        return renderInput(row, 'outstanding', value, {
+          ...fullTextStyle(value, 90),
+          textAlign: 'right',
+          fontWeight: 700,
+          color: parseFloat(value) > 0 ? '#ef4444' : 'inherit'
+        });
       case 'piNo':
         return renderInput(row, 'piNo', value, fullTextStyle(value, 170));
       case 'tiNo':
