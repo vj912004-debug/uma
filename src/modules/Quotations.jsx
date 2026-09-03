@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Eye, Plus, Search, Download, Trash2, Edit2, GripVertical } from 'lucide-react';
-import { generateDocNumber } from '../utils/numbering';
+import { Eye, Plus, Search, Download, Trash2, Edit2, GripVertical, Copy } from 'lucide-react';
+import { nextAvailableDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import { formatDate } from '../utils/dateUtils';
 import SearchableSelect from '../components/SearchableSelect';
+import {
+  RATE_UNIT_OPTIONS,
+  emptyRateUnits,
+  mergeRateUnits,
+  defaultRateUnit,
+  formatQuotedRate
+} from '../utils/quotationRates';
+import { qtyInputValue } from '../utils/documentCharges';
 
 const defaultValidityDate = () => {
   const d = new Date();
@@ -86,6 +94,20 @@ const ChargeNoteInput = ({ value, onChange, placeholder = 'Note e.g. Nil if Qty 
   />
 );
 
+const RateUnitSelect = ({ chargeKey, value, onChange }) => (
+  <select
+    className="input-field"
+    style={{ padding: '0.25rem 0.35rem', width: '96px', fontSize: '0.75rem' }}
+    value={value ?? defaultRateUnit(chargeKey)}
+    onChange={(e) => onChange(chargeKey, e.target.value)}
+    title="Printed after the rate (e.g. /Each, / Kg, /No)"
+  >
+    {RATE_UNIT_OPTIONS.map((opt) => (
+      <option key={opt.value || 'amount'} value={opt.value}>{opt.label === 'Amount only' ? '—' : opt.label}</option>
+    ))}
+  </select>
+);
+
 /** Quotation only: nothing selected until the user checks a charge. */
 const DEFAULT_CHARGES = {
   cleaning: false, filterBag: false, processing: false, sieving: false,
@@ -115,6 +137,7 @@ const getDefaultForm = () => ({
   rates: { ...DEFAULT_RATES },
   chargeNotes: emptyChargeNotes(),
   chargeSection: {},
+  rateUnits: emptyRateUnits(),
   mainCharges: [],
   optionalCharges: [],
   productSettings: {},
@@ -124,27 +147,28 @@ const getDefaultForm = () => ({
   signatoryName: 'Amit Patel'
 });
 
-const formatChargeRateLabel = (item, rate, qty) => {
-  if (item.isQtyRate && qty) return `₹ ${rate} / Kg (Qty: ${qty} Kg)`;
-  return `₹ ${rate}${item.isQtyRate ? ' / Kg' : ''}`;
+const formatChargeRateLabel = (item, rate, unit) => {
+  if (!(parseFloat(rate) > 0)) return 'NIL';
+  return formatQuotedRate(rate, unit ?? defaultRateUnit(item.key));
 };
 
 const customChargeRows = (rows = []) =>
   (rows || []).filter((row) => !row.sourceKey && String(row.description || '').trim());
 
-const buildAutoChargeRows = (section, charges, rates, qty, psdRequirement, chargeNotes = {}, chargeSection = {}) => {
+const buildAutoChargeRows = (section, charges, rates, qty, psdRequirement, chargeNotes = {}, chargeSection = {}, rateUnits = {}) => {
   const rows = [];
   ALL_CHARGE_DEFS.forEach((item) => {
     if (getChargeSection(chargeSection, item.key) !== section) return;
     if (!charges?.[item.key]) return;
     const rate = rates?.[item.key] || 0;
-    if (section === 'main' && rate <= 0 && defaultChargeSection(item.key) === 'main') return;
+    const unit = rateUnits[item.key] ?? defaultRateUnit(item.key);
     if (section === 'main') {
       rows.push({
         description: item.label,
         psdRequirement: item.key === 'processing' ? (psdRequirement || '') : '',
-        rate: rate > 0 ? formatChargeRateLabel(item, rate, qty) : 'NIL',
-        dryRate: rate > 0 ? formatChargeRateLabel(item, rate, qty) : 'NIL',
+        qty: item.isQtyRate ? (qty === '' || qty == null ? '' : (parseFloat(qty) || 0)) : '',
+        rate: rate > 0 ? formatChargeRateLabel(item, rate, unit) : 'NIL',
+        dryRate: rate > 0 ? formatChargeRateLabel(item, rate, unit) : 'NIL',
         wetRate: '',
         sourceKey: item.key,
         note: chargeNotes?.[item.key] || ''
@@ -152,7 +176,8 @@ const buildAutoChargeRows = (section, charges, rates, qty, psdRequirement, charg
     } else {
       rows.push({
         description: item.label,
-        rate: rate > 0 ? formatChargeRateLabel(item, rate, qty) : 'NIL',
+        qty: item.isQtyRate ? (qty === '' || qty == null ? '' : (parseFloat(qty) || 0)) : '',
+        rate: rate > 0 ? formatChargeRateLabel(item, rate, unit) : 'NIL',
         sourceKey: item.key,
         selected: true,
         note: chargeNotes?.[item.key] || ''
@@ -170,14 +195,15 @@ const rebuildChargeTables = (
   existingOptional = [],
   chargeNotes = {},
   chargeSection = {},
-  existingMain = []
+  existingMain = [],
+  rateUnits = {}
 ) => ({
   mainCharges: [
-    ...buildAutoChargeRows('main', charges, rates, qty, psdRequirement, chargeNotes, chargeSection),
+    ...buildAutoChargeRows('main', charges, rates, qty, psdRequirement, chargeNotes, chargeSection, rateUnits),
     ...customChargeRows(existingMain)
   ],
   optionalCharges: [
-    ...buildAutoChargeRows('optional', charges, rates, qty, psdRequirement, chargeNotes, chargeSection),
+    ...buildAutoChargeRows('optional', charges, rates, qty, psdRequirement, chargeNotes, chargeSection, rateUnits),
     ...customChargeRows(existingOptional)
   ]
 });
@@ -192,7 +218,8 @@ const tablesFromForm = (form, patch = {}) => {
     next.optionalCharges,
     next.chargeNotes,
     next.chargeSection,
-    next.mainCharges
+    next.mainCharges,
+    next.rateUnits
   );
 };
 
@@ -232,6 +259,7 @@ const snapshotCurrentProductSettings = (form) => {
       rates: { ...form.rates },
       chargeNotes: { ...emptyChargeNotes(), ...(form.chargeNotes || {}) },
       chargeSection: { ...(form.chargeSection || {}) },
+      rateUnits: mergeRateUnits(form.rateUnits),
       mainCharges: JSON.parse(JSON.stringify(form.mainCharges || [])),
       optionalCharges: JSON.parse(JSON.stringify(form.optionalCharges || []))
     }
@@ -251,6 +279,7 @@ const applyProductToQuotation = (baseForm, productName, party) => {
     });
     const chargeNotes = { ...emptyChargeNotes(), ...notesFromRows, ...(saved.chargeNotes || {}) };
     const chargeSection = inferChargeSection(saved);
+    const rateUnits = mergeRateUnits({ ...(baseForm.rateUnits || {}), ...(saved.rateUnits || {}) });
     const tables = rebuildChargeTables(
       charges,
       rates,
@@ -259,7 +288,8 @@ const applyProductToQuotation = (baseForm, productName, party) => {
       saved.optionalCharges,
       chargeNotes,
       chargeSection,
-      saved.mainCharges
+      saved.mainCharges,
+      rateUnits
     );
     return {
       ...baseForm,
@@ -271,6 +301,7 @@ const applyProductToQuotation = (baseForm, productName, party) => {
       rates,
       chargeNotes,
       chargeSection,
+      rateUnits,
       mainCharges: tables.mainCharges.length ? tables.mainCharges : (saved.mainCharges || []),
       optionalCharges: tables.optionalCharges.length ? tables.optionalCharges : (saved.optionalCharges || [])
     };
@@ -278,8 +309,8 @@ const applyProductToQuotation = (baseForm, productName, party) => {
 
   const prodConfig = (party?.products || []).find(p => p.name === productName);
   const { charges, rates, psdRequirement } = buildChargesFromPartyProduct(prodConfig);
-  const qty = baseForm.productName === productName ? baseForm.qty : '';
-  const tables = rebuildChargeTables(charges, rates, qty, psdRequirement, [], emptyChargeNotes(), {}, []);
+  const qty = baseForm.productName === productName ? (baseForm.qty ?? '') : '';
+  const tables = rebuildChargeTables(charges, rates, qty, psdRequirement, [], emptyChargeNotes(), {}, [], emptyRateUnits());
   return {
     ...baseForm,
     productName,
@@ -290,12 +321,30 @@ const applyProductToQuotation = (baseForm, productName, party) => {
     rates,
     chargeNotes: emptyChargeNotes(),
     chargeSection: {},
+    rateUnits: emptyRateUnits(),
     ...tables
   };
 };
 
+const quoteHasProduct = (q, productName) => {
+  const name = String(productName || '').trim();
+  if (!q || !name) return false;
+  if (q.productSettings?.[name]) return true;
+  return String(q.productName || '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .includes(name);
+};
+
+const primaryProductName = (q) => {
+  const current = String(q?.productName || '').split(',')[0]?.trim();
+  if (current) return current;
+  return Object.keys(q?.productSettings || {})[0] || '';
+};
+
 const Quotations = () => {
-  const { data, updateData, updateItem, deleteItemSoftly, incrementSerial } = useAppContext();
+  const { data, updateData, updateItem, deleteItemSoftly, ensureSerialAtLeast } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [productPickerOpen, setProductPickerOpen] = useState(false);
@@ -304,16 +353,28 @@ const Quotations = () => {
   const [formData, setFormData] = useState(getDefaultForm());
   const [dropTarget, setDropTarget] = useState(null);
 
+  const quotationsList = data.quotations?.filter(q => !q.isDeleted) || [];
+
+  const nextQuoteNumber = (date, excludeId = null) => nextAvailableDocNumber(
+    'QTN',
+    data.settings?.serials?.QT || 1,
+    date,
+    data.quotations || [],
+    { numberKey: 'quotationNo', excludeId }
+  );
+
   useEffect(() => {
     if (isModalOpen && !formData.id) {
-      const serial = data.settings?.serials?.QT || 1;
-      setFormData(prev => ({ ...prev, quotationNo: generateDocNumber('QTN', serial, new Date(prev.date)) }));
+      const { docNo } = nextQuoteNumber(formData.date);
+      setFormData(prev => (prev.id ? prev : { ...prev, quotationNo: docNo }));
     }
   }, [isModalOpen, data.settings?.serials?.QT, formData.date, formData.id]);
 
   const handlePartySelect = (e) => {
-    const partyId = e.target.value;
-    const party = data.parties.find(p => p.id === partyId);
+    const name = e.target.value || '';
+    const party = (data.parties || []).find(p =>
+      !p.isDeleted && (p.name || '').trim().toLowerCase() === name.trim().toLowerCase()
+    );
     if (party) {
       setFormData(prev => ({
         ...prev,
@@ -327,12 +388,25 @@ const Quotations = () => {
         chargeNotes: emptyChargeNotes(),
         chargeSection: {}
       }));
+      return;
     }
+    setFormData(prev => ({
+      ...prev,
+      partyId: '',
+      partyName: name
+    }));
   };
 
   const loadProduct = (productName, baseForm = formData) => {
     const party = data.parties.find(p => p.id === baseForm.partyId);
-    setFormData(applyProductToQuotation(baseForm, productName, party));
+    let next = applyProductToQuotation(baseForm, productName, party);
+    // Switching to a product this saved quote did not cover must not overwrite it.
+    if (baseForm.id && !quoteHasProduct(baseForm, productName)) {
+      const { docNo } = nextQuoteNumber(next.date, baseForm.id);
+      const { id, createdAt, ...rest } = next;
+      next = { ...rest, quotationNo: docNo };
+    }
+    setFormData(next);
   };
 
   const handleProductSelect = (e) => loadProduct(e.target.value);
@@ -361,6 +435,17 @@ const Quotations = () => {
     });
   };
 
+  const handleRateUnitChange = (key, val) => {
+    setFormData(prev => {
+      const nextUnits = { ...emptyRateUnits(), ...(prev.rateUnits || {}), [key]: val };
+      return {
+        ...prev,
+        rateUnits: nextUnits,
+        ...tablesFromForm(prev, { rateUnits: nextUnits })
+      };
+    });
+  };
+
   const handleChargeNoteChange = (key, val) => {
     setFormData(prev => {
       const chargeNotes = { ...emptyChargeNotes(), ...(prev.chargeNotes || {}), [key]: val };
@@ -380,48 +465,61 @@ const Quotations = () => {
     }));
   };
 
+  const quotationPrintData = (q) => {
+    const editingThis = isModalOpen && formData && (!q?.id || !formData.id || q.id === formData.id);
+    const source = editingThis ? { ...formData, ...tablesFromForm(formData) } : q;
+    return source;
+  };
+
+  const previewQuotation = (q) => viewPDF('QUOTATION', quotationPrintData(q));
+  const downloadQuotation = (q) => exportToPDF('QUOTATION', quotationPrintData(q));
+
   const selectedParty = data.parties.find(p => p.id === formData.partyId);
   const partyProducts = selectedParty?.products || [];
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const productSettings = snapshotCurrentProductSettings(formData);
-    const configuredProducts = Object.keys(productSettings);
+    const currentProduct = String(formData.productName || '').trim();
     const synced = tablesFromForm(formData);
+    const currentSettings = currentProduct
+      ? {
+          qty: formData.qty,
+          psdRequirement: formData.psdRequirement || '',
+          charges: { ...formData.charges },
+          rates: { ...formData.rates },
+          chargeNotes: { ...emptyChargeNotes(), ...(formData.chargeNotes || {}) },
+          chargeSection: { ...(formData.chargeSection || {}) },
+                rateUnits: mergeRateUnits(formData.rateUnits),
+          mainCharges: synced.mainCharges,
+          optionalCharges: synced.optionalCharges
+        }
+      : null;
+    const productSettings = {
+      ...(formData.productSettings || {}),
+      ...(currentProduct ? { [currentProduct]: currentSettings } : {})
+    };
     const payload = {
       ...formData,
       ...synced,
-      productSettings: {
-        ...productSettings,
-        ...(formData.productName
-          ? {
-              [formData.productName]: {
-                ...(productSettings[formData.productName] || {}),
-                charges: { ...formData.charges },
-                rates: { ...formData.rates },
-                chargeNotes: { ...emptyChargeNotes(), ...(formData.chargeNotes || {}) },
-                chargeSection: { ...(formData.chargeSection || {}) },
-                mainCharges: synced.mainCharges,
-                optionalCharges: synced.optionalCharges
-              }
-            }
-          : {})
-      },
-      productName: configuredProducts.length > 1
-        ? configuredProducts.join(', ')
-        : (formData.productName || configuredProducts[0] || '')
+      productSettings,
+      productName: currentProduct
     };
 
     if (formData.id) {
       updateItem('quotations', formData.id, payload);
     } else {
-      const newQuotation = {
+      const usedNos = new Set((data.quotations || []).map((q) => q.quotationNo).filter(Boolean));
+      const { docNo, nextSerial } = nextQuoteNumber(payload.date);
+      const quotationNo = payload.quotationNo && !usedNos.has(payload.quotationNo)
+        ? payload.quotationNo
+        : docNo;
+      updateData('quotations', {
         ...payload,
-        id: Date.now().toString(),
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        quotationNo,
         createdAt: new Date().toISOString()
-      };
-      updateData('quotations', newQuotation);
-      incrementSerial('QT');
+      });
+      ensureSerialAtLeast('QT', nextSerial);
     }
     closeQuotationModal();
   };
@@ -446,6 +544,7 @@ const Quotations = () => {
       rates: { ...DEFAULT_RATES, ...(q.rates || {}) },
       chargeNotes: { ...emptyChargeNotes(), ...(q.chargeNotes || {}) },
       chargeSection: inferChargeSection(q),
+      rateUnits: mergeRateUnits(q.rateUnits),
       productSettings: { ...(q.productSettings || {}) }
     };
 
@@ -459,20 +558,27 @@ const Quotations = () => {
           rates: baseForm.rates,
           chargeNotes: baseForm.chargeNotes,
           chargeSection: baseForm.chargeSection || {},
+          rateUnits: mergeRateUnits(baseForm.rateUnits),
           mainCharges: q.mainCharges || [],
           optionalCharges: q.optionalCharges || []
         };
       }
     }
 
-    const partyProducts = party?.products || [];
-    if (partyProducts.length > 1) {
-      setPendingEditData({ baseForm, party, partyProducts });
+    const configuredProducts = Object.keys(baseForm.productSettings || {});
+    if (configuredProducts.length > 1) {
+      setPendingEditData({
+        baseForm,
+        party,
+        partyProducts: configuredProducts.map((name) =>
+          (party?.products || []).find((p) => p.name === name) || { name }
+        )
+      });
       setProductPickerOpen(true);
       return;
     }
 
-    const productName = q.productName?.split(',')[0]?.trim() || partyProducts[0]?.name || '';
+    const productName = primaryProductName(baseForm) || party?.products?.[0]?.name || '';
     openQuotationForm(applyProductToQuotation(baseForm, productName, party));
   };
 
@@ -484,7 +590,30 @@ const Quotations = () => {
     setPendingEditData(null);
   };
 
+  const handleCopyAsNew = (q) => {
+    const party = data.parties.find(p => p.id === q.partyId);
+    const productName = primaryProductName(q);
+    const { id, createdAt, quotationNo, isDeleted, deletedAt, ...rest } = q;
+    const baseForm = {
+      ...getDefaultForm(),
+      ...rest,
+      charges: { ...DEFAULT_CHARGES, ...(q.charges || {}) },
+      rates: { ...DEFAULT_RATES, ...(q.rates || {}) },
+      chargeNotes: { ...emptyChargeNotes(), ...(q.chargeNotes || {}) },
+      chargeSection: inferChargeSection(q),
+      rateUnits: mergeRateUnits(q.rateUnits),
+      productSettings: q.productSettings?.[productName]
+        ? { [productName]: q.productSettings[productName] }
+        : { ...(q.productSettings || {}) }
+    };
+    const applied = applyProductToQuotation(baseForm, productName, party);
+    const { docNo } = nextQuoteNumber(applied.date);
+    openQuotationForm({ ...applied, quotationNo: docNo });
+  };
+
   const handleNewQuotation = () => {
+    setProductPickerOpen(false);
+    setPendingEditData(null);
     setFormData(getDefaultForm());
     setIsModalOpen(true);
   };
@@ -495,8 +624,8 @@ const Quotations = () => {
       [type]: [
         ...prev[type],
         type === 'mainCharges'
-          ? { description: '', psdRequirement: '', rate: '', dryRate: '', wetRate: '', note: '' }
-          : { description: '', rate: '', selected: true, note: '' }
+          ? { description: '', psdRequirement: '', qty: '', rate: '', dryRate: '', wetRate: '', note: '' }
+          : { description: '', qty: '', rate: '', selected: true, note: '' }
       ]
     }));
   };
@@ -620,10 +749,19 @@ const Quotations = () => {
     transition: 'border-color 0.15s ease, background 0.15s ease'
   });
 
-  const quotationsList = data.quotations?.filter(q => !q.isDeleted) || [];
-  const filtered = quotationsList.filter(q => 
-    q.partyName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    q.quotationNo.toLowerCase().includes(searchTerm.toLowerCase())
+  const filtered = quotationsList.filter(q => {
+    const term = searchTerm.toLowerCase();
+    return (
+      (q.partyName || '').toLowerCase().includes(term) ||
+      (q.quotationNo || '').toLowerCase().includes(term) ||
+      (q.productName || '').toLowerCase().includes(term)
+    );
+  });
+
+  const existingQuotesForCurrentProduct = quotationsList.filter((q) =>
+    q.partyId === formData.partyId &&
+    q.id !== formData.id &&
+    quoteHasProduct(q, formData.productName)
   );
 
   return (
@@ -658,6 +796,7 @@ const Quotations = () => {
                 <th>Date</th>
                 <th>Quotation No</th>
                 <th>Party Name</th>
+                <th>Product</th>
                 <th>Subject</th>
                 <th>Actions</th>
               </tr>
@@ -668,16 +807,20 @@ const Quotations = () => {
                   <td>{formatDate(q.date)}</td>
                   <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{q.quotationNo}</td>
                   <td>{q.partyName}</td>
+                  <td>{primaryProductName(q) || '—'}</td>
                   <td>{q.subject}</td>
                   <td>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }} onClick={() => viewPDF('QUOTATION', q)} title="Preview PDF">
+                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }} onClick={() => previewQuotation(q)} title="Preview PDF">
                         <Eye size={14} /> Preview
                       </button>
-                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }} onClick={() => exportToPDF('QUOTATION', q)}>
+                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }} onClick={() => downloadQuotation(q)}>
                         <Download size={14} /> PDF
                       </button>
-                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'transparent', color: 'var(--text-muted)' }} onClick={() => handleEdit(q)}>
+                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(16, 185, 129, 0.12)', color: '#059669' }} onClick={() => handleCopyAsNew(q)} title="New quotation for the same company and product">
+                        <Copy size={14} />
+                      </button>
+                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'transparent', color: 'var(--text-muted)' }} onClick={() => handleEdit(q)} title="Edit this quotation">
                         <Edit2 size={14} />
                       </button>
                       <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} onClick={() => deleteItemSoftly('quotations', q.id)}>
@@ -694,11 +837,11 @@ const Quotations = () => {
 
       {/* Product picker — shown when editing a quotation with multiple party products */}
       {productPickerOpen && pendingEditData && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, backdropFilter: 'blur(5px)' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '560px', maxWidth: '95%', maxHeight: '85vh', overflowY: 'auto' }}>
-            <h2 style={{ marginBottom: '0.35rem', fontSize: '1.25rem' }}>Select Product to Edit</h2>
+            <h2 style={{ marginBottom: '0.35rem', fontSize: '1.25rem' }}>Select Product on this Quotation</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-              This party has multiple products. Choose which product&apos;s quotation details you want to edit.
+              This quotation has more than one product saved. Choose which product to edit. To quote the same product again as a new entry, use New Quotation or the copy button in the list.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
               {pendingEditData.partyProducts.map(prod => {
@@ -750,7 +893,7 @@ const Quotations = () => {
       )}
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>{formData.id ? 'Edit Quotation' : 'Create Quotation'}</h2>
             <form onSubmit={handleSubmit}>
@@ -765,11 +908,18 @@ const Quotations = () => {
                   <input type="date" className="input-field" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
                 </div>
                 <div>
-                  <label>Select Party *</label>
-                  <SearchableSelect className="input-field" required value={formData.partyId} onChange={handlePartySelect}>
-                    <option value="">-- Select --</option>
-                    {data.parties.filter(p => p.type === 'Customer').map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
+                  <label>Party Name *</label>
+                  <SearchableSelect
+                    allowCustom
+                    className="input-field"
+                    required
+                    placeholder="Select or type party name"
+                    value={formData.partyName}
+                    onChange={handlePartySelect}
+                  >
+                    <option value="">Select or type party name</option>
+                    {data.parties.filter(p => !p.isDeleted && p.type === 'Customer').map(p => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
                     ))}
                   </SearchableSelect>
                 </div>
@@ -859,8 +1009,13 @@ const Quotations = () => {
                     </table>
                   </div>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.5rem 0 0' }}>
-                    Click <strong>Edit</strong> on a product to load its charges and editable fields below.
+                    Click <strong>Edit</strong> on a product to load its charges below. Saving a <strong>new</strong> quotation always adds a new entry — previous quotations for the same company and product are kept.
                   </p>
+                  {!formData.id && existingQuotesForCurrentProduct.length > 0 && (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', margin: '0.5rem 0 0', fontWeight: 600 }}>
+                      This company already has {existingQuotesForCurrentProduct.length} quotation{existingQuotesForCurrentProduct.length > 1 ? 's' : ''} for {formData.productName} ({existingQuotesForCurrentProduct.map((q) => q.quotationNo).join(', ')}). Save will add a new one; previous quotes stay.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -888,7 +1043,7 @@ const Quotations = () => {
                 </div>
                 <div>
                   <label>Estimated Qty (Kg)</label>
-                  <input type="number" className="input-field" placeholder="Qty for rate calculation" value={formData.qty} onChange={e => handleQtyChange(e.target.value)} />
+                  <input type="number" min="0" step="any" className="input-field" placeholder="NIL" value={qtyInputValue(formData.qty)} onChange={e => handleQtyChange(e.target.value)} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>PSD Requirement</label>
@@ -918,7 +1073,7 @@ const Quotations = () => {
                 </div>
                 <div>
                   <label>Estimated Qty (Kg)</label>
-                  <input type="number" className="input-field" placeholder="Qty for rate calculation" value={formData.qty} onChange={e => handleQtyChange(e.target.value)} />
+                  <input type="number" min="0" step="any" className="input-field" placeholder="NIL" value={qtyInputValue(formData.qty)} onChange={e => handleQtyChange(e.target.value)} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>PSD Requirement</label>
@@ -981,7 +1136,11 @@ const Quotations = () => {
                             value={formData.rates?.[item.key] || 0}
                             onChange={e => handleMaterialRateChange(item.key, e.target.value)}
                           />
-                          {item.isQtyRate && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ Kg</span>}
+                          <RateUnitSelect
+                            chargeKey={item.key}
+                            value={formData.rateUnits?.[item.key]}
+                            onChange={handleRateUnitChange}
+                          />
                         </div>
                         <div style={{ paddingLeft: '1.5rem' }}>
                           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Print note</span>
@@ -1043,6 +1202,11 @@ const Quotations = () => {
                             value={formData.rates?.[item.key] || 0}
                             onChange={e => handleMaterialRateChange(item.key, e.target.value)}
                           />
+                          <RateUnitSelect
+                            chargeKey={item.key}
+                            value={formData.rateUnits?.[item.key]}
+                            onChange={handleRateUnitChange}
+                          />
                         </div>
                         <div style={{ paddingLeft: '1.5rem' }}>
                           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Print note</span>
@@ -1077,18 +1241,19 @@ const Quotations = () => {
                 </div>
                 <div style={dropZoneStyle('mainTable')}>
                 {formData.mainCharges.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '22px 1.5fr 1.2fr 1fr 0.85fr 0.85fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '22px 1.4fr 1.1fr 0.95fr 70px 0.8fr 0.8fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                     <div></div>
                     <div>Charge Description</div>
                     <div>Print note</div>
                     <div>PSD Requirement</div>
+                    <div>Qty</div>
                     <div>Dry Rate</div>
                     <div>Wet Rate</div>
                     <div></div>
                   </div>
                 )}
                 {formData.mainCharges.map((charge, idx) => (
-                  <div key={charge.sourceKey || `main-${idx}`} style={{ display: 'grid', gridTemplateColumns: '22px 1.5fr 1.2fr 1fr 0.85fr 0.85fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                  <div key={charge.sourceKey || `main-${idx}`} style={{ display: 'grid', gridTemplateColumns: '22px 1.4fr 1.1fr 0.95fr 70px 0.8fr 0.8fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                     <span
                       draggable
                       title="Drag to Optional table"
@@ -1101,6 +1266,7 @@ const Quotations = () => {
                     <input type="text" className="input-field" placeholder="Charge Description (e.g. Processing Charges)" value={charge.description} onChange={e => updateChargeRow('mainCharges', idx, 'description', e.target.value)} />
                     <ChargeNoteInput value={charge.note || ''} onChange={(val) => updateChargeRow('mainCharges', idx, 'note', val)} />
                     <input type="text" className="input-field" placeholder="PSD Requirement (optional)" value={charge.psdRequirement || ''} onChange={e => updateChargeRow('mainCharges', idx, 'psdRequirement', e.target.value)} />
+                    <input type="number" min="0" step="any" className="input-field" placeholder="NIL" value={qtyInputValue(charge.qty)} onChange={e => updateChargeRow('mainCharges', idx, 'qty', e.target.value)} />
                     <input type="text" className="input-field" placeholder="Dry Rate (e.g. 5 / Kg)" value={charge.dryRate !== undefined ? charge.dryRate : (charge.rate || '')} onChange={e => updateChargeRow('mainCharges', idx, 'dryRate', e.target.value)} />
                     <input type="text" className="input-field" placeholder="Wet Rate (e.g. 6 / Kg)" value={charge.wetRate || ''} onChange={e => updateChargeRow('mainCharges', idx, 'wetRate', e.target.value)} />
                     <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeChargeRow('mainCharges', idx)}>
@@ -1127,16 +1293,17 @@ const Quotations = () => {
                 </div>
                 <div style={dropZoneStyle('optionalTable')}>
                 {formData.optionalCharges.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '22px 1.6fr 1.2fr 1fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '22px 1.5fr 1.1fr 70px 1fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                     <div></div>
                     <div>Description</div>
                     <div>Print note</div>
+                    <div>Qty</div>
                     <div>Rate</div>
                     <div></div>
                   </div>
                 )}
                 {formData.optionalCharges.map((charge, idx) => (
-                  <div key={charge.sourceKey || `opt-${idx}`} style={{ display: 'grid', gridTemplateColumns: '22px 1.6fr 1.2fr 1fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                  <div key={charge.sourceKey || `opt-${idx}`} style={{ display: 'grid', gridTemplateColumns: '22px 1.5fr 1.1fr 70px 1fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                     <span
                       draggable
                       title="Drag to Main Charges table"
@@ -1152,6 +1319,7 @@ const Quotations = () => {
                       onChange={(val) => updateChargeRow('optionalCharges', idx, 'note', val)}
                       placeholder="Note e.g. If Required"
                     />
+                    <input type="number" min="0" step="any" className="input-field" placeholder="NIL" value={qtyInputValue(charge.qty)} onChange={e => updateChargeRow('optionalCharges', idx, 'qty', e.target.value)} />
                     <input type="text" className="input-field" placeholder="Rate (e.g. ₹ 500 / PC)" value={charge.rate} onChange={e => updateChargeRow('optionalCharges', idx, 'rate', e.target.value)} />
                     <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeChargeRow('optionalCharges', idx)}>
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
@@ -1177,7 +1345,17 @@ const Quotations = () => {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
                 <button type="button" className="btn" onClick={closeQuotationModal}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={!formData.productName}>Save Quotation</button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={!formData.productName}
+                  onClick={() => previewQuotation(formData)}
+                >
+                  <Eye size={16} /> Preview
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={!formData.productName}>
+                  {formData.id ? 'Update Quotation' : 'Save as New Quotation'}
+                </button>
               </div>
             </form>
           </div>

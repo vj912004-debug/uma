@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
+import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus, ArrowLeft } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import DocChargeRow from '../components/DocChargeRow';
 import {
@@ -12,6 +12,7 @@ import {
   calcStandardChargesSubtotal,
   calcProductChargesSubtotalWithQty,
   parseChargeFieldValue,
+  qtyInputValue,
   mergeSavedDocCharges,
   getFreshMaterialReceipt,
   findAnyTaxInvoice,
@@ -55,6 +56,7 @@ const TaxInvoice = () => {
     shipAddress: '',
     gstinBill: '',
     gstinShip: '',
+    partyId: '',
     partyName: '',
     productName: '',
     productSummaries: [],
@@ -67,7 +69,7 @@ const TaxInvoice = () => {
     discount: 0,
     taxRate: 18,
     terms: 'Payment against delivery.',
-    customCharges: [] // Array of { name: '', hsn: '', rate: 0, qty: 1, checked: true }
+    customCharges: [] // Array of { name: '', hsn: '', rate: 0, qty: 0, checked: true }
   });
 
   const activePL = editingDoc
@@ -116,6 +118,7 @@ const TaxInvoice = () => {
       shipAddress: freshMR.shipAddress || mrParty?.shipAddress || '',
       gstinBill: freshMR.gstinBill || mrParty?.gstinBill || '',
       gstinShip: freshMR.gstinShip || mrParty?.gstinShip || '',
+      partyId: freshMR.partyId || mrParty?.id || '',
       partyName: freshMR.partyName,
       productName: productLabel,
       productSummaries,
@@ -206,13 +209,33 @@ const TaxInvoice = () => {
     setForm(prev => ({ ...prev, qty: parseFloat(val) || 0 }));
   };
 
+  const handlePartyNameChange = (e) => {
+    const name = e.target.value || '';
+    const party = (data.parties || []).find(p =>
+      !p.isDeleted && (p.name || '').trim().toLowerCase() === name.trim().toLowerCase()
+    );
+    if (party) {
+      setForm(prev => ({
+        ...prev,
+        partyId: party.id,
+        partyName: party.name,
+        billAddress: party.billAddress || prev.billAddress || '',
+        shipAddress: party.shipAddress || party.billAddress || prev.shipAddress || '',
+        gstinBill: party.gstinBill || prev.gstinBill || '',
+        gstinShip: party.gstinShip || party.gstinBill || prev.gstinShip || ''
+      }));
+      return;
+    }
+    setForm(prev => ({ ...prev, partyId: '', partyName: name }));
+  };
+
   const toggleProductCharge = (prodName, key) => {
     setForm(prev => {
       const pc = getProductChargeBlock(prodName);
       const turningOn = !pc.charges[key];
       const qtys = { ...(pc.qtys || emptyChargeQtys()) };
       if (turningOn && (qtys[key] == null || qtys[key] === '')) {
-        qtys[key] = 1;
+        qtys[key] = '';
       }
       return {
         ...prev,
@@ -267,7 +290,7 @@ const TaxInvoice = () => {
       const turningOn = !prev.charges[key];
       const qtys = { ...(prev.qtys || emptyChargeQtys()) };
       if (turningOn && (qtys[key] == null || qtys[key] === '')) {
-        qtys[key] = 1;
+        qtys[key] = '';
       }
       return { ...prev, charges: { ...prev.charges, [key]: turningOn }, qtys };
     });
@@ -284,7 +307,7 @@ const TaxInvoice = () => {
   const addCustomCharge = () => {
     setForm(prev => ({
       ...prev,
-      customCharges: [...(prev.customCharges || []), { id: Date.now(), name: '', qty: 1, rate: 0, checked: true }]
+      customCharges: [...(prev.customCharges || []), { id: Date.now(), name: '', qty: '', rate: 0, checked: true }]
     }));
   };
 
@@ -347,6 +370,7 @@ const TaxInvoice = () => {
       discount: 0,
       taxRate: 18,
       terms: 'Payment against delivery.',
+      partyId: '',
       partyName: '',
       productName: '',
       hsnCode: '',
@@ -378,6 +402,7 @@ const TaxInvoice = () => {
       discount: 0,
       taxRate: 18,
       terms: 'Payment against delivery.',
+      partyId: '',
       partyName: '',
       productName: '',
       productSummaries: [],
@@ -429,6 +454,7 @@ const TaxInvoice = () => {
     let finalDoc = {
       ...form,
       receiptId,
+      partyId: form.partyId || activeMR?.partyId || editingDoc?.partyId || '',
       partyName: form.partyName,
       productName,
       productSummaries,
@@ -462,6 +488,14 @@ const TaxInvoice = () => {
       incrementSerial('TI');
     }
     setIsModalOpen(false);
+    setSelectedPL(null);
+    setEditingDoc(null);
+  };
+
+  const closeForm = () => {
+    setIsModalOpen(false);
+    setSelectedPL(null);
+    setEditingDoc(null);
   };
 
   const pendingPLs = (data.packingLists || []).filter(pl =>
@@ -489,6 +523,8 @@ const TaxInvoice = () => {
 
   return (
     <div>
+      {!isModalOpen && (
+      <>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Tax Invoices</h1>
@@ -587,12 +623,19 @@ const TaxInvoice = () => {
           </div>
         </div>
       </div>
+      </>
+      )}
 
-      {/* Tax Invoice Modal Form */}
+      {/* Tax Invoice Form */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto' }}>
-            <h2 style={{ marginBottom: '1.5rem' }}>{editingDoc ? 'Modify Tax Invoice' : 'Create Tax Invoice'}</h2>
+            <h2 style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+              <span>{editingDoc ? 'Modify Tax Invoice' : 'Create Tax Invoice'}</span>
+              <button type="button" className="btn" onClick={closeForm}>
+                <ArrowLeft size={18} /> Back to TI list
+              </button>
+            </h2>
             
             <form onSubmit={handleSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -622,11 +665,29 @@ const TaxInvoice = () => {
                 </div>
                 <div>
                   <label>Party Name</label>
-                  <input type="text" className="input-field" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
+                  <SearchableSelect
+                    allowCustom
+                    className="input-field"
+                    placeholder="Select or type party name"
+                    value={form.partyName}
+                    onChange={handlePartyNameChange}
+                  >
+                    <option value="">Select or type party name</option>
+                    {(data.parties || []).filter(p => !p.isDeleted).map(p => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
+                    ))}
+                  </SearchableSelect>
                 </div>
                 <div>
                   <label>Product(s)</label>
-                  <input type="text" className="input-field" readOnly value={form.productName} />
+                  <input
+                    type="text"
+                    className="input-field"
+                    readOnly={!!activeMR}
+                    placeholder={activeMR ? '' : 'Enter product name'}
+                    value={form.productName}
+                    onChange={e => setForm({...form, productName: e.target.value})}
+                  />
                   {(form.productSummaries || []).length > 0 && (
                     <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                       {(form.productSummaries || []).map((p, idx) => (
@@ -705,7 +766,7 @@ const TaxInvoice = () => {
                           charges={form.charges}
                           rates={form.rates}
                           qtys={form.qtys}
-                          materialQty={parseFloat(form.qty) || 1}
+                          materialQty={parseFloat(form.qty) || 0}
                           onToggle={toggleCharge}
                           onQtyChange={handleQtyChange}
                           onRateChange={handleRateChange}
@@ -725,7 +786,7 @@ const TaxInvoice = () => {
                       <div key={c.id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                         <input type="checkbox" checked={c.checked !== false} onChange={e => updateCustomCharge(c.id, 'checked', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-primary)' }} />
                         <input type="text" className="input-field" placeholder="Description" value={c.name} onChange={e => updateCustomCharge(c.id, 'name', e.target.value)} />
-                        <input type="number" className="input-field" placeholder="Qty" value={c.qty} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
+                        <input type="number" className="input-field" placeholder="NIL" value={qtyInputValue(c.qty)} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
                         <input type="number" className="input-field" placeholder="Rate" value={c.rate} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
                         <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeCustomCharge(c.id)}>
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
@@ -774,7 +835,7 @@ const TaxInvoice = () => {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
-                <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => setIsModalOpen(false)}>Cancel</button>
+                <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={closeForm}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Tax Invoice</button>
               </div>
             </form>

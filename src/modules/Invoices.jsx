@@ -55,14 +55,14 @@ const Invoices = () => {
   const addItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { description: '', hsn: '', qty: 1, rate: 0, amount: 0 }]
+      items: [...formData.items, { description: '', hsn: '', qty: 0, rate: 0, amount: 0 }]
     });
   };
 
   const addStandardCharge = (charge) => {
     setFormData({
       ...formData,
-      items: [...formData.items, { description: charge.name, hsn: charge.hsn, qty: 1, rate: charge.rate, amount: charge.rate }]
+      items: [...formData.items, { description: charge.name, hsn: charge.hsn, qty: 0, rate: charge.rate, amount: 0 }]
     });
   };
 
@@ -167,7 +167,7 @@ const Invoices = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(8px)' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '1000px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
               <div>

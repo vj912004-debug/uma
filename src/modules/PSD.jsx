@@ -234,7 +234,7 @@ const PSD = () => {
 
       {/* PSD Modal Form */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '650px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>Upload PSD Lab Analysis Report</h2>
             

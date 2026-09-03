@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
+import SearchableSelect from '../components/SearchableSelect';
 import {
   buildDCFieldsFromProducts,
   getReceiptProductNames,
@@ -27,6 +28,7 @@ const emptyDCForm = (docNo = '') => ({
   selectedProducts: [],
   qty: 0,
   totalDrums: 0,
+  emptyDrums: 0,
   value: '',
   vehicleNo: '',
   transporterName: '',
@@ -156,6 +158,7 @@ const DeliveryChallan = () => {
       productName: computed?.productName || form.productName,
       qty: form.qty,
       totalDrums: form.totalDrums,
+      emptyDrums: computed?.emptyDrums ?? form.emptyDrums ?? 0,
       value: form.value === '' || form.value == null ? '' : form.value,
       receiptId: editingDoc?.receiptId || activeMR?.id || activePL?.receiptId || ''
     };
@@ -276,7 +279,7 @@ const DeliveryChallan = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>{editingDoc ? 'Modify Delivery Challan' : 'Create Delivery Challan (D.C.)'}</h2>
 
@@ -336,7 +339,18 @@ const DeliveryChallan = () => {
 
                 <div>
                   <label>Party Name</label>
-                  <input type="text" className="input-field" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
+                  <SearchableSelect
+                    allowCustom
+                    className="input-field"
+                    placeholder="Select or type party name"
+                    value={form.partyName}
+                    onChange={e => setForm({...form, partyName: e.target.value})}
+                  >
+                    <option value="">Select or type party name</option>
+                    {(data.parties || []).filter(p => !p.isDeleted).map(p => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
+                    ))}
+                  </SearchableSelect>
                 </div>
                 <div>
                   <label>Product Name</label>
@@ -349,6 +363,11 @@ const DeliveryChallan = () => {
                 <div>
                   <label>Total Drums *</label>
                   <input type="number" className="input-field" required value={form.totalDrums} onChange={e => setForm({...form, totalDrums: parseInt(e.target.value, 10) || 0})} />
+                  {(parseInt(form.emptyDrums, 10) || 0) > 0 && (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                      Includes {form.emptyDrums} empty drum{(parseInt(form.emptyDrums, 10) || 0) !== 1 ? 's' : ''}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label>Value of Goods (₹)</label>

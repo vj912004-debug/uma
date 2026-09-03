@@ -6,19 +6,20 @@ import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import {
   STANDARD_CHARGES_LIST,
-  OTHER_CHARGE_ITEM
+  OTHER_CHARGE_ITEM,
+  qtyInputValue
 } from '../utils/documentCharges';
 import { calcNoteLines } from '../utils/debitCreditNoteHtml';
 import SearchableSelect from '../components/SearchableSelect';
 
-const blankLine = () => ({ id: Date.now() + Math.random(), description: '', qty: 1, rate: 0 });
+const blankLine = () => ({ id: Date.now() + Math.random(), description: '', qty: '', rate: 0 });
 
 const linesFromNote = (note) => {
   if (Array.isArray(note.customCharges) && note.customCharges.length) {
     return note.customCharges.map((c) => ({
       id: c.id || Date.now() + Math.random(),
       description: c.description || '',
-      qty: c.qty ?? 1,
+      qty: c.qty ?? '',
       rate: c.rate ?? 0
     }));
   }
@@ -28,7 +29,7 @@ const linesFromNote = (note) => {
     migrated.push({
       id: `${c.key}-${Date.now()}`,
       description: c.label || c.key,
-      qty: parseFloat(note.qtys?.[c.key]) || 1,
+      qty: parseFloat(note.qtys?.[c.key]) || 0,
       rate: parseFloat(note.rates?.[c.key]) || 0
     });
   });
@@ -82,14 +83,17 @@ const CreditNotes = () => {
   });
 
   const handlePartySelect = (e) => {
-    const party = data.parties.find(p => p.id === e.target.value);
+    const name = e.target.value || '';
+    const party = (data.parties || []).find(p =>
+      !p.isDeleted && (p.name || '').trim().toLowerCase() === name.trim().toLowerCase()
+    );
     if (party) {
       const bill = party.billAddress || '';
       const ship = party.shipAddress || bill;
       setForm(prev => ({
         ...prev,
         partyId: party.id,
-        partyName: party.name || prev.partyName,
+        partyName: party.name || name,
         address: bill || prev.address || '',
         billAddress: bill || prev.billAddress || '',
         shipAddress: ship || prev.shipAddress || '',
@@ -97,9 +101,9 @@ const CreditNotes = () => {
         state: party.state || prev.state || 'GUJARAT',
         stateCode: party.stateCode || prev.stateCode || '24'
       }));
-    } else {
-      setForm(prev => ({ ...prev, partyId: '' }));
+      return;
     }
+    setForm(prev => ({ ...prev, partyId: '', partyName: name }));
   };
 
   const handleOpenModal = () => {
@@ -286,7 +290,7 @@ const CreditNotes = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>{isEditing ? 'Edit Credit Note' : 'Create Credit Note'}</h2>
             <form onSubmit={handleSubmit}>
@@ -301,21 +305,17 @@ const CreditNotes = () => {
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Party Name *</label>
-                  <input
-                    type="text"
+                  <SearchableSelect
+                    allowCustom
                     className="input-field"
                     required
-                    placeholder="Type party / customer name"
+                    placeholder="Select or type party name"
                     value={form.partyName}
-                    onChange={e => setForm(prev => ({ ...prev, partyName: e.target.value }))}
-                  />
-                </div>
-                <div style={{ gridColumn: 'span 2' }}>
-                  <label>Load from Parties (optional)</label>
-                  <SearchableSelect className="input-field" value={form.partyId} onChange={handlePartySelect}>
-                    <option value="">-- Select to auto-fill name / address --</option>
-                    {data.parties.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
+                    onChange={handlePartySelect}
+                  >
+                    <option value="">Select or type party name</option>
+                    {(data.parties || []).filter(p => !p.isDeleted).map(p => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
                     ))}
                   </SearchableSelect>
                 </div>
@@ -414,7 +414,7 @@ const CreditNotes = () => {
                   {(form.customCharges || []).map(c => (
                     <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                       <input type="text" className="input-field" placeholder="Enter description" value={c.description} onChange={e => updateCustomCharge(c.id, 'description', e.target.value)} />
-                      <input type="number" className="input-field" placeholder="Qty" value={c.qty} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
+                      <input type="number" className="input-field" placeholder="NIL" value={qtyInputValue(c.qty)} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
                       <input type="number" className="input-field" placeholder="Rate" value={c.rate} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
                       <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeCustomCharge(c.id)}>
                         <Trash2 size={16} />

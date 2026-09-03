@@ -452,7 +452,7 @@ const ProductionPlanning = () => {
       </div>
 
       {isColumnModalOpen && userRole === 'Admin' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, backdropFilter: 'blur(4px)', padding: '2rem' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '700px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1rem' }}>Staff Visible Columns (Boss Control)</h2>
             <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>Staff members can view only selected columns. Admin always sees all columns.</p>
@@ -489,7 +489,7 @@ const ProductionPlanning = () => {
       )}
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)', padding: '2rem' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '800px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>{isEditing ? 'Modify Plan Entry' : 'Schedule New Batch'}</h2>
             <form onSubmit={handleSubmit}>

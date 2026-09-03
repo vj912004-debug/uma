@@ -763,6 +763,13 @@ export const buildPrintPrefsCss = (prefs) => {
     opacity: 1 !important;
     background: #ffffff !important;
   }
+  .uma-print-root table.dt tbody tr.filler-row td {
+    min-height: 16px !important;
+    height: 16px !important;
+    padding: 2px 3px !important;
+    border: 1px solid #e6e6e6 !important;
+    background: #ffffff !important;
+  }
   .uma-print-root table.items tbody tr.empty td {
     min-height: 18px !important;
     border: 1px solid #c9bce8 !important;
@@ -951,6 +958,11 @@ export const buildPrintPrefsCss = (prefs) => {
     font-size: ${bodyFs}px !important;
     white-space: nowrap !important;
   }
+  .uma-print-root table.items tbody td.left {
+    vertical-align: top !important;
+    white-space: pre-wrap !important;
+    text-align: left !important;
+  }
   .uma-print-root .ti-page table.items tbody td,
   .uma-print-root .pi-page table.items tbody td,
   .uma-print-root .cn-page table.items tbody td,
@@ -1064,12 +1076,26 @@ export const buildPrintPrefsCss = (prefs) => {
     overflow: visible !important;
   }
   .uma-print-root .pl-page .pl-meta {
-    grid-template-columns: 1fr 1fr !important;
-    gap: 8px 28px !important;
-    align-items: start !important;
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
+    gap: 1px !important;
+    align-items: stretch !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 0 8px !important;
   }
   .uma-print-root.print-density-xl .pl-page .pl-meta {
-    grid-template-columns: 1fr 1fr !important;
+    grid-template-columns: none !important;
+  }
+  .uma-print-root .pl-page .product-block {
+    flex: 0 0 auto !important;
+    margin: 0 0 16px !important;
+  }
+  .uma-print-root .pl-page .products {
+    flex: 0 0 auto !important;
+    overflow: visible !important;
   }
   .uma-print-root .pl-page .meta-field {
     display: flex !important;
@@ -1080,8 +1106,8 @@ export const buildPrintPrefsCss = (prefs) => {
     min-width: 0 !important;
   }
   .uma-print-root .pl-page .meta-field .lbl {
-    min-width: auto !important;
-    flex: 0 0 auto !important;
+    min-width: 130px !important;
+    flex: 0 0 130px !important;
     white-space: nowrap !important;
     letter-spacing: normal !important;
     word-spacing: 0.15em !important;
@@ -1107,10 +1133,10 @@ export const buildPrintPrefsCss = (prefs) => {
     overflow: visible !important;
   }
   .uma-print-root .pl-page .table-wrap {
-    flex: 1 1 auto !important;
+    flex: 0 0 auto !important;
     min-height: 0 !important;
     height: auto !important;
-    overflow: hidden !important;
+    overflow: visible !important;
   }
   .uma-print-root .pl-page table.items {
     flex: 0 0 auto !important;

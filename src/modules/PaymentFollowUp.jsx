@@ -91,7 +91,7 @@ const StatCard = ({ label, value, icon: Icon, accent }) => (
 );
 
 const ModalShell = ({ title, onClose, children, width = '720px' }) => (
-  <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, backdropFilter: 'blur(4px)', padding: '1.5rem' }}>
+  <div className="page-form-overlay">
     <div className="premium-card" style={{ width, maxWidth: '96%', maxHeight: '92vh', overflowY: 'auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <h2 style={{ margin: 0, fontSize: '1.2rem' }}>{title}</h2>

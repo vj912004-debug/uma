@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { Search, Plus, CreditCard } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 import { formatDate } from '../utils/dateUtils';
-import { getReceiptOutstanding, getPartyOutstandingByFY } from '../utils/paymentTotals';
+import { getReceiptOutstanding, getPartyOutstandingByFY, collectPartyDueEntities } from '../utils/paymentTotals';
 import { getCurrentFYKey, getFYKeysThroughCurrent } from '../utils/financialYear';
 import { useNavigate } from 'react-router-dom';
 import SearchableSelect from '../components/SearchableSelect';
@@ -69,8 +69,8 @@ const PartyDue = () => {
     });
   };
 
-  // Same outstanding as Excel Processing Sheet rows for this party (no extra debit notes)
-  const partyRows = data.parties.map(party => {
+  // Outstanding = unpaid tax invoice totals (bill − received − TDS) per party
+  const partyRows = collectPartyDueEntities(data).map((party) => {
     const invoiceDuesByFY = getPartyOutstandingByFY(data, party, fyKeys, currentFY);
     const finals = {};
     let totalDue = 0;
@@ -215,7 +215,7 @@ const PartyDue = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '600px', maxWidth: '90%' }}>
             <h2 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <CreditCard style={{ color: 'var(--accent-primary)' }} />

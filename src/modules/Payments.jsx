@@ -174,7 +174,7 @@ const Payments = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '500px' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>Record Payment</h2>
             <form onSubmit={handleSubmit}>

@@ -57,10 +57,18 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
       const batchText = line.text.replace(/^BATCH NO:?\s*/i, '');
       curGroup.batches.push({
         text: batchText,
-        drums: parseInt(line.drums, 10) || 0
+        drums: parseInt(line.drums, 10) || 0,
+        qty: line.qty
       });
       curGroup.totalDrums += parseInt(line.drums, 10) || 0;
       curGroup.totalQty += parseFloat(line.qty) || 0;
+    } else if (line.kind === 'empty-drums') {
+      groups.push({
+        isEmptyDrums: true,
+        text: line.text || 'Empty Drums',
+        drums: parseInt(line.drums, 10) || 0
+      });
+      curGroup = null;
     } else {
        groups.push({
          isProduct: false,
@@ -74,12 +82,18 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
 
   groups.forEach((g) => {
     if (g.isProduct) {
-      const q = g.totalQty > 0 ? fmtQty(g.totalQty) : '';
+      const q = fmtQty(g.totalQty);
       const numBatches = g.batches.length;
       const batchLabel = (b) => (typeof b === 'string' ? b : (b?.text || ''));
       const batchDrums = (b) => {
         const n = typeof b === 'string' ? (g.totalDrums || 0) : (parseInt(b?.drums, 10) || 0);
         return n > 0 ? n : '';
+      };
+      const batchQtyCell = (b, isFirst) => {
+        const raw = typeof b === 'string' ? '' : b?.qty;
+        const n = parseFloat(raw);
+        if (Number.isFinite(n) && n !== 0) return fmtQty(n);
+        return isFirst ? q : '';
       };
 
       if (numBatches <= 1) {
@@ -88,28 +102,39 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
         bodyRows.push(`
           <tr>
             <td class="num">${g.sr}</td>
-            <td class="left"><strong>${escHtml(g.productName)}</strong></td>
+            <td class="left"><strong>${escHtml(String(g.productName || '').trim())}</strong></td>
             <td class="num">${escHtml(batchText)}</td>
             <td class="num">${d}</td>
-            <td class="num">${q}</td>
+            <td class="num">${numBatches === 1 ? batchQtyCell(g.batches[0], true) : q}</td>
           </tr>`);
       } else {
         bodyRows.push(`
           <tr>
             <td class="num" rowspan="${numBatches}">${g.sr}</td>
-            <td class="left" rowspan="${numBatches}"><strong>${escHtml(g.productName)}</strong></td>
+            <td class="left"><strong>${escHtml(String(g.productName || '').trim())}</strong></td>
             <td class="num">${escHtml(batchLabel(g.batches[0]))}</td>
             <td class="num">${batchDrums(g.batches[0])}</td>
-            <td class="num" rowspan="${numBatches}">${q}</td>
+            <td class="num">${batchQtyCell(g.batches[0], true)}</td>
           </tr>`);
         for (let i = 1; i < numBatches; i++) {
           bodyRows.push(`
           <tr>
+            <td class="left"></td>
             <td class="num">${escHtml(batchLabel(g.batches[i]))}</td>
             <td class="num">${batchDrums(g.batches[i])}</td>
+            <td class="num">${batchQtyCell(g.batches[i], false)}</td>
           </tr>`);
         }
       }
+    } else if (g.isEmptyDrums) {
+      bodyRows.push(`
+        <tr>
+          <td class="num"></td>
+          <td class="left"></td>
+          <td class="num">${escHtml(g.text)}</td>
+          <td class="num">${g.drums > 0 ? g.drums : ''}</td>
+          <td class="num"></td>
+        </tr>`);
     } else {
       bodyRows.push(`
         <tr>
@@ -117,7 +142,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
           <td class="left">${escHtml(g.text)}</td>
           <td class="num"></td>
           <td class="num">${g.drums > 0 ? g.drums : ''}</td>
-          <td class="num">${g.qty > 0 ? fmtQty(g.qty) : ''}</td>
+          <td class="num">${fmtQty(g.qty)}</td>
         </tr>`);
     }
   });
@@ -143,7 +168,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   }
 
   const drumsTotal = parseInt(totalDrums, 10) > 0 ? String(parseInt(totalDrums, 10)) : '';
-  const qtyTotal = parseFloat(totalQty) > 0 ? fmtQty(totalQty) : '';
+  const qtyTotal = fmtQty(totalQty);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -414,7 +439,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   table.items tbody td {
     border: 1px solid var(--lav-border);
     padding: 4px 6px;
-    vertical-align: middle;
+    vertical-align: top;
     font-size:12px;
     font-weight: 500;
     word-break: break-word;
@@ -422,13 +447,19 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
     background: #fff;
     color: #231f20;
   }
-  /* Data / note rows stay compact */
+  /* Data / note rows stay compact — extra page height goes to blank rows */
+  table.items tbody tr:not(.empty):not(.dc-delivery-note) {
+    height: 1px;
+  }
   table.items tbody tr:not(.empty) td {
     height: 24px;
     white-space: nowrap;
+    vertical-align: top;
   }
   table.items tbody tr:not(.empty) td.left {
     white-space: pre-wrap;
+    vertical-align: top;
+    text-align: left;
   }
   table.items tbody td.num { text-align: center; }
   table.items tbody td.left { text-align: left; }
@@ -682,6 +713,7 @@ export const renderDeliveryChallanPdf = async (data, { mode = 'save', printPrefs
     docNo: data.dcNo || 'N/A',
     width: 794,
     fitPage: true,
+    splitOverflowPages: true,
     printPrefs
   });
 };

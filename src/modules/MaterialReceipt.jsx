@@ -15,7 +15,7 @@ import {
   getReceiptProductSummaries,
   getReceiptTotals
 } from '../utils/receiptProducts';
-import { flattenMRChargeSnapshot } from '../utils/documentCharges';
+import { flattenMRChargeSnapshot, qtyInputValue } from '../utils/documentCharges';
 import SearchableSelect from '../components/SearchableSelect';
 
 const CHARGE_KEYS = [
@@ -30,7 +30,7 @@ const emptyChargeRates = () =>
   Object.fromEntries(CHARGE_KEYS.map(k => [k, 0]));
 
 const emptyChargeQtys = () =>
-  Object.fromEntries(CHARGE_KEYS.map(k => [k, 1]));
+  Object.fromEntries(CHARGE_KEYS.map(k => [k, '']));
 
 const buildProductSettingsFromParty = (prodConfig) => {
   if (!prodConfig) {
@@ -70,7 +70,7 @@ const buildProductSettingsFromParty = (prodConfig) => {
     customCharges: (prodConfig.customCharges || []).map(cc => ({
       ...cc,
       checked: cc.checked !== false,
-      qty: cc.qty || 1
+      qty: cc.qty || 0
     }))
   };
 };
@@ -119,12 +119,12 @@ const applyCommonChargesToProductSettings = (productSettings, charges, rates, qt
       ...block,
       charges: { ...emptyChargeFlags(), ...(block.charges || {}), ...Object.fromEntries(COMMON_CHARGE_KEYS.map((k) => [k, !!charges?.[k]])) },
       rates: { ...emptyChargeRates(), ...(block.rates || {}), ...Object.fromEntries(COMMON_CHARGE_KEYS.map((k) => [k, parseFloat(rates?.[k]) || 0])) },
-      qtys: { ...emptyChargeQtys(), ...(block.qtys || {}), ...Object.fromEntries(COMMON_CHARGE_KEYS.map((k) => [k, parseFloat(qtys?.[k]) || 1])) }
+      qtys: { ...emptyChargeQtys(), ...(block.qtys || {}), ...Object.fromEntries(COMMON_CHARGE_KEYS.map((k) => [k, parseFloat(qtys?.[k]) || 0])) }
     };
     // Keep per-product processing
     next[name].charges.processing = block.charges?.processing || false;
     next[name].rates.processing = parseFloat(block.rates?.processing) || 0;
-    next[name].qtys.processing = parseFloat(block.qtys?.processing) || 1;
+    next[name].qtys.processing = parseFloat(block.qtys?.processing) || 0;
   });
   return next;
 };
@@ -224,7 +224,7 @@ const MaterialReceipt = () => {
     totalQty: 0,
     charges: { cleaning: false, filterBag: false, processing: false, sieving: false, psdReport: false, liner: false, courier: false, fiberDrum: false, transportation: false, hdpeDrum: false, batchChangeover: false },
     rates: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
-    qtys: { cleaning: 1, filterBag: 1, processing: 1, sieving: 1, psdReport: 1, liner: 1, courier: 1, fiberDrum: 1, transportation: 1, hdpeDrum: 1, batchChangeover: 1 },
+    qtys: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
     customCharges: [],
     productSettings: {},
     chargeNotes: emptyChargeNotes()
@@ -248,29 +248,36 @@ const MaterialReceipt = () => {
 
   // Triggered when Party selection changes
   const handlePartyChange = (e) => {
-    const pId = e.target.value;
-    if (!pId) {
+    const name = e.target.value || '';
+    const party = (data.parties || []).find(p =>
+      !p.isDeleted && (p.name || '').trim().toLowerCase() === name.trim().toLowerCase()
+    );
+    if (!party) {
       setFormData(prev => ({
         ...prev,
         partyId: '',
-        partyName: '',
-        billAddress: '',
-        gstinBill: '',
-        shipAddress: '',
-        gstinShip: '',
-        productName: '',
-        nickName: '',
-        batches: [],
-        productSettings: {}
+        partyName: name,
+        ...(name ? {} : {
+          billAddress: '',
+          gstinBill: '',
+          shipAddress: '',
+          gstinShip: '',
+          productName: '',
+          nickName: '',
+          batches: [],
+          productSettings: {}
+        })
       }));
       return;
     }
 
-    const party = data.parties.find(p => p.id === pId);
-    if (party) {
-      setFormData(prev => ({
+    setFormData(prev => {
+      if (prev.partyId === party.id) {
+        return { ...prev, partyId: party.id, partyName: party.name };
+      }
+      return {
         ...prev,
-        partyId: pId,
+        partyId: party.id,
         partyName: party.name,
         billAddress: party.billAddress || '',
         gstinBill: party.gstinBill || '',
@@ -280,8 +287,8 @@ const MaterialReceipt = () => {
         nickName: '',
         batches: [],
         productSettings: {}
-      }));
-    }
+      };
+    });
   };
 
   const patchProductSettings = (prodName, updater) => {
@@ -340,7 +347,7 @@ const MaterialReceipt = () => {
         COMMON_CHARGE_KEYS.forEach((k) => {
           charges[k] = !!seed.charges?.[k];
           rates[k] = parseFloat(seed.rates?.[k]) || 0;
-          qtys[k] = parseFloat(seed.qtys?.[k]) || 1;
+          qtys[k] = parseFloat(seed.qtys?.[k]) || 0;
         });
       }
       return {
@@ -386,6 +393,38 @@ const MaterialReceipt = () => {
     }));
   };
 
+  const handleProductQtyChange = (prodName, raw) => {
+    setFormData((prev) => {
+      const idxs = prev.batches
+        .map((b, i) => ({ b, i }))
+        .filter(({ b }) => !b.isEmptyDrums && (b.productName || '') === prodName)
+        .map(({ i }) => i);
+      if (!idxs.length) return prev;
+      const next = [...prev.batches];
+      if (raw === '') {
+        idxs.forEach((i, n) => {
+          next[i] = { ...next[i], qty: n === 0 ? '' : 0 };
+        });
+        return { ...prev, batches: next };
+      }
+      const n = parseFloat(raw);
+      if (!Number.isFinite(n)) return prev;
+      if (idxs.length === 1) {
+        next[idxs[0]] = { ...next[idxs[0]], qty: raw };
+        return { ...prev, batches: next };
+      }
+      const others = idxs.slice(0, -1).reduce((s, i) => s + (parseFloat(next[i].qty) || 0), 0);
+      if (n < others) {
+        idxs.forEach((i, k) => {
+          next[i] = { ...next[i], qty: k === 0 ? raw : 0 };
+        });
+      } else {
+        next[idxs[idxs.length - 1]] = { ...next[idxs[idxs.length - 1]], qty: raw === '' ? '' : (n - others) };
+      }
+      return { ...prev, batches: next };
+    });
+  };
+
   const handleEdit = (mr) => {
     const prepared = prepareReceiptEditData(mr, data.parties);
     // Keep settings only for products that have received batches on this receipt
@@ -415,7 +454,7 @@ const MaterialReceipt = () => {
       COMMON_CHARGE_KEYS.forEach((k) => {
         seededCharges[k] = !!firstSettings.charges?.[k];
         seededRates[k] = parseFloat(firstSettings.rates?.[k]) || 0;
-        seededQtys[k] = parseFloat(firstSettings.qtys?.[k]) || 1;
+        seededQtys[k] = parseFloat(firstSettings.qtys?.[k]) || 0;
       });
     }
     setFormData({
@@ -468,7 +507,7 @@ const MaterialReceipt = () => {
     totalQty: 0,
     charges: { cleaning: false, filterBag: false, processing: false, sieving: false, psdReport: false, liner: false, courier: false, fiberDrum: false, transportation: false, hdpeDrum: false, batchChangeover: false },
     rates: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
-    qtys: { cleaning: 1, filterBag: 1, processing: 1, sieving: 1, psdReport: 1, liner: 1, courier: 1, fiberBag: 1, transportation: 1, hdpeDrum: 1, batchChangeover: 1 },
+    qtys: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberBag: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
     customCharges: [],
     productSettings: {},
     chargeNotes: emptyChargeNotes()
@@ -515,8 +554,8 @@ const MaterialReceipt = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     try {
-      if (!formData.partyId) {
-        alert("Please select a Party.");
+      if (!formData.partyName?.trim()) {
+        alert("Please select or enter a Party name.");
         return;
       }
       const hasProductBatch = formData.batches.some(b => !b.isEmptyDrums && b.productName);
@@ -564,7 +603,7 @@ const MaterialReceipt = () => {
           qtys: {
             ...emptyChargeQtys(),
             ...(formData.qtys || {}),
-            processing: parseFloat(live.qtys?.processing) || 1
+            processing: parseFloat(live.qtys?.processing) || 0
           },
           customCharges: JSON.parse(JSON.stringify(live.customCharges || [])),
           chargeNotes: { ...emptyChargeNotes(), ...(formData.chargeNotes || {}) }
@@ -688,8 +727,7 @@ const MaterialReceipt = () => {
           list="psdReqOptions"
           className="input-field"
           style={{ padding: '0.3rem', fontSize: '0.825rem', width: '100%', boxSizing: 'border-box' }}
-          required
-          value={batch.psdReq}
+          value={batch.psdReq || ''}
           onChange={e => handleBatchCellChange(idx, 'psdReq', e.target.value)}
         />
       </td>
@@ -776,8 +814,9 @@ const MaterialReceipt = () => {
                     className="input-field"
                     min="0"
                     step="any"
-                    value={formData.qtys?.[item.key] ?? 1}
-                    onChange={(e) => patchCommonCharges({ qtys: { [item.key]: parseFloat(e.target.value) || 0 } })}
+                    value={qtyInputValue(formData.qtys?.[item.key])}
+                    placeholder="NIL"
+                    onChange={(e) => patchCommonCharges({ qtys: { [item.key]: e.target.value } })}
                     style={{ padding: '0.25rem', fontSize: '0.8rem', width: '100%', boxSizing: 'border-box' }}
                   />
                 </td>
@@ -976,7 +1015,7 @@ const MaterialReceipt = () => {
 
       {/* Main Material Receipt Modal */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'stretch', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '0.75rem' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '100%', maxWidth: '100%', height: '100%', maxHeight: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
             <h2 style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>{isEditing ? 'Modify Material Receipt' : 'Register Material Receipt'}</span>
@@ -1006,15 +1045,17 @@ const MaterialReceipt = () => {
                 {/* Party Selection */}
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Party Name *</label>
-                  <SearchableSelect 
-                    className="input-field" 
-                    required 
-                    value={formData.partyId}
+                  <SearchableSelect
+                    allowCustom
+                    className="input-field"
+                    required
+                    placeholder="Select or type party name"
+                    value={formData.partyName}
                     onChange={handlePartyChange}
                   >
-                    <option value="">Select Customer / Supplier</option>
-                    {data.parties.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.vendorCode})</option>
+                    <option value="">Select or type party name</option>
+                    {(data.parties || []).filter(p => !p.isDeleted).map(p => (
+                      <option key={p.id} value={p.name}>{p.name}{p.vendorCode ? ` (${p.vendorCode})` : ''}</option>
                     ))}
                   </SearchableSelect>
                 </div>
@@ -1181,8 +1222,17 @@ const MaterialReceipt = () => {
                               <div>
                                 <label>Quantity</label>
                                 <div style={{ position: 'relative' }}>
-                                  <input type="text" className="input-field" readOnly value={productQty.toFixed(2)} style={{ paddingRight: '2.5rem' }} />
-                                  <span style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Kg</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    className="input-field"
+                                    placeholder="NIL"
+                                    value={qtyInputValue(productQty)}
+                                    onChange={(e) => handleProductQtyChange(prod.name, e.target.value)}
+                                    style={{ paddingRight: '2.5rem' }}
+                                  />
+                                  <span style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, pointerEvents: 'none' }}>Kg</span>
                                 </div>
                               </div>
                               </div>
@@ -1190,7 +1240,7 @@ const MaterialReceipt = () => {
                     <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                         <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.85rem', fontWeight: 600 }}>Manual Custom Charges</label>
-                        <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => patchProductSettings(prod.name, s => ({ ...s, customCharges: [...(s.customCharges || []), { id: Date.now() + Math.random(), name: '', hsn: '', rate: 0, qty: 1, checked: true }] }))}>
+                        <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => patchProductSettings(prod.name, s => ({ ...s, customCharges: [...(s.customCharges || []), { id: Date.now() + Math.random(), name: '', hsn: '', rate: 0, qty: '', checked: true }] }))}>
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Row
                         </button>
                       </div>
@@ -1211,7 +1261,7 @@ const MaterialReceipt = () => {
                             newC[cIdx] = { ...newC[cIdx], hsn: e.target.value };
                             return { ...s, customCharges: newC };
                           })} />
-                          <input type="number" className="input-field" placeholder="Qty" value={charge.qty} onChange={e => patchProductSettings(prod.name, s => {
+                          <input type="number" className="input-field" placeholder="NIL" value={qtyInputValue(charge.qty)} onChange={e => patchProductSettings(prod.name, s => {
                             const newC = [...(s.customCharges || [])];
                             newC[cIdx] = { ...newC[cIdx], qty: e.target.value };
                             return { ...s, customCharges: newC };
@@ -1250,7 +1300,7 @@ const MaterialReceipt = () => {
                             <th style={{ padding: '0.5rem' }}>Batch Number</th>
                             <th style={{ padding: '0.5rem', width: '120px' }}>No of Drums</th>
                             <th style={{ padding: '0.5rem', width: '150px' }}>Quantity (Kg)</th>
-                            <th style={{ padding: '0.5rem' }}>PSD Req *</th>
+                            <th style={{ padding: '0.5rem' }}>PSD Req</th>
                             <th style={{ padding: '0.5rem', width: '120px' }}>PSD Report</th>
                             <th style={{ padding: '0.5rem', width: '120px' }}>PSD Method</th>
                             <th style={{ padding: '0.5rem', width: '60px' }}>Del</th>

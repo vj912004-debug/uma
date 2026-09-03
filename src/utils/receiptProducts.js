@@ -3,6 +3,14 @@ import { numberInputValue } from './numberInput';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
+export const isEmptyDrumsLabel = (value) =>
+  /^empty\s*drums?$/i.test(String(value || '').trim());
+
+export const isEmptyDrumsBatch = (b) =>
+  !!b?.isEmptyDrums
+  || isEmptyDrumsLabel(b?.batchNo)
+  || isEmptyDrumsLabel(b?.productName);
+
 const canonicalPartyName = (name, party) => {
   const n = (name || '').trim();
   if (!n) return '';
@@ -27,7 +35,7 @@ const planForBatch = (productionPlans, mr, batch, batchIdx) => {
 };
 
 const resolveBatchProductName = (batch, mr, party, batchIdx = -1, productionPlans = []) => {
-  if (!batch || batch.isEmptyDrums) return null;
+  if (!batch || isEmptyDrumsBatch(batch)) return null;
 
   const partyProducts = party?.products || [];
   const settings = mr?.productSettings || {};
@@ -70,9 +78,15 @@ const batchMatchesProduct = (batch, batchIdx, mr, prodName, options = {}) => {
   return false;
 };
 
+/** Drums entered on Material Receipt → Empty Drums (All Products). */
+export const getEmptyDrumsCount = (mr) =>
+  (mr?.batches || [])
+    .filter(isEmptyDrumsBatch)
+    .reduce((sum, b) => sum + (parseInt(b.drums, 10) || 0), 0);
+
 export const getProductBatches = (mr, prodName, options = {}) =>
   (mr.batches || []).filter((b, idx) =>
-    !b.isEmptyDrums && batchMatchesProduct(b, idx, mr, prodName, options)
+    !isEmptyDrumsBatch(b) && batchMatchesProduct(b, idx, mr, prodName, options)
   );
 
 export const getReceiptProductNames = (mr, options = {}) => {
@@ -81,14 +95,14 @@ export const getReceiptProductNames = (mr, options = {}) => {
   const names = [];
   const add = (name) => {
     const canonical = canonicalPartyName(name, party);
-    if (!canonical) return;
+    if (!canonical || isEmptyDrumsLabel(canonical)) return;
     const key = norm(canonical);
     if (seen.has(key)) return;
     seen.add(key);
     names.push(canonical);
   };
 
-  const activeBatches = (mr.batches || []).filter(b => !b.isEmptyDrums);
+  const activeBatches = (mr.batches || []).filter(b => !isEmptyDrumsBatch(b));
   const receiptPlans = plansForReceipt(productionPlans, mr.id);
 
   activeBatches.forEach((batch, idx) => {
@@ -136,12 +150,17 @@ export const getReceiptProductNames = (mr, options = {}) => {
 export const getProductQty = (mr, prodName, options = {}) => {
   const batches = getProductBatches(mr, prodName, options);
   const fromBatches = batches.reduce((sum, b) => sum + (parseFloat(b.qty) || 0), 0);
-  if (fromBatches > 0 || batches.length > 0) return fromBatches;
+  if (fromBatches > 0) return fromBatches;
 
   const { productionPlans = [] } = options;
-  return plansForReceipt(productionPlans, mr.id)
+  const fromPlans = plansForReceipt(productionPlans, mr.id)
     .filter(p => norm(p.productName) === norm(prodName))
     .reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0);
+  if (fromPlans > 0) return fromPlans;
+
+  const names = getReceiptProductNames(mr, options);
+  if (names.length <= 1) return parseFloat(mr.totalQty) || 0;
+  return 0;
 };
 
 export const getProductDrums = (mr, prodName, options = {}) =>
@@ -149,7 +168,9 @@ export const getProductDrums = (mr, prodName, options = {}) =>
 
 export const getReceiptProductSummaries = (mr, options = {}) => {
   const { productionPlans = [] } = options;
-  return getReceiptProductNames(mr, options).map(prodName => {
+  const names = getReceiptProductNames(mr, options);
+  const mrTotal = parseFloat(mr.totalQty) || 0;
+  return names.map(prodName => {
     const batches = getProductBatches(mr, prodName, options);
     const plans = plansForReceipt(productionPlans, mr.id)
       .filter(p => norm(p.productName) === norm(prodName));
@@ -157,7 +178,8 @@ export const getReceiptProductSummaries = (mr, options = {}) => {
     const batchCount = batches.length || plans.length;
     const drums = batches.reduce((sum, b) => sum + (parseInt(b.drums) || 0), 0);
     const qty = batches.reduce((sum, b) => sum + (parseFloat(b.qty) || 0), 0)
-      || plans.reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0);
+      || plans.reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0)
+      || (names.length <= 1 ? mrTotal : 0);
 
     return { prodName, batchCount, drums, qty };
   });
@@ -171,7 +193,7 @@ export const getReceiptTotals = (mr, options = {}) => {
     qty: summaries.reduce((s, p) => s + p.qty, 0)
   };
   if (fromSummaries.batchCount > 0) return fromSummaries;
-  const active = (mr.batches || []).filter(b => !b.isEmptyDrums);
+  const active = (mr.batches || []).filter(b => !isEmptyDrumsBatch(b));
   return {
     batchCount: active.length,
     drums: mr.totalDrums || active.reduce((s, b) => s + (parseInt(b.drums) || 0), 0),
@@ -223,7 +245,7 @@ export const buildMRDrumSlots = (mr, prodOpts = {}) => {
   });
 
   if (!slots.length) {
-    (mr.batches || []).filter(b => !b.isEmptyDrums).forEach((b, idx) => {
+    (mr.batches || []).filter(b => !isEmptyDrumsBatch(b)).forEach((b, idx) => {
       const drumCount = parseInt(b.drums, 10) || 1;
       const pName = b.productName || productNames[0] || mr.productName || '';
       for (let d = 1; d <= drumCount; d += 1) {
@@ -278,7 +300,7 @@ export const alignDrumRowsToProducts = (rows, mr, prodOpts = {}) => {
   }
 
   const used = new Set();
-  return slots.map((slot) => {
+  const mapped = slots.map((slot) => {
     let pi = pool.findIndex((r, i) => !used.has(i)
       && norm(r.batchNo) === norm(slot.batchNo)
       && norm(String(r.drumNo)) === norm(String(slot.drumNo))
@@ -315,6 +337,14 @@ export const alignDrumRowsToProducts = (rows, mr, prodOpts = {}) => {
     used.add(pi);
     return formatPlDrumRow(pool[pi], slot);
   });
+  const extras = pool
+    .filter((_, i) => !used.has(i))
+    .map((r) => formatPlDrumRow(r, {
+      productName: r.productName,
+      batchNo: r.batchNo,
+      drumNo: r.drumNo
+    }));
+  return extras.length ? [...mapped, ...extras] : mapped;
 };
 
 /** Build PL batch rows from Material Receipt drums, overlaying BPR/existing weights. */
@@ -346,6 +376,94 @@ export const buildPLBatchesFromMR = (data, mr, prodOpts = {}, existingRows = nul
 export const getBPRDispatchedRowsForPL = (data, mr, prodOpts = {}) =>
   buildPLBatchesFromMR(data, mr, prodOpts, null);
 
+/** One received/dispatch slot per drum for a single MR product. */
+export const buildProductDrumSlots = (mr, prodName, options = {}) => {
+  const name = resolveReceiptProductName(mr, prodName, options) || String(prodName || '').trim();
+  const batches = name ? getProductBatches(mr, name, options) : [];
+  const rows = [];
+  batches.forEach((b) => {
+    const count = Math.max(1, parseInt(b.drums, 10) || 1);
+    for (let d = 1; d <= count; d++) {
+      rows.push({
+        batchNo: b.batchNo || '',
+        drumNo: String(d),
+        productName: name,
+        gross: '',
+        tare: '',
+        net: ''
+      });
+    }
+  });
+  return { name, batches, rows };
+};
+
+/** Overlay PL/BPR weights onto product drum slots without mixing other products. */
+export const overlayWeightsOnDrumSlots = (slots, weightRows = [], productName = '') => {
+  const wantProd = norm(productName);
+  const pool = [...(weightRows || [])].filter((r) => {
+    if (!r) return false;
+    if (!isMeaningfulPlRow(r)) return false;
+    if (!wantProd || !r.productName) return true;
+    return norm(r.productName) === wantProd;
+  });
+  const used = new Set();
+  const mapped = (slots || []).map((slot) => {
+    let pi = pool.findIndex((r, i) => !used.has(i)
+      && norm(r.batchNo) === norm(slot.batchNo)
+      && norm(String(r.drumNo)) === norm(String(slot.drumNo))
+      && (!wantProd || !r.productName || norm(r.productName) === wantProd));
+
+    if (pi < 0) {
+      pi = pool.findIndex((r, i) => !used.has(i)
+        && norm(r.batchNo) === norm(slot.batchNo)
+        && (!wantProd || !r.productName || norm(r.productName) === wantProd));
+    }
+
+    if (pi < 0) {
+      return { ...slot };
+    }
+
+    used.add(pi);
+    const src = pool[pi];
+    return {
+      ...slot,
+      batchNo: slot.batchNo || src.batchNo || '',
+      drumNo: slot.drumNo || (src.drumNo != null && src.drumNo !== '' ? String(src.drumNo) : ''),
+      productName: slot.productName || productName || src.productName || '',
+      gross: src.gross ?? '',
+      tare: src.tare ?? '',
+      net: src.net ?? ''
+    };
+  });
+  const extras = pool.filter((_, i) => !used.has(i)).map((src) => ({
+    batchNo: src.batchNo || '',
+    drumNo: src.drumNo != null && src.drumNo !== '' ? String(src.drumNo) : '',
+    productName: src.productName || productName || '',
+    gross: src.gross ?? '',
+    tare: src.tare ?? '',
+    net: src.net ?? ''
+  }));
+  return extras.length ? [...mapped, ...extras] : mapped;
+};
+
+/** Build BPR drum tables for one product only (never mixes other products on the same MR). */
+export const buildBprRowsForProduct = (mr, prodName, options = {}, weightRows = []) => {
+  const { name, batches, rows } = buildProductDrumSlots(mr, prodName, options);
+  const overlaid = weightRows?.length
+    ? overlayWeightsOnDrumSlots(rows, weightRows, name)
+    : rows.map((r) => ({ ...r }));
+  return {
+    productName: name,
+    batches,
+    receivedRows: overlaid,
+    dispatchedRows: overlaid.map((r) => ({ ...r })),
+    qty: getProductQty(mr, name, options),
+    drums: rows.length || getProductDrums(mr, name, options),
+    batchNo: batches.map((b) => b.batchNo).filter((no) => no && !isEmptyDrumsLabel(no)).join(', '),
+    totalNoBatch: batches.length
+  };
+};
+
 export const getPLDisplayProductLabel = (pl, appData = {}) => {
   const mr = (appData.materialReceipts || []).find(r => r.id === pl?.receiptId);
   const opts = mr ? receiptProductOptions(mr, appData) : {};
@@ -361,9 +479,51 @@ export const getPLProductNetQty = (pl, prodName, mr, prodOpts = {}) => {
   return getProductQty(mr, prodName, prodOpts);
 };
 
-export const getPLProductDrums = (pl, prodName) => {
+const isSievingLumpPlRow = (r = {}) =>
+  /sieving\s*lumps?/.test(`${r.batchNo || ''} ${r.drumNo || ''} ${r.productName || ''}`.toLowerCase());
+
+const isPlDispatchDrumRow = (r) =>
+  isMeaningfulPlRow(r) && !isEmptyDrumsBatch(r) && !isSievingLumpPlRow(r);
+
+/** Packing-list drum rows for one product (falls back when PL rows have no productName). */
+export const getPLRowsForProduct = (pl, prodName, mr = null, prodOpts = {}) => {
+  const rows = (pl?.batches || []).filter(isPlDispatchDrumRow);
+  if (!prodName) return rows;
   const nk = norm(prodName);
-  return (pl?.batches || []).filter(r => (r.productName || '').trim() && norm(r.productName) === nk).length;
+  const named = rows.filter((r) => (r.productName || '').trim() && norm(r.productName) === nk);
+  if (named.length) return named;
+  const unlabeled = rows.filter((r) => !String(r.productName || '').trim());
+  if (unlabeled.length && mr) {
+    const batchNos = new Set(
+      getProductBatches(mr, prodName, prodOpts)
+        .map((b) => String(b.batchNo || '').trim().toLowerCase())
+        .filter(Boolean)
+    );
+    if (batchNos.size) {
+      const matched = unlabeled.filter((r) => batchNos.has(String(r.batchNo || '').trim().toLowerCase()));
+      if (matched.length) return matched;
+    }
+  }
+  const plLabel = String(pl?.productName || '').trim();
+  if (plLabel && !plLabel.includes(',') && norm(plLabel) === nk) return rows;
+  if (plLabel.includes(',')) {
+    const parts = plLabel.split(',').map((s) => s.trim()).filter(Boolean);
+    if (parts.length === 1 && norm(parts[0]) === nk) return rows;
+  }
+  return [];
+};
+
+export const getPLProductDrums = (pl, prodName, mr = null, prodOpts = {}) =>
+  getPLRowsForProduct(pl, prodName, mr, prodOpts).length;
+
+/** Drum counts per batch number from the Packing List (one PL row = one drum). */
+export const getPLBatchDrumCounts = (pl, prodName, mr = null, prodOpts = {}) => {
+  const map = {};
+  getPLRowsForProduct(pl, prodName, mr, prodOpts).forEach((r) => {
+    const key = String(r.batchNo || '').trim() || '—';
+    map[key] = (map[key] || 0) + 1;
+  });
+  return map;
 };
 
 /** Material value entered on the Material Receipt (₹). */
@@ -372,11 +532,11 @@ export const getMRMaterialValue = (mr) => {
   return Number.isFinite(v) && v > 0 ? v : 0;
 };
 
-/** Build DC qty/drums/value/labels from Material Receipt for selected products.
- * Always uses received (MR) qty — not packing-list net weight. */
+/** Build DC qty/drums/value/labels.
+ * Qty always from Material Receipt. Drums come from Packing List when present. */
 export const buildDCFieldsFromProducts = (mr, pl, prodOpts, selectedProductNames = []) => {
   if (!mr) {
-    return { productSummaries: [], productName: '', qty: 0, totalDrums: 0, value: 0 };
+    return { productSummaries: [], productName: '', qty: 0, totalDrums: 0, emptyDrums: 0, value: 0 };
   }
   const allSummaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
   const selectedSet = new Set((selectedProductNames || []).map(n => norm(n)));
@@ -384,16 +544,22 @@ export const buildDCFieldsFromProducts = (mr, pl, prodOpts, selectedProductNames
     ? allSummaries.filter(p => selectedSet.has(norm(p.prodName)))
     : allSummaries;
 
-  const productSummaries = selected.map((p) => ({
-    ...p,
-    qty: getProductQty(mr, p.prodName, prodOpts) || p.qty || 0,
-    drums: getProductDrums(mr, p.prodName, prodOpts) || p.drums || 0
-  }));
+  const productSummaries = selected.map((p) => {
+    const mrDrums = getProductDrums(mr, p.prodName, prodOpts) || p.drums || 0;
+    const plDrums = getPLProductDrums(pl, p.prodName, mr, prodOpts);
+    return {
+      ...p,
+      qty: getProductQty(mr, p.prodName, prodOpts) || p.qty || 0,
+      drums: plDrums > 0 ? plDrums : mrDrums
+    };
+  });
 
   const qtyFromProducts = productSummaries.reduce((s, p) => s + (parseFloat(p.qty) || 0), 0);
   const drumsFromProducts = productSummaries.reduce((s, p) => s + (parseInt(p.drums, 10) || 0), 0);
+  const emptyDrums = getEmptyDrumsCount(mr);
   const mrTotalQty = parseFloat(mr.totalQty) || 0;
   const mrTotalDrums = parseInt(mr.totalDrums, 10) || 0;
+  const plHasDrums = selected.some((p) => getPLProductDrums(pl, p.prodName, mr, prodOpts) > 0);
 
   // When all MR products are selected (or none specified), use authoritative MR totalQty
   const selectingAll = !selectedProductNames?.length
@@ -403,9 +569,9 @@ export const buildDCFieldsFromProducts = (mr, pl, prodOpts, selectedProductNames
   const qty = selectingAll && mrTotalQty > 0
     ? mrTotalQty
     : (qtyFromProducts > 0 ? qtyFromProducts : mrTotalQty);
-  const totalDrums = selectingAll && mrTotalDrums > 0
-    ? mrTotalDrums
-    : (drumsFromProducts > 0 ? drumsFromProducts : mrTotalDrums);
+  const totalDrums = plHasDrums
+    ? drumsFromProducts + emptyDrums
+    : (selectingAll && mrTotalDrums > 0 ? mrTotalDrums : drumsFromProducts + emptyDrums);
 
   const productName = productSummaries.map(p => p.prodName).filter(Boolean).join(', ')
     || (mr.productName || '');
@@ -415,6 +581,7 @@ export const buildDCFieldsFromProducts = (mr, pl, prodOpts, selectedProductNames
     productName,
     qty,
     totalDrums,
+    emptyDrums,
     value: (() => {
       const v = getMRMaterialValue(mr);
       return v > 0 ? v : '';
@@ -454,12 +621,12 @@ export const buildPLProductSummaries = (pl, mr, prodOpts = {}) => {
 };
 
 export const syncReceiptProductSummary = (batches, party = null, mr = null, productionPlans = []) => {
-  const active = (batches || []).filter(b => !b.isEmptyDrums);
+  const active = (batches || []).filter(b => !isEmptyDrumsBatch(b));
   const seen = new Set();
   const names = [];
   const add = (name) => {
     const canonical = canonicalPartyName(name, party);
-    if (!canonical) return;
+    if (!canonical || isEmptyDrumsLabel(canonical)) return;
     const key = norm(canonical);
     if (seen.has(key)) return;
     seen.add(key);
@@ -568,76 +735,9 @@ export const enrichBPRForPrint = (bpr, appData = {}) => {
     return s + (!Number.isNaN(n) && r[key] !== '' && r[key] != null ? n : 0);
   }, 0);
   const countDrums = (rows) => (rows || []).filter((r) => r.batchNo || r.drumNo).length;
-  const rowHasWeight = (r = {}) => [r.gross, r.tare, r.net].some((v) => {
-    if (v === '' || v === undefined || v === null) return false;
-    const n = parseFloat(v);
-    return !Number.isNaN(n) && n !== 0;
-  });
-  const calcRowNet = (gross, tare, net) => {
-    if (net !== '' && net != null && !Number.isNaN(parseFloat(net)) && parseFloat(net) !== 0) {
-      return net;
-    }
-    const g = parseFloat(gross);
-    const t = parseFloat(tare);
-    if (!Number.isNaN(g) && !Number.isNaN(t) && gross !== '' && tare !== '') {
-      return Math.max(0, g - t);
-    }
-    return net ?? '';
-  };
 
-  let receivedBatches = [...(bpr.receivedBatches || [])];
-  let dispatchedBatches = [...(bpr.dispatchedBatches || [])];
-
-  // If BPR drum weights are empty but Packing List has them, copy into print payload
-  if (pl?.batches?.length) {
-    const fillFromPl = (slots) => {
-      const pool = [...pl.batches];
-      const used = new Set();
-      return slots.map((slot) => {
-        if (rowHasWeight(slot)) return slot;
-        let pi = pool.findIndex(
-          (r, i) =>
-            !used.has(i)
-            && String(r.batchNo || '') === String(slot.batchNo || '')
-            && String(r.drumNo || '') === String(slot.drumNo || '')
-        );
-        if (pi < 0) pi = pool.findIndex((r, i) => !used.has(i) && rowHasWeight(r));
-        if (pi < 0) return slot;
-        used.add(pi);
-        const src = pool[pi];
-        const gross = src.gross ?? '';
-        const tare = src.tare ?? '';
-        const net = calcRowNet(gross, tare, src.net);
-        return {
-          ...slot,
-          batchNo: slot.batchNo || src.batchNo || '',
-          drumNo: slot.drumNo != null && slot.drumNo !== '' ? slot.drumNo : (src.drumNo ?? ''),
-          gross: gross === '' || gross == null ? (slot.gross ?? '') : gross,
-          tare: tare === '' || tare == null ? (slot.tare ?? '') : tare,
-          net: net === '' || net == null ? (slot.net ?? '') : net
-        };
-      });
-    };
-
-    // Separate pools so both sides can receive PL weights when empty
-    dispatchedBatches = fillFromPl(dispatchedBatches);
-    receivedBatches = fillFromPl(receivedBatches);
-
-    // If received still empty but dispatched has weights, mirror for print
-    receivedBatches = receivedBatches.map((slot, idx) => {
-      if (rowHasWeight(slot)) return slot;
-      const d = dispatchedBatches[idx] || {};
-      if (!rowHasWeight(d)) return slot;
-      return {
-        ...slot,
-        batchNo: slot.batchNo || d.batchNo || '',
-        drumNo: slot.drumNo != null && slot.drumNo !== '' ? slot.drumNo : (d.drumNo ?? ''),
-        gross: d.gross ?? '',
-        tare: d.tare ?? '',
-        net: d.net ?? ''
-      };
-    });
-  }
+  const receivedBatches = [...(bpr.receivedBatches || [])];
+  const dispatchedBatches = [...(bpr.dispatchedBatches || [])];
 
   const sievingLumps = parseFloat(
     bpr.lumpsNetWeight ?? bpr.sievingLumps ?? pl?.sievingLumps ?? pl?.sievingLumpsNet ?? ''

@@ -2,7 +2,7 @@ import { formatDate } from '../utils/dateUtils';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
+import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus, ArrowLeft } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import ExportButton from '../components/ExportButton';
 import DocChargeRow from '../components/DocChargeRow';
@@ -14,14 +14,15 @@ import {
   buildChargeQtys,
   calcStandardChargesSubtotal,
   parseChargeFieldValue,
-  isMaterialQtyCharge
+  isMaterialQtyCharge,
+  qtyInputValue
 } from '../utils/documentCharges';
 import SearchableSelect from '../components/SearchableSelect';
 
 const PurchaseOrders = () => {
   const { data, updateData, updateItem, deleteItemSoftly, incrementSerial } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
 
@@ -93,7 +94,7 @@ const PurchaseOrders = () => {
       const materialQty = parseFloat(prev.qty) || 0;
       const qtys = { ...(prev.qtys || emptyChargeQtys()) };
       if (turningOn && (qtys[key] == null || qtys[key] === '')) {
-        qtys[key] = isMaterialQtyCharge(key) ? materialQty : 1;
+        qtys[key] = '';
       }
       return { ...prev, charges: { ...prev.charges, [key]: turningOn }, qtys };
     });
@@ -107,10 +108,29 @@ const PurchaseOrders = () => {
     setForm(prev => ({ ...prev, qtys: { ...(prev.qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) } }));
   };
 
+  const handlePartyNameChange = (e) => {
+    const name = e.target.value || '';
+    const party = (data.parties || []).find(p =>
+      !p.isDeleted && (p.name || '').trim().toLowerCase() === name.trim().toLowerCase()
+    );
+    if (party) {
+      setForm(prev => ({
+        ...prev,
+        partyName: party.name,
+        address: party.billAddress || prev.address || '',
+        gstin: party.gstinBill || prev.gstin || '',
+        mobile: party.phone1 || prev.mobile || '',
+        email: party.email1 || prev.email || ''
+      }));
+      return;
+    }
+    setForm(prev => ({ ...prev, partyName: name }));
+  };
+
   const addCustomCharge = () => {
     setForm(prev => ({
       ...prev,
-      customCharges: [...(prev.customCharges || []), { id: Date.now(), name: '', qty: 1, rate: 0, checked: true }]
+      customCharges: [...(prev.customCharges || []), { id: Date.now(), name: '', qty: '', rate: 0, checked: true }]
     }));
   };
 
@@ -163,7 +183,7 @@ const PurchaseOrders = () => {
       email: '',
       qty: 0
     });
-    setIsModalOpen(true);
+    setIsFormOpen(true);
   };
 
   const handleCreateNew = () => {
@@ -192,7 +212,7 @@ const PurchaseOrders = () => {
       email: '',
       qty: 0
     });
-    setIsModalOpen(true);
+    setIsFormOpen(true);
   };
 
   const handleEdit = (po) => {
@@ -202,7 +222,13 @@ const PurchaseOrders = () => {
       ...po,
       qtys: po.qtys ? { ...emptyChargeQtys(), ...po.qtys } : buildChargeQtys({}, materialQty)
     });
-    setIsModalOpen(true);
+    setIsFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setEditingDoc(null);
+    setSelectedMR(null);
   };
 
   const handleSubmit = (e) => {
@@ -231,7 +257,9 @@ const PurchaseOrders = () => {
       updateData('purchaseOrders', { ...finalDoc, id: Date.now().toString() });
       incrementSerial('PO');
     }
-    setIsModalOpen(false);
+    setIsFormOpen(false);
+    setEditingDoc(null);
+    setSelectedMR(null);
   };
 
   // Find MRs that do not have a PO generated yet
@@ -256,6 +284,180 @@ const PurchaseOrders = () => {
   const chargesList = STANDARD_CHARGES_LIST;
   const materialQty = parseFloat(form.qty) || 0;
 
+  if (isFormOpen) {
+    return (
+      <div>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
+          <div>
+            <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>{editingDoc ? 'Modify Purchase Order' : 'Create Purchase Order'}</h1>
+            <p style={{ color: 'var(--text-muted)' }}>Enter purchase order details on this page.</p>
+          </div>
+          <button type="button" className="btn" onClick={closeForm}>
+            <ArrowLeft size={18} /> Back to PO list
+          </button>
+        </header>
+
+        <div className="premium-card">
+          <form onSubmit={handleSubmit}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div>
+                <label>PO Number</label>
+                <input type="text" className="input-field" value={form.poNo} onChange={e => setForm({...form, poNo: e.target.value})} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
+              </div>
+              <div>
+                <label>PO Date *</label>
+                <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+              </div>
+              <div>
+                <label>Supplier Doc No</label>
+                <input type="text" className="input-field" value={form.partyDocNo} onChange={e => setForm({...form, partyDocNo: e.target.value})} />
+              </div>
+              <div>
+                <label>Supplier Doc Date</label>
+                <input type="date" className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
+              </div>
+              <div>
+                <label>Supplier / Party Name *</label>
+                <SearchableSelect
+                  allowCustom
+                  required
+                  className="input-field"
+                  placeholder="Select or type party name"
+                  value={form.partyName}
+                  onChange={handlePartyNameChange}
+                >
+                  <option value="">Select or type party name</option>
+                  {(data.parties || []).filter(p => !p.isDeleted).map(p => (
+                    <option key={p.id} value={p.name}>{p.name}</option>
+                  ))}
+                </SearchableSelect>
+              </div>
+              <div>
+                <label>Product Name</label>
+                <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label>Product Description / Specifications</label>
+                <textarea className="input-field" rows="3" placeholder="Additional lines shown under product name on PO PDF" value={form.productDescription || ''} onChange={e => setForm({...form, productDescription: e.target.value})} />
+              </div>
+              <div>
+                <label>Vendor Address</label>
+                <textarea className="input-field" rows="2" value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} />
+              </div>
+              <div>
+                <label>Vendor State</label>
+                <input type="text" className="input-field" value={form.state || 'GUJARAT'} onChange={e => setForm({...form, state: e.target.value})} />
+              </div>
+              <div>
+                <label>Vendor GSTIN</label>
+                <input type="text" className="input-field" value={form.gstin || ''} onChange={e => setForm({...form, gstin: e.target.value})} />
+              </div>
+              <div>
+                <label>Vendor Mobile</label>
+                <input type="text" className="input-field" value={form.mobile || ''} onChange={e => setForm({...form, mobile: e.target.value})} />
+              </div>
+              <div>
+                <label>Vendor Email</label>
+                <input type="text" className="input-field" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} />
+              </div>
+              <div>
+                <label>Material Qty (Kg)</label>
+                <input type="number" step="any" className="input-field" value={form.qty} onChange={e => setForm({...form, qty: parseFloat(e.target.value) || 0})} />
+              </div>
+              <div style={{ gridColumn: 'span 4' }}>
+                <label>Terms & Conditions</label>
+                <textarea className="input-field" rows="3" value={form.terms} onChange={e => setForm({...form, terms: e.target.value})} />
+              </div>
+            </div>
+
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>PO Grid</h3>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+              <div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {chargesList.map(item => (
+                    <DocChargeRow
+                      key={item.key}
+                      item={item}
+                      charges={form.charges}
+                      rates={form.rates}
+                      qtys={form.qtys}
+                      materialQty={materialQty}
+                      onToggle={toggleCharge}
+                      onQtyChange={handleQtyChange}
+                      onRateChange={handleRateChange}
+                    />
+                  ))}
+                </div>
+
+                <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.9rem', fontWeight: 600 }}>Manual Custom Charges</label>
+                    <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={addCustomCharge}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Row
+                    </button>
+                  </div>
+                  {(form.customCharges || []).map(c => (
+                    <div key={c.id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                      <input type="checkbox" checked={c.checked !== false} onChange={e => updateCustomCharge(c.id, 'checked', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-primary)' }} />
+                      <input type="text" className="input-field" placeholder="Description" value={c.name} onChange={e => updateCustomCharge(c.id, 'name', e.target.value)} />
+                      <input type="number" className="input-field" placeholder="NIL" value={qtyInputValue(c.qty)} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
+                      <input type="number" className="input-field" placeholder="Rate" value={c.rate} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
+                      <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeCustomCharge(c.id)}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                      </button>
+                    </div>
+                  ))}
+                  {(form.customCharges || []).length === 0 && (
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No manual charges added.</div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--accent-primary)' }}>GST Calculations</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span>Subtotal:</span>
+                  <span style={{ fontWeight: 600 }}>₹{getSubtotal().toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                  <span>Discount (₹):</span>
+                  <input type="number" className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.discount} onChange={e => setForm({...form, discount: parseFloat(e.target.value) || 0})} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                  <span>GST Rate (%):</span>
+                  <SearchableSelect className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
+                    <option value="18">18%</option>
+                    <option value="12">12%</option>
+                    <option value="5">5%</option>
+                    <option value="0">0%</option>
+                  </SearchableSelect>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span>CGST @{(form.taxRate / 2)}%:</span>
+                  <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span>SGST @{(form.taxRate / 2)}%:</span>
+                  <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
+                  <span>Grand Total:</span>
+                  <span>₹{(Math.max(0, getSubtotal() - form.discount) * (1 + form.taxRate / 100)).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+              <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={closeForm}>Cancel</button>
+              <button type="submit" className="btn btn-primary">Save Purchase Order</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -272,7 +474,6 @@ const PurchaseOrders = () => {
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
-        {/* Left Side: Pending MRs scheduler */}
         <div className="premium-card">
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
@@ -284,10 +485,10 @@ const PurchaseOrders = () => {
               <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', fontSize: '0.85rem' }}>No pending receipts awaiting PO.</p>
             ) : (
               pendingMRs.map(mr => (
-                <div 
-                  key={mr.id} 
-                  className="glass-panel" 
-                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.15s ease' }} 
+                <div
+                  key={mr.id}
+                  className="glass-panel"
+                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.15s ease' }}
                   onClick={() => handleCreate(mr)}
                 >
                   <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{mr.receiptNo}</p>
@@ -299,16 +500,15 @@ const PurchaseOrders = () => {
           </div>
         </div>
 
-        {/* Right Side: PO Log */}
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Purchase Order Log</h3>
-          
+
           <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
             <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-            <input 
-              type="text" 
-              className="input-field" 
-              placeholder="Search by PO number or Party Name..." 
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Search by PO number or Party Name..."
               style={{ paddingLeft: '3rem' }}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
@@ -358,159 +558,6 @@ const PurchaseOrders = () => {
           </div>
         </div>
       </div>
-
-      {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
-          <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto' }}>
-            <h2 style={{ marginBottom: '1.5rem' }}>{editingDoc ? 'Modify Purchase Order' : 'Create Purchase Order'}</h2>
-            
-            <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div>
-                  <label>PO Number</label>
-                  <input type="text" className="input-field" value={form.poNo} onChange={e => setForm({...form, poNo: e.target.value})} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
-                </div>
-                <div>
-                  <label>PO Date *</label>
-                  <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
-                </div>
-                <div>
-                  <label>Supplier Doc No</label>
-                  <input type="text" className="input-field" value={form.partyDocNo} onChange={e => setForm({...form, partyDocNo: e.target.value})} />
-                </div>
-                <div>
-                  <label>Supplier Doc Date</label>
-                  <input type="date" className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
-                </div>
-                <div>
-                  <label>Supplier / Party Name *</label>
-                  <input type="text" className="input-field" required placeholder="Enter supplier / party name" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
-                </div>
-                <div>
-                  <label>Product Name</label>
-                  <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
-                </div>
-                <div style={{ gridColumn: 'span 2' }}>
-                  <label>Product Description / Specifications</label>
-                  <textarea className="input-field" rows="3" placeholder="Additional lines shown under product name on PO PDF" value={form.productDescription || ''} onChange={e => setForm({...form, productDescription: e.target.value})} />
-                </div>
-                <div>
-                  <label>Vendor Address</label>
-                  <textarea className="input-field" rows="2" value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} />
-                </div>
-                <div>
-                  <label>Vendor State</label>
-                  <input type="text" className="input-field" value={form.state || 'GUJARAT'} onChange={e => setForm({...form, state: e.target.value})} />
-                </div>
-                <div>
-                  <label>Vendor GSTIN</label>
-                  <input type="text" className="input-field" value={form.gstin || ''} onChange={e => setForm({...form, gstin: e.target.value})} />
-                </div>
-                <div>
-                  <label>Vendor Mobile</label>
-                  <input type="text" className="input-field" value={form.mobile || ''} onChange={e => setForm({...form, mobile: e.target.value})} />
-                </div>
-                <div>
-                  <label>Vendor Email</label>
-                  <input type="text" className="input-field" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} />
-                </div>
-                <div>
-                  <label>Material Qty (Kg)</label>
-                  <input type="number" step="any" className="input-field" value={form.qty} onChange={e => setForm({...form, qty: parseFloat(e.target.value) || 0})} />
-                </div>
-                <div style={{ gridColumn: 'span 4' }}>
-                  <label>Terms & Conditions</label>
-                  <textarea className="input-field" rows="3" value={form.terms} onChange={e => setForm({...form, terms: e.target.value})} />
-                </div>
-              </div>
-
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', pb: '0.5rem' }}>PO Grid</h3>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
-                <div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {chargesList.map(item => (
-                      <DocChargeRow
-                        key={item.key}
-                        item={item}
-                        charges={form.charges}
-                        rates={form.rates}
-                        qtys={form.qtys}
-                        materialQty={materialQty}
-                        onToggle={toggleCharge}
-                        onQtyChange={handleQtyChange}
-                        onRateChange={handleRateChange}
-                      />
-                    ))}
-                  </div>
-
-                  <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                      <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.9rem', fontWeight: 600 }}>Manual Custom Charges</label>
-                      <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={addCustomCharge}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Row
-                      </button>
-                    </div>
-                    {(form.customCharges || []).map(c => (
-                      <div key={c.id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
-                        <input type="checkbox" checked={c.checked !== false} onChange={e => updateCustomCharge(c.id, 'checked', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-primary)' }} />
-                        <input type="text" className="input-field" placeholder="Description" value={c.name} onChange={e => updateCustomCharge(c.id, 'name', e.target.value)} />
-                        <input type="number" className="input-field" placeholder="Qty" value={c.qty} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
-                        <input type="number" className="input-field" placeholder="Rate" value={c.rate} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
-                        <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeCustomCharge(c.id)}>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                        </button>
-                      </div>
-                    ))}
-                    {(form.customCharges || []).length === 0 && (
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No manual charges added.</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Calculation Summary */}
-                <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--accent-primary)' }}>GST Calculations</h4>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span>Subtotal:</span>
-                    <span style={{ fontWeight: 600 }}>₹{getSubtotal().toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                    <span>Discount (₹):</span>
-                    <input type="number" className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.discount} onChange={e => setForm({...form, discount: parseFloat(e.target.value) || 0})} />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                    <span>GST Rate (%):</span>
-                    <SearchableSelect className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
-                      <option value="18">18%</option>
-                      <option value="12">12%</option>
-                      <option value="5">5%</option>
-                      <option value="0">0%</option>
-                    </SearchableSelect>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span>CGST @{(form.taxRate / 2)}%:</span>
-                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span>SGST @{(form.taxRate / 2)}%:</span>
-                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
-                    <span>Grand Total:</span>
-                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (1 + form.taxRate / 100)).toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
-                <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => setIsModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Purchase Order</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

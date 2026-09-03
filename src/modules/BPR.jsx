@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
@@ -7,15 +7,20 @@ import { getStoredCompanyProfile } from '../utils/companyProfile';
 import ExportButton from '../components/ExportButton';
 import { Plus, Search, Edit2, Trash2, ClipboardList, FileDown, Printer, FileText } from 'lucide-react';
 import { numberInputValue, parseOptionalNumber } from '../utils/numberInput';
+import SearchableSelect from '../components/SearchableSelect';
 import {
   getPartyProductForMR,
   getReceiptProductNames,
+  getProductQty,
+  getProductDrums,
   receiptProductOptions,
   enrichBPRForPrint,
-  findAnyPackingList
+  findDedicatedReceiptDoc,
+  buildBprRowsForProduct,
+  resolveReceiptProductName
 } from '../utils/receiptProducts';
 
-const emptyRow = (batchNo, drumNo) => ({ batchNo, drumNo, gross: '', tare: '', net: '' });
+const emptyRow = (batchNo, drumNo, productName = '') => ({ batchNo, drumNo, productName, gross: '', tare: '', net: '' });
 const emptyMetrics = () => ({ volBefore: '', volAfter: '', bd: '', td: '', micron: '' });
 const emptyPreviousBulkDensity = () => ({
   asSuch: emptyMetrics(),
@@ -63,37 +68,6 @@ const sumGross = (rows) => (rows || []).reduce((s, r) => {
 }, 0);
 
 const countFilledDrums = (rows) => (rows || []).filter((r) => r.batchNo || r.drumNo).length;
-
-const applyPlWeightsToRows = (slots, plBatches = []) => {
-  const pool = [...(plBatches || [])];
-  const used = new Set();
-  return slots.map((slot) => {
-    let pi = pool.findIndex(
-      (r, i) =>
-        !used.has(i) &&
-        String(r.batchNo || '') === String(slot.batchNo || '') &&
-        String(r.drumNo || '') === String(slot.drumNo || '')
-    );
-    if (pi < 0) pi = pool.findIndex((r, i) => !used.has(i));
-    if (pi < 0) return { ...slot };
-    used.add(pi);
-    const src = pool[pi];
-    const gross = numberInputValue(src.gross ?? '');
-    const tare = numberInputValue(src.tare ?? '');
-    const net =
-      src.net !== '' && src.net != null
-        ? numberInputValue(src.net)
-        : calcNet(gross, tare);
-    return {
-      ...slot,
-      batchNo: src.batchNo || slot.batchNo,
-      drumNo: src.drumNo != null && src.drumNo !== '' ? String(src.drumNo) : slot.drumNo,
-      gross,
-      tare,
-      net
-    };
-  });
-};
 
 const normalizeRow = (r) => ({
   ...r,
@@ -210,58 +184,37 @@ const BPR = () => {
     setIsModalOpen(true);
   };
 
-  const handleCreate = (mr, openTab = 'page1') => {
+  const handleCreate = (mr, productName = '', openTab = 'page1') => {
     setSelectedMR(mr);
     setEditingBPR(null);
     setActiveTab(openTab);
 
     const bprSerial = data.settings?.serials?.BPR || 1;
-    const docNo = generateDocNumber('BPR', bprSerial, new Date(form.date));
-
-    const activeMRBatches = (mr.batches || []).filter(b => !b.isEmptyDrums);
-    const receivedRows = [];
-    activeMRBatches.forEach(b => {
-      const drumCount = parseInt(b.drums) || 1;
-      for (let d = 1; d <= drumCount; d++) {
-        receivedRows.push(emptyRow(b.batchNo, d.toString()));
-      }
-    });
-
-    const prodConfig = getPartyProductForMR(mr, data);
+    const docNo = generateDocNumber('BPR', bprSerial, new Date());
     const prodOpts = receiptProductOptions(mr, data);
     const productNames = getReceiptProductNames(mr, prodOpts);
-    const firstBatch = activeMRBatches[0];
+    const liveBprs = (data.bprs || []).filter((b) => !b.isDeleted);
+    const pendingName = productNames.find((n) => !findDedicatedReceiptDoc(liveBprs, mr.id, n));
+    const prod = resolveReceiptProductName(
+      mr,
+      productName || pendingName || productNames[0] || mr.productName,
+      prodOpts
+    ) || productName || pendingName || productNames[0] || mr.productName || '';
+    const built = buildBprRowsForProduct(mr, prod, prodOpts);
+    const prodConfig = getPartyProductForMR(mr, data, prod);
+    const firstBatch = built.batches[0];
     const psdRequirement = firstBatch?.psdReq || prodConfig?.psdReq || '90% < 10M';
-    const psdNotes = productNames
-      .map((name) => getPartyProductForMR(mr, data, name)?.psdNote)
-      .filter(Boolean);
-    const psdNote = psdNotes.length
-      ? [...new Set(psdNotes)].join(' | ')
-      : (prodConfig?.psdNote || '');
-    const drumTotal =
-      receivedRows.length ||
-      parseInt(mr.totalDrums, 10) ||
-      activeMRBatches.reduce((s, b) => s + (parseInt(b.drums, 10) || 0), 0) ||
-      0;
-
-    // Auto-create matching drum rows on the dispatch side
-    let dispatchedRows = receivedRows.map((r) => emptyRow(r.batchNo, r.drumNo));
-
-    // Pull gross/tare/net from an existing packing list when available
-    const pl = findAnyPackingList(data.packingLists, mr.id);
-    if (pl?.batches?.length) {
-      dispatchedRows = applyPlWeightsToRows(dispatchedRows, pl.batches);
-    }
-
-    const paddedReceived = padBPRBatchRows(receivedRows);
-    const paddedDispatched = padBPRBatchRows(dispatchedRows);
+    const psdNote = prodConfig?.psdNote || '';
+    const drumTotal = built.drums || 0;
+    const paddedReceived = padBPRBatchRows(built.receivedRows);
+    const paddedDispatched = padBPRBatchRows(built.dispatchedRows);
 
     setForm({
       bprNo: docNo,
       date: new Date().toISOString().split('T')[0],
       partyName: mr.partyName,
-      productName: mr.productName,
-      totalInputQty: mr.totalQty,
+      productName: built.productName || prod,
+      totalInputQty: built.qty,
       psdRequirement,
       psdNote,
       totalDrums: drumTotal,
@@ -307,10 +260,37 @@ const BPR = () => {
     setIsModalOpen(true);
   };
 
+  const applyFormProduct = (prodName) => {
+    if (!selectedMR) {
+      setForm((prev) => ({ ...prev, productName: prodName }));
+      return;
+    }
+    const prodOpts = receiptProductOptions(selectedMR, data);
+    const name = resolveReceiptProductName(selectedMR, prodName, prodOpts) || prodName;
+    const prodConfig = getPartyProductForMR(selectedMR, data, name);
+    const built = buildBprRowsForProduct(selectedMR, name, prodOpts);
+    const drumTotal = built.drums || 0;
+    setForm((prev) => ({
+      ...prev,
+      productName: built.productName || name,
+      totalInputQty: built.qty,
+      totalDrums: drumTotal,
+      psdRequirement: prodConfig?.psdReq || prev.psdRequirement || '90% < 10M',
+      psdNote: prodConfig?.psdNote || '',
+      receivedBatches: padBPRBatchRows(built.receivedRows),
+      dispatchedBatches: padBPRBatchRows(built.dispatchedRows),
+      packingConsumables: {
+        ...(prev.packingConsumables || {}),
+        drumUsed: drumTotal ? String(drumTotal) : (prev.packingConsumables?.drumUsed || '')
+      }
+    }));
+  };
+
   const handleEdit = (bpr, openTab = 'page1') => {
     setEditingBPR(bpr);
     setActiveTab(openTab);
     const mr = data.materialReceipts.find(m => m.id === bpr.receiptId);
+    setSelectedMR(mr || null);
     const prodConfig = mr ? getPartyProductForMR(mr, data, bpr.productName) : null;
     let receivedBatches = (bpr.receivedBatches || []).map(normalizeRow);
     let dispatchedBatches = (bpr.dispatchedBatches || []).map(normalizeRow);
@@ -489,11 +469,15 @@ const BPR = () => {
     );
     const pc = { ...(form.packingConsumables || {}) };
     if (!pc.drumUsed && filledDrums) pc.drumUsed = String(filledDrums);
+    const linkedMr = selectedMR || data.materialReceipts.find((m) => m.id === (editingBPR?.receiptId || form.receiptId));
+    const resolvedProduct = linkedMr && !String(form.productName || '').includes(',')
+      ? (resolveReceiptProductName(linkedMr, form.productName, receiptProductOptions(linkedMr, data)) || form.productName)
+      : form.productName;
     const finalDoc = {
       ...form,
       receiptId: editingBPR?.receiptId || selectedMR?.id || '',
       partyName: form.partyName,
-      productName: form.productName,
+      productName: resolvedProduct,
       totalDrums: filledDrums || form.totalDrums || 0,
       packingConsumables: pc,
       totalReceivedNet,
@@ -517,10 +501,27 @@ const BPR = () => {
     }
   };
 
-  // Find receipts that do not have a BPR generated yet
-  const pendingReceipts = data.materialReceipts.filter(mr => 
-    !(data.bprs || []).some(b => b.receiptId === mr.id)
-  );
+  const pendingBprJobs = useMemo(() => {
+    const liveBprs = (data.bprs || []).filter((b) => !b.isDeleted);
+    const jobs = [];
+    (data.materialReceipts || []).forEach((mr) => {
+      const prodOpts = receiptProductOptions(mr, data);
+      const names = getReceiptProductNames(mr, prodOpts);
+      const products = names.length ? names : [mr.productName].filter(Boolean);
+      if (!products.length) products.push('');
+      products.forEach((productName) => {
+        if (!findDedicatedReceiptDoc(liveBprs, mr.id, productName || '')) {
+          jobs.push({
+            mr,
+            productName,
+            qty: productName ? getProductQty(mr, productName, prodOpts) : (mr.totalQty || 0),
+            drums: productName ? getProductDrums(mr, productName, prodOpts) : (mr.totalDrums || 0)
+          });
+        }
+      });
+    });
+    return jobs;
+  }, [data]);
 
   const filteredBPRs = (data.bprs || []).filter(b => 
     (b.bprNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -604,19 +605,19 @@ const BPR = () => {
           </h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Select a receipt to enter manufacturing batch weights.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {pendingReceipts.length === 0 ? (
+            {pendingBprJobs.length === 0 ? (
               <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', fontSize: '0.85rem' }}>No pending receipts awaiting processing.</p>
             ) : (
-              pendingReceipts.map(mr => (
+              pendingBprJobs.map(job => (
                 <div 
-                  key={mr.id} 
+                  key={`${job.mr.id}_${job.productName || 'default'}`} 
                   className="glass-panel" 
                   style={{ padding: '1rem', cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.15s ease' }} 
-                  onClick={() => handleCreate(mr)}
+                  onClick={() => handleCreate(job.mr, job.productName)}
                 >
-                  <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{mr.receiptNo}</p>
-                  <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.25rem 0' }}>{mr.partyName}</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>{mr.productName} - {mr.totalQty} Kg ({mr.totalDrums} Drums)</p>
+                  <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{job.mr.receiptNo}</p>
+                  <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.25rem 0' }}>{job.mr.partyName}</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>{job.productName || job.mr.productName} - {job.qty} Kg ({job.drums} Drums)</p>
                 </div>
               ))
             )}
@@ -705,19 +706,19 @@ const BPR = () => {
             />
           </div>
 
-          {pendingReceipts.length > 0 && (
+          {pendingBprJobs.length > 0 && (
             <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Pending Weight Entry</h4>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                {pendingReceipts.map(mr => (
+                {pendingBprJobs.map(job => (
                   <button
-                    key={mr.id}
+                    key={`${job.mr.id}_${job.productName || 'default'}`}
                     type="button"
                     className="btn btn-secondary"
                     style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
-                    onClick={() => handleCreate(mr, 'page2')}
+                    onClick={() => handleCreate(job.mr, job.productName, 'page2')}
                   >
-                    {mr.receiptNo} — {mr.productName} ({mr.totalDrums || 0} drums)
+                    {job.mr.receiptNo} — {job.productName || job.mr.productName} ({job.drums || 0} drums)
                   </button>
                 ))}
               </div>
@@ -767,7 +768,7 @@ const BPR = () => {
 
       {/* Embedded Generator Modal */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1rem' }}>{editingBPR ? 'Modify BPR' : 'Create Batch Processing Record (BPR)'}</h2>
 
@@ -810,11 +811,42 @@ const BPR = () => {
                 </div>
                 <div>
                   <label>Party Name</label>
-                  <input type="text" className="input-field" value={form.partyName} onChange={e => setForm({...form, partyName: e.target.value})} />
+                  <SearchableSelect
+                    allowCustom
+                    className="input-field"
+                    placeholder="Select or type party name"
+                    value={form.partyName}
+                    onChange={e => setForm({...form, partyName: e.target.value})}
+                  >
+                    <option value="">Select or type party name</option>
+                    {(data.parties || []).filter(p => !p.isDeleted).map(p => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
+                    ))}
+                  </SearchableSelect>
                 </div>
                 <div>
                   <label>Product Name</label>
-                  <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
+                  {selectedMR ? (
+                    <SearchableSelect
+                      className="input-field"
+                      value={form.productName}
+                      disabled={!!editingBPR}
+                      onChange={(e) => {
+                        if (editingBPR) setForm({ ...form, productName: e.target.value });
+                        else applyFormProduct(e.target.value);
+                      }}
+                    >
+                      <option value="">Select product</option>
+                      {form.productName && !getReceiptProductNames(selectedMR, receiptProductOptions(selectedMR, data)).includes(form.productName) && (
+                        <option value={form.productName}>{form.productName}</option>
+                      )}
+                      {getReceiptProductNames(selectedMR, receiptProductOptions(selectedMR, data)).map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </SearchableSelect>
+                  ) : (
+                    <input type="text" className="input-field" value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />
+                  )}
                 </div>
                 <div>
                   <label>PSD Requirement *</label>

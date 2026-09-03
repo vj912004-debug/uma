@@ -251,6 +251,34 @@ const CompanyProfileSettings = () => {
           </div>
         </Section>
 
+        <Section title="Bank Details">
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: 0, marginBottom: '1rem' }}>
+            Printed on Tax Invoice, Proforma Invoice, Purchase Order, and Debit Note.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label>Bank Name</label>
+              <input className="input-field" value={form.bankName || ''} onChange={e => setField('bankName', e.target.value)} placeholder="e.g. AXIS BANK LTD" />
+            </div>
+            <div className="form-group">
+              <label>Account Name</label>
+              <input className="input-field" value={form.accountName || ''} onChange={e => setField('accountName', e.target.value)} placeholder="e.g. UMA MICRON" />
+            </div>
+            <div className="form-group">
+              <label>Current A/c No.</label>
+              <input className="input-field" value={form.accountNumber || ''} onChange={e => setField('accountNumber', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>IFS Code</label>
+              <input className="input-field" value={form.ifscCode || ''} onChange={e => setField('ifscCode', e.target.value)} placeholder="e.g. UTIB0000383" />
+            </div>
+            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+              <label>Branch</label>
+              <input className="input-field" value={form.branch || ''} onChange={e => setField('branch', e.target.value)} placeholder="e.g. Nizampura, Vadodara - 390002" />
+            </div>
+          </div>
+        </Section>
+
         <div className="premium-card" style={{ marginBottom: '1.5rem' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem' }}>Document Preview</h3>
           <div style={{ padding: '1rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
@@ -264,6 +292,11 @@ const CompanyProfileSettings = () => {
             <p style={{ fontSize: '0.85rem', margin: '0.25rem 0' }}>{formatCompanyAddressSingle(form)}</p>
             <p style={{ fontSize: '0.85rem', margin: '0.25rem 0' }}>{form.phone}{form.email ? ` | ${form.email}` : ''}</p>
             {form.gstNumber && <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0.25rem 0' }}>GSTIN: {form.gstNumber}</p>}
+            {(form.bankName || form.accountNumber) && (
+              <p style={{ fontSize: '0.85rem', margin: '0.5rem 0 0', color: 'var(--text-muted)' }}>
+                Bank: {[form.bankName, form.accountName, form.accountNumber, form.ifscCode].filter(Boolean).join(' · ')}
+              </p>
+            )}
           </div>
         </div>
 

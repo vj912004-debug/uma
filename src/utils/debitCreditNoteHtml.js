@@ -19,7 +19,8 @@ import {
   buildFooterTerms,
   formatPrintTermsHtml,
   DEFAULT_INVOICE_TERMS,
-  buildOptionalMetaRowHtml
+  buildOptionalMetaRowHtml,
+  buildBankDetailsBox
 } from './printTheme';
 
 const NOTE_CHARGES = [...STANDARD_CHARGES_LIST, OTHER_CHARGE_ITEM];
@@ -878,18 +879,7 @@ const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
   <div class="inv-bot">
   <!-- BANK DETAILS + TOTALS -->
   <div class="bottom">
-    ${noteType === 'Debit Note' ? `
-    <div class="bank">
-      <div class="box-head"><svg viewBox="0 0 24 24"><path d="M3 10l9-6 9 6"/><path d="M4 10h16v9H4z"/><path d="M4 19h16M8 10v9M12 10v9M16 10v9"/></svg> OUR BANK DETAILS</div>
-      <div class="bank-body">
-        <div class="bank-row"><span class="blabel">Bank Name</span><span class="bcolon">:</span><span>AXIS BANK LTD</span></div>
-        <div class="bank-row"><span class="blabel">A/c Name</span><span class="bcolon">:</span><span>UMA MICRON</span></div>
-        <div class="bank-row"><span class="blabel">Current A/c No.</span><span class="bcolon">:</span><span>916020061629671</span></div>
-        <div class="bank-row"><span class="blabel">IFS CODE</span><span class="bcolon">:</span><span>UTIB0000383</span></div>
-        <div class="bank-row"><span class="blabel">Branch</span><span class="bcolon">:</span><span>Nizampura, Vadodara - 390002</span></div>
-      </div>
-    </div>
-    ` : `
+    ${noteType === 'Debit Note' ? buildBankDetailsBox(profile) : `
     <div class="bank">
       <div class="box-head"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> NOTES</div>
       <div class="bank-body" style="min-height: 80px; font-size:12px; line-height: 1.5;">
@@ -957,6 +947,7 @@ const renderPdfCommon = async (html, docNo, prefix, mode, printPrefs) => {
     filePrefix: prefix,
     docNo,
     fitPage: true,
+    splitOverflowPages: true,
     printPrefs
   });
 };

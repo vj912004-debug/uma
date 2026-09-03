@@ -213,7 +213,7 @@ const TaskManager = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '500px', maxWidth: '90%' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>{isEditing ? 'Edit Task Reminder' : 'Schedule Task reminder'}</h2>
             

@@ -1,6 +1,6 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { formatPdfDateSlash } from './taxInvoiceLayout';
-import { escHtml, buildPrintBrandHtml, applyPrintPrefsToHtml } from './printTheme';
+import { escHtml, buildPrintBrandHtml, applyPrintPrefsToHtml, layoutFillOtherPrintPages } from './printTheme';
 import { PRINT_ROOT_CLASS } from './printPrefs';
 
 const hasWeight = (row = {}) => {
@@ -29,25 +29,6 @@ const resolveDispatchRow = (received = {}, dispatched = {}) => {
 
 const bprMark = (val) => {
   if (val === true || val === 'Yes' || val === 'yes' || val === '✓') return '✓';
-  return '';
-};
-
-const fmtWt = (v) => {
-  if (v === '' || v === undefined || v === null) return '';
-  const n = typeof v === 'number' ? v : parseFloat(v);
-  if (Number.isNaN(n) || n === 0) return '';
-  return n.toFixed(2);
-};
-
-const calcNet = (row) => {
-  if (row.net !== '' && row.net !== undefined && row.net !== null && row.net !== 0) {
-    return typeof row.net === 'number' ? row.net.toFixed(2) : String(row.net);
-  }
-  const g = parseFloat(row.gross);
-  const t = parseFloat(row.tare);
-  if (!Number.isNaN(g) && !Number.isNaN(t) && row.gross !== '' && row.tare !== '') {
-    return Math.max(0, g - t).toFixed(2);
-  }
   return '';
 };
 
@@ -152,10 +133,36 @@ export const buildBlankBprPayload = ({ partyName = '', productName = '', company
   };
 };
 
+const isEmptyDrumsLabel = (value) =>
+  /^empty\s*drums?$/i.test(String(value || '').trim());
+
+/** Product batch numbers only — Empty Drum stays on the BPR table, not this header. */
+const productBatchNos = (rows = []) => {
+  const nos = [];
+  const seen = new Set();
+  (rows || []).forEach((b) => {
+    if (b?.isEmptyDrums) return;
+    String(b?.batchNo || '').split(',').forEach((part) => {
+      const t = part.trim();
+      if (!t || isEmptyDrumsLabel(t)) return;
+      const key = t.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      nos.push(t);
+    });
+  });
+  return nos;
+};
+
 export const buildBprHtml = (data, profileInput) => {
   const profile = mergeCompanyProfile(profileInput);
-  const batchNos = [...new Set((data.receivedBatches || []).map((b) => b.batchNo).filter(Boolean))];
-  const primaryBatchNo = batchNos.join(', ') || data.batchNo || '';
+  const batchNos = productBatchNos(data.receivedBatches);
+  const fallbackBatchNo = String(data.batchNo || '')
+    .split(',')
+    .map((p) => p.trim())
+    .filter((p) => p && !isEmptyDrumsLabel(p))
+    .join(', ');
+  const primaryBatchNo = batchNos.join(', ') || fallbackBatchNo;
   const totalNoBatch = batchNos.length || data.totalNoBatch || '';
   const pc = {
     ...(data.packingMaterials || {}),
@@ -332,39 +339,11 @@ export const buildBprHtml = (data, profileInput) => {
     groupMap[key].pairs.push(pair);
   });
 
-  const parseWtNum = (v) => {
-    if (v === '' || v == null) return 0;
-    const n = typeof v === 'number' ? v : parseFloat(v);
-    return Number.isFinite(n) ? n : 0;
-  };
-  const netNum = (row) => {
-    const s = calcNet(row);
-    const n = parseFloat(s);
-    return (!s || Number.isNaN(n)) ? 0 : n;
-  };
-
   const packingRows = [];
-  let printedDispatchNet = 0;
   batchGroups.forEach((group) => {
-    let gRGross = 0;
-    let gRTare = 0;
-    let gRNet = 0;
-    let gDGross = 0;
-    let gDTare = 0;
-    let gDNet = 0;
     group.pairs.forEach(({ r: rawR, d: rawD }) => {
       const r = rawR || {};
       const d = resolveDispatchRow(r, rawD || {});
-      const dNetStr = calcNet(d);
-      const dNet = parseFloat(dNetStr);
-      if (!Number.isNaN(dNet) && dNetStr) printedDispatchNet += dNet;
-      gRGross += parseWtNum(r.gross);
-      gRTare += parseWtNum(r.tare);
-      gRNet += netNum(r);
-      gDGross += parseWtNum(d.gross);
-      gDTare += parseWtNum(d.tare);
-      gDNet += (!Number.isNaN(dNet) && dNetStr) ? dNet : 0;
-      // Always surface batch/drum from either side so page-2 never looks blank.
       const rBatch = r.batchNo || d.batchNo || '';
       const rDrum = (r.drumNo != null && r.drumNo !== '') ? r.drumNo : (d.drumNo ?? '');
       const dBatch = d.batchNo || r.batchNo || '';
@@ -373,31 +352,30 @@ export const buildBprHtml = (data, profileInput) => {
       <tr>
         <td>${escHtml(rBatch)}</td>
         <td>${escHtml(rDrum)}</td>
-        <td class="wt">${fmtWt(r.gross)}</td>
-        <td class="wt">${fmtWt(r.tare)}</td>
-        <td class="wt">${calcNet(r)}</td>
+        <td class="wt"></td>
+        <td class="wt"></td>
+        <td class="wt"></td>
         <td>${escHtml(dBatch)}</td>
         <td>${escHtml(dDrum)}</td>
-        <td class="wt">${fmtWt(d.gross)}</td>
-        <td class="wt">${fmtWt(d.tare)}</td>
-        <td class="wt">${dNetStr}</td>
+        <td class="wt"></td>
+        <td class="wt"></td>
+        <td class="wt"></td>
       </tr>`);
     });
     packingRows.push(`
       <tr class="batch-total-row">
         <td colspan="2" class="batch-total-label">TOTAL — Batch ${escHtml(group.batchNo)}</td>
-        <td class="wt">${gRGross > 0 ? gRGross.toFixed(2) : ''}</td>
-        <td class="wt">${gRTare > 0 ? gRTare.toFixed(2) : ''}</td>
-        <td class="wt">${gRNet > 0 ? gRNet.toFixed(2) : ''}</td>
+        <td class="wt"></td>
+        <td class="wt"></td>
+        <td class="wt"></td>
         <td colspan="2" class="batch-total-label">TOTAL — Batch ${escHtml(group.batchNo)}</td>
-        <td class="wt">${gDGross > 0 ? gDGross.toFixed(2) : ''}</td>
-        <td class="wt">${gDTare > 0 ? gDTare.toFixed(2) : ''}</td>
-        <td class="wt">${gDNet > 0 ? gDNet.toFixed(2) : ''}</td>
+        <td class="wt"></td>
+        <td class="wt"></td>
+        <td class="wt"></td>
       </tr>`);
   });
 
   if (sievingLumps > 0) {
-    printedDispatchNet += sievingLumps;
     packingRows.push(`
       <tr class="lump-row">
         <td></td><td></td><td></td><td></td><td></td>
@@ -405,7 +383,7 @@ export const buildBprHtml = (data, profileInput) => {
         <td></td>
         <td class="lump-label">Sieving Lumps</td>
         <td></td>
-        <td class="wt">${sievingLumps.toFixed(2)}</td>
+        <td class="wt"></td>
       </tr>`);
   }
 
@@ -419,7 +397,7 @@ export const buildBprHtml = (data, profileInput) => {
   const savedDispatchNet = typeof data.totalDispatchedNet === 'number'
     ? data.totalDispatchedNet
     : (parseFloat(data.totalDispatchedNet) || 0);
-  const finalDispatchNet = printedDispatchNet > 0 ? printedDispatchNet : savedDispatchNet;
+  const finalDispatchNet = savedDispatchNet;
   const dq = data.dispatchQty || {};
   const micronizedPrint = (
     finalDispatchNet > 0
@@ -498,7 +476,7 @@ export const buildBprHtml = (data, profileInput) => {
         </tr>
         <tr>
           <td style="width:20%;" class="left-align">Total Quantity (kg) :</td>
-          <td style="width:20%;">${escHtml(data.totalInputQty ?? '')}</td>
+          <td style="width:20%;">${escHtml(data.totalInputQty || '0')}</td>
           <td style="width:15%;" class="left-align">Batch No. :</td>
           <td style="width:15%;">${escHtml(primaryBatchNo)}</td>
           <td style="width:15%;" class="left-align">Total No. Batch :</td>
@@ -654,6 +632,9 @@ export const buildBprHtml = (data, profileInput) => {
   .page{
     width:794px;height:1123px;min-height:1123px;max-height:1123px;padding:8px;margin:0;background:#fff;
     display:flex;flex-direction:column;page-break-after:always;box-sizing:border-box;overflow:hidden;
+  }
+  .page.page-p2{
+    height:auto;min-height:1123px;max-height:none;overflow:visible;
   }
   .sheet{
     flex:1 1 auto;height:100%;min-height:0;border:2px solid #5a009d;padding:10px;
@@ -1011,26 +992,74 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageNodes = [...idoc.querySelectorAll('.page')];
+    const a4H = 1123;
+    const addCanvasPages = (canvas) => {
+      const pageHpx = a4H * 2;
+      if (canvas.height <= pageHpx + 2) {
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297);
+        return;
+      }
+      let yPx = 0;
+      let pageIndex = 0;
+      while (yPx < canvas.height - 1) {
+        const sliceH = Math.min(pageHpx, canvas.height - yPx);
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = pageHpx;
+        const ctx = pageCanvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, pageCanvas.width, pageHpx);
+        ctx.drawImage(canvas, 0, yPx, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+        if (pageIndex > 0) pdf.addPage();
+        pdf.addImage(pageCanvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297);
+        yPx += sliceH;
+        pageIndex += 1;
+      }
+    };
     for (let i = 0; i < pageNodes.length; i++) {
       if (i > 0) pdf.addPage();
       const target = pageNodes[i];
+      const isP2 = target.classList.contains('page-p2');
+      if (isP2) {
+        layoutFillOtherPrintPages(idoc, a4H);
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const p2Overflows = (target.scrollHeight || 0) > a4H + 8;
+        if (p2Overflows) {
+          target.style.height = 'auto';
+          target.style.minHeight = `${a4H}px`;
+          target.style.maxHeight = 'none';
+          target.style.overflow = 'visible';
+        }
+      }
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const captureH = isP2
+        ? Math.max(a4H, target.scrollHeight || 0, target.offsetHeight || 0)
+        : a4H;
       const canvas = await html2canvas(target, {
         scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff',
         width: 794,
         windowWidth: 794,
-        height: 1123,
-        windowHeight: 1123,
+        height: captureH,
+        windowHeight: captureH,
         logging: false,
         onclone: (clonedDoc) => {
           clonedDoc.querySelectorAll('.page').forEach((el) => {
-            el.style.height = '1123px';
-            el.style.minHeight = '1123px';
-            el.style.maxHeight = '1123px';
+            const p2 = el.classList.contains('page-p2');
+            if (p2 && captureH > a4H) {
+              el.style.height = `${captureH}px`;
+              el.style.minHeight = `${captureH}px`;
+              el.style.maxHeight = 'none';
+              el.style.overflow = 'visible';
+            } else {
+              el.style.height = '1123px';
+              el.style.minHeight = '1123px';
+              el.style.maxHeight = '1123px';
+              el.style.overflow = 'hidden';
+            }
             el.style.display = 'flex';
             el.style.flexDirection = 'column';
-            el.style.overflow = 'hidden';
             el.style.boxSizing = 'border-box';
           });
           clonedDoc.querySelectorAll('.sheet').forEach((el) => {
@@ -1218,7 +1247,7 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
           });
         }
       });
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297);
+      addCanvasPages(canvas);
     }
 
     if (mode === 'view') {

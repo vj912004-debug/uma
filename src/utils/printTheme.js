@@ -2,6 +2,7 @@
 
 import { applyPrintPrefsToHtml, getStoredPrintPrefs, PRINT_ROOT_CLASS, getPrintDensity, getPrintMinFitScale, normalizePrintPrefs } from './printPrefs';
 import { DEFAULT_PRINT_LOGO_SRC } from './defaultPrintLogo';
+import { getBankDetailRows } from './companyProfile';
 
 export { applyPrintPrefsToHtml } from './printPrefs';
 export { DEFAULT_PRINT_LOGO_SRC } from './defaultPrintLogo';
@@ -16,9 +17,19 @@ export const escHtml = (v) => String(v ?? '')
 
 export const fmtMoney = (n) => (parseFloat(n) || 0).toFixed(2);
 
-export const fmtQty = (n) => {
+/** Empty / invalid qty → 0. Zero is kept as 0 (never coerced to 1). */
+export const parseQty = (n) => {
+  if (n === '' || n == null) return 0;
   const v = parseFloat(n);
-  if (!v) return '';
+  return Number.isFinite(v) ? v : 0;
+};
+
+/** Empty / untyped qty prints blank — not 0 or NIL. Typed values print as entered. */
+export const fmtQty = (n) => {
+  if (n === '' || n == null) return '';
+  const v = parseFloat(n);
+  if (!Number.isFinite(v)) return '';
+  if (v === 0) return '';
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
 };
 
@@ -167,14 +178,18 @@ export const buildFillerRowsHtml = (colCount, rowCount = 12) => {
   return Array.from({ length: rowCount }, () => `<tr class="filler-row">${cells}</tr>`).join('');
 };
 
-/** Add or remove 18px blank item rows until the table fills leftover A4 space. */
-const fillItemsBlankRowsToFit = (page, itemsRow, rowPx = 18) => {
+/** Add or remove blank item rows until the table fills leftover A4 space (keeps TOTAL at the bottom). */
+const fillItemsBlankRowsToFit = (page, band, rowPx = 18) => {
   const doc = page.ownerDocument;
-  const table = page.querySelector('table.items');
+  if (!page || !band) return;
+  const table = (band.querySelector && (
+    band.querySelector('table.items') || band.querySelector('table.dt')
+  )) || page.querySelector('table.items') || page.querySelector('table.dt');
   const tbody = table?.querySelector('tbody');
-  if (!table || !tbody || !itemsRow) return;
+  if (!table || !tbody) return;
 
-  const first = tbody.querySelector('tr');
+  const tfoot = table.querySelector('tfoot');
+  const first = tbody.querySelector('tr:not(.dc-delivery-note):not(.special-row)');
   let colCount = 0;
   if (first) {
     [...first.children].forEach((cell) => {
@@ -183,7 +198,7 @@ const fillItemsBlankRowsToFit = (page, itemsRow, rowPx = 18) => {
   }
   if (!colCount) colCount = 12;
   table.style.setProperty('height', 'auto', 'important');
-  table.style.setProperty('max-height', '100%', 'important');
+  table.style.setProperty('max-height', 'none', 'important');
   table.style.setProperty('margin-bottom', '0', 'important');
 
   const applyRowPx = (tr) => {
@@ -198,20 +213,30 @@ const fillItemsBlankRowsToFit = (page, itemsRow, rowPx = 18) => {
 
   const leftover = () => {
     void page.offsetHeight;
-    const rowBox = itemsRow.getBoundingClientRect();
+    const bandBox = band.getBoundingClientRect();
     const tableBox = table.getBoundingClientRect();
-    return Math.floor(rowBox.bottom - tableBox.bottom);
+    const bandBottom = Math.floor(bandBox.bottom);
+    const belowTable = bandBottom - Math.floor(tableBox.bottom);
+    if (!tfoot) return belowTable;
+    const tfootBox = tfoot.getBoundingClientRect();
+    const lastBody = tbody.lastElementChild;
+    const lastBodyBottom = lastBody
+      ? Math.floor(lastBody.getBoundingClientRect().bottom)
+      : Math.floor(tableBox.top);
+    const belowFoot = bandBottom - Math.floor(tfootBox.bottom);
+    const aboveFoot = Math.floor(tfootBox.top) - lastBodyBottom;
+    return Math.max(belowTable, belowFoot, aboveFoot);
   };
 
   let guard = 0;
-  while (leftover() < 0 && guard < 60) {
+  while (leftover() < 0 && guard < 80) {
     const last = tbody.querySelector('tr.filler-row:last-child');
     if (!last) break;
     last.remove();
     guard += 1;
   }
   guard = 0;
-  while (leftover() >= rowPx && guard < 60) {
+  while (leftover() >= rowPx && guard < 80) {
     const tr = doc.createElement('tr');
     tr.className = 'filler-row';
     for (let i = 0; i < colCount; i += 1) {
@@ -229,8 +254,46 @@ const fillItemsBlankRowsToFit = (page, itemsRow, rowPx = 18) => {
   }
 };
 
+/** Fill leftover A4 space with blank grid rows on BPR / quotation / other item tables. */
+export const layoutFillOtherPrintPages = (doc, pageHeight) => {
+  if (!doc) return;
+
+  doc.querySelectorAll('.page-p2').forEach((page) => {
+    const wrap = page.querySelector('.table-wrap');
+    if (!wrap) return;
+    page.style.setProperty('height', `${pageHeight}px`, 'important');
+    page.style.setProperty('min-height', `${pageHeight}px`, 'important');
+    wrap.style.setProperty('flex', '1 1 auto', 'important');
+    wrap.style.setProperty('min-height', '0', 'important');
+    wrap.style.setProperty('overflow', 'hidden', 'important');
+    fillItemsBlankRowsToFit(page, wrap, 22);
+  });
+
+  doc.querySelectorAll('.sheet.pdf-page:not(.page2)').forEach((page) => {
+    if (page.querySelector('.items-row') || page.classList.contains('pl-page')) return;
+    const lastTable = [...page.querySelectorAll('table.dt')].pop();
+    if (!lastTable) return;
+    const wrap = lastTable.parentElement;
+    const tablesBox = page.querySelector('.tables');
+    if (tablesBox) tablesBox.style.setProperty('flex', '1 1 auto', 'important');
+    if (wrap) wrap.style.setProperty('flex', '1 1 auto', 'important');
+    page.style.setProperty('height', `${pageHeight}px`, 'important');
+    page.style.setProperty('min-height', `${pageHeight}px`, 'important');
+    fillItemsBlankRowsToFit(page, wrap || lastTable, 16);
+  });
+
+  doc.querySelectorAll('.pfu-page').forEach((page) => {
+    const table = page.querySelector('table.items');
+    const wrap = table?.parentElement;
+    if (!wrap) return;
+    page.style.setProperty('height', `${pageHeight}px`, 'important');
+    page.style.setProperty('min-height', `${pageHeight}px`, 'important');
+    fillItemsBlankRowsToFit(page, wrap, 18);
+  });
+};
+
 /** Pages that pin Terms/Declaration/Signatory inside A4 without html2canvas flex clipping. */
-export const FIT_FOOTER_PAGE_SEL = '.ti-page, .pi-page, .cn-page, .dn-page, .po-page';
+export const FIT_FOOTER_PAGE_SEL = '.ti-page, .pi-page, .cn-page, .dn-page, .po-page, .pdf-page';
 
 export const FIT_FOOTER_CSS = `
   .ti-page .content-wrapper,
@@ -319,10 +382,11 @@ export const FIT_FOOTER_CSS = `
 export const layoutFitFooterPages = (doc, pageHeight) => {
   if (!doc) return;
   doc.querySelectorAll(FIT_FOOTER_PAGE_SEL).forEach((page) => {
+    if (page.classList.contains('pl-page')) return;
     const wrap = page.querySelector('.content-wrapper') || page;
-    const topRow = page.querySelector('.inv-top');
+    const topRow = page.querySelector('.inv-top, .dc-top');
     const itemsRow = page.querySelector('.items-row');
-    const botRow = page.querySelector('.inv-bot');
+    const botRow = page.querySelector('.inv-bot, .dc-bot');
     if (!itemsRow || !botRow) return;
 
     page.style.setProperty('overflow', 'visible', 'important');
@@ -422,10 +486,30 @@ export const layoutFitFooterPages = (doc, pageHeight) => {
     if (page.classList.contains('ti-page') || page.classList.contains('pi-page')) {
       page.querySelectorAll('table.items').forEach((el) => {
         el.style.setProperty('height', 'auto', 'important');
-        el.style.setProperty('max-height', '100%', 'important');
+        el.style.setProperty('max-height', 'none', 'important');
       });
-      fillItemsBlankRowsToFit(page, itemsRow, 18);
     }
+
+    const table = page.querySelector('table.items');
+    const tableH = table ? Math.ceil(Math.max(table.scrollHeight, table.offsetHeight || 0)) : 0;
+    const rowH = Math.ceil(itemsRow.clientHeight || itemsH);
+    if (tableH > rowH + 8) {
+      wrap.style.setProperty('height', 'auto', 'important');
+      wrap.style.setProperty('max-height', 'none', 'important');
+      wrap.style.setProperty('overflow', 'visible', 'important');
+      itemsRow.style.setProperty('height', 'auto', 'important');
+      itemsRow.style.setProperty('max-height', 'none', 'important');
+      itemsRow.style.setProperty('flex', '0 0 auto', 'important');
+      itemsRow.style.setProperty('overflow', 'visible', 'important');
+      page.style.setProperty('height', 'auto', 'important');
+      page.style.setProperty('max-height', 'none', 'important');
+      page.style.setProperty('min-height', `${pageHeight}px`, 'important');
+      page.style.setProperty('overflow', 'visible', 'important');
+      return;
+    }
+
+    const isDc = Boolean(page.querySelector('.dc-bot')) || page.classList.contains('dc-page');
+    fillItemsBlankRowsToFit(page, itemsRow, isDc ? 22 : 18);
   });
 };
 
@@ -434,22 +518,23 @@ export const layoutPackingListPages = (doc, pageHeight) => {
   doc.querySelectorAll('.pl-page').forEach((page) => {
     const sheet = page.querySelector('.sheet') || page;
     const header = page.querySelector('.header');
-    const meta = page.querySelector('.pl-meta');
-    const wrap = page.querySelector('.table-wrap');
+    const products = page.querySelector('.products');
+    const wraps = [...page.querySelectorAll('.table-wrap')];
     const foot = page.querySelector('.barfoot');
-    const table = page.querySelector('table.items');
-    if (!wrap || !table) return;
+    const tables = [...page.querySelectorAll('table.items')];
+    if (!wraps.length || !tables.length) return;
 
-    page.style.setProperty('height', `${pageHeight}px`, 'important');
-    page.style.setProperty('max-height', `${pageHeight}px`, 'important');
-    page.style.setProperty('overflow', 'hidden', 'important');
     sheet.style.setProperty('display', 'flex', 'important');
     sheet.style.setProperty('flex-direction', 'column', 'important');
-    sheet.style.setProperty('height', '100%', 'important');
     sheet.style.setProperty('min-height', '0', 'important');
+    if (products) {
+      products.style.setProperty('overflow', 'visible', 'important');
+      products.style.setProperty('flex', '0 0 auto', 'important');
+    }
 
-    const cols = [...table.querySelectorAll('colgroup col')];
-    if (cols.length >= 6) {
+    tables.forEach((table) => {
+      const cols = [...table.querySelectorAll('colgroup col')];
+      if (cols.length < 6) return;
       table.style.setProperty('table-layout', 'auto', 'important');
       let batchNeed = 0;
       table.querySelectorAll('td.batch').forEach((td) => {
@@ -470,20 +555,46 @@ export const layoutPackingListPages = (doc, pageHeight) => {
       cols[4].style.width = `${wtPct}%`;
       cols[5].style.width = `${wtPct}%`;
       table.style.setProperty('table-layout', 'fixed', 'important');
-    }
+      table.style.setProperty('height', 'auto', 'important');
+      table.style.setProperty('max-height', 'none', 'important');
+    });
+
+    wraps.forEach((wrap) => {
+      wrap.style.setProperty('flex', '0 0 auto', 'important');
+      wrap.style.setProperty('height', 'auto', 'important');
+      wrap.style.setProperty('max-height', 'none', 'important');
+      wrap.style.setProperty('overflow', 'visible', 'important');
+    });
 
     void page.offsetHeight;
-    const used = (header?.offsetHeight || 0) + (meta?.offsetHeight || 0) + (foot?.offsetHeight || 0) + 28;
-    const tableH = Math.max(140, pageHeight - used);
-    wrap.style.setProperty('flex', `1 1 ${tableH}px`, 'important');
-    wrap.style.setProperty('height', `${tableH}px`, 'important');
-    wrap.style.setProperty('max-height', `${tableH}px`, 'important');
-    wrap.style.setProperty('min-height', '0', 'important');
-    wrap.style.setProperty('overflow', 'hidden', 'important');
-    table.style.setProperty('height', 'auto', 'important');
-    table.style.setProperty('max-height', '100%', 'important');
+    const used = (header?.offsetHeight || 0) + (products?.offsetHeight || 0) + (foot?.offsetHeight || 0) + 28;
+    const overflows = used > pageHeight + 8;
 
-    fillItemsBlankRowsToFit(page, wrap, 22);
+    page.style.setProperty('overflow', 'visible', 'important');
+    sheet.style.setProperty('overflow', 'visible', 'important');
+
+    if (overflows) {
+      page.style.setProperty('height', 'auto', 'important');
+      page.style.setProperty('max-height', 'none', 'important');
+      page.style.setProperty('min-height', `${pageHeight}px`, 'important');
+      sheet.style.setProperty('height', 'auto', 'important');
+      return;
+    }
+
+    page.style.setProperty('height', `${pageHeight}px`, 'important');
+    page.style.setProperty('max-height', `${pageHeight}px`, 'important');
+    sheet.style.setProperty('height', '100%', 'important');
+    if (products) {
+      products.style.setProperty('flex', '1 1 auto', 'important');
+      products.style.setProperty('min-height', '0', 'important');
+      products.style.setProperty('overflow', 'hidden', 'important');
+    }
+    const lastWrap = wraps[wraps.length - 1];
+    const leftover = Math.max(40, pageHeight - used);
+    lastWrap.style.setProperty('flex', `1 1 ${leftover}px`, 'important');
+    lastWrap.style.setProperty('min-height', '0', 'important');
+    lastWrap.style.setProperty('overflow', 'hidden', 'important');
+    fillItemsBlankRowsToFit(page, lastWrap, 22);
   });
 };
 
@@ -1117,13 +1228,7 @@ export const buildPartyCard = (title, iconClass, name, addressLines, gstin, stat
 };
 
 export const buildBankDetailsBox = (profile) => {
-  const rows = [
-    ['Bank Name', profile.bankName || 'AXIS BANK LTD'],
-    ['A/c Name', profile.accountName || profile.companyName || 'UMA MICRON'],
-    ['Current A/c No.', profile.accountNumber || ''],
-    ['IFS CODE', profile.ifscCode || ''],
-    ['Branch', profile.branch || '']
-  ].filter(([, v]) => hasPrintVal(v));
+  const rows = getBankDetailRows(profile);
 
   return `
   <div class="bank">
@@ -1347,6 +1452,7 @@ export const renderHtmlToPdf = async (html, {
       target.style.zoom = '1';
       layoutFitFooterPages(idoc, singlePageHeight);
       layoutPackingListPages(idoc, singlePageHeight);
+      layoutFillOtherPrintPages(idoc, singlePageHeight);
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const naturalH = Math.max(target.scrollHeight, target.offsetHeight || 0);
@@ -1383,6 +1489,7 @@ export const renderHtmlToPdf = async (html, {
 
       layoutFitFooterPages(idoc, singlePageHeight);
       layoutPackingListPages(idoc, singlePageHeight);
+      layoutFillOtherPrintPages(idoc, singlePageHeight);
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
@@ -1540,6 +1647,7 @@ export const renderHtmlToPdf = async (html, {
           });
           layoutFitFooterPages(clonedDoc, singlePageHeight);
           layoutPackingListPages(clonedDoc, singlePageHeight);
+          layoutFillOtherPrintPages(clonedDoc, singlePageHeight);
         }
       });
 

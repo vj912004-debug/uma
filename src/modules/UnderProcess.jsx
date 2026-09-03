@@ -8,7 +8,7 @@ import {
   Search
 } from 'lucide-react';
 import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
-import { copyChargeQtysFromSettings, enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, getLinkedPITermsForTI, applyProformaFinancialsToTaxInvoice, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges } from '../utils/documentCharges';
+import { enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, getLinkedPITermsForTI, applyProformaFinancialsToTaxInvoice, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges, qtyInputValue } from '../utils/documentCharges';
 import {
   getReceiptProductNames,
   getProductBatches,
@@ -20,7 +20,9 @@ import {
   resolveReceiptProductName,
   receiptProductOptions,
   findReceiptDoc,
+  findDedicatedReceiptDoc,
   findAnyPackingList,
+  buildBprRowsForProduct,
   getPLDisplayProductLabel,
   buildPLProductSummaries,
   getMRReceivedQty,
@@ -53,7 +55,7 @@ const CHARGES_LIST = [
 
 const emptyChargeFlags = () => Object.fromEntries(CHARGE_KEYS.map(k => [k, false]));
 const emptyChargeRates = () => Object.fromEntries(CHARGE_KEYS.map(k => [k, 0]));
-const emptyChargeQtys = () => Object.fromEntries(CHARGE_KEYS.map(k => [k, 1]));
+const emptyChargeQtys = () => Object.fromEntries(CHARGE_KEYS.map(k => [k, '']));
 
 const isMaterialQtyCharge = (key) => ['processing', 'sieving', 'cleaning'].includes(key);
 
@@ -62,8 +64,9 @@ const buildChargeQtys = (settings, materialQty = 0) => {
   CHARGE_KEYS.forEach(k => {
     if (isMaterialQtyCharge(k)) {
       const saved = settings?.qtys?.[k];
-      if (saved == null || saved === '') {
-        qtys[k] = materialQty || qtys[k];
+      const savedNum = saved === '' || saved == null ? 0 : parseFloat(saved);
+      if (!savedNum) {
+        qtys[k] = materialQty || '';
       }
     }
   });
@@ -86,8 +89,8 @@ const formatWeightNet = (val) => (parseFloat(val) || 0).toFixed(2);
 
 const getChargeLineQty = (pc, key, materialQty) => {
   const q = pc.qtys?.[key];
-  if (isMaterialQtyCharge(key)) return parseChargeNumber(q, materialQty || 1);
-  return parseChargeNumber(q, 1);
+  if (isMaterialQtyCharge(key)) return parseChargeNumber(q, materialQty || 0);
+  return parseChargeNumber(q, 0);
 };
 
 const normalizeProductCharges = (productCharges, legacyDoc, mr, prodOpts, fallbackProductName) => {
@@ -162,7 +165,7 @@ const initProductChargesFromMR = (mr, party, productOptions = {}) => {
     result[prodName] = {
       charges: { ...(settings.charges || emptyChargeFlags()) },
       rates: { ...(settings.rates || emptyChargeRates()) },
-      qtys: copyChargeQtysFromSettings(settings)
+      qtys: buildChargeQtys(settings, materialQty)
     };
   });
   if (!productNames.length && mr.productName) {
@@ -170,7 +173,7 @@ const initProductChargesFromMR = (mr, party, productOptions = {}) => {
     result[mr.productName] = {
       charges: { ...(mr.charges || emptyChargeFlags()) },
       rates: { ...(mr.rates || emptyChargeRates()) },
-      qtys: copyChargeQtysFromSettings({ qtys: mr.qtys })
+      qtys: buildChargeQtys({ qtys: mr.qtys }, materialQty)
     };
   }
   return result;
@@ -194,7 +197,7 @@ const calcProductChargesSubtotal = (productCharges, mr, qtyResolver, productOpti
 
 const findPI = (data, mrId) => findAnyProformaInvoice(data.invoices, mrId);
 const findBPR = (data, mrId, productName = '') =>
-  findReceiptDoc(data.bprs, mrId, productName);
+  findDedicatedReceiptDoc((data.bprs || []).filter((d) => !d.isDeleted), mrId, productName);
 const findPSD = (data, mrId, productName = '') =>
   findReceiptDoc(data.psds, mrId, productName);
 const findPL = (data, mrId, productName = '') => {
@@ -219,7 +222,7 @@ const initProductChargesForScope = (mr, party, prodOpts, activeProductName) => {
     [canonical]: {
       charges: { ...(settings.charges || emptyChargeFlags()) },
       rates: { ...(settings.rates || emptyChargeRates()) },
-      qtys: copyChargeQtysFromSettings(settings)
+      qtys: buildChargeQtys(settings, materialQty)
     }
   };
 };
@@ -237,7 +240,8 @@ const renderChargeRow = (item, pc, prodName, materialQty, toggleCharge, handleQt
           type="number"
           step={item.isQtyRate ? '0.01' : '1'}
           className="input-field input-compact"
-          value={pc.qtys?.[item.key] ?? (item.isQtyRate ? materialQty : 1)}
+          value={qtyInputValue(pc.qtys?.[item.key])}
+          placeholder="NIL"
           onChange={e => handleQtyChange(prodName, item.key, e.target.value)}
           min="0"
         />
@@ -469,7 +473,7 @@ const UnderProcess = () => {
   };
 
   return (
-    <div>
+    <div className="under-process-page">
       <header className="page-header">
         <div>
           <h1 className="page-title">Under Process</h1>
@@ -535,11 +539,12 @@ const UnderProcess = () => {
         </div>
       </div>
 
-      <div className="premium-card data-table-container" style={{ padding: '1.5rem', background: '#ffffff' }}>
-        <div style={{ marginBottom: '1.25rem' }}>
+      <div className="premium-card data-table-container under-process-table-card" style={{ padding: '1.5rem', background: '#ffffff' }}>
+        <div style={{ marginBottom: '1.25rem', flexShrink: 0 }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#5b1c85', margin: 0 }}>Material Processing Status</h2>
           <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: '0.25rem 0 0' }}>View and manage document generation for each material</p>
         </div>
+        <div className="under-process-table-scroll">
         <table className="workflow-table">
           <thead>
             <tr>
@@ -581,8 +586,11 @@ const UnderProcess = () => {
                 const dc = getDC(mr.id, productName);
                 const ti = getTI(mr.id, productName);
                 const rowQty = productName
-                  ? getProductQty(mr, productName, prodOpts)
-                  : (mr.totalQty || mr.receivedQty || 0);
+                  ? (getProductQty(mr, productName, prodOpts)
+                    || (getReceiptProductNames(mr, prodOpts).length <= 1
+                      ? (parseFloat(mr.totalQty) || parseFloat(mr.receivedQty) || 0)
+                      : 0))
+                  : (parseFloat(mr.totalQty) || parseFloat(mr.receivedQty) || 0);
 
                 return (
                   <tr key={`${mr.id}_${productName || 'default'}`}>
@@ -729,6 +737,7 @@ const UnderProcess = () => {
             )}
           </tbody>
         </table>
+        </div>
 
         <div className="legend">
           <div className="legend-item">
@@ -846,7 +855,7 @@ const UnderProcess = () => {
 
 // Modal Wrapper Component
 const ModalWrapper = ({ title, children, onClose }) => (
-  <div className="modal-overlay">
+  <div className="page-form-overlay">
     <div className="premium-card modal-panel">
       <button onClick={onClose} className="modal-close" aria-label="Close">
         <X size={20} />
@@ -922,8 +931,8 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
       const turningOn = !pc.charges[key];
       const materialQty = getProductQty(mr, prodName, prodOpts);
       const qtys = { ...(pc.qtys || emptyChargeQtys()) };
-      if (turningOn && (qtys[key] == null || qtys[key] === '')) {
-        qtys[key] = isMaterialQtyCharge(key) ? materialQty : 1;
+      if (turningOn && (qtys[key] == null || qtys[key] === '' || qtys[key] === 0)) {
+        qtys[key] = isMaterialQtyCharge(key) && materialQty ? materialQty : '';
       }
       return {
         ...prev,
@@ -1001,7 +1010,7 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
       productCharges: sanitizedCharges,
       charges: chargeSnapshot.charges,
       rates: chargeSnapshot.rates,
-      qtys: chargeSnapshot.qtys,
+      qtys: buildChargeQtys(chargeSnapshot, materialQty),
       customCharges: chargeSnapshot.customCharges || [],
       receiptId: mr.id,
       partyName: mr.partyName,
@@ -1142,11 +1151,23 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const { data, updateData, updateItem, incrementSerial } = useAppContext();
   const party = (data.parties || []).find(p => p.id === mr.partyId);
   const prodOpts = receiptProductOptions(mr, data);
+  const allProductNames = getReceiptProductNames(mr, prodOpts);
   const productNames = getScopedProductNames(mr, prodOpts, activeProductName);
-  const primaryProduct = resolveReceiptProductName(mr, activeProductName || productNames[0] || '', prodOpts);
+  const lockedProduct = activeProductName
+    ? resolveReceiptProductName(mr, activeProductName, prodOpts)
+    : '';
+  const defaultProduct = (() => {
+    if (lockedProduct) return lockedProduct;
+    if (editing?.productName && !String(editing.productName).includes(',')) {
+      return resolveReceiptProductName(mr, editing.productName, prodOpts) || editing.productName;
+    }
+    const pending = allProductNames.find((n) => !findBPR(data, mr.id, n));
+    return pending || allProductNames[0] || mr.productName || '';
+  })();
+  const primaryProduct = resolveReceiptProductName(mr, defaultProduct, prodOpts) || defaultProduct;
   const firstProdConfig = getPartyProductForMR(mr, data, primaryProduct);
-  const scopedQty = activeProductName ? getProductQty(mr, activeProductName, prodOpts) : (mr.totalQty || mr.receivedQty || 0);
-  const scopedDrums = activeProductName ? getProductDrums(mr, activeProductName, prodOpts) : (mr.totalDrums || 1);
+  const scopedQty = getProductQty(mr, primaryProduct, prodOpts);
+  const scopedDrums = getProductDrums(mr, primaryProduct, prodOpts);
 
   const bprSectionStyle = {
     marginBottom: '1.5rem',
@@ -1160,7 +1181,7 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     bprNo: '',
     date: new Date().toISOString().split('T')[0],
     customerName: mr.partyName,
-    productName: activeProductName || getReceiptProductLabel(mr, prodOpts),
+    productName: primaryProduct,
     totalInputQty: scopedQty,
     batchNo: '',
     totalNoBatch: 0,
@@ -1195,34 +1216,58 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     plantSupervisorSignature: ''
   });
 
+  const scopeBprToProduct = (prev, prodName, extraWeightRows = []) => {
+    const name = resolveReceiptProductName(mr, prodName, prodOpts) || prodName;
+    const prodConfig = getPartyProductForMR(mr, data, name);
+    const built = buildBprRowsForProduct(mr, name, prodOpts, extraWeightRows);
+    const drumTotal = built.drums || 0;
+    return {
+      ...prev,
+      productName: built.productName || name,
+      totalInputQty: built.qty,
+      totalDrums: drumTotal,
+      batchNo: built.batchNo,
+      totalNoBatch: built.totalNoBatch,
+      psdRequirement: prodConfig?.psdReq || prev.psdRequirement || '90% < 10M',
+      psdNote: prodConfig?.psdNote || '',
+      receivedBatches: padBPRBatchRows(built.receivedRows),
+      dispatchedBatches: padBPRBatchRows(built.dispatchedRows),
+      packingMaterials: {
+        ...(prev.packingMaterials || {}),
+        drumUsed: drumTotal ? String(drumTotal) : (prev.packingMaterials?.drumUsed || '')
+      }
+    };
+  };
+
   useEffect(() => {
     if (editing) {
-      const prodConfig = getPartyProductForMR(mr, data, activeProductName || editing.productName);
-      let receivedBatches = editing.receivedBatches || [];
-      let dispatchedBatches = editing.dispatchedBatches || [];
+      const name = primaryProduct || resolveReceiptProductName(mr, editing.productName, prodOpts) || editing.productName;
+      const prodConfig = getPartyProductForMR(mr, data, name);
+      const extraReceived = editing.receivedBatches || [];
+      const extraDispatched = editing.dispatchedBatches || [];
+      const builtReceived = buildBprRowsForProduct(mr, name, prodOpts, extraReceived);
+      const builtDispatched = buildBprRowsForProduct(
+        mr,
+        name,
+        prodOpts,
+        extraDispatched.length ? extraDispatched : extraReceived
+      );
+      const receivedBatches = padBPRBatchRows(builtReceived.receivedRows);
+      const dispatchedBatches = padBPRBatchRows(builtDispatched.dispatchedRows);
       const filledReceived = receivedBatches.filter((r) => r.batchNo || r.drumNo);
       const filledDispatched = dispatchedBatches.filter((r) => r.batchNo || r.drumNo);
-      if (filledReceived.length && !filledDispatched.length) {
-        receivedBatches = padBPRBatchRows(filledReceived);
-        dispatchedBatches = padBPRBatchRows(
-          filledReceived.map((r) => ({
-            batchNo: r.batchNo,
-            drumNo: r.drumNo,
-            productName: r.productName || '',
-            gross: '',
-            tare: '',
-            net: ''
-          }))
-        );
-      }
       const drumTotal =
-        editing.totalDrums ||
         filledDispatched.length ||
         filledReceived.length ||
-        scopedDrums ||
+        builtReceived.drums ||
+        editing.totalDrums ||
         0;
       setForm({
         ...editing,
+        productName: name,
+        totalInputQty: builtReceived.qty || editing.totalInputQty,
+        batchNo: builtReceived.batchNo || editing.batchNo,
+        totalNoBatch: builtReceived.totalNoBatch || editing.totalNoBatch,
         psdNote: editing.psdNote || prodConfig?.psdNote || '',
         psdRequirement: editing.psdRequirement || prodConfig?.psdReq || '90% < 10M',
         totalDrums: drumTotal,
@@ -1244,115 +1289,14 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       });
     } else {
       const bprSerial = data.settings?.serials?.BPR || 1;
-      const docNo = generateDocNumber('BPR', bprSerial, new Date(form.date));
-
-      // Construct rows from MR batches (with legacy fallback for old single-batch structure)
-      const activeMRBatches = activeProductName
-        ? getProductBatches(mr, activeProductName, prodOpts)
-        : (() => {
-            const all = getReceiptProductNames(mr, prodOpts).flatMap(prodName =>
-              getProductBatches(mr, prodName, prodOpts).map(b => ({ ...b, productName: prodName }))
-            );
-            if (all.length) return all;
-            return (mr.batches || [
-              { batchNo: mr.batchNo || 'N/A', drums: 1, qty: parseFloat(mr.receivedQty || mr.totalQty || 0), isEmptyDrums: false }
-            ]).filter(b => !b.isEmptyDrums);
-          })();
-      const receivedRows = [];
-      
-      activeMRBatches.forEach(b => {
-        const drumCount = parseInt(b.drums) || 1;
-        const pName = b.productName || productNames[0] || mr.productName?.split(',')[0]?.trim() || '';
-        for (let d = 1; d <= drumCount; d++) {
-          receivedRows.push({
-            batchNo: b.batchNo,
-            drumNo: d.toString(),
-            productName: pName,
-            gross: '',
-            tare: '',
-            net: ''
-          });
-        }
-      });
-
-      const scopedProdConfig = getPartyProductForMR(mr, data, primaryProduct) || firstProdConfig;
-      const firstBatch = activeMRBatches[0];
-      const psdRequirement = firstBatch?.psdReq || scopedProdConfig?.psdReq || '90% < 10M';
-      const scopedNames = activeProductName ? [primaryProduct] : productNames;
-      const psdNotes = scopedNames
-        .map((name) => getPartyProductForMR(mr, data, name)?.psdNote)
-        .filter(Boolean);
-      const psdNote = psdNotes.length
-        ? [...new Set(psdNotes)].join(' | ')
-        : (scopedProdConfig?.psdNote || '');
-
-      const drumTotal = receivedRows.length || scopedDrums || 0;
-      let dispatchedRows = receivedRows.map((r) => ({
-        batchNo: r.batchNo,
-        drumNo: r.drumNo,
-        productName: r.productName,
-        gross: '',
-        tare: '',
-        net: ''
-      }));
-
-      const pl = findAnyPackingList(data.packingLists, mr.id);
-      if (pl?.batches?.length) {
-        const pool = [...pl.batches];
-        const used = new Set();
-        dispatchedRows = dispatchedRows.map((slot) => {
-          let pi = pool.findIndex(
-            (r, i) =>
-              !used.has(i) &&
-              String(r.batchNo || '') === String(slot.batchNo || '') &&
-              String(r.drumNo || '') === String(slot.drumNo || '')
-          );
-          if (pi < 0) pi = pool.findIndex((r, i) => !used.has(i));
-          if (pi < 0) return slot;
-          used.add(pi);
-          const src = pool[pi];
-          const gross = src.gross ?? '';
-          const tare = src.tare ?? '';
-          const g = parseFloat(gross);
-          const t = parseFloat(tare);
-          const net =
-            src.net !== '' && src.net != null
-              ? src.net
-              : (!isNaN(g) && !isNaN(t) && gross !== '' && tare !== '' ? Math.max(0, g - t) : '');
-          return {
-            ...slot,
-            batchNo: src.batchNo || slot.batchNo,
-            drumNo: src.drumNo != null && src.drumNo !== '' ? String(src.drumNo) : slot.drumNo,
-            gross,
-            tare,
-            net
-          };
-        });
-      }
-
-      const paddedReceived = padBPRBatchRows(receivedRows);
-      const paddedDispatched = padBPRBatchRows(dispatchedRows);
-
-      setForm(prev => ({
-        ...prev,
+      const docNo = generateDocNumber('BPR', bprSerial, new Date());
+      setForm((prev) => ({
+        ...scopeBprToProduct(prev, primaryProduct),
         bprNo: docNo,
-        customerName: mr.partyName,
-        productName: activeProductName || getReceiptProductLabel(mr, prodOpts),
-        totalInputQty: scopedQty,
-        totalDrums: drumTotal,
-        psdRequirement,
-        psdNote,
-        receivedBatches: paddedReceived,
-        dispatchedBatches: paddedDispatched,
-        packingMaterials: {
-          ...(prev.packingMaterials || {}),
-          drumUsed: prev.packingMaterials?.drumUsed || (drumTotal ? String(drumTotal) : '')
-        },
-        batchNo: activeMRBatches.map(b => b.batchNo).filter(Boolean).join(', '),
-        totalNoBatch: activeMRBatches.length
+        customerName: mr.partyName
       }));
     }
-  }, [editing, mr, activeProductName, scopedQty, scopedDrums, data.settings?.serials?.BPR]);
+  }, [editing, mr, activeProductName, primaryProduct, data.settings?.serials?.BPR]);
 
   // Handle double dispatch drums expansion
   const toggleDoubleDispatch = () => {
@@ -1551,6 +1495,8 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     };
     const finalDoc = {
       ...form,
+      productName: resolveReceiptProductName(mr, form.productName || lockedProduct || primaryProduct, prodOpts)
+        || form.productName,
       partyName: form.partyName || form.customerName || mr.partyName,
       receiptId: mr.id,
       totalDrums: filledDrums || form.totalDrums || 0,
@@ -1620,13 +1566,17 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
             <SearchableSelect
               className="input-field"
               value={form.productName}
-              onChange={(e) => setForm({ ...form, productName: e.target.value })}
+              disabled={!!lockedProduct}
+              onChange={(e) => {
+                const next = e.target.value;
+                setForm((prev) => scopeBprToProduct(prev, next));
+              }}
             >
               <option value="">Select product</option>
-              {form.productName && !productNames.includes(form.productName) && (
+              {form.productName && !(lockedProduct ? productNames : allProductNames).includes(form.productName) && (
                 <option value={form.productName}>{form.productName}</option>
               )}
-              {productNames.map((name) => (
+              {(lockedProduct ? productNames : allProductNames).map((name) => (
                 <option key={name} value={name}>{name}</option>
               ))}
             </SearchableSelect>
@@ -2235,6 +2185,13 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     });
   };
 
+  const removeRow = (idx) => {
+    setForm(prev => ({
+      ...prev,
+      batches: prev.batches.filter((_, i) => i !== idx)
+    }));
+  };
+
   const rowMatchesProduct = (row, prodName) => {
     const target = (prodName || '').trim().toLowerCase();
     const rowProd = (row.productName || '').trim().toLowerCase();
@@ -2354,12 +2311,13 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                       <th style={{ padding: '0.35rem' }}>Gross Wt (Manual)</th>
                       <th style={{ padding: '0.35rem' }}>Tare Wt (Manual)</th>
                       <th style={{ padding: '0.35rem' }}>Net Wt (Auto)</th>
+                      <th style={{ padding: '0.35rem', width: '44px' }}>Del</th>
                     </tr>
                   </thead>
                   <tbody>
                     {prodRows.length === 0 ? (
                       <tr>
-                        <td colSpan={6} style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                        <td colSpan={7} style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                           No rows yet — click &quot;+ Add Row&quot; to add drum weights for this product.
                         </td>
                       </tr>
@@ -2383,6 +2341,16 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                             <td style={{ padding: '0.25rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
                               {r.netVal > 0 ? r.netVal.toFixed(2) : '0.00'}
                             </td>
+                            <td style={{ padding: '0.25rem' }}>
+                              <button
+                                type="button"
+                                title="Delete row"
+                                onClick={() => removeRow(r.idx)}
+                                style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.7)', cursor: 'pointer' }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
                           </tr>
                         ))}
                         <tr style={{ background: 'rgba(91, 28, 133, 0.1)', borderBottom: '2px solid var(--accent-primary)' }}>
@@ -2398,6 +2366,7 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                           <td style={{ padding: '0.45rem 0.35rem', fontWeight: 800, color: 'var(--accent-primary)' }}>
                             {group.net.toFixed(2)}
                           </td>
+                          <td />
                         </tr>
                       </React.Fragment>
                     ))}
@@ -2476,6 +2445,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     productSummaries: initialComputed.productSummaries,
     qty: initialComputed.qty,
     totalDrums: initialComputed.totalDrums,
+    emptyDrums: initialComputed.emptyDrums || 0,
     value: initialComputed.value === 0 || initialComputed.value == null ? '' : initialComputed.value,
     vehicleNo: mr.vehicleNo || '',
     transporterName: '',
@@ -2549,6 +2519,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       productName: computed.productName || form.productName,
       qty: form.qty,
       totalDrums: form.totalDrums,
+      emptyDrums: computed.emptyDrums || form.emptyDrums || 0,
       value: form.value === '' || form.value == null ? '' : form.value,
       receiptId: mr.id
     };
@@ -2623,15 +2594,14 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         <div>
           <label>Party Name</label>
           <SearchableSelect
+            allowCustom
             className="input-field"
+            placeholder="Select or type party name"
             value={form.partyName}
             onChange={(e) => setForm({ ...form, partyName: e.target.value })}
           >
-            <option value="">Select party</option>
-            {form.partyName && !(data.parties || []).some((p) => p.name === form.partyName) && (
-              <option value={form.partyName}>{form.partyName}</option>
-            )}
-            {(data.parties || []).map((p) => (
+            <option value="">Select or type party name</option>
+            {(data.parties || []).filter((p) => !p.isDeleted).map((p) => (
               <option key={p.id} value={p.name}>{p.name}</option>
             ))}
           </SearchableSelect>
@@ -2659,6 +2629,11 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         <div>
           <label>Total Drums *</label>
           <input type="number" className="input-field" required value={form.totalDrums} onChange={e => setForm({...form, totalDrums: parseInt(e.target.value, 10) || 0})} />
+          {(parseInt(form.emptyDrums, 10) || 0) > 0 && (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+              Includes {form.emptyDrums} empty drum{(parseInt(form.emptyDrums, 10) || 0) !== 1 ? 's' : ''}
+            </div>
+          )}
         </div>
         <div>
           <label>Value of Goods (₹)</label>
@@ -2779,7 +2754,12 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
     partyDocDate: mr.partyDocDate || '',
     productName: getReceiptProductLabel(mr, prodOpts),
     productSummaries: [],
-    productCharges: resolveTIProductChargesForDoc(mr, party, data.invoices, prodOpts),
+    productCharges: normalizeProductCharges(
+      resolveTIProductChargesForDoc(mr, party, data.invoices, prodOpts),
+      null,
+      mr,
+      prodOpts
+    ),
     customCharges: getLinkedPITermsForTI(data.invoices, mr.id)?.customCharges || [],
     discount: getLinkedPITermsForTI(data.invoices, mr.id)?.discount ?? 0,
     taxRate: getLinkedPITermsForTI(data.invoices, mr.id)?.taxRate ?? 18,
@@ -2820,8 +2800,12 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
         ...prev,
         productName: getReceiptProductLabel(mr, prodOpts),
         productSummaries: summaries,
-        productCharges: piTerms?.productCharges
-          || resolveTIProductChargesForDoc(mr, party, data.invoices, prodOpts),
+        productCharges: normalizeProductCharges(
+          piTerms?.productCharges || resolveTIProductChargesForDoc(mr, party, data.invoices, prodOpts),
+          piTerms,
+          mr,
+          prodOpts
+        ),
         customCharges: piTerms?.customCharges || [],
         discount: piTerms?.discount ?? 0,
         taxRate: piTerms?.taxRate ?? 18,
@@ -2848,8 +2832,8 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
       const turningOn = !pc.charges[key];
       const materialQty = resolveProductQty(prodName);
       const qtys = { ...(pc.qtys || emptyChargeQtys()) };
-      if (turningOn && (qtys[key] == null || qtys[key] === '')) {
-        qtys[key] = isMaterialQtyCharge(key) ? materialQty : 1;
+      if (turningOn && (qtys[key] == null || qtys[key] === '' || qtys[key] === 0)) {
+        qtys[key] = isMaterialQtyCharge(key) && materialQty ? materialQty : '';
       }
       return {
         ...prev,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
@@ -35,7 +35,20 @@ import Attendance from './modules/Attendance';
 import CompanyProfileSettings from './modules/CompanyProfileSettings';
 import EmployeeManagement from './modules/EmployeeManagement';
 
-const AppLayout = () => (
+const AppLayout = () => {
+  useEffect(() => {
+    const main = document.querySelector('.app-main');
+    if (!main) return undefined;
+    const scrollFormIntoView = () => {
+      if (main.querySelector('.page-form-overlay')) main.scrollTop = 0;
+    };
+    const observer = new MutationObserver(scrollFormIntoView);
+    observer.observe(main, { childList: true, subtree: true });
+    scrollFormIntoView();
+    return () => observer.disconnect();
+  }, []);
+
+  return (
   <div className="app-layout">
     <Sidebar />
     <main className="app-main">
@@ -73,7 +86,8 @@ const AppLayout = () => (
       </Routes>
     </main>
   </div>
-);
+  );
+};
 
 function App() {
   return (

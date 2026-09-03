@@ -125,20 +125,27 @@ export const formatPdfDateSlash = (d) => {
 };
 
 export const getPdfProductLines = (data) => {
+  const materialQty = parseFloat(data.qty) || 0;
   if (data.productSummaries?.length) {
-    return data.productSummaries.map(p => ({
+    const lines = data.productSummaries.map(p => ({
       name: p.prodName || '',
       qty: parseFloat(p.qty) || 0
     })).filter(p => p.name);
+    const sum = lines.reduce((s, p) => s + (parseFloat(p.qty) || 0), 0);
+    if (sum <= 0 && materialQty > 0 && lines.length === 1) {
+      lines[0].qty = materialQty;
+    }
+    return lines;
   }
   if (data.productName?.includes(',')) {
-    return data.productName.split(',').map(name => ({
-      name: name.trim(),
-      qty: 0
-    })).filter(p => p.name);
+    const names = data.productName.split(',').map((name) => name.trim()).filter(Boolean);
+    return names.map((name) => ({
+      name,
+      qty: names.length === 1 ? materialQty : 0
+    }));
   }
   if (data.productName) {
-    return [{ name: data.productName, qty: parseFloat(data.qty) || 0 }];
+    return [{ name: data.productName, qty: materialQty }];
   }
   return [];
 };
@@ -146,8 +153,8 @@ export const getPdfProductLines = (data) => {
 const getPdfChargeLineQty = (data, key, materialQty) => {
   const saved = data.qtys?.[key];
   if (saved != null && saved !== '') return parseFloat(saved) || 0;
-  if (MATERIAL_QTY_CHARGE_KEYS.includes(key)) return materialQty || 1;
-  return 1;
+  if (MATERIAL_QTY_CHARGE_KEYS.includes(key)) return materialQty || 0;
+  return 0;
 };
 
 export { getPdfChargeLineQty };
@@ -166,7 +173,7 @@ const pushProcessingLine = (lines, qty, rate) => {
   const lineQty = parseFloat(qty) || 0;
   const lineRate = parseFloat(rate) || 0;
   const amt = lineQty * lineRate;
-  if (lineQty <= 0 || lineRate <= 0 || amt <= 0) return;
+  if (lineQty <= 0 && lineRate <= 0) return;
   lines.push({ qty: lineQty, rate: lineRate, amt });
 };
 
@@ -209,10 +216,10 @@ const collectTiChargeLines = (data) => {
         if (pc.charges?.[c.key]) {
           const rowQty = pc.qtys?.[c.key] != null && pc.qtys?.[c.key] !== ''
             ? (parseFloat(pc.qtys[c.key]) || 0)
-            : 1;
+            : 0;
           const rate = parseFloat(pc.rates?.[c.key] || 0);
           const amt = rowQty * rate;
-          if (amt > 0) addAggLine(aggregated, c.key, rowQty, rate, amt);
+          addAggLine(aggregated, c.key, rowQty, rate, amt);
         }
       });
     });
@@ -253,7 +260,7 @@ export const buildTiPrintChargeRows = (data) => {
       return;
     }
     const line = aggregated[charge.key];
-    if (line?.amt > 0) {
+    if (line && (line.amt > 0 || line.rate > 0 || line.qty > 0)) {
       rows.push({ key: charge.key, label: charge.label, qty: line.qty, rate: line.rate, amt: line.amt });
     }
   });
@@ -309,7 +316,7 @@ export const calcTiTotals = (data) => {
   if (data.customCharges?.length) {
     data.customCharges.forEach((cc) => {
       if (!cc.checked) return;
-      const ccQty = parseFloat(cc.qty) || 1;
+      const ccQty = parseFloat(cc.qty) || 0;
       const rate = parseFloat(cc.rate) || 0;
       const amt = ccQty * rate;
       if (amt <= 0) return;

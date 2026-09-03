@@ -311,7 +311,7 @@ const Parties = () => {
 
       {/* Main Party Form Modal */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', overflowY: 'auto', padding: '2rem 0' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '850px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>{isEditing ? 'Modify Party' : 'Register New Party'}</span>
@@ -412,11 +412,10 @@ const Parties = () => {
 
                 {/* Contacts */}
                 <div>
-                  <label>Contact Number 1 *</label>
+                  <label>Contact Number 1</label>
                   <input 
                     type="text" 
                     className="input-field" 
-                    required
                     placeholder="Primary contact"
                     value={formData.phone1}
                     onChange={e => setFormData({...formData, phone1: e.target.value})}
@@ -543,7 +542,7 @@ const Parties = () => {
 
       {/* Associated Product Configuration Sub-Modal */}
       {isProductModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, backdropFilter: 'blur(5px)' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '680px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ marginBottom: '1.25rem' }}>{editingProductIdx !== null ? 'Modify Product Config' : 'Configure New Product & Charges'}</h3>
             <form onSubmit={handleSaveProduct}>

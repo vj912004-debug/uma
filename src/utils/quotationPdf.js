@@ -3,8 +3,10 @@ import { formatPdfDateDmy, formatPdfDateSlash } from './taxInvoiceLayout';
 import {
   escHtml,
   renderHtmlToPdf,
-  buildPrintBrandHtml
+  buildPrintBrandHtml,
+  fmtQty
 } from './printTheme';
+import { formatPrintRateText, formatQuotedRate, mergeRateUnits, defaultRateUnit } from './quotationRates';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const formatQuoteDateLong = (d) => {
@@ -30,23 +32,6 @@ const splitAddress = (address) => {
     .join('<br>');
 };
 
-const extractUnit = (rateStr) => {
-  if (!rateStr) return '-';
-  const lower = rateStr.toLowerCase();
-  if (lower.includes('/ kg')) return 'Per Kg';
-  if (lower.includes('/ pc') || lower.includes('/ no')) return 'Per No.';
-  if (lower.includes('nil')) return 'Lump Sum';
-  if (lower.includes('/ report')) return 'Per Report';
-  return 'Per Process';
-};
-
-const extractRate = (rateStr) => {
-  if (!rateStr) return '-';
-  let rate = String(rateStr).replace(/₹/g, '').trim();
-  rate = rate.replace(/\/\s*[a-zA-Z]+/g, '').trim();
-  return rate || 'Nil';
-};
-
 const formatChargeDescriptionHtml = (c) => {
   const base = String(c?.description || '').trim();
   const note = String(c?.note || c?.chargeNote || '').trim();
@@ -58,74 +43,129 @@ const formatChargeDescriptionHtml = (c) => {
   return `${prefix}<b>${escHtml(wrapped)}</b>`;
 };
 
-const rateDisplayHtml = (rateStr) => {
-  const rate = extractRate(rateStr);
-  if (!rate || rate === '-' || /^nil$/i.test(rate)) {
+const rateDisplayHtml = (rateStr, sourceKey = '', rateUnits = {}) => {
+  const text = formatPrintRateText(rateStr, sourceKey, rateUnits);
+  if (!text || text === '-' || /^nil$/i.test(text)) {
     return '<span class="nil">NIL</span>';
   }
-  return escHtml(rate);
+  return escHtml(text);
 };
 
-const OPTIONAL_PRINT_CHARGES = [
-  { key: 'filterBag', label: 'Filter Bag Charges (591190)' },
-  { key: 'psdReport', label: 'PSD Report Charges (998346)' },
-  { key: 'liner', label: 'Liner (39233090)' },
-  { key: 'courier', label: 'Courier (996812)' },
-  { key: 'fiberDrum', label: 'Fiber Drum (7310)' },
-  { key: 'transportation', label: 'Transportation (996511)' },
-  { key: 'hdpeDrum', label: 'HDPE Drum (39233090)' },
-  { key: 'batchChangeover', label: 'Batch Changeover (998842)' }
+const MAIN_PRINT_CHARGES = [
+  { key: 'cleaning', label: 'Minimum Cleaning Charges (998842)', isQtyRate: true },
+  { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true },
+  { key: 'sieving', label: 'Sieving Charges (998842)', isQtyRate: true }
 ];
 
-/** Build optional service rows for print from saved rows and/or selected charge flags. */
-const resolveOptionalChargesForPrint = (data) => {
-  const section = data.chargeSection || {};
-  const mainKeys = new Set(
-    (data.mainCharges || []).map((c) => c.sourceKey).filter(Boolean)
-  );
-  const fromRows = (data.optionalCharges || [])
-    .filter((c) => {
-      if (c.selected === false) return false;
-      if (c.sourceKey && (section[c.sourceKey] === 'main' || mainKeys.has(c.sourceKey))) return false;
-      return String(c.description || '').trim();
-    })
-    .map((c) => ({
-      ...c,
-      note: c.note || data.chargeNotes?.[c.sourceKey] || ''
+const OPTIONAL_PRINT_CHARGES = [
+  { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
+  { key: 'psdReport', label: 'PSD Report Charges (998346)', isQtyRate: false },
+  { key: 'liner', label: 'Liner (39233090)', isQtyRate: false },
+  { key: 'courier', label: 'Courier (996812)', isQtyRate: false },
+  { key: 'fiberDrum', label: 'Fiber Drum (7310)', isQtyRate: false },
+  { key: 'transportation', label: 'Transportation (996511)', isQtyRate: false },
+  { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },
+  { key: 'batchChangeover', label: 'Batch Changeover (998842)', isQtyRate: false }
+];
+
+const ALL_PRINT_CHARGES = [...MAIN_PRINT_CHARGES, ...OPTIONAL_PRINT_CHARGES];
+
+const defaultPrintSection = (key) =>
+  MAIN_PRINT_CHARGES.some((item) => item.key === key) ? 'main' : 'optional';
+
+const printSectionFor = (data, key) =>
+  data.chargeSection?.[key] || defaultPrintSection(key);
+
+const customPrintRows = (rows = []) =>
+  (rows || [])
+    .filter((row) => !row.sourceKey && String(row.description || '').trim())
+    .map((row) => ({
+      ...row,
+      note: row.note || row.chargeNote || ''
     }));
 
-  const fromFlags = [];
-  OPTIONAL_PRINT_CHARGES.forEach((item) => {
-    if (!data.charges?.[item.key]) return;
-    if (section[item.key] === 'main' || mainKeys.has(item.key)) return;
-    const already = fromRows.some(
-      (r) => r.sourceKey === item.key
-        || String(r.description || '').toLowerCase().includes(item.label.split(' (')[0].toLowerCase())
-    );
-    if (already) return;
-    const rate = data.rates?.[item.key] || 0;
-    fromFlags.push({
-      description: item.label,
-      rate: rate > 0 ? `₹ ${rate}` : 'NIL',
-      selected: true,
-      sourceKey: item.key,
-      note: data.chargeNotes?.[item.key] || ''
-    });
-  });
+const savedRowFor = (data, key) =>
+  [...(data.mainCharges || []), ...(data.optionalCharges || [])]
+    .find((row) => row?.sourceKey === key) || null;
 
-  return [...fromRows, ...fromFlags];
+const catalogRowForPrint = (item, data) => {
+  const saved = savedRowFor(data, item.key);
+  const rateUnits = mergeRateUnits(data.rateUnits);
+  const rateNum = parseFloat(data.rates?.[item.key]);
+  const fallbackRate = Number.isFinite(rateNum) && rateNum > 0
+    ? formatQuotedRate(rateNum, rateUnits[item.key] ?? defaultRateUnit(item.key))
+    : 'NIL';
+  const qty = saved?.qty != null && saved.qty !== ''
+    ? saved.qty
+    : (item.isQtyRate ? data.qty : '');
+  return {
+    description: saved?.description || item.label,
+    psdRequirement: item.key === 'processing'
+      ? (saved?.psdRequirement || data.psdRequirement || '')
+      : (saved?.psdRequirement || ''),
+    qty,
+    rate: saved?.dryRate || saved?.rate || fallbackRate,
+    dryRate: saved?.dryRate || saved?.rate || fallbackRate,
+    wetRate: saved?.wetRate || '',
+    sourceKey: item.key,
+    note: saved?.note || data.chargeNotes?.[item.key] || ''
+  };
+};
+
+const firstProductName = (data) =>
+  String(data?.productName || '').split(',')[0].trim();
+
+/** Merge product snapshot + top-level quote so print sees the ticked charges. */
+export const enrichQuotationForPrint = (data = {}) => {
+  const productName = firstProductName(data);
+  const saved = (productName && data.productSettings?.[productName]) || {};
+  const charges = { ...(saved.charges || {}), ...(data.charges || {}) };
+  const rates = { ...(saved.rates || {}), ...(data.rates || {}) };
+  const chargeNotes = { ...(saved.chargeNotes || {}), ...(data.chargeNotes || {}) };
+  const chargeSection = { ...(saved.chargeSection || {}), ...(data.chargeSection || {}) };
+  const rateUnits = mergeRateUnits({ ...(saved.rateUnits || {}), ...(data.rateUnits || {}) });
+  const mainCharges = (data.mainCharges && data.mainCharges.length)
+    ? data.mainCharges
+    : (saved.mainCharges || []);
+  const optionalCharges = (data.optionalCharges && data.optionalCharges.length)
+    ? data.optionalCharges
+    : (saved.optionalCharges || []);
+  return {
+    ...data,
+    charges,
+    rates,
+    chargeNotes,
+    chargeSection,
+    rateUnits,
+    mainCharges,
+    optionalCharges,
+    qty: data.qty ?? saved.qty,
+    psdRequirement: data.psdRequirement || saved.psdRequirement || ''
+  };
+};
+
+/** Tick flag or a row already in the Main/Optional table counts as selected. */
+const isChargeSelected = (data, item) =>
+  Boolean(data.charges?.[item.key]) || Boolean(savedRowFor(data, item.key));
+
+const resolveChargesForPrint = (data) => {
+  const mainCharges = [];
+  const optionalCharges = [];
+  ALL_PRINT_CHARGES.forEach((item) => {
+    if (!isChargeSelected(data, item)) return;
+    const row = catalogRowForPrint(item, data);
+    if (printSectionFor(data, item.key) === 'main') mainCharges.push(row);
+    else optionalCharges.push(row);
+  });
+  return {
+    mainCharges: [...mainCharges, ...customPrintRows(data.mainCharges)],
+    optionalCharges: [...optionalCharges, ...customPrintRows(data.optionalCharges)]
+  };
 };
 
 export const buildQuotationHtml = (data, profileInput) => {
   const profile = mergeCompanyProfile(profileInput);
-  // Quotation print: only selected / filled rows — never dump every charge.
-  const mainCharges = (data.mainCharges || [])
-    .filter((c) => String(c.description || '').trim())
-    .map((c) => ({
-      ...c,
-      note: c.note || data.chargeNotes?.[c.sourceKey] || ''
-    }));
-  const optionalCharges = resolveOptionalChargesForPrint(data);
+  const { mainCharges, optionalCharges } = resolveChargesForPrint(data);
   const companyName = escHtml(profile.companyName || 'UMA MICRON');
   const qtnNo = escHtml(data.quotationNo || 'N/A');
   const qtnDate = escHtml(formatQuoteDateLong(data.date) || formatPdfDateDmy(data.date) || 'N/A');
@@ -135,26 +175,24 @@ export const buildQuotationHtml = (data, profileInput) => {
     ? escHtml(data.description).replace(/\r?\n/g, '<br>')
     : '';
 
+  const rateUnits = mergeRateUnits(data.rateUnits);
+  const lineQtyHtml = (c) => fmtQty(c?.qty);
   const mainRows =
     mainCharges.length > 0
       ? mainCharges
           .map((c, i) => {
             const rateSrc = c.dryRate || c.rate || c.wetRate || '';
-            const remark = c.wetRate && (c.dryRate || c.rate)
-              ? `Wet: ${extractRate(c.wetRate)}`
-              : '';
             return `
             <tr>
               <td>${i + 1}</td>
               <td class="left">${formatChargeDescriptionHtml(c)}</td>
               <td>${c.psdRequirement ? escHtml(c.psdRequirement) : ''}</td>
-              <td>${extractUnit(rateSrc)}</td>
-              <td>${rateDisplayHtml(rateSrc)}</td>
-              <td>${escHtml(remark)}</td>
+              <td class="qty">${lineQtyHtml(c)}</td>
+              <td>${rateDisplayHtml(rateSrc, c.sourceKey, rateUnits)}</td>
             </tr>`;
           })
           .join('')
-      : `<tr><td colspan="6" style="text-align:center;color:var(--muted)">No charges selected</td></tr>`;
+      : `<tr><td colspan="5" style="text-align:center;color:var(--muted)">No charges selected</td></tr>`;
 
   const optionalRows =
     optionalCharges.length > 0
@@ -164,7 +202,8 @@ export const buildQuotationHtml = (data, profileInput) => {
             <tr>
               <td>${i + 1}</td>
               <td class="left">${formatChargeDescriptionHtml(c)}</td>
-              <td>${rateDisplayHtml(c.rate)} / ${extractUnit(c.rate)}</td>
+              <td class="qty">${lineQtyHtml(c)}</td>
+              <td>${rateDisplayHtml(c.rate, c.sourceKey, rateUnits)}</td>
             </tr>`
           )
           .join('')
@@ -403,6 +442,7 @@ export const buildQuotationHtml = (data, profileInput) => {
   table.dt.green tbody tr:nth-child(even) td{background:#f3faf4;}
   table.dt.green td{border-color:#dcefdf;}
   table.dt td.left{text-align:left;}
+  table.dt th.qty, table.dt td.qty{width:54px;white-space:nowrap;}
   .nil{color:var(--green);font-weight:800;}
 
   /* ============ FEATURES (3×2 grid fills page 1) ============ */
@@ -722,16 +762,16 @@ export const buildQuotationHtml = (data, profileInput) => {
       <div>
         <div class="tbl-title"><svg viewBox="0 0 24 24"><path d="M4 4h16v2H4zM4 11h16v2H4zM4 18h16v2H4z"/></svg>COMMERCIAL OFFER</div>
         <table class="dt">
-          <thead><tr><th>Sr. No.</th><th>Description</th><th>PSD Requirement</th><th>Unit</th><th>Rate <span class="sym">(₹)</span></th><th>Remarks</th></tr></thead>
+          <thead><tr><th>Sr. No.</th><th>Description</th><th>PSD Requirement</th><th class="qty">Qty</th><th>Rate</th></tr></thead>
           <tbody>
             ${mainRows}
           </tbody>
         </table>
       </div>
       ${optionalCharges.length ? `<div>
-        <div class="tbl-title green"><svg viewBox="0 0 24 24"><path d="M12 2l1.9 5.9H20l-4.9 3.6L17 17.5 12 14l-5 3.5 1.9-6L4 7.9h6.1z"/></svg>OPTIONAL SERVICES</div>
+        <div class="tbl-title green"><svg viewBox="0 0 24 24"><path d="M12 2l1.9 5.9H20l-4.9 3.6L17 17.5 12 14l-5 3.5 1.9-6L4 7.9h6.1z"/></svg>BELOW ITEMS IF REQUIRED:</div>
         <table class="dt green">
-          <thead><tr><th>Sr. No.</th><th>Description</th><th>Rate <span class="sym">(₹)</span></th></tr></thead>
+          <thead><tr><th>Sr. No.</th><th>Description</th><th class="qty">Qty</th><th>Rate</th></tr></thead>
           <tbody>
             ${optionalRows}
           </tbody>
@@ -920,7 +960,8 @@ export const fitQuotationToTwoPages = (doc, { singlePageHeight = 1123, density =
 };
 
 export const renderQuotationPdf = async (data, { mode = 'save', printPrefs } = {}) => {
-  const html = buildQuotationHtml(data, data.companyProfile);
+  const quote = enrichQuotationForPrint(data);
+  const html = buildQuotationHtml(quote, quote.companyProfile);
   await renderHtmlToPdf(html, {
     mode,
     filePrefix: 'QUOTATION',

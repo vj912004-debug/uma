@@ -27,7 +27,10 @@ export const OTHER_CHARGE_ITEM = { key: 'other', label: 'Other Particulars', isQ
 export const isMaterialQtyCharge = (key) => ['processing', 'sieving', 'cleaning', 'other'].includes(key);
 
 export const emptyChargeQtys = (extraKeys = []) =>
-  Object.fromEntries([...CHARGE_KEYS, ...extraKeys].map(k => [k, 1]));
+  Object.fromEntries([...CHARGE_KEYS, ...extraKeys].map(k => [k, '']));
+
+/** Empty qty fields show blank so the user can type; placeholder is NIL. */
+export const qtyInputValue = (q) => (q === 0 || q === '' || q == null ? '' : q);
 
 export const emptyChargeRates = (extraKeys = []) =>
   Object.fromEntries([...CHARGE_KEYS, ...extraKeys].map(k => [k, 0]));
@@ -50,8 +53,9 @@ export const buildChargeQtys = (settings, materialQty = 0, extraKeys = []) => {
   keys.forEach(k => {
     if (isMaterialQtyCharge(k)) {
       const saved = settings?.qtys?.[k];
-      if (saved == null || saved === '') {
-        qtys[k] = materialQty || qtys[k];
+      const savedNum = saved === '' || saved == null ? 0 : parseFloat(saved);
+      if (!savedNum) {
+        qtys[k] = materialQty || '';
       }
     }
   });
@@ -65,7 +69,7 @@ export const copyChargeQtysFromSettings = (settings, extraKeys = []) => ({
 });
 
 export const getChargeLineQty = (qtys, key) =>
-  parseChargeNumber(qtys?.[key], 1);
+  parseChargeNumber(qtys?.[key], 0);
 
 export const calcStandardChargesSubtotal = (charges, rates, qtys, materialQty = 0, keys = CHARGE_KEYS) =>
   keys.reduce((sum, key) => {
@@ -207,7 +211,7 @@ export const buildProductChargeSettingsFromParty = (prodConfig) => {
     customCharges: (prodConfig.customCharges || []).map(cc => ({
       ...cc,
       checked: cc.checked !== false,
-      qty: cc.qty || 1
+      qty: parseChargeNumber(cc.qty, 0)
     }))
   };
 };
@@ -252,10 +256,10 @@ const mergeProductChargeSettings = (mr, party, productNames) => {
         const saved = s.qtys?.[key];
         const lineQty = saved != null && saved !== ''
           ? parseChargeNumber(saved, 0)
-          : 1;
+          : 0;
         merged.qtys[key] = parseChargeNumber(merged.qtys[key], 0) + lineQty;
       } else if (s.charges?.[key]) {
-        merged.qtys[key] = parseChargeNumber(s.qtys?.[key], merged.qtys[key] || 1);
+        merged.qtys[key] = parseChargeNumber(s.qtys?.[key], merged.qtys[key] || 0);
       }
     });
     (s.customCharges || []).forEach(cc => merged.customCharges.push({ ...cc }));
@@ -553,18 +557,20 @@ export const initProductChargesFromMR = (mr, party, productOptions = {}) => {
   const result = {};
   productNames.forEach(prodName => {
     const settings = getMRProductChargeSettings(mr, party, prodName);
+    const materialQty = getProductQty(mr, prodName, prodOpts);
     result[prodName] = {
       charges: { ...emptyChargeFlagsOnly(), ...(settings.charges || {}) },
       rates: { ...emptyChargeRates(), ...(settings.rates || {}) },
-      qtys: copyChargeQtysFromSettings(settings)
+      qtys: buildChargeQtys(settings, materialQty)
     };
   });
   if (!productNames.length && mr?.productName) {
     const settings = getMRProductChargeSettings(mr, party, mr.productName);
+    const materialQty = parseFloat(mr.totalQty) || parseFloat(mr.receivedQty) || 0;
     result[mr.productName] = {
       charges: { ...emptyChargeFlagsOnly(), ...(settings.charges || {}) },
       rates: { ...emptyChargeRates(), ...(settings.rates || {}) },
-      qtys: copyChargeQtysFromSettings(settings)
+      qtys: buildChargeQtys(settings, materialQty)
     };
   }
   return result;
@@ -606,7 +612,7 @@ export const sanitizeProductCharges = (productCharges) => {
     Object.entries(productCharges).map(([prodName, pc]) => [prodName, {
       charges: { ...emptyChargeFlagsOnly(), ...(pc.charges || {}) },
       rates: Object.fromEntries(CHARGE_KEYS.map(k => [k, parseChargeNumber(pc.rates?.[k], 0)])),
-      qtys: Object.fromEntries(CHARGE_KEYS.map(k => [k, parseChargeNumber(pc.qtys?.[k], 1)]))
+      qtys: Object.fromEntries(CHARGE_KEYS.map(k => [k, parseChargeNumber(pc.qtys?.[k], 0)]))
     }])
   );
 };

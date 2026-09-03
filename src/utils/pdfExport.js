@@ -7,7 +7,8 @@ import {
   drawPdfCompanyHeader,
   drawPdfCompanyHeaderBoxed,
   formatCompanyAddressLines,
-  getContactLine
+  getContactLine,
+  formatBankDetailsText
 } from './companyProfile';
 
 import { renderTaxInvoicePdf } from './taxInvoiceHtml';
@@ -193,7 +194,7 @@ const buildPO_PI_TI = (doc, docType, data) => {
       itemsBody.push([
         sno++,
         data.productName,
-        data.qty || '-',
+        data.qty || 0,
         '-',
         '-',
         '-', '-', '-', '-', '-', '-', '-'
@@ -202,7 +203,7 @@ const buildPO_PI_TI = (doc, docType, data) => {
 
   chargesList.forEach(c => {
      if (data.charges && data.charges[c.key]) {
-        const qty = c.isQty ? (parseFloat(data.qty) || 1) : 1;
+        const qty = c.isQty ? (parseFloat(data.qty) || 0) : (parseFloat(data.qtys?.[c.key]) || 0);
         const rate = parseFloat(data.rates?.[c.key] || 0);
         const amt = qty * rate;
         const sgstAmt = amt * (sgstRate / 100);
@@ -213,7 +214,7 @@ const buildPO_PI_TI = (doc, docType, data) => {
         itemsBody.push([
           sno++,
           c.label,
-          c.isQty ? qty.toFixed(2) : '1',
+          c.isQty ? qty.toFixed(2) : String(qty),
           rate.toFixed(2),
           amt.toFixed(2),
           sgstRate,
@@ -260,7 +261,7 @@ const buildPO_PI_TI = (doc, docType, data) => {
 
   itemsBody.push([
     { content: 'Total', colSpan: 2, styles: { halign: 'center', fontStyle: 'bold', fillColor: [180,200,240] } },
-    data.qty || '-',
+    data.qty || 0,
     '',
     totalAmt.toFixed(2),
     { content: totalSgst.toFixed(2), colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } },
@@ -297,7 +298,7 @@ const buildPO_PI_TI = (doc, docType, data) => {
   if (docType === 'PI' || docType === 'TI') {
     leftBody = [
       [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold' } }],
-      [`Bank Name     : AXIS BANK LTD\nA/c Name      : ${profile.companyName}\nCurrent A/c No. : 916020061629671\nIFS CODE      : UTIB0000383\nBranch        : Nizampura`],
+      [`${formatBankDetailsText(profile)}`],
       [{ content: 'NOTE:\nPACKING MATERIALS AND TRANSPORTATION\nCHARGES WILL BE CHAGRE EXTRA AS ACTUAL', styles: { fontStyle: 'bold' } }],
       [{ content: 'Terms & conditions\n1) Subject to vadodara Juridiction.\n2) Payment 100% ADVANCE AGAINST PI\nthis is system generated PI so no need to sign', styles: { fontStyle: 'bold' } }]
     ];
@@ -351,24 +352,6 @@ export const padBPRBatchRows = (rows, minRows = BPR_PAGE2_ROW_COUNT) => {
 const BPR_PAGE2_ROWS = BPR_PAGE2_ROW_COUNT;
 const BPR_GRID = { lineColor: [0, 0, 0], lineWidth: 0.5, textColor: 0, fontSize: 9, cellPadding: 2 };
 
-const bprFmtWt = (v) => {
-  if (v === '' || v === undefined || v === null) return '';
-  if (v === 0) return '';
-  return typeof v === 'number' ? v.toFixed(2) : v;
-};
-
-const bprFmtNet = (row) => {
-  if (row.net !== '' && row.net !== undefined && row.net !== null && row.net !== 0) {
-    return typeof row.net === 'number' ? row.net.toFixed(2) : row.net;
-  }
-  const g = parseFloat(row.gross);
-  const t = parseFloat(row.tare);
-  if (!Number.isNaN(g) && !Number.isNaN(t) && row.gross !== '' && row.tare !== '') {
-    return Math.max(0, g - t).toFixed(2);
-  }
-  return '';
-};
-
 const bprCheck = (val) => (val === true ? 'Yes' : val === false ? '' : (val || ''));
 
 const buildBPR = (doc, data) => {
@@ -377,8 +360,22 @@ const buildBPR = (doc, data) => {
   const companyTitle = profile.companyName || 'Uma Micron';
   const margin = { left: 14, right: 14 };
 
-  const batchNos = [...new Set((data.receivedBatches || []).map((b) => b.batchNo).filter(Boolean))];
-  const primaryBatchNo = batchNos.join(', ') || data.batchNo || '';
+  const isEmptyDrumsLabel = (s) => /^empty\s*drums?$/i.test(String(s || '').trim());
+  const batchNos = [...new Set(
+    (data.receivedBatches || []).flatMap((b) => {
+      if (b?.isEmptyDrums) return [];
+      return String(b?.batchNo || '')
+        .split(',')
+        .map((p) => p.trim())
+        .filter((p) => p && !isEmptyDrumsLabel(p));
+    })
+  )];
+  const fallbackBatchNo = String(data.batchNo || '')
+    .split(',')
+    .map((p) => p.trim())
+    .filter((p) => p && !isEmptyDrumsLabel(p))
+    .join(', ');
+  const primaryBatchNo = batchNos.join(', ') || fallbackBatchNo;
   const totalNoBatch = batchNos.length || data.totalNoBatch || '';
   const totalDrums = data.totalDrums || (data.receivedBatches || []).length || '';
   const pc = data.packingConsumables || {};
@@ -418,7 +415,7 @@ const buildBPR = (doc, data) => {
       [{ content: 'Batch Processing Record', colSpan: 6, styles: { halign: 'center', fontStyle: 'bold', fontSize: 11 } }],
       ['Customer Name :', { content: data.partyName || data.customerName || '', colSpan: 5 }],
       ['Product Name :', { content: data.productName || '', colSpan: 5 }],
-      ['Total Quantity (kg) :', data.totalInputQty ?? '', 'Batch No. :', primaryBatchNo, `Total No. Batch : ${totalNoBatch}`, `Total Drum : ${totalDrums}`],
+      ['Total Quantity (kg) :', data.totalInputQty || 0, 'Batch No. :', primaryBatchNo, `Total No. Batch : ${totalNoBatch}`, `Total Drum : ${totalDrums}`],
       [{ content: 'Material Received', colSpan: 2, styles: { halign: 'center' } }, { content: 'Committed', styles: { halign: 'center' } }, { content: 'Processing Start', colSpan: 2, styles: { halign: 'center' } }, { content: 'Processing supervisor', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }],
       ['Date', data.materialReceivedDate ? fmtDate(data.materialReceivedDate) : '', data.committedDate ? fmtDate(data.committedDate) : '', data.processingStartDate ? fmtDate(data.processingStartDate) : '', ''],
       ['Time', data.materialReceivedTime || '', data.committedTime || '', data.processingStartTime || '', data.processingSupervisor || ''],
@@ -463,8 +460,8 @@ const buildBPR = (doc, data) => {
     const r = received[i] || {};
     const d = dispatched[i] || {};
     packingBody.push([
-      r.batchNo || '', r.drumNo || '', bprFmtWt(r.gross), bprFmtWt(r.tare), bprFmtNet(r),
-      d.batchNo || '', d.drumNo || '', bprFmtWt(d.gross), bprFmtWt(d.tare), bprFmtNet(d)
+      r.batchNo || '', r.drumNo || '', '', '', '',
+      d.batchNo || '', d.drumNo || '', '', '', ''
     ]);
   }
 
@@ -549,8 +546,8 @@ const MATERIAL_QTY_CHARGE_KEYS = ['cleaning', 'processing', 'sieving', 'other'];
 const getPdfChargeLineQty = (data, key, materialQty) => {
   const saved = data.qtys?.[key];
   if (saved != null && saved !== '') return parseFloat(saved) || 0;
-  if (MATERIAL_QTY_CHARGE_KEYS.includes(key)) return materialQty || 1;
-  return 1;
+  if (MATERIAL_QTY_CHARGE_KEYS.includes(key)) return materialQty || 0;
+  return 0;
 };
 
 const buildTiChargeAmounts = (data) => {
@@ -600,7 +597,7 @@ const buildTiChargeAmounts = (data) => {
         if (pc.charges?.[c.key]) {
           const rowQty = pc.qtys?.[c.key] != null && pc.qtys?.[c.key] !== ''
             ? (parseFloat(pc.qtys[c.key]) || 0)
-            : 1;
+            : 0;
           const rate = parseFloat(pc.rates?.[c.key] || 0);
           addLine(c.key, rowQty, rate, rowQty * rate);
         }
@@ -775,7 +772,7 @@ const buildTaxInvoicePDF = (doc, data) => {
     const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
     const qtyDisplay = line.qty
       ? (Number.isInteger(line.qty) ? line.qty : line.qty.toFixed(2))
-      : '';
+      : 0;
     const rateDisplay = line.rate ? line.rate.toFixed(2) : '';
 
     itemsBody.push([
@@ -808,10 +805,11 @@ const buildTaxInvoicePDF = (doc, data) => {
   if (data.customCharges?.length) {
     data.customCharges.forEach((cc) => {
       if (!cc.checked) return;
-      const ccQty = parseFloat(cc.qty) || 1;
+      const ccQty = parseFloat(cc.qty);
+      const qtyVal = Number.isFinite(ccQty) ? ccQty : 0;
       const rate = parseFloat(cc.rate) || 0;
-      const amt = ccQty * rate;
-      if (amt <= 0) return;
+      const amt = qtyVal * rate;
+      if (!String(cc.name || '').trim()) return;
       const gstPct = (parseFloat(data.taxRate) || 18) / 2;
       const sgstRate = gstPct;
       const cgstRate = gstPct;
@@ -821,7 +819,7 @@ const buildTaxInvoicePDF = (doc, data) => {
       extraRows.push([
         '',
         cc.name || '',
-        ccQty,
+        qtyVal,
         rate.toFixed(2),
         amt.toFixed(2),
         sgstRate,
@@ -914,7 +912,7 @@ const buildTaxInvoicePDF = (doc, data) => {
     body: [
       [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold', textDecoration: 'underline', lineWidth: { top: 0.5, bottom: 0, left: 0.5, right: 0.5 } } }],
       [{
-        content: `Bank Name : AXIS BANK LTD\nA/c Name : ${profile.companyName}\nCurrent A/c No. : 916020061629671\nIFS CODE : UTIB0000383\nBranch : Nizampura`,
+        content: formatBankDetailsText(profile),
         styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 28, fontStyle: 'normal' }
       }]
     ],
@@ -1125,7 +1123,7 @@ const buildPurchaseOrderPDF = (doc, data) => {
     itemsBody.push([
       1,
       buildPoItemDescription(data),
-      qty || '-',
+      qty || 0,
       rate.toFixed(2),
       subtotal.toFixed(2),
       sgstRate, sgstAmt.toFixed(2),
@@ -1238,20 +1236,27 @@ const buildPurchaseOrderPDF = (doc, data) => {
 };
 
 const getPdfProductLines = (data) => {
+  const materialQty = parseFloat(data.qty) || 0;
   if (data.productSummaries?.length) {
-    return data.productSummaries.map(p => ({
+    const lines = data.productSummaries.map(p => ({
       name: p.prodName || '',
       qty: parseFloat(p.qty) || 0
     })).filter(p => p.name);
+    const sum = lines.reduce((s, p) => s + (parseFloat(p.qty) || 0), 0);
+    if (sum <= 0 && materialQty > 0 && lines.length === 1) {
+      lines[0].qty = materialQty;
+    }
+    return lines;
   }
   if (data.productName?.includes(',')) {
-    return data.productName.split(',').map(name => ({
-      name: name.trim(),
-      qty: 0
-    })).filter(p => p.name);
+    const names = data.productName.split(',').map((name) => name.trim()).filter(Boolean);
+    return names.map((name) => ({
+      name,
+      qty: names.length === 1 ? materialQty : 0
+    }));
   }
   if (data.productName) {
-    return [{ name: data.productName, qty: parseFloat(data.qty) || 0 }];
+    return [{ name: data.productName, qty: materialQty }];
   }
   return [];
 };
@@ -1377,7 +1382,7 @@ const buildPerformaInvoicePDF = (doc, data) => {
     const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
     const qtyDisplay = line.qty
       ? (Number.isInteger(line.qty) ? line.qty : line.qty.toFixed(2))
-      : '';
+      : 0;
     const rateDisplay = line.rate ? line.rate.toFixed(2) : '';
 
     itemsBody.push([
@@ -1406,10 +1411,11 @@ const buildPerformaInvoicePDF = (doc, data) => {
   if (data.customCharges?.length) {
     data.customCharges.forEach((cc) => {
       if (!cc.checked) return;
-      const ccQty = parseFloat(cc.qty) || 1;
+      const ccQty = parseFloat(cc.qty);
+      const qtyVal = Number.isFinite(ccQty) ? ccQty : 0;
       const rate = parseFloat(cc.rate) || 0;
-      const amt = ccQty * rate;
-      if (amt <= 0) return;
+      const amt = qtyVal * rate;
+      if (!String(cc.name || '').trim()) return;
       const gstPct = (parseFloat(data.taxRate) || 18) / 2;
       const sgstAmt = amt * (gstPct / 100);
       const cgstAmt = amt * (gstPct / 100);
@@ -1417,7 +1423,7 @@ const buildPerformaInvoicePDF = (doc, data) => {
       extraRows.push([
         extraRows.length + PI_CHARGES_LIST.length + 1,
         cc.name || '',
-        ccQty,
+        qtyVal,
         rate.toFixed(2),
         amt.toFixed(2),
         gstPct,
@@ -1512,7 +1518,7 @@ const buildPerformaInvoicePDF = (doc, data) => {
     margin: { left: PDF_MARGIN, right: 0 },
     body: [
       [{
-        content: 'OUR BANK DETAILS\n\nBank Name : AXIS BANK LTD\nA/c Name : ' + profile.companyName + '\nCurrent A/c No. : 916020061629671\nIFS CODE : UTIB0000383\nBranch : Nizampura',
+        content: `OUR BANK DETAILS\n\n${formatBankDetailsText(profile)}`,
         styles: { minCellHeight: 52, fontStyle: 'normal', valign: 'top', lineWidth: { top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 } }
       }]
     ],
@@ -1817,7 +1823,7 @@ const buildFormattedInvoice = (doc, docType, data) => {
       const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
 
       itemsBody.push([
-        sno++, data.productName, qty || '-', rate > 0 ? rate.toFixed(2) : '0.00', amt.toFixed(2),
+        sno++, data.productName, qty || 0, rate > 0 ? rate.toFixed(2) : '0.00', amt.toFixed(2),
         sgstRate, sgstAmt.toFixed(2), cgstRate, cgstAmt.toFixed(2), igstRate, igstAmt.toFixed(2), rowTotal.toFixed(2)
       ]);
       totalAmt += amt;
@@ -1831,7 +1837,7 @@ const buildFormattedInvoice = (doc, docType, data) => {
   if (data.customCharges && data.customCharges.length > 0) {
     data.customCharges.forEach(cc => {
        if (cc.checked) {
-          const qty = parseFloat(cc.qty) || 1;
+          const qty = parseFloat(cc.qty) || 0;
           const rate = parseFloat(cc.rate) || 0;
           const amt = qty * rate;
           const sgstAmt = amt * (sgstRate / 100);
@@ -1874,17 +1880,17 @@ const buildFormattedInvoice = (doc, docType, data) => {
   chargesList.forEach(c => {
      if (data.charges && data.charges[c.key]) {
         const isQty = ['cleaning', 'processing', 'sieving'].includes(c.key);
-        const qty = isQty ? (parseFloat(data.qty) || 1) : 1;
+        const qty = isQty ? (parseFloat(data.qty) || 0) : (parseFloat(data.qtys?.[c.key]) || 0);
         const rate = parseFloat(data.rates?.[c.key] || 0);
         const amt = qty * rate;
-        if (amt > 0) {
+        if (amt > 0 || rate > 0 || qty > 0) {
           const sgstAmt = amt * (sgstRate / 100);
           const cgstAmt = amt * (cgstRate / 100);
           const igstAmt = amt * (igstRate / 100);
           const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
           
           itemsBody.push([
-            sno++, c.label, isQty ? qty.toFixed(0) : '1', rate.toFixed(2), amt.toFixed(2),
+            sno++, c.label, qty, rate.toFixed(2), amt.toFixed(2),
             sgstRate, sgstAmt.toFixed(2), cgstRate, cgstAmt.toFixed(2),
             igstRate, igstAmt.toFixed(2), rowTotal.toFixed(2)
           ]);
@@ -1894,7 +1900,7 @@ const buildFormattedInvoice = (doc, docType, data) => {
           totalCgst += cgstAmt;
           totalIgst += igstAmt;
           totalAll += rowTotal;
-          totalQty += (isQty ? qty : 1);
+          totalQty += qty;
         }
      }
   });
@@ -1956,7 +1962,7 @@ const buildFormattedInvoice = (doc, docType, data) => {
   if (isPI) {
     leftBody = [
       [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold', lineWidth: { top: 0.5, bottom: 0, left: 0.5, right: 0.5 } } }],
-      [{ content: `Bank Name     : AXIS BANK LTD\nA/c Name      : ${profile.companyName}\nCurrent A/c No. : 916020061629671\nIFS CODE      : UTIB0000383\nBranch        : Nizampura`, styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 25 } }],
+      [{ content: formatBankDetailsText(profile), styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 25 } }],
       [{ content: 'NOTE:\nPACKING MATERIALS AND TRANSPORTATION\nCHARGES WILL BE CHAGRE EXTRA AS ACTUAL', styles: { fontStyle: 'bold', minCellHeight: 15 } }],
       [{ content: 'Terms & conditions\n1) Subject to vadodara Juridiction.\n2) Payment 100% ADVANCE AGAINST PI\nthis is system generated PI so no need to sign', styles: { fontStyle: 'bold', minCellHeight: 20 } }]
     ];
@@ -1969,7 +1975,7 @@ const buildFormattedInvoice = (doc, docType, data) => {
   } else {
     leftBody = [
       [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold', lineWidth: { top: 0.5, bottom: 0, left: 0.5, right: 0.5 } } }],
-      [{ content: `Bank Name     : AXIS BANK LTD\nA/c Name      : ${profile.companyName}\nCurrent A/c No. : 916020061629671\nIFS CODE      : UTIB0000383\nBranch        : Nizampura`, styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 25 } }],
+      [{ content: formatBankDetailsText(profile), styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 25 } }],
       [{ content: 'Terms & conditions\n1) Subject to vadodara Juridiction.\n2) Payment Term as per our agree terms.\n3) Interest will charged @ 24% per annum if\namount remaining unpaid from due date.', styles: { minCellHeight: 35 } }]
     ];
   }

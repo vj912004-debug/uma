@@ -54,10 +54,12 @@ export const hasSheetOverride = (overrides, key) =>
 /** Bill amount for a receipt: Processing Sheet override wins over Tax Invoice total. */
 export const getReceiptBillAmount = (mr, ti) => {
   const o = getMergedSheetOverrides(mr, ti?.id);
-  if (hasSheetOverride(o, 'totalBill')) return parseFloat(o.totalBill) || 0;
+  if (hasSheetOverride(o, 'totalBill')) {
+    const bill = parseFloat(o.totalBill);
+    if (Number.isFinite(bill) && bill > 0.01) return bill;
+  }
   const fromTi = parseFloat(ti?.total);
   if (Number.isFinite(fromTi) && fromTi > 0) return fromTi;
-  // Fallback if total missing but subtotal/tax present
   const sub = parseFloat(ti?.subtotal) || 0;
   const tax = parseFloat(ti?.taxAmount) || 0;
   if (sub + tax > 0) return sub + tax;
@@ -87,19 +89,26 @@ export const getReceiptEffectiveTds = (mr, payments, invoiceId) => {
  */
 export const getReceiptOutstanding = (mr, ti, payments) => {
   const o = getMergedSheetOverrides(mr, ti?.id);
-  // Manual Processing Sheet outstanding is the source of truth when typed
+  const computed = () => {
+    const bill = getReceiptBillAmount(mr, ti);
+    if (bill <= 0 && !ti && !hasSheetOverride(o, 'totalBill')) return 0;
+    let outstanding =
+      bill -
+      getReceiptEffectivePaid(mr, payments, ti?.id) -
+      getReceiptEffectiveTds(mr, payments, ti?.id);
+    if (outstanding < 0.01) outstanding = 0;
+    return outstanding;
+  };
+
   if (hasSheetOverride(o, 'outstanding')) {
     const v = parseFloat(o.outstanding);
+    const calc = computed();
+    if ((!Number.isFinite(v) || v <= 0) && calc > 0.01) return calc;
     return Number.isFinite(v) && v > 0 ? v : 0;
   }
   const hasBill = !!ti || hasSheetOverride(o, 'totalBill');
   if (!hasBill) return 0;
-  let outstanding =
-    getReceiptBillAmount(mr, ti) -
-    getReceiptEffectivePaid(mr, payments, ti?.id) -
-    getReceiptEffectiveTds(mr, payments, ti?.id);
-  if (outstanding < 0.01) outstanding = 0;
-  return outstanding;
+  return computed();
 };
 
 export const isTaxInvoiceDoc = (inv) => {
@@ -142,13 +151,26 @@ export const getInvoiceDebitCreditNet = (data, invoiceNo) => {
   return dn - cn;
 };
 
+const normPartyName = (s) => String(s || '')
+  .toLowerCase()
+  .replace(/[.,]/g, ' ')
+  .replace(/\bpvt\b/g, 'private')
+  .replace(/\bltd\b/g, 'limited')
+  .replace(/\s+/g, ' ')
+  .trim();
+
 export const samePartyRef = (party, partyId, partyName) => {
   if (!party) return false;
-  const nameA = String(party.name || '').trim().toLowerCase();
-  const nameB = String(partyName || '').trim().toLowerCase();
-  if (nameA && nameB) return nameA === nameB;
   if (party.id != null && partyId != null && String(partyId) !== '') {
-    return String(party.id) === String(partyId);
+    if (String(party.id) === String(partyId)) return true;
+  }
+  const a = normPartyName(party.name);
+  const b = normPartyName(partyName);
+  if (a && b) {
+    if (a === b) return true;
+    const shorter = a.length <= b.length ? a : b;
+    const longer = a.length <= b.length ? b : a;
+    if (shorter.length >= 10 && longer.includes(shorter)) return true;
   }
   return false;
 };
@@ -163,10 +185,10 @@ export const listProcessingSheetDueRows = (data) => {
   const mrsCovered = new Set();
 
   (data?.invoices || [])
-    .filter((inv) => String(inv.invoiceNo || '').includes('/IN/'))
+    .filter((inv) => !inv.isDeleted && String(inv.invoiceNo || '').includes('/IN/'))
     .forEach((ti) => {
       const mr = (data.materialReceipts || []).find(
-        (m) => String(m.id) === String(ti.receiptId)
+        (m) => !m.isDeleted && String(m.id) === String(ti.receiptId)
       );
       const baseMr = mr || {
         id: ti.receiptId || `orphan-${ti.id}`,
@@ -179,11 +201,11 @@ export const listProcessingSheetDueRows = (data) => {
       const o = getMergedSheetOverrides(baseMr, ti.id);
       const partyName = hasSheetOverride(o, 'partyName')
         ? o.partyName
-        : (baseMr.partyName || ti.partyName || '');
+        : (ti.partyName || baseMr.partyName || '');
       rows.push({
         receiptId: baseMr.id,
         invoiceId: ti.id,
-        partyId: baseMr.partyId || ti.partyId || '',
+        partyId: ti.partyId || baseMr.partyId || '',
         partyName,
         outstanding: getReceiptOutstanding(baseMr, ti, payments),
         fyDate: hasSheetOverride(o, 'invoiceDate') ? o.invoiceDate : (ti.date || baseMr.date)
@@ -206,15 +228,83 @@ export const listProcessingSheetDueRows = (data) => {
   return rows;
 };
 
-/** FY buckets of Processing Sheet outstanding for one party. */
+const parseMoney = (v) => {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = parseFloat(String(v ?? '').replace(/[₹,\s]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+};
+
+/** Every party master row, plus any tax-invoice / receipt party not in master. */
+export const collectPartyDueEntities = (data) => {
+  const list = [];
+  const seenIds = new Set();
+  const seenNames = new Set();
+  const add = (id, name) => {
+    const n = String(name || '').trim();
+    const idKey = id != null && String(id) !== '' ? String(id) : '';
+    const nameKey = normPartyName(n);
+    if (idKey && seenIds.has(idKey)) return;
+    if (!idKey && nameKey && seenNames.has(nameKey)) return;
+    if (!idKey && !nameKey) return;
+    if (idKey) seenIds.add(idKey);
+    if (nameKey) seenNames.add(nameKey);
+    list.push({
+      id: idKey || `name:${nameKey}`,
+      name: n || 'Unknown'
+    });
+  };
+
+  (data?.parties || []).filter((p) => !p.isDeleted).forEach((p) => add(p.id, p.name));
+  (data?.invoices || []).filter(isTaxInvoiceDoc).forEach((ti) => add(ti.partyId, ti.partyName));
+  (data?.materialReceipts || []).filter((m) => !m.isDeleted).forEach((mr) => add(mr.partyId, mr.partyName));
+  return list;
+};
+
+/** FY buckets of unpaid tax-invoice totals for one party. */
 export const getPartyOutstandingByFY = (data, party, fyKeys, currentFY) => {
   const byFy = Object.fromEntries((fyKeys || []).map((k) => [k, 0]));
-  listProcessingSheetDueRows(data).forEach((row) => {
-    if (!samePartyRef(party, row.partyId, row.partyName)) return;
-    const fy = getFYOfDate(row.fyDate);
-    const amt = parseFloat(row.outstanding) || 0;
-    if (Object.prototype.hasOwnProperty.call(byFy, fy)) byFy[fy] += amt;
-    else if (currentFY && Object.prototype.hasOwnProperty.call(byFy, currentFY)) byFy[currentFY] += amt;
+  const add = (fyDate, invoiceNo, amt) => {
+    const n = parseMoney(amt);
+    if (n < 0.01) return;
+    let fy = getFYOfDate(fyDate);
+    if (!fy || !Object.prototype.hasOwnProperty.call(byFy, fy)) {
+      const fromNo = String(invoiceNo || '').match(/(\d{2}-\d{2})/);
+      if (fromNo && Object.prototype.hasOwnProperty.call(byFy, fromNo[1])) fy = fromNo[1];
+      else if (currentFY && Object.prototype.hasOwnProperty.call(byFy, currentFY)) fy = currentFY;
+    }
+    if (fy && Object.prototype.hasOwnProperty.call(byFy, fy)) byFy[fy] += n;
+  };
+
+  const payments = data?.payments || [];
+  const coveredMrs = new Set();
+
+  (data?.invoices || []).filter(isTaxInvoiceDoc).forEach((ti) => {
+    const mr = (data.materialReceipts || []).find(
+      (m) => !m.isDeleted && String(m.id) === String(ti.receiptId)
+    );
+    const partyId = ti.partyId || mr?.partyId || '';
+    const partyName = ti.partyName || mr?.partyName || '';
+    if (!samePartyRef(party, partyId, partyName) && !samePartyRef(party, mr?.partyId, mr?.partyName)) return;
+    if (mr) coveredMrs.add(String(mr.id));
+
+    const bill = parseMoney(ti.total) || (parseMoney(ti.subtotal) + parseMoney(ti.taxAmount));
+    if (bill < 0.01) return;
+    const baseMr = mr || {
+      id: ti.receiptId || `orphan-${ti.id}`,
+      partyId,
+      partyName,
+      sheetOverrides: {}
+    };
+    const paid = getReceiptEffectivePaid(baseMr, payments, ti.id);
+    const tds = getReceiptEffectiveTds(baseMr, payments, ti.id);
+    add(ti.date || mr?.date, ti.invoiceNo, bill - paid - tds);
   });
+
+  (data?.materialReceipts || []).forEach((mr) => {
+    if (mr.isDeleted || coveredMrs.has(String(mr.id))) return;
+    if (!samePartyRef(party, mr.partyId, mr.partyName)) return;
+    add(mr.sheetOverrides?.invoiceDate || mr.date, '', getReceiptOutstanding(mr, null, payments));
+  });
+
   return byFy;
 };

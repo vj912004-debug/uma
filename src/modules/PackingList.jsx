@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
+import SearchableSelect from '../components/SearchableSelect';
 import {
   getReceiptProductLabel,
   getReceiptProductSummaries,
@@ -172,6 +173,13 @@ const PackingList = () => {
     });
   };
 
+  const removeRow = (idx) => {
+    setForm(prev => ({
+      ...prev,
+      batches: prev.batches.filter((_, i) => i !== idx)
+    }));
+  };
+
   const rowMatchesProduct = (row, prodName) => {
     const target = (prodName || form.productName || '').trim().toLowerCase();
     const rowProd = (row.productName || '').trim().toLowerCase();
@@ -281,6 +289,7 @@ const PackingList = () => {
   });
 
   const filteredPLs = (data.packingLists || []).filter(pl => {
+    if (pl.isDeleted) return false;
     const label = getPLDisplayProductLabel(pl, data);
     return (pl.plNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       label.toLowerCase().includes(searchTerm.toLowerCase());
@@ -387,7 +396,7 @@ const PackingList = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(5px)', padding: '2rem 0' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>{editingPL ? 'Modify Packing List' : 'Create Packing List (P.L.)'}</h2>
 
@@ -403,14 +412,19 @@ const PackingList = () => {
                 </div>
                 <div>
                   <label>Party Name</label>
-                  <input
-                    type="text"
+                  <SearchableSelect
+                    allowCustom
                     className="input-field"
-                    readOnly={!!activeMR}
+                    disabled={!!activeMR}
+                    placeholder={activeMR ? '' : 'Select or type party name'}
                     value={form.partyName || ''}
                     onChange={e => setForm({ ...form, partyName: e.target.value })}
-                    placeholder={activeMR ? '' : 'Enter party name'}
-                  />
+                  >
+                    <option value="">{activeMR ? '' : 'Select or type party name'}</option>
+                    {(data.parties || []).filter(p => !p.isDeleted).map(p => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
+                    ))}
+                  </SearchableSelect>
                 </div>
                 <div>
                   <label>MR No</label>
@@ -504,12 +518,13 @@ const PackingList = () => {
                               <th style={{ padding: '0.35rem' }}>Gross Wt (Manual)</th>
                               <th style={{ padding: '0.35rem' }}>Tare Wt (Manual)</th>
                               <th style={{ padding: '0.35rem' }}>Net Wt (Auto)</th>
+                              <th style={{ padding: '0.35rem', width: '44px' }}>Del</th>
                             </tr>
                           </thead>
                           <tbody>
                             {prodRows.length === 0 ? (
                               <tr>
-                                <td colSpan={6} style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                <td colSpan={7} style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                                   No rows yet — click &quot;+ Add Row&quot; to add drum weights for this product.
                                 </td>
                               </tr>
@@ -533,6 +548,16 @@ const PackingList = () => {
                                     <td style={{ padding: '0.25rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
                                       {r.netVal > 0 ? r.netVal.toFixed(2) : '0.00'}
                                     </td>
+                                    <td style={{ padding: '0.25rem' }}>
+                                      <button
+                                        type="button"
+                                        title="Delete row"
+                                        onClick={() => removeRow(r.idx)}
+                                        style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.7)', cursor: 'pointer' }}
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </td>
                                   </tr>
                                 ))}
                                 <tr style={{ background: 'rgba(91, 28, 133, 0.1)', borderBottom: '2px solid var(--accent-primary)' }}>
@@ -548,6 +573,7 @@ const PackingList = () => {
                                   <td style={{ padding: '0.45rem 0.35rem', fontWeight: 800, color: 'var(--accent-primary)' }}>
                                     {group.net.toFixed(2)}
                                   </td>
+                                  <td />
                                 </tr>
                               </React.Fragment>
                             ))}
@@ -588,6 +614,7 @@ const PackingList = () => {
                         <td style={{ padding: '0.65rem 0.5rem', fontWeight: 800, color: 'var(--accent-primary)', textAlign: 'center', minWidth: '90px' }}>
                           {grandTotal.net.toFixed(2)}
                         </td>
+                        <td />
                       </tr>
                     </tbody>
                   </table>

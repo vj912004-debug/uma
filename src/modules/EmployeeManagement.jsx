@@ -245,7 +245,7 @@ const EmployeeManagement = () => {
       </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={closeModal}>
+        <div className="page-form-overlay" onClick={closeModal}>
           <div className="modal-content" style={{ width: '480px' }} onClick={(e) => e.stopPropagation()}>
             {generatedCreds ? (
               <>

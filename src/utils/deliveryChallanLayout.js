@@ -4,8 +4,12 @@ import {
   getProductBatches,
   getProductQty,
   getProductDrums,
+  getEmptyDrumsCount,
   getMRMaterialValue,
-  receiptProductOptions
+  receiptProductOptions,
+  findAnyPackingList,
+  getPLProductDrums,
+  getPLBatchDrumCounts
 } from './receiptProducts';
 
 export const formatDcDateSlash = (d) => {
@@ -26,9 +30,23 @@ const fmtMoney = (n) => (parseFloat(n) || 0).toFixed(2);
 
 /** Build aligned description / drums / qty lines for DC PDF.
  * Quantities always come from Material Receipt (received qty), never packing list. */
+const resolveLinkedMr = (dc, appData = {}) => {
+  const mrs = appData.materialReceipts || [];
+  if (!dc || !mrs.length) return null;
+  const id = dc.receiptId || dc.mrId || '';
+  const idStr = String(id);
+  return mrs.find((r) => id && r.id === id)
+    || mrs.find((r) => idStr && String(r.id) === idStr)
+    || mrs.find((r) => dc.receiptNo && r.receiptNo === dc.receiptNo)
+    || mrs.find((r) => dc.partyDocNo && r.partyDocNo === dc.partyDocNo
+      && String(r.partyName || '').trim().toLowerCase() === String(dc.partyName || '').trim().toLowerCase())
+    || null;
+};
+
 export const buildDcPrintLines = (dc, appData = {}) => {
-  const mr = (appData.materialReceipts || []).find((r) => r.id === dc.receiptId) || null;
+  const mr = resolveLinkedMr(dc, appData);
   const prodOpts = mr ? receiptProductOptions(mr, appData) : {};
+  const pl = findAnyPackingList(appData.packingLists, mr?.id || dc.receiptId);
 
   const selected = dc.selectedProducts?.length
     ? dc.selectedProducts
@@ -43,6 +61,7 @@ export const buildDcPrintLines = (dc, appData = {}) => {
   let receivedDrumsTotal = 0;
 
   products.forEach((prodName) => {
+    if (/^empty\s*drums?$/i.test(String(prodName || '').trim())) return;
     if (prodName) {
       lines.push({ kind: 'product', text: prodName, drums: '', qty: '' });
     }
@@ -51,17 +70,24 @@ export const buildDcPrintLines = (dc, appData = {}) => {
 
     const batches = getProductBatches(mr, prodName, prodOpts);
     const prodQty = getProductQty(mr, prodName, prodOpts);
-    const prodDrums = getProductDrums(mr, prodName, prodOpts);
+    const plDrumCounts = getPLBatchDrumCounts(pl, prodName, mr, prodOpts);
+    const plDrums = getPLProductDrums(pl, prodName, mr, prodOpts);
+    const mrDrums = getProductDrums(mr, prodName, prodOpts);
+    const prodDrums = plDrums > 0 ? plDrums : mrDrums;
     receivedQtyTotal += prodQty || 0;
     receivedDrumsTotal += prodDrums || 0;
 
+    const usedPlBatches = new Set();
     if (batches.length) {
       const batchQtySum = batches.reduce((s, b) => s + (parseFloat(b.qty) || 0), 0);
       const displayProdQty = prodQty > 0 ? prodQty : batchQtySum;
 
       batches.forEach((b) => {
-        if (b.isEmptyDrums || /^empty\s*drums$/i.test(String(b.batchNo || '').trim())) return;
-        const d = parseInt(b.drums, 10) || 0;
+        const batchKey = String(b.batchNo || '').trim() || '—';
+        usedPlBatches.add(batchKey);
+        const mrD = parseInt(b.drums, 10) || 0;
+        const plD = plDrumCounts[batchKey] || 0;
+        const d = plD > 0 ? plD : mrD;
         let q = parseFloat(b.qty) || 0;
         if (batches.length === 1 && displayProdQty > 0) q = displayProdQty;
         else if (q <= 0 && batches.length === 1 && prodQty > 0) q = prodQty;
@@ -69,10 +95,19 @@ export const buildDcPrintLines = (dc, appData = {}) => {
           kind: 'batch',
           text: `BATCH NO:${b.batchNo || ''}`,
           drums: d > 0 ? d : '',
-          qty: q > 0 ? q.toFixed(2) : ''
+          qty: (q > 0 ? q : 0).toFixed(2)
         });
       });
-      if (batchQtySum <= 0 && displayProdQty > 0 && batches.length > 1) {
+      Object.entries(plDrumCounts).forEach(([batchNo, d]) => {
+        if (usedPlBatches.has(batchNo) || !d) return;
+        lines.push({
+          kind: 'batch',
+          text: `BATCH NO:${batchNo === '—' ? '' : batchNo}`,
+          drums: d,
+          qty: ''
+        });
+      });
+      if (batchQtySum <= 0 && displayProdQty > 0 && batches.length > 1 && !plDrums) {
         lines.push({
           kind: 'batch',
           text: 'Received Qty',
@@ -80,6 +115,15 @@ export const buildDcPrintLines = (dc, appData = {}) => {
           qty: displayProdQty.toFixed(2)
         });
       }
+    } else if (Object.keys(plDrumCounts).length) {
+      Object.entries(plDrumCounts).forEach(([batchNo, d]) => {
+        lines.push({
+          kind: 'batch',
+          text: `BATCH NO:${batchNo === '—' ? '' : batchNo}`,
+          drums: d > 0 ? d : '',
+          qty: prodQty > 0 && Object.keys(plDrumCounts).length === 1 ? prodQty.toFixed(2) : ''
+        });
+      });
     } else if (prodQty > 0 || prodDrums > 0) {
       lines.push({
         kind: 'batch',
@@ -90,26 +134,20 @@ export const buildDcPrintLines = (dc, appData = {}) => {
     }
   });
 
-  const isMrEmptyDrumsEntry = (b) =>
-    !!b?.isEmptyDrums
-    || (
-      /^empty\s*drums$/i.test(String(b?.batchNo || '').trim())
-      && !String(b?.productName || '').trim()
-    );
-  const emptyDrumsCount = (mr?.batches || [])
-    .filter(isMrEmptyDrumsEntry)
-    .reduce((sum, b) => sum + (parseInt(b.drums, 10) || 0), 0);
-
-  for (let i = lines.length - 1; i >= 0; i -= 1) {
-    const l = lines[i];
-    if (
-      l.kind === 'batch'
-      && /^empty\s*drums$/i.test(String(l.text || '').replace(/^BATCH NO:?\s*/i, '').trim())
-    ) {
-      lines.splice(i, 1);
-    }
+  const formQty = parseFloat(dc.qty) || 0;
+  const formDrums = parseInt(dc.totalDrums, 10) || 0;
+  let emptyDrumsCount = getEmptyDrumsCount(mr)
+    || parseInt(dc.emptyDrums, 10)
+    || parseInt(dc.emptyDrumsCount, 10)
+    || 0;
+  if (!emptyDrumsCount && mr && formDrums > receivedDrumsTotal) {
+    emptyDrumsCount = formDrums - receivedDrumsTotal;
   }
-  if (emptyDrumsCount > 0) {
+
+  const emptyAlreadyListed = lines.some((l) =>
+    /^empty\s*drums?$/i.test(String(l.text || '').replace(/^BATCH NO:?\s*/i, '').trim())
+  );
+  if (emptyDrumsCount > 0 && !emptyAlreadyListed) {
     lines.push({
       kind: 'batch',
       text: 'Empty Drums',
@@ -119,7 +157,12 @@ export const buildDcPrintLines = (dc, appData = {}) => {
   }
 
   if (!lines.length && dc.productName) {
-    lines.push({ kind: 'product', text: dc.productName, drums: '', qty: '' });
+    const printedName = String(dc.productName)
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s && !/^empty\s*drums?$/i.test(s))
+      .join(', ');
+    if (printedName) lines.push({ kind: 'product', text: printedName, drums: '', qty: '' });
   }
 
   const mrValue = getMRMaterialValue(mr);
@@ -136,8 +179,6 @@ export const buildDcPrintLines = (dc, appData = {}) => {
     });
   }
 
-  const formQty = parseFloat(dc.qty) || 0;
-  const formDrums = parseInt(dc.totalDrums, 10) || 0;
   const linesQty = lines.reduce((s, l) => s + (parseFloat(l.qty) || 0), 0);
   const linesDrums = lines.reduce((s, l) => s + (parseInt(l.drums, 10) || 0), 0);
 

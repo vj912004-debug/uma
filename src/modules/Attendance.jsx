@@ -324,7 +324,7 @@ const Attendance = () => {
       </div>
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, backdropFilter: 'blur(5px)', padding: '2rem' }}>
+        <div className="page-form-overlay">
           <div className="premium-card" style={{ width: '700px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.25rem' }}>{isEditing ? 'Edit Attendance' : 'Manual Attendance Entry'}</h2>
             <form onSubmit={submit}>

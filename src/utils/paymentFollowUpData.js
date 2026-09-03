@@ -4,9 +4,7 @@ import {
   getReceiptEffectivePaid,
   getReceiptEffectiveTds,
   hasSheetOverride,
-  isTaxInvoiceDoc,
-  getInvoiceDebitCreditNet,
-  getPartyDebitCreditNet
+  isTaxInvoiceDoc
 } from './paymentTotals';
 
 export const money = (n) =>
@@ -88,8 +86,7 @@ export const collectPartyInvoiceRows = (data, party, asOnDate = todayISO()) => {
     if (!invoiceNo) return;
     if (mr) mrsCovered.add(String(mr.id));
 
-    const noteNet = getInvoiceDebitCreditNet(data, invoiceNo);
-    const outstanding = getReceiptOutstanding(baseMr, ti, payments) + noteNet;
+    const outstanding = getReceiptOutstanding(baseMr, ti, payments);
     const invoiceDate = ti.date || baseMr.date || '';
     const ageDays = daysBetween(invoiceDate, asOnDate);
     rows.push({
@@ -160,8 +157,7 @@ export const buildOutstandingInvoices = (data, asOnDate = todayISO()) => {
     };
 
     const party = resolveParty(data, baseMr.partyId, ti.partyName || baseMr.partyName);
-    const noteNet = getInvoiceDebitCreditNet(data, ti.invoiceNo);
-    const outstanding = getReceiptOutstanding(baseMr, ti, payments) + noteNet;
+    const outstanding = getReceiptOutstanding(baseMr, ti, payments);
     if (outstanding < 0.01) return;
 
     if (mr) mrsCovered.add(mr.id);
@@ -286,33 +282,7 @@ export const buildCustomerOutstanding = (data, asOnDate = todayISO()) => {
     });
 
   byParty.forEach((row) => {
-    const party = { id: row.partyId, name: row.partyName };
-    const invoiceNoteNet = (row.invoices || []).reduce(
-      (s, inv) => s + getInvoiceDebitCreditNet(data, inv.invoiceNo),
-      0
-    );
-    const unmatchedNet = getPartyDebitCreditNet(data, party) - invoiceNoteNet;
-    row.outstandingAmount = (row.invoiceOutstanding || 0) + unmatchedNet;
-  });
-
-  (data.parties || []).filter((p) => !p.isDeleted).forEach((party) => {
-    const key = partyKey(party.id, party.name, party.id);
-    if (byParty.has(key)) return;
-    const net = getPartyDebitCreditNet(data, party);
-    if (net < 0.01) return;
-    byParty.set(key, {
-      partyId: party.id,
-      partyName: party.name,
-      phone: party.phone1 || party.mobile || '',
-      email: party.email1 || party.email || '',
-      address: party.billAddress || '',
-      gstin: party.gstinBill || '',
-      pendingInvoices: 0,
-      invoiceOutstanding: 0,
-      outstandingAmount: net,
-      overdueAmount: 0,
-      invoices: []
-    });
+    if (row.outstandingAmount == null) row.outstandingAmount = row.invoiceOutstanding || 0;
   });
 
   return [...byParty.values()]

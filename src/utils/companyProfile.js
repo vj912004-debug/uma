@@ -19,8 +19,27 @@ export const DEFAULT_COMPANY_PROFILE = {
   establishedYear: '',
   ownerName: '',
   description: '',
+  bankName: 'AXIS BANK LTD',
+  accountName: 'UMA MICRON',
+  accountNumber: '916020061629671',
+  ifscCode: 'UTIB0000383',
+  branch: 'Nizampura, Vadodara - 390002',
   updatedAt: null
 };
+
+export const getBankDetailRows = (profile) => {
+  const p = mergeCompanyProfile(profile);
+  return [
+    ['Bank Name', p.bankName],
+    ['A/c Name', p.accountName || p.companyName],
+    ['Current A/c No.', p.accountNumber],
+    ['IFS CODE', p.ifscCode],
+    ['Branch', p.branch]
+  ].filter(([, v]) => String(v ?? '').trim());
+};
+
+export const formatBankDetailsText = (profile) =>
+  getBankDetailRows(profile).map(([label, value]) => `${label} : ${value}`).join('\n');
 
 export const mergeCompanyProfile = (profile) => ({
   ...DEFAULT_COMPANY_PROFILE,

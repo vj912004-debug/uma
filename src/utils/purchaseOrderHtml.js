@@ -6,7 +6,7 @@ import {
   formatPdfDateDmy,
   buildTiChargeAmounts
 } from './taxInvoiceLayout';
-import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPrintTermsHtml, DEFAULT_PO_TERMS, DEFAULT_INVOICE_DECLARATION } from './printTheme';
+import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPrintTermsHtml, DEFAULT_PO_TERMS, DEFAULT_INVOICE_DECLARATION, buildBankDetailsBox } from './printTheme';
 
 export const escHtml = (v) => String(v ?? '')
   .replace(/&/g, '&amp;')
@@ -17,8 +17,9 @@ export const escHtml = (v) => String(v ?? '')
 export const fmtMoney = (n) => (parseFloat(n) || 0).toFixed(2);
 
 export const fmtQty = (n) => {
+  if (n === '' || n == null) return '';
   const v = parseFloat(n);
-  if (!v) return '';
+  if (!Number.isFinite(v) || v === 0) return '';
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
 };
 
@@ -58,20 +59,25 @@ export const buildPurchaseOrderHtml = (raw, profileInput) => {
       cleanDesc = match[1].trim();
     }
 
+    const qtyEntered = qty !== '' && qty != null && Number.isFinite(parseFloat(qty)) && parseFloat(qty) !== 0;
+    const rateEntered = parseFloat(rate) > 0;
+    const blankNums = !qtyEntered && !rateEntered && !(parseFloat(amt) > 0);
+    const money = (v) => (blankNums ? '' : fmtMoney(v));
+
     rows.push(`
       <tr>
         <td class="center">${sr++}</td>
         <td class="left">${escHtml(cleanDesc)}</td>
         <td class="center">${fmtQty(qty)}</td>
-        <td class="num">${rate ? escHtml(parseFloat(rate).toFixed(2)) : ''}</td>
-        <td class="num">${fmtMoney(amt)}</td>
-        <td class="num">${sgstPercent || ''}</td>
-        <td class="num">${fmtMoney(sgstAmt)}</td>
-        <td class="num">${cgstPercent || ''}</td>
-        <td class="num">${fmtMoney(cgstAmt)}</td>
-        <td class="num">${igstPercent || ''}</td>
-        <td class="num">${fmtMoney(igstAmt)}</td>
-        <td class="num">${fmtMoney(rowTotal)}</td>
+        <td class="num">${rateEntered ? escHtml(parseFloat(rate).toFixed(2)) : ''}</td>
+        <td class="num">${money(amt)}</td>
+        <td class="num">${blankNums ? '' : (sgstPercent || '')}</td>
+        <td class="num">${money(sgstAmt)}</td>
+        <td class="num">${blankNums ? '' : (cgstPercent || '')}</td>
+        <td class="num">${money(cgstAmt)}</td>
+        <td class="num">${blankNums ? '' : (igstPercent || '')}</td>
+        <td class="num">${money(igstAmt)}</td>
+        <td class="num">${money(rowTotal)}</td>
       </tr>`);
   };
 
@@ -91,17 +97,21 @@ export const buildPurchaseOrderHtml = (raw, profileInput) => {
 
   TI_CHARGES_LIST.forEach((charge) => {
     const line = chargeAmounts[charge.key];
-    if (!line || !(line.amt > 0)) return;
+    if (!line || !(line.amt > 0 || line.rate > 0 || line.qty > 0)) return;
     pushRow(charge.label, line.qty, line.rate, line.amt || 0, sgstRate, cgstRate);
   });
 
   (data.customCharges || []).forEach((cc) => {
     if (!cc.checked) return;
-    const ccQty = parseFloat(cc.qty) || 1;
+    const rawQty = cc.qty;
+    const ccQty = parseFloat(rawQty);
+    const qty = (rawQty === '' || rawQty == null || !Number.isFinite(ccQty) || ccQty === 0) ? '' : ccQty;
+    const qtyNum = qty === '' ? 0 : ccQty;
     const rate = parseFloat(cc.rate) || 0;
-    const amt = ccQty * rate;
-    if (amt <= 0) return;
-    pushRow(cc.name || '', ccQty, rate, amt, sgstRate, cgstRate);
+    const amt = qtyNum * rate;
+    const name = String(cc.name || '').trim();
+    if (!name) return;
+    pushRow(name, qty, rate, amt, sgstRate, cgstRate);
   });
 
   rows.push(buildFillerRowsHtml(12, 12));
@@ -722,16 +732,7 @@ export const buildPurchaseOrderHtml = (raw, profileInput) => {
   <div class="inv-bot">
   <!-- BANK DETAILS + TOTALS -->
   <div class="bottom">
-    <div class="bank">
-      <div class="box-head"><svg viewBox="0 0 24 24"><path d="M3 10l9-6 9 6"/><path d="M4 10h16v9H4z"/><path d="M4 19h16M8 10v9M12 10v9M16 10v9"/></svg> OUR BANK DETAILS</div>
-      <div class="bank-body">
-        <div class="bank-row"><span class="blabel">Bank Name</span><span class="bcolon">:</span><span>AXIS BANK LTD</span></div>
-        <div class="bank-row"><span class="blabel">A/c Name</span><span class="bcolon">:</span><span>${escHtml(profile.companyName || 'UMA MICRON')}</span></div>
-        <div class="bank-row"><span class="blabel">Current A/c No.</span><span class="bcolon">:</span><span>916020061629671</span></div>
-        <div class="bank-row"><span class="blabel">IFS CODE</span><span class="bcolon">:</span><span>UTIB0000383</span></div>
-        <div class="bank-row"><span class="blabel">Branch</span><span class="bcolon">:</span><span>Nizampura, Vadodara - 390002</span></div>
-      </div>
-    </div>
+    ${buildBankDetailsBox(profile)}
 
     <div class="totals">
       <div class="totals-body">
@@ -776,6 +777,7 @@ export const renderPurchaseOrderPdf = async (data, { mode = 'save', printPrefs }
     filePrefix: 'PO',
     docNo: data.poNo || 'N/A',
     width: 794,
-    fitPage: true
+    fitPage: true,
+    splitOverflowPages: true
   });
 };

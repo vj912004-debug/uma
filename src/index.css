@@ -238,6 +238,32 @@ label {
   flex-shrink: 0;
   opacity: 0.7;
 }
+.searchable-select-combo-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.searchable-select-combo-input {
+  padding-right: 2rem;
+}
+.searchable-select-caret-hit {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: 0;
+  padding: 0.15rem;
+  cursor: pointer;
+  color: inherit;
+  display: flex;
+  align-items: center;
+}
+.searchable-select-caret-hit:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 .searchable-select.is-open .searchable-select-caret {
   transform: rotate(180deg);
 }
@@ -375,17 +401,17 @@ tbody tr:hover td {
   box-shadow: 0 4px 12px rgba(91, 28, 133, 0.3);
 }
 
-/* Modal Structure */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--modal-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  backdrop-filter: blur(8px);
-  padding: 1rem;
+/* Document forms: full page inside the module (not a popup overlay) */
+.modal-overlay,
+.page-form-overlay {
+  position: static;
+  inset: auto;
+  background: none;
+  display: block;
+  z-index: auto;
+  backdrop-filter: none;
+  padding: 0;
+  width: 100%;
 }
 
 .modal-content {
@@ -393,10 +419,33 @@ tbody tr:hover td {
   border: 1px solid var(--border-color);
   border-radius: 14px;
   padding: 1.5rem;
-  max-width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  box-shadow: none;
+}
+
+.page-form-overlay > .premium-card,
+.page-form-overlay > .modal-panel,
+.page-form-overlay > .modal-content,
+.modal-overlay > .premium-card,
+.modal-overlay > .modal-panel,
+.modal-overlay > .modal-content {
+  width: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+.app-main > *:has(> .page-form-overlay) > *:not(.page-form-overlay),
+.app-main > *:has(> .modal-overlay) > *:not(.modal-overlay) {
+  display: none;
+}
+
+.app-main > *:has(> .page-form-overlay ~ .page-form-overlay) > .page-form-overlay:not(:last-of-type),
+.app-main > *:has(> .modal-overlay ~ .modal-overlay) > .modal-overlay:not(:last-of-type) {
+  display: none;
 }
 
 /* Sidebar */
@@ -857,6 +906,48 @@ tbody tr:hover td {
   background: rgba(91, 28, 133, 0.03);
 }
 
+/* Under Process: keep column headers visible while scrolling rows */
+.under-process-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 1rem;
+}
+
+.under-process-table-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.under-process-table-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.under-process-page .workflow-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.under-process-page .workflow-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: #F3EEF9;
+  box-shadow: 0 1px 0 var(--border-color);
+}
+
+.under-process-table-card .legend {
+  flex-shrink: 0;
+  margin-top: 0.75rem;
+}
+
 /* Document status buttons */
 .doc-done,
 .doc-pending {
@@ -1137,10 +1228,10 @@ tbody tr:hover td {
 }
 
 .modal-panel {
-  width: 880px;
-  max-width: 95%;
-  max-height: 92vh;
-  overflow-y: auto;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
   position: relative;
 }
 
@@ -1188,6 +1279,14 @@ tbody tr:hover td {
   
   .app-main {
     padding: 1.25rem;
+  }
+
+  .under-process-page {
+    min-height: 70vh;
+  }
+
+  .under-process-table-scroll {
+    max-height: min(70vh, 640px);
   }
 
   .form-grid-4 {
