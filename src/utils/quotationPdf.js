@@ -3,8 +3,7 @@ import { formatPdfDateDmy, formatPdfDateSlash } from './taxInvoiceLayout';
 import {
   escHtml,
   renderHtmlToPdf,
-  buildPrintBrandHtml,
-  fmtQty
+  buildPrintHeader
 } from './printTheme';
 import { formatPrintRateText, formatQuotedRate, mergeRateUnits, defaultRateUnit } from './quotationRates';
 
@@ -176,7 +175,6 @@ export const buildQuotationHtml = (data, profileInput) => {
     : '';
 
   const rateUnits = mergeRateUnits(data.rateUnits);
-  const lineQtyHtml = (c) => fmtQty(c?.qty);
   const mainRows =
     mainCharges.length > 0
       ? mainCharges
@@ -187,12 +185,11 @@ export const buildQuotationHtml = (data, profileInput) => {
               <td>${i + 1}</td>
               <td class="left">${formatChargeDescriptionHtml(c)}</td>
               <td>${c.psdRequirement ? escHtml(c.psdRequirement) : ''}</td>
-              <td class="qty">${lineQtyHtml(c)}</td>
               <td>${rateDisplayHtml(rateSrc, c.sourceKey, rateUnits)}</td>
             </tr>`;
           })
           .join('')
-      : `<tr><td colspan="5" style="text-align:center;color:var(--muted)">No charges selected</td></tr>`;
+      : `<tr><td colspan="4" style="text-align:center;color:var(--muted)">No charges selected</td></tr>`;
 
   const optionalRows =
     optionalCharges.length > 0
@@ -202,7 +199,6 @@ export const buildQuotationHtml = (data, profileInput) => {
             <tr>
               <td>${i + 1}</td>
               <td class="left">${formatChargeDescriptionHtml(c)}</td>
-              <td class="qty">${lineQtyHtml(c)}</td>
               <td>${rateDisplayHtml(c.rate, c.sourceKey, rateUnits)}</td>
             </tr>`
           )
@@ -306,32 +302,31 @@ export const buildQuotationHtml = (data, profileInput) => {
   }
   .sheet + .sheet{margin-top:30px;}
 
-  /* ============ HEADER (compact so page 1 fits A4) ============ */
-  .header{position:relative;display:flex;align-items:stretch;justify-content:space-between;
-    padding:0 0 0 22px;background:#fff;min-height:96px;overflow:hidden;
-    width:100%;box-sizing:border-box;flex-shrink:0;}
-  .brand{display:flex;align-items:center;gap:10px;padding:10px 10px 10px 0;min-width:0;flex:0 1 auto;z-index:2;}
+  /* ============ HEADER (same badge style as TI / PI / PO) ============ */
+  .header{
+    position:relative;display:flex;align-items:center;justify-content:space-between;gap:14px;
+    margin:0;padding:10px 18px 10px 22px;background:#fff;
+    border-bottom:1px solid var(--purple);
+    width:100%;box-sizing:border-box;flex-shrink:0;
+  }
+  .brand{display:flex;align-items:center;gap:10px;min-width:0;flex:0 1 auto;}
   .brand-lockup{width:250px;height:60px;flex-shrink:0;display:flex;align-items:center;}
   .brand-lockup img{width:100%;height:100%;object-fit:contain;object-position:left center;display:block;}
   .brand-title h1{font-family:Georgia,'Times New Roman',serif;color:var(--purple);font-size:26px;
     letter-spacing:.5px;font-weight:700;line-height:1;}
   .brand-title p{color:var(--green);font-weight:700;font-size:11px;letter-spacing:.3px;margin-top:2px;}
-
-  .quote-banner{
-    position:relative;display:flex;align-items:stretch;justify-content:flex-end;
-    align-self:stretch;min-height:96px;margin:0;margin-left:auto;
-    flex:1 1 300px;min-width:260px;max-width:none;z-index:1;
+  .tax-invoice-box{
+    background:var(--purple);color:#fff;text-align:center;padding:8px 18px;
+    display:flex;flex-direction:column;justify-content:center;align-items:center;align-self:center;
+    min-width:200px;min-height:64px;border-radius:6px;overflow:visible;height:auto;box-sizing:border-box;
+    flex:0 0 auto;
   }
-  .quote-banner .fill{
-    background:var(--purple);height:100%;min-height:96px;width:100%;
-    display:flex;flex-direction:column;align-items:flex-end;justify-content:center;
-    padding:0 24px 0 44px;box-sizing:border-box;
-    border-radius:0 0 0 56px;
+  .tax-invoice-box .ti-title{
+    font-size:22px;font-weight:800;letter-spacing:0.5px;margin:0;padding:0;line-height:1.1;white-space:nowrap;
   }
-  .quote-banner h2{color:#fff;font-size:28px;letter-spacing:2px;font-weight:800;line-height:1;margin:0;}
-  .quote-banner .sub{
-    margin-top:6px;background:#fff;color:var(--purple);font-size:9px;
-    font-weight:700;letter-spacing:.5px;padding:3px 10px;border-radius:4px;white-space:nowrap;
+  .tax-invoice-box .ti-sub{
+    background:#fff;color:var(--purple);font-size:10px;font-weight:700;letter-spacing:.5px;
+    padding:2px 8px;margin-top:4px;white-space:nowrap;
   }
 
   /* ============ CONTACT BAR ============ */
@@ -373,6 +368,7 @@ export const buildQuotationHtml = (data, profileInput) => {
   .ic{width:12px;height:12px;flex-shrink:0;fill:var(--purple);margin-top:2px;}
 
   .body-pad{padding:0 22px 4px;flex:1 1 auto;width:100%;box-sizing:border-box;min-width:0;min-height:0;overflow:visible;display:flex;flex-direction:column;}
+  .sheet.quot-hide-features .body-pad{flex:0 0 auto;}
 
   /* ============ TWO COL INFO ============ */
   .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;align-items:stretch;width:100%;}
@@ -423,14 +419,14 @@ export const buildQuotationHtml = (data, profileInput) => {
   .fac-img img{width:100%;height:100%;object-fit:cover;display:block;}
 
   /* ============ TABLES ============ */
-  .tables{display:flex;flex-direction:column;gap:10px;margin-top:8px;align-items:stretch;width:100%;}
-  .tables > div{min-width:0;display:flex;flex-direction:column;width:100%;}
+  .tables{display:flex;flex-direction:column;gap:10px;margin-top:8px;align-items:stretch;width:100%;flex:0 0 auto;overflow:visible;}
+  .tables > div{min-width:0;display:flex;flex-direction:column;width:100%;flex:0 0 auto;overflow:visible;}
   .tbl-title{display:flex;align-items:center;gap:6px;background:var(--purple);color:#fff;
     font-size:10px;font-weight:700;letter-spacing:.3px;padding:5px 10px;border-radius:6px 6px 0 0;
     width:100%;box-sizing:border-box;}
   .tbl-title.green{background:var(--green);}
   .tbl-title svg{width:12px;height:12px;fill:#fff;}
-  table.dt{width:100%;border-collapse:collapse;border:1px solid var(--purple-border);border-top:none;flex:1;}
+  table.dt{width:100%;border-collapse:collapse;border:1px solid var(--purple-border);border-top:none;flex:0 0 auto;height:auto;max-height:none;overflow:visible;}
   table.dt.green{border-color:#bfe0c4;}
   table.dt th{background:var(--purple-light);color:var(--purple-dark);font-size:8.5px;font-weight:700;
     padding:4px 3px;border:1px solid var(--purple-border);text-align:center;vertical-align:middle;
@@ -442,68 +438,100 @@ export const buildQuotationHtml = (data, profileInput) => {
   table.dt.green tbody tr:nth-child(even) td{background:#f3faf4;}
   table.dt.green td{border-color:#dcefdf;}
   table.dt td.left{text-align:left;}
-  table.dt th.qty, table.dt td.qty{width:54px;white-space:nowrap;}
+  table.dt th:first-child, table.dt td:first-child{width:42px;}
+  table.dt th:last-child, table.dt td:last-child{width:140px;white-space:nowrap;}
+  /* Qty is not printed on quotations */
+  table.dt th.qty, table.dt td.qty{display:none!important;width:0!important;padding:0!important;border:none!important;}
   .nil{color:var(--green);font-weight:800;}
 
-  /* ============ FEATURES (3×2 grid fills page 1) ============ */
+  /* ============ FEATURES (grow to fill leftover A4 space) ============ */
   .features{
     display:grid;
     grid-template-columns:repeat(3,minmax(0,1fr));
-    grid-auto-rows:1fr;
-    gap:10px;
-    margin:10px 0 6px 0;
-    flex:1 1 auto;
+    grid-template-rows:repeat(2,minmax(0,1fr));
+    gap:8px;
+    margin:8px 0 4px 0;
+    flex:0 0 auto;
     min-height:0;
     align-content:stretch;
+  }
+  .sheet.quot-features-fill .features{
+    flex:1 1 auto!important;
+    min-height:0!important;
+    height:auto!important;
+    align-self:stretch;
+  }
+  .sheet.quot-features-fill .body-pad{
+    flex:1 1 auto!important;
+    min-height:0!important;
   }
   .feat{
     border:1px solid #e6e6e6;
     border-top:3px solid var(--purple);
     border-radius:6px;
-    padding:8px 8px;
+    padding:6px 6px;
     text-align:center;
     background:#fdfdfd;
     min-width:0;
+    min-height:0;
     height:100%;
+    width:100%;
+    box-sizing:border-box;
     display:flex;
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    gap:5px;
+    gap:4px;
   }
-  .feat .circ{width:26px;height:26px;border-radius:50%;margin:0;display:flex;
+  .feat .circ{width:22px;height:22px;border-radius:50%;margin:0;display:flex;
     align-items:center;justify-content:center;flex-shrink:0;}
-  .feat .circ svg{width:13px;height:13px;}
-  .feat p{font-size:8.5px;font-weight:800;color:var(--text);line-height:1.2;letter-spacing:.05px;margin:0;}
+  .feat .circ svg{width:11px;height:11px;}
+  .feat p{font-size:8px;font-weight:800;color:var(--text);line-height:1.15;letter-spacing:.05px;margin:0;}
 
-  /* Extra compact mode if content still tall */
-  .sheet.quot-compact .header,
-  .sheet.quot-compact .quote-banner,
-  .sheet.quot-compact .quote-banner .fill{min-height:84px;}
-  .sheet.quot-compact .brand-lockup{width:220px;height:52px;}
-  .sheet.quot-compact .quote-banner h2{font-size:24px;}
-  .sheet.quot-compact .two-col{margin-top:6px;gap:8px;}
-  .sheet.quot-compact .subject{margin-top:6px;padding:4px 10px;}
-  .sheet.quot-compact .letter{margin-top:6px;gap:10px;}
-  .sheet.quot-compact .letter-text{font-size:9.5px;line-height:1.35;}
-  .sheet.quot-compact .letter-text p{margin-top:4px;}
-  .sheet.quot-compact .fac-img{flex-basis:150px;height:84px;}
-  .sheet.quot-compact .tables{margin-top:6px;gap:8px;}
-  .sheet.quot-compact .features{margin:8px 0 4px 0;gap:8px;}
-  .sheet.quot-compact .feat{padding:6px 6px;gap:4px;}
-  .sheet.quot-compact .feat .circ{width:22px;height:22px;}
-  .sheet.quot-compact .feat .circ svg{width:11px;height:11px;}
-  .sheet.quot-compact .feat p{font-size:8px;}
-  .sheet.quot-compact-more .body-pad{padding:0 18px 2px;}
-  .sheet.quot-compact-more .letter-text{font-size:9px;line-height:1.3;}
-  .sheet.quot-compact-more .fac-img{display:none;}
-  .sheet.quot-compact-more .feat{padding:5px 5px;gap:3px;}
-  .sheet.quot-compact-more .feat .circ{width:20px;height:20px;margin-bottom:0;}
-  .sheet.quot-compact-more .feat .circ svg{width:10px;height:10px;}
-  .sheet.quot-compact-more .feat p{font-size:7.5px;}
+  /* Compact modes when charge tables are tall — keep all rows visible on page 1 */
+  .sheet.quot-compact .brand-lockup{width:210px;height:48px;}
+  .sheet.quot-compact .tax-invoice-box{min-height:56px;padding:6px 14px;}
+  .sheet.quot-compact .tax-invoice-box .ti-title{font-size:18px;}
+  .sheet.quot-compact .tax-invoice-box .ti-sub{font-size:8.5px;padding:2px 6px;}
+  .sheet.quot-compact .contact-bar{padding:5px 14px;font-size:8px;gap:3px 12px;}
+  .sheet.quot-compact .two-col{margin-top:5px;gap:6px!important;}
+  .sheet.quot-compact .card{padding:6px 10px;}
+  .sheet.quot-compact .subject{margin-top:5px;padding:3px 8px;font-size:9px;}
+  .sheet.quot-compact .letter{margin-top:5px;gap:8px;}
+  .sheet.quot-compact .letter-text{font-size:9px;line-height:1.3;}
+  .sheet.quot-compact .letter-text p{margin-top:3px;}
+  .sheet.quot-compact .fac-img{flex-basis:130px;height:72px;}
+  .sheet.quot-compact .tables{margin-top:5px;gap:6px!important;}
+  .sheet.quot-compact table.dt th,
+  .sheet.quot-compact table.dt td{padding:3px 2px!important;font-size:8px!important;}
+  .sheet.quot-compact .features{margin:6px 0 2px 0;gap:6px!important;}
+  .sheet.quot-compact .feat{padding:5px 4px;gap:3px;}
+  .sheet.quot-compact .feat .circ{width:20px;height:20px;}
+  .sheet.quot-compact .feat .circ svg{width:10px;height:10px;}
+  .sheet.quot-compact .feat p{font-size:7.5px;}
+  .sheet.quot-compact-more .body-pad{padding:0 16px 2px;}
+  .sheet.quot-compact-more .letter-text{font-size:8.5px;line-height:1.25;}
+  .sheet.quot-compact-more .fac-img{display:none!important;}
+  .sheet.quot-compact-more .features{min-height:0;}
+  .sheet.quot-compact-more .feat{padding:4px 3px;gap:2px;}
+  .sheet.quot-compact-more .feat .circ{width:18px;height:18px;margin-bottom:0;}
+  .sheet.quot-compact-more .feat .circ svg{width:9px;height:9px;}
+  .sheet.quot-compact-more .feat p{font-size:7px;}
   .sheet.quot-compact-more table.dt td,
-  .sheet.quot-compact-more table.dt th{padding:3px 2px;font-size:8px;}
-
+  .sheet.quot-compact-more table.dt th{padding:2px 2px!important;font-size:7.5px!important;}
+  .sheet.quot-compact-more .tbl-title{padding:3px 8px;font-size:9px;}
+  .sheet.quot-hide-features .features{display:none!important;}
+  .sheet.quot-ultra .letter{margin-top:3px;}
+  .sheet.quot-ultra .letter-text p:nth-child(n+3){display:none;}
+  .sheet.quot-ultra .two-col{margin-top:4px;}
+  .sheet.quot-ultra .tables{margin-top:4px;gap:4px!important;}
+  .sheet.quot-ultra table.dt td,
+  .sheet.quot-ultra table.dt th{padding:1px 2px!important;font-size:7px!important;line-height:1.15;}
+  .sheet.quot-ultra .brand-lockup{width:180px;height:42px;}
+  .sheet.quot-ultra .tax-invoice-box{min-height:50px;padding:5px 12px;}
+  .sheet.quot-ultra .tax-invoice-box .ti-title{font-size:16px;}
+  .sheet.quot-ultra .tax-invoice-box .ti-sub{font-size:8px;padding:1px 5px;}
+  .sheet.quot-ultra .contact-bar{padding:4px 12px;font-size:7.5px;}
   /* ============ PAGE 2 ============ */
   .sheet.page2{
     display:flex;
@@ -676,21 +704,8 @@ export const buildQuotationHtml = (data, profileInput) => {
 <!-- ============================================================ PAGE 1 ============================================================ -->
 <div class="sheet pdf-page print-host">
 
-  <!-- HEADER -->
-  <div class="header">
-    <div class="brand">
-      ${buildPrintBrandHtml(profile, {
-        companyName: profile.companyName || 'UMA MICRON',
-        tagline: profile.tagline || "Micronization of API's"
-      })}
-    </div>
-    <div class="quote-banner">
-      <div class="fill">
-        <h2>QUOTATION</h2>
-        <div class="sub">CONTRACT MICRONIZATION SERVICES</div>
-      </div>
-    </div>
-  </div>
+  <!-- HEADER (same layout as TI / PI / PO) -->
+  ${buildPrintHeader(profile, 'QUOTATION', 'CONTRACT MICRONIZATION SERVICES')}
 
   <!-- CONTACT BAR -->
   <div class="contact-bar">
@@ -741,7 +756,7 @@ export const buildQuotationHtml = (data, profileInput) => {
     </div>
 
     <!-- SUBJECT -->
-    <div class="subject">SUBJECT: <span>${subject}</span></div>
+    <div class="subject">SUBJECT:&nbsp;<span>${subject}</span></div>
 
     <!-- LETTER -->
     <div class="letter">
@@ -761,8 +776,8 @@ export const buildQuotationHtml = (data, profileInput) => {
     <div class="tables">
       <div>
         <div class="tbl-title"><svg viewBox="0 0 24 24"><path d="M4 4h16v2H4zM4 11h16v2H4zM4 18h16v2H4z"/></svg>COMMERCIAL OFFER</div>
-        <table class="dt">
-          <thead><tr><th>Sr. No.</th><th>Description</th><th>PSD Requirement</th><th class="qty">Qty</th><th>Rate</th></tr></thead>
+        <table class="dt quote-main-table">
+          <thead><tr><th style="width:42px">Sr. No.</th><th>Description</th><th>PSD Requirement</th><th style="width:140px">Rate</th></tr></thead>
           <tbody>
             ${mainRows}
           </tbody>
@@ -770,8 +785,8 @@ export const buildQuotationHtml = (data, profileInput) => {
       </div>
       ${optionalCharges.length ? `<div>
         <div class="tbl-title green"><svg viewBox="0 0 24 24"><path d="M12 2l1.9 5.9H20l-4.9 3.6L17 17.5 12 14l-5 3.5 1.9-6L4 7.9h6.1z"/></svg>BELOW ITEMS IF REQUIRED:</div>
-        <table class="dt green">
-          <thead><tr><th>Sr. No.</th><th>Description</th><th class="qty">Qty</th><th>Rate</th></tr></thead>
+        <table class="dt green quote-optional-table">
+          <thead><tr><th style="width:42px">Sr. No.</th><th>Description</th><th style="width:140px">Rate</th></tr></thead>
           <tbody>
             ${optionalRows}
           </tbody>
@@ -927,34 +942,186 @@ export const buildQuotationHtml = (data, profileInput) => {
 };
 
 /**
- * Keep quotation on exactly 2 A4 pages: tighten spacing first; capture uses fitPage
- * as a last resort so nothing is clipped and no 3rd page is created.
+ * Fit quotation page 1 onto one A4 sheet without clipping charge rows.
+ * Tables always win: hide/compact chrome first, then optionally restore features
+ * only when leftover space is enough. Never let feature flex steal table height.
  */
 export const fitQuotationToTwoPages = (doc, { singlePageHeight = 1123, density = 'base' } = {}) => {
   if (!doc) return;
 
   doc.querySelectorAll('.quot-continue').forEach((el) => el.remove());
+  doc.querySelectorAll('.sheet.pdf-page:not(.page2) tr.filler-row').forEach((tr) => tr.remove());
+
+  doc.querySelectorAll('table.dt').forEach((table) => {
+    const headerRow = table.querySelector('thead tr');
+    if (!headerRow) return;
+    const qtyIndexes = [];
+    [...headerRow.children].forEach((th, idx) => {
+      const label = String(th.textContent || '').replace(/\s+/g, ' ').trim();
+      if (/^qty$/i.test(label) || th.classList.contains('qty')) qtyIndexes.push(idx);
+    });
+    qtyIndexes.reverse().forEach((colIdx) => {
+      table.querySelectorAll('tr').forEach((tr) => {
+        const cell = tr.children[colIdx];
+        if (cell) cell.remove();
+      });
+    });
+  });
 
   const pages = [...doc.querySelectorAll('.sheet.pdf-page')];
   pages.forEach((page) => {
+    const isPage2 = page.classList.contains('page2');
+    page.style.zoom = '1';
+    page.style.transform = 'none';
+    page.style.width = '';
+    page.classList.remove(
+      'quot-compact',
+      'quot-compact-more',
+      'quot-hide-features',
+      'quot-ultra',
+      'quot-features-fill'
+    );
+
+    if (isPage2) {
+      page.style.height = `${singlePageHeight}px`;
+      page.style.minHeight = `${singlePageHeight}px`;
+      page.style.maxHeight = `${singlePageHeight}px`;
+      page.style.overflow = 'hidden';
+      return;
+    }
+
+    const features = page.querySelector('.features');
+    const facImg = page.querySelector('.fac-img');
+    const tablesBox = page.querySelector('.tables');
+    const bodyPad = page.querySelector('.body-pad');
+
     page.style.height = 'auto';
     page.style.maxHeight = 'none';
     page.style.minHeight = '0';
     page.style.overflow = 'visible';
-    page.style.zoom = '1';
-    page.classList.remove('quot-compact', 'quot-compact-more');
-    // Pre-compact for larger print fonts so layout starts tighter.
+    if (tablesBox) {
+      tablesBox.style.setProperty('flex', '0 0 auto', 'important');
+      tablesBox.style.setProperty('height', 'auto', 'important');
+      tablesBox.style.setProperty('max-height', 'none', 'important');
+      tablesBox.style.setProperty('overflow', 'visible', 'important');
+    }
+    page.querySelectorAll('.tables > div, table.dt').forEach((el) => {
+      el.style.setProperty('flex', '0 0 auto', 'important');
+      el.style.setProperty('height', 'auto', 'important');
+      el.style.setProperty('max-height', 'none', 'important');
+      el.style.setProperty('overflow', 'visible', 'important');
+    });
+    if (features) {
+      features.style.display = '';
+      features.style.setProperty('flex', '0 0 auto', 'important');
+      features.style.setProperty('min-height', '0', 'important');
+    }
+    if (facImg) facImg.style.display = '';
+    if (bodyPad) {
+      bodyPad.style.setProperty('flex', '0 0 auto', 'important');
+      bodyPad.style.setProperty('overflow', 'visible', 'important');
+      bodyPad.style.setProperty('min-height', '0', 'important');
+    }
+
+    // Fit charge tables first — features stay hidden until we know there is room.
+    page.classList.add('quot-hide-features');
     if (density === 'lg' || density === 'xl') page.classList.add('quot-compact');
     if (density === 'xl') page.classList.add('quot-compact-more');
     void page.offsetHeight;
 
-    if (page.scrollHeight > singlePageHeight + 2) {
-      page.classList.add('quot-compact');
+    const pageH = () => Math.max(page.scrollHeight, page.offsetHeight || 0);
+    const steps = [
+      () => page.classList.add('quot-compact'),
+      () => page.classList.add('quot-compact-more'),
+      () => { if (facImg) facImg.style.display = 'none'; },
+      () => page.classList.add('quot-ultra')
+    ];
+    for (let i = 0; i < steps.length && pageH() > singlePageHeight + 2; i += 1) {
+      steps[i]();
       void page.offsetHeight;
     }
-    if (page.scrollHeight > singlePageHeight + 2) {
-      page.classList.add('quot-compact-more');
+
+    // Restore feature cards and stretch them into leftover A4 space.
+    const coreH = pageH();
+    const leftover = singlePageHeight - coreH;
+    if (features && leftover >= 72) {
+      page.classList.remove('quot-hide-features');
+      page.classList.add('quot-features-fill');
+
+      page.style.height = `${singlePageHeight}px`;
+      page.style.minHeight = `${singlePageHeight}px`;
+      page.style.maxHeight = `${singlePageHeight}px`;
+      page.style.overflow = 'hidden';
+
+      if (bodyPad) {
+        bodyPad.style.setProperty('flex', '1 1 auto', 'important');
+        bodyPad.style.setProperty('min-height', '0', 'important');
+      }
+
+      // Measure how much of the page is used above the feature grid, then size cards to the rest.
+      features.style.setProperty('display', 'none', 'important');
       void page.offsetHeight;
+      let usedAbove = 0;
+      const headerEl = page.querySelector('.header');
+      const contactEl = page.querySelector('.contact-bar');
+      if (headerEl) usedAbove += Math.ceil(headerEl.getBoundingClientRect().height);
+      if (contactEl) usedAbove += Math.ceil(contactEl.getBoundingClientRect().height);
+      if (bodyPad) {
+        const cs = getComputedStyle(bodyPad);
+        usedAbove += (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+        [...bodyPad.children].forEach((child) => {
+          if (child === features) return;
+          usedAbove += Math.ceil(child.getBoundingClientRect().height);
+          const m = getComputedStyle(child);
+          usedAbove += (parseFloat(m.marginTop) || 0) + (parseFloat(m.marginBottom) || 0);
+        });
+      }
+      const fillH = Math.max(72, Math.floor(singlePageHeight - usedAbove - 14));
+      features.style.setProperty('display', 'grid', 'important');
+      features.style.setProperty('flex', '1 1 auto', 'important');
+      features.style.setProperty('min-height', `${fillH}px`, 'important');
+      features.style.setProperty('height', `${fillH}px`, 'important');
+      features.style.setProperty('align-content', 'stretch', 'important');
+      features.style.setProperty('margin-top', '8px', 'important');
+      features.style.setProperty('margin-bottom', '2px', 'important');
+      features.style.setProperty('gap', '8px', 'important');
+      void page.offsetHeight;
+
+      // If showing features still overflows, drop them so charge tables stay complete.
+      if (pageH() > singlePageHeight + 4) {
+        page.classList.add('quot-hide-features');
+        page.classList.remove('quot-features-fill');
+        features.style.removeProperty('height');
+        features.style.removeProperty('min-height');
+        features.style.setProperty('flex', '0 0 auto', 'important');
+        if (bodyPad) bodyPad.style.setProperty('flex', '0 0 auto', 'important');
+        void page.offsetHeight;
+      }
+    } else {
+      page.style.height = `${singlePageHeight}px`;
+      page.style.minHeight = `${singlePageHeight}px`;
+      page.style.maxHeight = `${singlePageHeight}px`;
+      page.style.overflow = 'hidden';
+      void page.offsetHeight;
+    }
+
+    // Still overflowing: scale the sheet (transform is respected by html2canvas better than zoom).
+    const lockedH = pageH();
+    if (lockedH > singlePageHeight + 4) {
+      page.style.height = 'auto';
+      page.style.maxHeight = 'none';
+      page.style.minHeight = '0';
+      page.style.overflow = 'visible';
+      void page.offsetHeight;
+      const natural = pageH();
+      const scale = Math.max(0.72, Math.min(1, singlePageHeight / natural));
+      page.style.width = `${Math.round(794 / scale)}px`;
+      page.style.transform = `scale(${scale})`;
+      page.style.transformOrigin = 'top left';
+      page.style.height = `${singlePageHeight}px`;
+      page.style.minHeight = `${singlePageHeight}px`;
+      page.style.maxHeight = `${singlePageHeight}px`;
+      page.style.overflow = 'hidden';
     }
   });
 };

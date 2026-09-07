@@ -5,6 +5,7 @@ import { generateDocNumber } from '../utils/numbering';
 import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
 import {
   getReceiptProductLabel,
   getReceiptProductSummaries,
@@ -408,7 +409,7 @@ const PackingList = () => {
                 </div>
                 <div>
                   <label>Packing List Date</label>
-                  <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+                  <DateField className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                 </div>
                 <div>
                   <label>Party Name</label>
@@ -621,7 +622,7 @@ const PackingList = () => {
                 )}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => setIsModalOpen(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Packing List</button>
               </div>

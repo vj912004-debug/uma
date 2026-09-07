@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Download } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
+import { normalizeGstType, GST_TYPE_IGST } from '../utils/taxInvoiceLayout';
 
 const Reports = () => {
   const { data } = useAppContext();
@@ -208,12 +209,19 @@ const GSTTable = ({ data }) => (
     <table className="data-table">
       <thead><tr><th>Invoice No</th><th>Party GSTIN</th><th>Rate</th><th>CGST</th><th>SGST</th><th>IGST</th></tr></thead>
       <tbody>
-        {data.map(inv => (
-          <tr key={inv.id}>
-            <td>{inv.invoiceNo}</td><td>{inv.partyGstin || 'URD'}</td><td>{inv.taxRate}%</td>
-            <td>₹{(inv.taxAmount / 2).toLocaleString()}</td><td>₹{(inv.taxAmount / 2).toLocaleString()}</td><td>-</td>
-          </tr>
-        ))}
+        {data.map(inv => {
+          const tax = parseFloat(inv.taxAmount) || 0;
+          const isIgst = normalizeGstType(inv.gstType) === GST_TYPE_IGST;
+          const half = tax / 2;
+          return (
+            <tr key={inv.id}>
+              <td>{inv.invoiceNo}</td><td>{inv.partyGstin || 'URD'}</td><td>{inv.taxRate}%</td>
+              <td>{isIgst ? '-' : `₹${half.toLocaleString()}`}</td>
+              <td>{isIgst ? '-' : `₹${half.toLocaleString()}`}</td>
+              <td>{isIgst ? `₹${tax.toLocaleString()}` : '-'}</td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   </div>

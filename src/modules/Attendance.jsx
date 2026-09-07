@@ -4,6 +4,8 @@ import ExportButton from '../components/ExportButton';
 import { formatDate } from '../utils/dateUtils';
 import { Plus, Search, Edit2, Trash2, Fingerprint, Filter } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
+import TimeField from '../components/TimeField';
 
 // Shift Configurations
 const SHIFTS = {
@@ -227,7 +229,7 @@ const Attendance = () => {
             <Filter size={16} color="var(--text-muted)" />
             <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Filters:</span>
           </div>
-          <input type="date" className="input-field" style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} value={filters.date} onChange={e => setFilters({...filters, date: e.target.value})} />
+          <DateField className="input-field" style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} value={filters.date} onChange={e => setFilters({...filters, date: e.target.value})} />
           <input type="text" className="input-field" placeholder="Employee Name..." style={{ width: '150px', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} value={filters.employee} onChange={e => setFilters({...filters, employee: e.target.value})} />
           <SearchableSelect className="input-field" style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} value={filters.department} onChange={e => setFilters({...filters, department: e.target.value})}>
             <option value="">All Departments</option>
@@ -331,7 +333,7 @@ const Attendance = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                 <div>
                   <label>Date *</label>
-                  <input type="date" className="input-field" required value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
+                  <DateField className="input-field" required value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
                 </div>
                 <div>
                   <label>Employee *</label>
@@ -373,11 +375,11 @@ const Attendance = () => {
                   <>
                     <div>
                       <label>In Time</label>
-                      <input type="time" className="input-field" required value={form.inTime} onChange={e => setForm({ ...form, inTime: e.target.value })} />
+                      <TimeField className="input-field" required value={form.inTime} onChange={e => setForm({ ...form, inTime: e.target.value })} />
                     </div>
                     <div>
                       <label>Out Time</label>
-                      <input type="time" className="input-field" required value={form.outTime} onChange={e => setForm({ ...form, outTime: e.target.value })} />
+                      <TimeField className="input-field" required value={form.outTime} onChange={e => setForm({ ...form, outTime: e.target.value })} />
                     </div>
                   </>
                 )}

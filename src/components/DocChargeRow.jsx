@@ -1,5 +1,5 @@
 import React from 'react';
-import { qtyInputValue } from '../utils/documentCharges';
+import { qtyInputValue, rateInputValue } from '../utils/documentCharges';
 
 const DocChargeRow = ({ item, label, charges, rates, qtys, materialQty, onToggle, onQtyChange, onRateChange }) => (
   <div className="charge-row">
@@ -23,8 +23,9 @@ const DocChargeRow = ({ item, label, charges, rates, qtys, materialQty, onToggle
         <input
           type="number"
           className="input-field input-compact"
-          style={{ width: '72px' }}
-          value={rates?.[item.key] ?? 0}
+          style={{ width: '110px' }}
+          value={rateInputValue(rates?.[item.key])}
+          placeholder="0"
           onChange={e => onRateChange(item.key, e.target.value)}
           min="0"
         />

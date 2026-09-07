@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useLocation } from 'react-router-dom';
+import DateField from '../components/DateField';
 import { 
   Search, 
   Building2, 
@@ -353,22 +354,13 @@ const ProcessingSheet = () => {
   );
 
   const renderDateInput = (row, field, value) => (
-    <input
-      type="date"
+    <DateField
+      className="dt-cell-input"
       value={toDateInputValue(value)}
       onChange={(e) => handleCellChange(row.id, field, e.target.value, row.invoiceId)}
       style={{
-        background: 'transparent',
-        border: '1px solid transparent',
-        color: 'inherit',
         width: '100%',
         minWidth: '118px',
-        fontSize: 'inherit',
-        outline: 'none',
-        fontFamily: 'inherit',
-        padding: '0',
-        textAlign: 'center',
-        cursor: 'pointer'
       }}
     />
   );

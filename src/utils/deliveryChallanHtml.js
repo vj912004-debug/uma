@@ -1,27 +1,70 @@
 import { mergeCompanyProfile } from './companyProfile';
-import { buildDcPrintLines, getDcAppData } from './deliveryChallanLayout';
+import { buildDcPrintLines, getDcAppData, resolveLinkedMr } from './deliveryChallanLayout';
 import { formatPdfDateDmy, splitPartyAddressLines } from './taxInvoiceLayout';
 import { escHtml, fmtQty, buildPrintBrandHtml, renderHtmlToPdf, hasPrintVal, fillPrintPartyFields } from './printTheme';
+
+const DEFAULT_DC_DELIVERY_NOTE =
+  'Material sent for Micronisation on Job Work basis. Goods to be returned after processing.';
+
+const cleanNote = (s) => String(s || '').trim();
+const isStockDeliveryNote = (s) => {
+  const t = cleanNote(s).replace(/\s+/g, ' ');
+  return !t || t.toLowerCase() === DEFAULT_DC_DELIVERY_NOTE.toLowerCase();
+};
+
+const resolveDeliveryNote = (data, linkedMr) => {
+  const dcTerms = cleanNote(data.termsAndConditions);
+  const dcNotes = cleanNote(data.deliveryNotes);
+  const mrNotes = cleanNote(linkedMr?.deliveryNotes);
+  if (dcTerms && !isStockDeliveryNote(dcTerms)) return dcTerms;
+  if (dcNotes && !isStockDeliveryNote(dcNotes)) return dcNotes;
+  if (mrNotes) return mrNotes;
+  return dcTerms || dcNotes || '';
+};
+
+const toTitleCase = (s) => String(s || '')
+  .toLowerCase()
+  .replace(/\b([a-z])/g, (ch) => ch.toUpperCase());
+
+/** Always return street + city lines for DC company strip (never one long line). */
+const buildDcCompanyAddressLines = (profile) => {
+  const p = mergeCompanyProfile(profile);
+  const city = String(p.city || 'Vadodara').trim();
+  const pin = String(p.pincode || '391350').trim();
+  const state = String(p.state || 'Gujarat').trim();
+  const country = String(p.country || 'India').trim();
+  let street = String(p.addressLine1 || '').trim();
+  const extra = String(p.addressLine2 || '').trim();
+
+  if (city && street) {
+    const lower = street.toLowerCase();
+    const cityAt = lower.indexOf(city.toLowerCase());
+    if (cityAt > 0) {
+      street = street.slice(0, cityAt).replace(/[,\s]+$/g, '').trim();
+    }
+  }
+  if (extra) street = street ? `${street.replace(/,\s*$/, '')}, ${extra}` : extra;
+  if (street && !/,\s*$/.test(street)) street = `${street},`;
+  if (!street) street = 'Plot No. 1116, G.I.D.C., Ranoli, N.H.No. 8,';
+
+  const line2 = `${city} - ${pin}, ${state}, ${country}`;
+  return [toTitleCase(street), toTitleCase(line2)];
+};
 
 export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   const appData = appDataInput || raw?.appData || getDcAppData();
   const data = fillPrintPartyFields(raw, appData);
   const profile = mergeCompanyProfile(profileInput);
-  const { lines, totalDrums, totalQty } = buildDcPrintLines(data, appData);
-  const linkedMr = (appData.materialReceipts || []).find((r) => r.id === data.receiptId) || null;
-  const deliveryNote = (
-    data.termsAndConditions
-    || data.deliveryNotes
-    || linkedMr?.deliveryNotes
-    || ''
-  ).trim();
+  const { lines, totalDrums, totalQty, goodsValueText } = buildDcPrintLines(data, appData);
+  const linkedMr = resolveLinkedMr(data, appData);
+  const deliveryNote = resolveDeliveryNote(data, linkedMr);
 
   const dcNo = escHtml(data.dcNo || 'N/A');
   const dcDate = escHtml(formatPdfDateDmy(data.date) || 'N/A');
   const poNo = escHtml(data.partyDocNo || '');
   const poDate = escHtml(formatPdfDateDmy(data.partyDocDate) || '');
-  const companyState = escHtml(profile.state || 'Gujarat');
-  
+  const companyState = escHtml(toTitleCase(profile.state || 'Gujarat'));
+  const [addrLine1, addrLine2] = buildDcCompanyAddressLines(profile).map(escHtml);
   const shipState = escHtml(data.shipState || data.billState || data.state || companyState);
   const stateCode = escHtml(data.shipStateCode || data.billStateCode || data.stateCode || '24');
   const partyGstin = escHtml(data.gstinShip || data.gstinBill || data.gstin || '');
@@ -69,6 +112,9 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
         drums: parseInt(line.drums, 10) || 0
       });
       curGroup = null;
+    } else if (line.kind === 'value') {
+      // Goods value is pinned near TOTAL — skip here.
+      curGroup = null;
     } else {
        groups.push({
          isProduct: false,
@@ -108,9 +154,10 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
             <td class="num">${numBatches === 1 ? batchQtyCell(g.batches[0], true) : q}</td>
           </tr>`);
       } else {
+        // No rowspan — each batch keeps its own bordered Sr. No. cell so grid lines fill the column.
         bodyRows.push(`
           <tr>
-            <td class="num" rowspan="${numBatches}">${g.sr}</td>
+            <td class="num">${g.sr}</td>
             <td class="left"><strong>${escHtml(String(g.productName || '').trim())}</strong></td>
             <td class="num">${escHtml(batchLabel(g.batches[0]))}</td>
             <td class="num">${batchDrums(g.batches[0])}</td>
@@ -119,7 +166,8 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
         for (let i = 1; i < numBatches; i++) {
           bodyRows.push(`
           <tr>
-            <td class="left"></td>
+            <td class="num">&nbsp;</td>
+            <td class="left">&nbsp;</td>
             <td class="num">${escHtml(batchLabel(g.batches[i]))}</td>
             <td class="num">${batchDrums(g.batches[i])}</td>
             <td class="num">${batchQtyCell(g.batches[i], false)}</td>
@@ -148,24 +196,33 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   });
 
   const blankRow = `
-      <tr class="empty">
+      <tr class="empty filler-row">
         <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
       </tr>`;
-  for (let i = 0; i < 4; i++) bodyRows.push(blankRow);
+  const pinBlankRow = `
+      <tr class="empty dc-pin-gap">
+        <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+      </tr>`;
 
-  if (deliveryNote) {
-    bodyRows.push(`
-      <tr class="dc-delivery-note">
+  // Seed blank rows above the pinned bottom block (layout may add/remove fillers).
+  for (let i = 0; i < 6; i++) bodyRows.push(blankRow);
+
+  // Pinned rows above TOTAL (TOTAL = last):
+  // 6th-last = DC notes, 3rd-last = total goods value.
+  // Order: notes, blank, blank, goods value, blank → TOTAL
+  bodyRows.push(`
+      <tr class="dc-delivery-note dc-pin-start">
         <td></td>
-        <td class="left" colspan="4"><strong>${escHtml(deliveryNote)}</strong></td>
+        <td class="left" colspan="4">${deliveryNote ? `<strong>${escHtml(deliveryNote)}</strong>` : '&nbsp;'}</td>
       </tr>`);
-  }
-
-  // Remaining blank handwriting rows — table still fills the page
-  const DC_BLANK_ROWS = 9;
-  for (let i = 0; i < DC_BLANK_ROWS; i++) {
-    bodyRows.push(blankRow);
-  }
+  bodyRows.push(pinBlankRow);
+  bodyRows.push(pinBlankRow);
+  bodyRows.push(`
+      <tr class="dc-goods-value">
+        <td></td>
+        <td class="left" colspan="4">${goodsValueText ? `<strong>${escHtml(goodsValueText)}</strong>` : '&nbsp;'}</td>
+      </tr>`);
+  bodyRows.push(pinBlankRow);
 
   const drumsTotal = parseInt(totalDrums, 10) > 0 ? String(parseInt(totalDrums, 10)) : '';
   const qtyTotal = fmtQty(totalQty);
@@ -304,23 +361,63 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
 
   /* ===== COMPANY / INVOICE INFO ROW ===== */
   .company-strip {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    align-items: stretch;
+    column-gap: 14px;
+    row-gap: 0;
     border-bottom: 2px solid var(--purple);
     padding-bottom: 8px;
     margin-bottom: 14px;
-    font-size:12px;
-    gap: 4px;
+    font-size: 12px;
+  }
+  .company-strip .dc-strip-left,
+  .company-strip .dc-strip-right {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
   }
   .company-strip .line {
     display: flex;
     align-items: flex-start;
-    gap: 4px;
+    gap: 5px;
   }
   .company-strip .line.nowrap {
     white-space: nowrap;
     align-items: center;
+  }
+  .company-strip .dc-contact-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+  }
+  .company-strip .dc-contact-row .line {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .company-strip .dc-addr-block {
+    align-items: flex-start;
+  }
+  .company-strip .dc-addr-text {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start;
+    gap: 1px;
+    line-height: 1.35;
+    white-space: normal !important;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .company-strip .dc-addr-text .dc-addr-l1,
+  .company-strip .dc-addr-text .dc-addr-l2 {
+    display: block !important;
+    white-space: normal !important;
+    width: 100%;
+    max-width: 100%;
   }
   .company-strip .icon {
     color: var(--purple);
@@ -331,6 +428,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
     align-items: center;
     margin-top: 1px;
   }
+  .company-strip .line.nowrap .icon { margin-top: 0; }
   .company-strip .icon svg { width: 16px; height: 16px; display: block; fill: none; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
   /* ===== BILL TO / SHIP TO & META DETAILS ===== */
@@ -419,7 +517,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   table.items {
     width: 100%;
     max-width: 100%;
-    height: 100%;
+    height: auto;
     border-collapse: collapse;
     table-layout: fixed;
     margin: 0;
@@ -447,45 +545,63 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
     background: #fff;
     color: #231f20;
   }
-  /* Data / note rows stay compact — extra page height goes to blank rows */
-  table.items tbody tr:not(.empty):not(.dc-delivery-note) {
-    height: 1px;
-  }
-  table.items tbody tr:not(.empty) td {
+  /* Data / note / value rows stay compact — blank rows share leftover evenly at equal height */
+  table.items tbody tr:not(.empty):not(.dc-delivery-note):not(.dc-goods-value):not(.filler-row):not(.dc-pin-gap) {
     height: 24px;
+  }
+  table.items tbody tr:not(.empty):not(.filler-row):not(.dc-pin-gap) td {
+    height: 24px;
+    min-height: 24px;
+    max-height: 28px;
     white-space: nowrap;
     vertical-align: top;
   }
-  table.items tbody tr:not(.empty) td.left {
+  table.items tbody tr:not(.empty):not(.filler-row):not(.dc-pin-gap) td.left {
     white-space: pre-wrap;
     vertical-align: top;
     text-align: left;
   }
   table.items tbody td.num { text-align: center; }
   table.items tbody td.left { text-align: left; }
-  table.items tbody tr.dc-delivery-note td {
+  table.items tbody tr.dc-delivery-note td,
+  table.items tbody tr.dc-goods-value td {
     height: auto;
+    max-height: none;
     padding: 6px 8px;
     font-size: 12px;
     line-height: 1.35;
     vertical-align: top;
     white-space: pre-wrap;
   }
-  table.items tbody tr.dc-delivery-note td.left {
+  table.items tbody tr.dc-delivery-note td.left,
+  table.items tbody tr.dc-goods-value td.left {
     text-align: left;
     font-weight: 700;
   }
-  table.items tbody tr.dc-delivery-note strong {
+  table.items tbody tr.dc-delivery-note strong,
+  table.items tbody tr.dc-goods-value strong {
     font-weight: 700;
   }
-  /* Blank rows: no fixed height so they split remaining space equally */
-  table.items tbody tr.empty td {
-    height: auto;
+  /* Blank handwriting rows — full grid lines in every column (incl. Sr. No.) */
+  table.items tbody tr.empty,
+  table.items tbody tr.filler-row,
+  table.items tbody tr.dc-pin-gap {
+    height: 22px;
+  }
+  table.items tbody tr.empty td,
+  table.items tbody tr.filler-row td,
+  table.items tbody tr.dc-pin-gap td {
+    height: 22px;
+    min-height: 22px;
+    max-height: 22px;
     padding: 0;
-    border: 1px solid var(--lav-border);
+    border: 1px solid var(--lav-border) !important;
     background: #fff;
-    line-height: 0;
-    font-size: 0;
+    line-height: 22px;
+    font-size: 10px;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    vertical-align: middle;
   }
   table.items tfoot {
     height: 1px;
@@ -585,25 +701,34 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
       </div>
 
       <div class="company-strip">
-        <div class="line" style="flex: 1;">
-          <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></span>
-          <span style="white-space: nowrap;">${escHtml(profile.addressLine1 || 'Plot No. 1116, G.I.D.C., Ranoli,')}<br>${escHtml(profile.city || 'Vadodara')} - ${escHtml(profile.pincode || '391350')}, ${companyState}, India</span>
+        <div class="dc-strip-left">
+          <div class="line dc-addr-block">
+            <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></span>
+            <div class="dc-addr-text">
+              <div class="dc-addr-l1">${addrLine1}</div>
+              <div class="dc-addr-l2">${addrLine2}</div>
+            </div>
+          </div>
+          <div class="line nowrap">
+            <span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.4 3.6 5.7 3.6 9s-1.2 6.6-3.6 9c-2.4-2.4-3.6-5.7-3.6-9S9.6 5.4 12 3z"/></svg></span>
+            <span>${escHtml(profile.website || 'www.umamicron.com')}</span>
+          </div>
         </div>
-        <div class="line nowrap">
-          <span class="icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
-          <span><strong>GSTIN:</strong> ${escHtml(profile.gstNumber || '')}</span>
-        </div>
-        <div class="line nowrap">
-          <span class="icon"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 2.9c0-.5.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg></span>
-          <span>${escHtml(profile.phone || '+91 97120 00297')}</span>
-        </div>
-        <div class="line nowrap">
-          <span class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 6.5l9 7 9-7"/></svg></span>
-          <span>${escHtml(profile.email || 'umamicron@gmail.com')}</span>
-        </div>
-        <div class="line nowrap">
-          <span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.4 3.6 5.7 3.6 9s-1.2 6.6-3.6 9c-2.4-2.4-3.6-5.7-3.6-9S9.6 5.4 12 3z"/></svg></span>
-          <span>${escHtml(profile.website || 'www.umamicron.com')}</span>
+        <div class="dc-strip-right">
+          <div class="line nowrap">
+            <span class="icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
+            <span><strong>GSTIN:</strong> ${escHtml(profile.gstNumber || '')}</span>
+          </div>
+          <div class="dc-contact-row">
+            <div class="line nowrap">
+              <span class="icon"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 2.9c0-.5.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg></span>
+              <span>${escHtml(profile.phone || '+91 97120 00297')}</span>
+            </div>
+            <div class="line nowrap">
+              <span class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 6.5l9 7 9-7"/></svg></span>
+              <span>${escHtml(profile.email || 'umamicron@gmail.com')}</span>
+            </div>
+          </div>
         </div>
       </div>
 

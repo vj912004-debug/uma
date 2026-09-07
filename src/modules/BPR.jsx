@@ -8,6 +8,8 @@ import ExportButton from '../components/ExportButton';
 import { Plus, Search, Edit2, Trash2, ClipboardList, FileDown, Printer, FileText } from 'lucide-react';
 import { numberInputValue, parseOptionalNumber } from '../utils/numberInput';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
+import TimeField from '../components/TimeField';
 import {
   getPartyProductForMR,
   getReceiptProductNames,
@@ -807,7 +809,7 @@ const BPR = () => {
                 </div>
                 <div>
                   <label>BPR Date *</label>
-                  <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+                  <DateField className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                 </div>
                 <div>
                   <label>Party Name</label>
@@ -885,27 +887,27 @@ const BPR = () => {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
                         <div>
                           <label style={{ fontSize: '0.75rem' }}>Material Received Date</label>
-                          <input type="date" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.materialReceivedDate || ''} onChange={e => setForm({...form, materialReceivedDate: e.target.value})} />
+                          <DateField className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.materialReceivedDate || ''} onChange={e => setForm({...form, materialReceivedDate: e.target.value})} />
                         </div>
                         <div>
                           <label style={{ fontSize: '0.75rem' }}>Time</label>
-                          <input type="time" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.materialReceivedTime || ''} onChange={e => setForm({...form, materialReceivedTime: e.target.value})} />
+                          <TimeField className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.materialReceivedTime || ''} onChange={e => setForm({...form, materialReceivedTime: e.target.value})} />
                         </div>
                         <div>
                           <label style={{ fontSize: '0.75rem' }}>Committed Date</label>
-                          <input type="date" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.committedDate || ''} onChange={e => setForm({...form, committedDate: e.target.value})} />
+                          <DateField className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.committedDate || ''} onChange={e => setForm({...form, committedDate: e.target.value})} />
                         </div>
                         <div>
                           <label style={{ fontSize: '0.75rem' }}>Time</label>
-                          <input type="time" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.committedTime || ''} onChange={e => setForm({...form, committedTime: e.target.value})} />
+                          <TimeField className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.committedTime || ''} onChange={e => setForm({...form, committedTime: e.target.value})} />
                         </div>
                         <div>
                           <label style={{ fontSize: '0.75rem' }}>Processing Start Date</label>
-                          <input type="date" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.processingStartDate || ''} onChange={e => setForm({...form, processingStartDate: e.target.value})} />
+                          <DateField className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.processingStartDate || ''} onChange={e => setForm({...form, processingStartDate: e.target.value})} />
                         </div>
                         <div>
                           <label style={{ fontSize: '0.75rem' }}>Time</label>
-                          <input type="time" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.processingStartTime || ''} onChange={e => setForm({...form, processingStartTime: e.target.value})} />
+                          <TimeField className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} value={form.processingStartTime || ''} onChange={e => setForm({...form, processingStartTime: e.target.value})} />
                         </div>
                       </div>
                     </div>
@@ -1025,11 +1027,11 @@ const BPR = () => {
                     </div>
                     <div>
                       <label>Process Completion Date</label>
-                      <input type="date" className="input-field" value={form.processCompletionDate || ''} onChange={e => setForm({...form, processCompletionDate: e.target.value})} />
+                      <DateField className="input-field" value={form.processCompletionDate || ''} onChange={e => setForm({...form, processCompletionDate: e.target.value})} />
                     </div>
                     <div>
                       <label>Process Completion Time</label>
-                      <input type="time" className="input-field" value={form.processCompletionTime || ''} onChange={e => setForm({...form, processCompletionTime: e.target.value})} />
+                      <TimeField className="input-field" value={form.processCompletionTime || ''} onChange={e => setForm({...form, processCompletionTime: e.target.value})} />
                     </div>
                   </div>
                 </>
@@ -1053,7 +1055,7 @@ const BPR = () => {
                 </>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => setIsModalOpen(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save BPR Entry</button>
               </div>

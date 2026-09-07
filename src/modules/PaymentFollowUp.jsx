@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import DateField from '../components/DateField';
 import {
   Search,
   Eye,
@@ -580,7 +581,7 @@ const PaymentFollowUp = () => {
         </div>
         <div>
           <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>As On Date</label>
-          <input type="date" className="input-field" value={asOnDate} onChange={(e) => setAsOnDate(e.target.value)} />
+          <DateField className="input-field" value={asOnDate} onChange={(e) => setAsOnDate(e.target.value)} />
         </div>
         <ExportButton data={filteredCustomers} columns={customerExportCols} filename="Customer_Wise_Outstanding" title="Customer Wise Outstanding" />
       </div>
@@ -863,7 +864,7 @@ const PaymentFollowUp = () => {
           <form onSubmit={saveFollowUp} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
             <div>
               <label>Follow-Up Date</label>
-              <input type="date" className="input-field" required value={followForm.date} onChange={(e) => setFollowForm({ ...followForm, date: e.target.value })} />
+              <DateField className="input-field" required value={followForm.date} onChange={(e) => setFollowForm({ ...followForm, date: e.target.value })} />
             </div>
             <div>
               <label>Method</label>
@@ -888,7 +889,7 @@ const PaymentFollowUp = () => {
             </div>
             <div>
               <label>Next Follow-Up Date</label>
-              <input type="date" className="input-field" value={followForm.nextFollowUpDate} onChange={(e) => setFollowForm({ ...followForm, nextFollowUpDate: e.target.value })} />
+              <DateField className="input-field" value={followForm.nextFollowUpDate} onChange={(e) => setFollowForm({ ...followForm, nextFollowUpDate: e.target.value })} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label>Invoice(s) Followed</label>
@@ -938,7 +939,7 @@ const PaymentFollowUp = () => {
             </div>
             <div>
               <label>Promise Date</label>
-              <input type="date" className="input-field" required value={promiseForm.promiseDate} onChange={(e) => setPromiseForm({ ...promiseForm, promiseDate: e.target.value })} />
+              <DateField className="input-field" required value={promiseForm.promiseDate} onChange={(e) => setPromiseForm({ ...promiseForm, promiseDate: e.target.value })} />
             </div>
             <div>
               <label>Promise Amount</label>

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, CreditCard, Banknote, Calendar, Search } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
 
 const Payments = () => {
   const { data, updateData, updateItem } = useAppContext();
@@ -190,7 +191,7 @@ const Payments = () => {
                   </div>
                   <div>
                     <label>Date</label>
-                    <input type="date" className="input-field" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                    <DateField className="input-field" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
                   </div>
                 </div>
                 <div>

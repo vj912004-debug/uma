@@ -32,8 +32,11 @@ export const emptyChargeQtys = (extraKeys = []) =>
 /** Empty qty fields show blank so the user can type; placeholder is NIL. */
 export const qtyInputValue = (q) => (q === 0 || q === '' || q == null ? '' : q);
 
+/** Empty rate fields show blank so typing 4500 does not become 45000. */
+export const rateInputValue = (r) => (r === 0 || r === '' || r == null ? '' : r);
+
 export const emptyChargeRates = (extraKeys = []) =>
-  Object.fromEntries([...CHARGE_KEYS, ...extraKeys].map(k => [k, 0]));
+  Object.fromEntries([...CHARGE_KEYS, ...extraKeys].map(k => [k, '']));
 
 export const parseChargeNumber = (val, fallback = 0) => {
   if (val === '' || val == null) return fallback;
@@ -436,6 +439,7 @@ export const getLinkedPITermsForTI = (invoices, receiptId) => {
     productCharges,
     discount: parseFloat(pi.discount) || 0,
     taxRate: pi.taxRate ?? 18,
+    gstType: pi.gstType === 'igst' ? 'igst' : 'cgst_sgst',
     customCharges: Array.isArray(pi.customCharges)
       ? JSON.parse(JSON.stringify(pi.customCharges))
       : [],
@@ -459,6 +463,7 @@ export const applyProformaFinancialsToTaxInvoice = (ti, piOrTerms) => {
     || (pi.productCharges ? sanitizeProductCharges(pi.productCharges) : ti.productCharges);
   const discount = terms ? terms.discount : (parseFloat(pi.discount) || 0);
   const taxRate = terms ? terms.taxRate : (pi.taxRate ?? ti.taxRate ?? 18);
+  const gstType = (terms?.gstType || pi.gstType || ti.gstType) === 'igst' ? 'igst' : 'cgst_sgst';
   const customCharges = terms?.customCharges?.length
     ? terms.customCharges
     : (Array.isArray(pi.customCharges) ? JSON.parse(JSON.stringify(pi.customCharges)) : (ti.customCharges || []));
@@ -475,6 +480,7 @@ export const applyProformaFinancialsToTaxInvoice = (ti, piOrTerms) => {
     customCharges,
     discount,
     taxRate,
+    gstType,
     qty,
     subtotal,
     taxAmount,

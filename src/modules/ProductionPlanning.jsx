@@ -4,6 +4,8 @@ import { useAppContext } from '../context/AppContext';
 import { Plus, Search, Edit2, Trash2, Calendar, Clock } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
+import TimeField from '../components/TimeField';
 
 const buildPlansFromReceipt = (receipt, parties) => {
   const party = parties.find(p => p.id === receipt.partyId);
@@ -576,11 +578,11 @@ const ProductionPlanning = () => {
                 
                 <div>
                   <label>Processing Start Date</label>
-                  <input type="date" className="input-field" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+                  <DateField className="input-field" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
                 </div>
                 <div>
                   <label>Processing Start Time</label>
-                  <input type="time" className="input-field" value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} />
+                  <TimeField className="input-field" value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} />
                 </div>
                 <div>
                   <label>Planning Status</label>
@@ -595,18 +597,18 @@ const ProductionPlanning = () => {
 
                 <div>
                   <label>Complete Date</label>
-                  <input type="date" className="input-field" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
+                  <DateField className="input-field" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
                 </div>
                 <div>
                   <label>Complete Time</label>
-                  <input type="time" className="input-field" value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} />
+                  <TimeField className="input-field" value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} />
                 </div>
                 <div>
                   <label>Total Processing Hours</label>
                   <input type="text" className="input-field" value={formData.hours || ''} readOnly placeholder="Auto-calculated" style={{ fontWeight: 600, color: 'var(--accent-primary)', background: 'var(--glass-bg)' }} />
                 </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => { setIsModalOpen(false); setIsEditing(null); }}>Cancel</button>
                 <button type="submit" className="btn btn-primary">{isEditing ? 'Save Changes' : 'Confirm Plan'}</button>
               </div>

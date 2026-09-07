@@ -4,15 +4,18 @@ import { useAppContext } from '../context/AppContext';
 import {Eye,  Plus, Search, Edit2, Trash2, FileDown } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
+import DateField from '../components/DateField';
 import {
   STANDARD_CHARGES_LIST,
   OTHER_CHARGE_ITEM,
-  qtyInputValue
+  qtyInputValue,
+  rateInputValue
 } from '../utils/documentCharges';
 import { calcNoteLines } from '../utils/debitCreditNoteHtml';
 import SearchableSelect from '../components/SearchableSelect';
+import { GST_TYPE_CGST_SGST, GST_TYPE_IGST, normalizeGstType } from '../utils/taxInvoiceLayout';
 
-const blankLine = () => ({ id: Date.now() + Math.random(), description: '', qty: '', rate: 0 });
+const blankLine = () => ({ id: Date.now() + Math.random(), description: '', qty: '', rate: '' });
 
 const linesFromNote = (note) => {
   if (Array.isArray(note.customCharges) && note.customCharges.length) {
@@ -20,17 +23,18 @@ const linesFromNote = (note) => {
       id: c.id || Date.now() + Math.random(),
       description: c.description || '',
       qty: c.qty ?? '',
-      rate: c.rate ?? 0
+      rate: (c.rate === 0 || c.rate == null || c.rate === '') ? '' : c.rate
     }));
   }
   const migrated = [];
   [...STANDARD_CHARGES_LIST, OTHER_CHARGE_ITEM].forEach((c) => {
     if (!note.charges?.[c.key]) return;
+    const rawRate = note.rates?.[c.key];
     migrated.push({
       id: `${c.key}-${Date.now()}`,
       description: c.label || c.key,
-      qty: parseFloat(note.qtys?.[c.key]) || 0,
-      rate: parseFloat(note.rates?.[c.key]) || 0
+      qty: note.qtys?.[c.key] ?? '',
+      rate: (rawRate === 0 || rawRate == null || rawRate === '') ? '' : rawRate
     });
   });
   return migrated.length ? migrated : [blankLine()];
@@ -79,7 +83,8 @@ const DebitNotes = () => {
     particulars: '',
     customCharges: [blankLine()],
     discount: 0,
-    taxRate: 18
+    taxRate: 18,
+    gstType: GST_TYPE_CGST_SGST
   });
 
   const handlePartySelect = (e) => {
@@ -127,7 +132,8 @@ const DebitNotes = () => {
       particulars: '',
       customCharges: [blankLine()],
       discount: 0,
-      taxRate: 18
+      taxRate: 18,
+      gstType: GST_TYPE_CGST_SGST
     });
     setIsEditing(null);
     setIsModalOpen(true);
@@ -148,7 +154,8 @@ const DebitNotes = () => {
       stateCode: note.stateCode || note.billStateCode || '24',
       customCharges: linesFromNote(note),
       discount: note.discount || 0,
-      taxRate: note.taxRate ?? 18
+      taxRate: note.taxRate ?? 18,
+      gstType: normalizeGstType(note.gstType)
     });
     setIsEditing(note.id);
     setIsModalOpen(true);
@@ -301,7 +308,7 @@ const DebitNotes = () => {
                 </div>
                 <div>
                   <label>Date *</label>
-                  <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+                  <DateField className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Party Name *</label>
@@ -368,7 +375,7 @@ const DebitNotes = () => {
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Ref Invoice Date</label>
-                  <input type="date" className="input-field" value={form.refInvoiceDate} onChange={e => setForm({...form, refInvoiceDate: e.target.value})} />
+                  <DateField className="input-field" value={form.refInvoiceDate} onChange={e => setForm({...form, refInvoiceDate: e.target.value})} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Customer PO No.</label>
@@ -405,17 +412,17 @@ const DebitNotes = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
                 <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 30px', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                     <span>Description</span>
                     <span>Qty</span>
                     <span>Rate (₹)</span>
                     <span />
                   </div>
                   {(form.customCharges || []).map(c => (
-                    <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                    <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                       <input type="text" className="input-field" placeholder="Enter description" value={c.description} onChange={e => updateCustomCharge(c.id, 'description', e.target.value)} />
                       <input type="number" className="input-field" placeholder="NIL" value={qtyInputValue(c.qty)} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
-                      <input type="number" className="input-field" placeholder="Rate" value={c.rate} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
+                      <input type="number" className="input-field" placeholder="Rate" value={rateInputValue(c.rate)} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
                       <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeCustomCharge(c.id)}>
                         <Trash2 size={16} />
                       </button>
@@ -440,6 +447,13 @@ const DebitNotes = () => {
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                    <span>GST Type:</span>
+                    <SearchableSelect className="input-field" style={{ width: '160px', padding: '0.2rem', height: 'auto' }} value={normalizeGstType(form.gstType)} onChange={e => setForm({...form, gstType: e.target.value})}>
+                      <option value={GST_TYPE_CGST_SGST}>CGST + SGST</option>
+                      <option value={GST_TYPE_IGST}>IGST</option>
+                    </SearchableSelect>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
                     <span>GST Rate (%):</span>
                     <SearchableSelect className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
                       <option value="18">18%</option>
@@ -448,32 +462,35 @@ const DebitNotes = () => {
                       <option value="0">0%</option>
                     </SearchableSelect>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span>CGST @{noteTotals.displayRate}%:</span>
-                    <span>₹{noteTotals.totalCgst.toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span>SGST @{noteTotals.displayRate}%:</span>
-                    <span>₹{noteTotals.totalSgst.toFixed(2)}</span>
-                  </div>
-                  {noteTotals.totalIgst > 0 && (
+                  {normalizeGstType(form.gstType) === GST_TYPE_IGST ? (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                       <span>IGST @{noteTotals.taxRate}%:</span>
                       <span>₹{noteTotals.totalIgst.toFixed(2)}</span>
                     </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                        <span>CGST @{noteTotals.displayRate}%:</span>
+                        <span>₹{noteTotals.totalCgst.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                        <span>SGST @{noteTotals.displayRate}%:</span>
+                        <span>₹{noteTotals.totalSgst.toFixed(2)}</span>
+                      </div>
+                    </>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <span>Round Off:</span>
                     <span>₹{noteTotals.roundOff.toFixed(2)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
                     <span>Grand Total:</span>
                     <span>₹{noteTotals.roundedTotal.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn" onClick={() => setIsModalOpen(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Debit Note</button>
               </div>

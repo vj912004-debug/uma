@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Plus, Search, Edit2, Trash2, ShieldAlert } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
 import { useNavigate } from 'react-router-dom';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
 
 const displayChargeRate = (v) => (v == null || v === '' || v === 0) ? '' : v;
 const parseChargeRateInput = (val) => (val === '' ? 0 : (parseFloat(val) || 0));
@@ -206,10 +207,12 @@ const Parties = () => {
 
   return (
     <div>
+      {!isModalOpen && (
+      <>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Party & Products Master</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Configure party contacts, billing terms, and product standard pricing templates.</p>
+          <h1 className="page-title">Party & Products Master</h1>
+          <p className="page-subtitle">Configure party contacts, billing terms, and product standard pricing templates.</p>
         </div>
         <button className="btn btn-primary" onClick={() => { resetPartyForm(); setIsModalOpen(true); }}>
           <Plus size={18} /> Add Party
@@ -278,7 +281,7 @@ const Parties = () => {
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
                         {(party.products || []).map((prod, pIdx) => (
-                          <span key={pIdx} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}>
+                          <span key={pIdx} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: 'var(--lavender)', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
                             {prod.name}
                           </span>
                         ))}
@@ -308,41 +311,53 @@ const Parties = () => {
           </table>
         </div>
       </div>
+      </>
+      )}
 
-      {/* Main Party Form Modal */}
+      {/* Main Party Form — card sections like reference */}
       {isModalOpen && (
-        <div className="page-form-overlay">
-          <div className="premium-card" style={{ width: '850px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h2 style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>{isEditing ? 'Modify Party' : 'Register New Party'}</span>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Code: {formData.vendorCode}</span>
-            </h2>
-            <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="page-form-overlay party-form-page">
+          <form onSubmit={handleSubmit} className="party-form">
+            <header className="party-form-header">
+              <button
+                type="button"
+                className="party-back-btn"
+                onClick={() => { setIsModalOpen(false); setIsEditing(null); }}
+              >
+                <ArrowLeft size={18} /> Back
+              </button>
+              <div className="party-form-title-wrap">
+                <h1>{isEditing ? 'Modify Party' : 'Register New Party'}</h1>
+                <p>{isEditing ? 'Update party details and product charge configuration.' : 'Add new party details and configure contact & billing information.'}</p>
+              </div>
+              <div className="party-form-code">Code: {formData.vendorCode || '—'}</div>
+            </header>
+
+            <section className="premium-card party-section-card">
+              <h3 className="party-section-title">Basic Information</h3>
+              <div className="party-grid-3">
                 <div>
                   <label>Document Date *</label>
-                  <input 
-                    type="date" 
-                    className="input-field" 
-                    required 
+                  <DateField
+                    className="input-field"
+                    required
                     value={formData.date}
                     onChange={e => setFormData({...formData, date: e.target.value})}
                   />
                 </div>
                 <div>
                   <label>Vendor Code</label>
-                  <input 
-                    type="text" 
-                    className="input-field" 
+                  <input
+                    type="text"
+                    className="input-field party-readonly-field"
+                    readOnly
                     value={formData.vendorCode}
-                    onChange={e => setFormData({...formData, vendorCode: e.target.value})}
-                    style={{ background: 'var(--glass-bg)', color: 'var(--accent-primary)', fontWeight: 600 }}
                   />
                 </div>
                 <div>
                   <label>Party Type</label>
-                  <SearchableSelect 
-                    className="input-field" 
+                  <SearchableSelect
+                    className="input-field"
                     value={formData.type}
                     onChange={e => setFormData({...formData, type: e.target.value})}
                   >
@@ -350,72 +365,74 @@ const Parties = () => {
                     <option value="Supplier">Supplier</option>
                   </SearchableSelect>
                 </div>
-                <div style={{ gridColumn: 'span 3' }}>
+                <div className="party-span-all">
                   <label>Party Name *</label>
-                  <input 
-                    type="text" 
-                    className="input-field" 
-                    required 
+                  <input
+                    type="text"
+                    className="input-field"
+                    required
                     placeholder="Enter official registered name"
                     value={formData.name}
                     onChange={e => setFormData({...formData, name: e.target.value})}
                   />
                 </div>
+              </div>
+            </section>
 
-                <div style={{ gridColumn: 'span 3', borderTop: '1px solid rgba(255,255,255,0.05)', margin: '0.5rem 0' }}></div>
-
-                {/* Addresses */}
-                <div style={{ gridColumn: 'span 3', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                  <div>
-                    <label>Bill To Address (Factory Address Option) *</label>
-                    <textarea 
-                      className="input-field" 
-                      rows="3"
-                      required
-                      placeholder="Billing / Registered Office Address"
-                      value={formData.billAddress}
-                      onChange={e => setFormData({...formData, billAddress: e.target.value})}
-                    />
-                    <label style={{ marginTop: '0.5rem' }}>Bill To GSTIN *</label>
-                    <input 
-                      type="text" 
-                      className="input-field" 
-                      required
-                      placeholder="e.g. 24AAAAA0000A1Z"
-                      value={formData.gstinBill}
-                      onChange={e => setFormData({...formData, gstinBill: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label>Ship To Address *</label>
-                    <textarea 
-                      className="input-field" 
-                      rows="3"
-                      required
-                      placeholder="Delivery / Warehouse Address"
-                      value={formData.shipAddress}
-                      onChange={e => setFormData({...formData, shipAddress: e.target.value})}
-                    />
-                    <label style={{ marginTop: '0.5rem' }}>Ship To GSTIN *</label>
-                    <input 
-                      type="text" 
-                      className="input-field" 
-                      required
-                      placeholder="e.g. 24AAAAA0000A1Z"
-                      value={formData.gstinShip}
-                      onChange={e => setFormData({...formData, gstinShip: e.target.value})}
-                    />
-                  </div>
+            <section className="premium-card party-section-card">
+              <h3 className="party-section-title">Address & GST Details</h3>
+              <div className="party-grid-2">
+                <div>
+                  <label>Bill To Address *</label>
+                  <textarea
+                    className="input-field"
+                    rows="3"
+                    required
+                    placeholder="Billing / Registered Office Address"
+                    value={formData.billAddress}
+                    onChange={e => setFormData({...formData, billAddress: e.target.value})}
+                  />
+                  <label style={{ marginTop: '0.75rem' }}>Bill To GSTIN# *</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    required
+                    placeholder="e.g. 24AAAAA0000A1Z"
+                    value={formData.gstinBill}
+                    onChange={e => setFormData({...formData, gstinBill: e.target.value})}
+                  />
                 </div>
+                <div>
+                  <label>Ship To Address *</label>
+                  <textarea
+                    className="input-field"
+                    rows="3"
+                    required
+                    placeholder="Delivery / Warehouse Address"
+                    value={formData.shipAddress}
+                    onChange={e => setFormData({...formData, shipAddress: e.target.value})}
+                  />
+                  <label style={{ marginTop: '0.75rem' }}>Ship To GSTIN# *</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    required
+                    placeholder="e.g. 24AAAAA0000A1Z"
+                    value={formData.gstinShip}
+                    onChange={e => setFormData({...formData, gstinShip: e.target.value})}
+                  />
+                </div>
+              </div>
+            </section>
 
-                <div style={{ gridColumn: 'span 3', borderTop: '1px solid rgba(255,255,255,0.05)', margin: '0.5rem 0' }}></div>
-
-                {/* Contacts */}
+            <section className="premium-card party-section-card">
+              <h3 className="party-section-title">Contact Details</h3>
+              <div className="party-grid-3">
                 <div>
                   <label>Contact Number 1</label>
-                  <input 
-                    type="text" 
-                    className="input-field" 
+                  <input
+                    type="text"
+                    className="input-field"
                     placeholder="Primary contact"
                     value={formData.phone1}
                     onChange={e => setFormData({...formData, phone1: e.target.value})}
@@ -423,9 +440,9 @@ const Parties = () => {
                 </div>
                 <div>
                   <label>Contact Number 2</label>
-                  <input 
-                    type="text" 
-                    className="input-field" 
+                  <input
+                    type="text"
+                    className="input-field"
                     placeholder="Alternative"
                     value={formData.phone2}
                     onChange={e => setFormData({...formData, phone2: e.target.value})}
@@ -433,21 +450,19 @@ const Parties = () => {
                 </div>
                 <div>
                   <label>Contact Number 3</label>
-                  <input 
-                    type="text" 
-                    className="input-field" 
+                  <input
+                    type="text"
+                    className="input-field"
                     placeholder="Landline / Other"
                     value={formData.phone3}
                     onChange={e => setFormData({...formData, phone3: e.target.value})}
                   />
                 </div>
-
-                {/* Emails */}
                 <div>
                   <label>Email ID 1</label>
-                  <input 
-                    type="email" 
-                    className="input-field" 
+                  <input
+                    type="email"
+                    className="input-field"
                     placeholder="primary@company.com"
                     value={formData.email1}
                     onChange={e => setFormData({...formData, email1: e.target.value})}
@@ -455,9 +470,9 @@ const Parties = () => {
                 </div>
                 <div>
                   <label>Email ID 2</label>
-                  <input 
-                    type="email" 
-                    className="input-field" 
+                  <input
+                    type="email"
+                    className="input-field"
                     placeholder="accounts@company.com"
                     value={formData.email2}
                     onChange={e => setFormData({...formData, email2: e.target.value})}
@@ -465,78 +480,76 @@ const Parties = () => {
                 </div>
                 <div>
                   <label>Email ID 3</label>
-                  <input 
-                    type="email" 
-                    className="input-field" 
+                  <input
+                    type="email"
+                    className="input-field"
                     placeholder="shipping@company.com"
                     value={formData.email3}
                     onChange={e => setFormData({...formData, email3: e.target.value})}
                   />
                 </div>
               </div>
+            </section>
 
-              {/* Associated Products Configuration Sub-form */}
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Associated Products & Default Invoice Charges</h3>
-                  <button type="button" className="btn btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={handleAddProduct}>
-                    <Plus size={14} /> Add Product Config
-                  </button>
-                </div>
-
-                <div style={{ overflowX: 'auto', background: 'var(--input-bg)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                        <th style={{ padding: '0.5rem' }}>Product Name</th>
-                        <th style={{ padding: '0.5rem' }}>Nick Name</th>
-                        <th style={{ padding: '0.5rem' }}>PSD Req</th>
-                        <th style={{ padding: '0.5rem' }}>Cleaning Chg</th>
-                        <th style={{ padding: '0.5rem' }}>Filter Bag</th>
-                        <th style={{ padding: '0.5rem' }}>Processing</th>
-                        <th style={{ padding: '0.5rem' }}>Sieving</th>
-                        <th style={{ padding: '0.5rem' }}>Actions</th>
+            <section className="premium-card party-section-card">
+              <div className="party-section-head">
+                <h3 className="party-section-title" style={{ margin: 0 }}>Products & Default Invoice Charges</h3>
+                <button type="button" className="btn btn-primary" style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem' }} onClick={handleAddProduct}>
+                  <Plus size={14} /> Add Product Config
+                </button>
+              </div>
+              <div className="party-products-table-wrap">
+                <table className="party-products-table">
+                  <thead>
+                    <tr>
+                      <th>Product Name</th>
+                      <th>Nick Name</th>
+                      <th>PSD Req</th>
+                      <th>Cleaning Chg</th>
+                      <th>Filter Bag</th>
+                      <th>Processing</th>
+                      <th>Sieving</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.products.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="party-empty-cell">No products configured for this party. Add a config above.</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {formData.products.length === 0 ? (
-                        <tr>
-                          <td colSpan="8" style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)' }}>No products configured for this party. Add a config above.</td>
+                    ) : (
+                      formData.products.map((prod, idx) => (
+                        <tr key={idx}>
+                          <td style={{ fontWeight: 600 }}>{prod.name}</td>
+                          <td>{prod.nickname || 'N/A'}</td>
+                          <td>{prod.psdReq}</td>
+                          <td>₹{prod.charges?.cleaning || 0}</td>
+                          <td>₹{prod.charges?.filterBag || 0}</td>
+                          <td>₹{prod.charges?.processing || 0}</td>
+                          <td>₹{prod.charges?.sieving || 0}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '0.35rem' }}>
+                              <button type="button" className="btn" style={{ padding: '0.25rem', background: 'transparent' }} onClick={() => handleEditProduct(idx)}>
+                                <Edit2 size={12} />
+                              </button>
+                              <button type="button" className="btn" style={{ padding: '0.25rem', background: 'transparent', color: 'rgba(239, 68, 68, 0.7)' }} onClick={() => handleDeleteProduct(idx)}>
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
-                      ) : (
-                        formData.products.map((prod, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                            <td style={{ padding: '0.5rem', fontWeight: 600 }}>{prod.name}</td>
-                            <td style={{ padding: '0.5rem' }}>{prod.nickname || 'N/A'}</td>
-                            <td style={{ padding: '0.5rem' }}>{prod.psdReq}</td>
-                            <td style={{ padding: '0.5rem' }}>₹{prod.charges?.cleaning || 0}</td>
-                            <td style={{ padding: '0.5rem' }}>₹{prod.charges?.filterBag || 0}</td>
-                            <td style={{ padding: '0.5rem' }}>₹{prod.charges?.processing || 0}</td>
-                            <td style={{ padding: '0.5rem' }}>₹{prod.charges?.sieving || 0}</td>
-                            <td style={{ padding: '0.5rem' }}>
-                              <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                <button type="button" className="btn" style={{ padding: '0.25rem', background: 'transparent' }} onClick={() => handleEditProduct(idx)}>
-                                  <Edit2 size={12} />
-                                </button>
-                                <button type="button" className="btn" style={{ padding: '0.25rem', background: 'transparent', color: 'rgba(239, 68, 68, 0.6)' }} onClick={() => handleDeleteProduct(idx)}>
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
+            </section>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
-                <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => { setIsModalOpen(false); setIsEditing(null); }}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{isEditing ? 'Apply Updates' : 'Confirm Registration'}</button>
-              </div>
-            </form>
-          </div>
+            <div className="party-form-actions">
+              <button type="button" className="btn" onClick={() => { setIsModalOpen(false); setIsEditing(null); }}>Cancel</button>
+              <button type="submit" className="btn btn-primary">{isEditing ? 'Apply Updates' : 'Confirm Registration'}</button>
+            </div>
+          </form>
         </div>
       )}
 
@@ -674,7 +687,7 @@ const Parties = () => {
                             onClick={() => setProductData(prev => ({ ...prev, disabledCharges: (prev.disabledCharges || []).filter(k => k !== key) }))}
                             style={{
                               fontSize: '0.7rem', padding: '0.2rem 0.5rem',
-                              background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)',
+                              background: 'rgba(255,255,255,0.05)', border: '1px dashed var(--border-color)',
                               borderRadius: '4px', color: 'var(--text-muted)', cursor: 'pointer',
                               display: 'flex', alignItems: 'center', gap: '0.25rem'
                             }}
@@ -727,7 +740,7 @@ const Parties = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => setIsProductModalOpen(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Product Configuration</button>
               </div>

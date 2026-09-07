@@ -131,12 +131,12 @@ const Sidebar = () => {
   return (
     <aside className="sidebar">
       {/* Brand Header */}
-      <div className="sidebar-brand" style={{ marginBottom: '1.5rem', padding: '0 0.35rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="sidebar-brand" style={{ marginBottom: '1.35rem', padding: '0 0.35rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <div className="sidebar-brand-logo">M</div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <h1 style={{ color: '#ffffff', fontSize: '1.05rem', fontWeight: 700, margin: 0, lineHeight: 1.2 }}>UMA MICRON</h1>
-            <p style={{ color: '#86efac', fontSize: '0.68rem', margin: 0, whiteSpace: 'nowrap', fontWeight: 600 }}>Micronization of API's</p>
+            <h1 style={{ fontSize: '1.05rem', fontWeight: 750, margin: 0, lineHeight: 1.2 }}>UMA MICRON</h1>
+            <p style={{ fontSize: '0.68rem', margin: 0, whiteSpace: 'nowrap', fontWeight: 600 }}>Micronization of API's</p>
           </div>
         </div>
         <button className="sidebar-close-btn" aria-label="Close Sidebar">
@@ -240,10 +240,8 @@ const Sidebar = () => {
         <div className="sidebar-user">
           <div className="sidebar-avatar">{initials}</div>
           <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
-            <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>
-              {displayName}
-            </p>
-            <p style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.65)', margin: 0 }}>
+            <p className="sidebar-user-name">{displayName}</p>
+            <p className="sidebar-user-meta">
               {userRole}{currentUser?.employeeId ? ` · ${currentUser.employeeId}` : ''}
             </p>
           </div>

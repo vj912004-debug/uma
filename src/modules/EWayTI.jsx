@@ -2,6 +2,7 @@ import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Search, Edit2 } from 'lucide-react';
+import DateField from '../components/DateField';
 
 const EWayTI = () => {
   const { data, updateItem } = useAppContext();
@@ -133,7 +134,7 @@ const EWayTI = () => {
                 </div>
                 <div>
                   <label>E-Way Bill Date *</label>
-                  <input type="date" className="input-field" required value={form.ewayBillDate} onChange={e => setForm({...form, ewayBillDate: e.target.value})} />
+                  <DateField className="input-field" required value={form.ewayBillDate} onChange={e => setForm({...form, ewayBillDate: e.target.value})} />
                 </div>
               </div>
 

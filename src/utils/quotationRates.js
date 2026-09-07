@@ -42,8 +42,9 @@ export const defaultRateUnit = (key) =>
 const formatAmount = (amount, unit) => {
   const n = parseFloat(amount);
   if (!Number.isFinite(n) || n <= 0) return '';
-  if (unit === '/-') return Number.isInteger(n) ? String(n) : n.toFixed(2);
-  return n.toFixed(2);
+  if (Number.isInteger(n) || Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+  if (unit === '/-') return String(n);
+  return n.toFixed(2).replace(/\.?0+$/, '');
 };
 
 /** e.g. Rs. 40/-, Rs. 1350.00/Each, Rs. 1500.00/Nos, Rs. 4500.00 per process */

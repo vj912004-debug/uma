@@ -86,10 +86,7 @@ export const buildPrintPrefsCss = (prefs) => {
   const tagFs = Math.round(bodyFs * 13 / 12);
   const subFs = Math.max(8, Math.round(bodyFs * 10 / 12));
   const grandFs = Math.round(bodyFs * 17 / 12);
-  const quoteFs = Math.round(bodyFs * 28 / 12);
-  const quoteCompactFs = Math.round(bodyFs * 24 / 12);
   const companyTitleFs = Math.round(bodyFs * 26 / 12);
-  const quoteSubFs = Math.max(8, Math.round(bodyFs * 9 / 12));
   // Tighten padding/gaps as font grows so pages stay balanced.
   const padScale = density === 'xl' ? 0.62 : density === 'lg' ? 0.72 : density === 'md' ? 0.85 : density === 'sm' ? 1.05 : 1;
   const gapScale = padScale;
@@ -476,6 +473,19 @@ export const buildPrintPrefsCss = (prefs) => {
     letter-spacing: 0.5px !important;
     white-space: nowrap !important;
   }
+  /* DC company address must stay on 2 stacked lines */
+  .uma-print-root .company-strip .dc-addr-text {
+    display: flex !important;
+    flex-direction: column !important;
+    white-space: normal !important;
+    min-width: 0 !important;
+  }
+  .uma-print-root .company-strip .dc-addr-l1,
+  .uma-print-root .company-strip .dc-addr-l2 {
+    display: block !important;
+    white-space: normal !important;
+    width: 100% !important;
+  }
   .uma-print-root .tax-invoice-box .ti-sub {
     font-size: ${subFs}px !important;
     margin-top: 4px !important;
@@ -493,48 +503,6 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .grand span,
   .uma-print-root .grand-total-banner {
     font-size: ${grandFs}px !important;
-  }
-  .uma-print-root .header:has(.quote-banner) {
-    align-items: stretch !important;
-    padding: 0 0 0 22px !important;
-    margin: 0 !important;
-    min-height: 96px !important;
-    height: auto !important;
-    overflow: hidden !important;
-  }
-  .uma-print-root .quote-banner {
-    align-self: stretch !important;
-    height: auto !important;
-    min-height: 96px !important;
-    margin: 0 !important;
-    flex-shrink: 0 !important;
-  }
-  .uma-print-root .quote-banner .fill {
-    min-width: 280px !important;
-    min-height: 96px !important;
-    height: 100% !important;
-    padding: 0 24px 0 44px !important;
-  }
-  .uma-print-root .quote-banner h2 {
-    font-family: ${fontFamily} !important;
-    font-size: ${quoteFs}px !important;
-    line-height: 1 !important;
-    letter-spacing: 2px !important;
-    margin: 0 !important;
-    white-space: nowrap !important;
-  }
-  .uma-print-root .quote-banner .sub {
-    font-size: ${quoteSubFs}px !important;
-    margin-top: 6px !important;
-    padding: 3px 10px !important;
-  }
-  .uma-print-root .sheet.quot-compact .header:has(.quote-banner),
-  .uma-print-root .sheet.quot-compact .quote-banner,
-  .uma-print-root .sheet.quot-compact .quote-banner .fill {
-    min-height: 84px !important;
-  }
-  .uma-print-root .sheet.quot-compact .quote-banner h2 {
-    font-size: ${quoteCompactFs}px !important;
   }
   .uma-print-root .party-body {
     min-height: 0 !important;

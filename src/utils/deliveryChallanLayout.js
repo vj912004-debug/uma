@@ -30,7 +30,7 @@ const fmtMoney = (n) => (parseFloat(n) || 0).toFixed(2);
 
 /** Build aligned description / drums / qty lines for DC PDF.
  * Quantities always come from Material Receipt (received qty), never packing list. */
-const resolveLinkedMr = (dc, appData = {}) => {
+export const resolveLinkedMr = (dc, appData = {}) => {
   const mrs = appData.materialReceipts || [];
   if (!dc || !mrs.length) return null;
   const id = dc.receiptId || dc.mrId || '';
@@ -170,14 +170,9 @@ export const buildDcPrintLines = (dc, appData = {}) => {
   const value = mrValue > 0
     ? mrValue
     : (Number.isFinite(dcValue) && dcValue > 0 ? dcValue : 0);
-  if (value > 0) {
-    lines.push({
-      kind: 'value',
-      text: `Total goods value Rs : ${fmtMoney(value)}`,
-      drums: '',
-      qty: ''
-    });
-  }
+  const goodsValueText = value > 0
+    ? `Total goods value Rs : ${fmtMoney(value)}`
+    : '';
 
   const linesQty = lines.reduce((s, l) => s + (parseFloat(l.qty) || 0), 0);
   const linesDrums = lines.reduce((s, l) => s + (parseInt(l.drums, 10) || 0), 0);
@@ -190,7 +185,7 @@ export const buildDcPrintLines = (dc, appData = {}) => {
     ? printedDrums
     : (formDrums > 0 ? formDrums : linesDrums);
 
-  return { lines, totalDrums, totalQty };
+  return { lines, totalDrums, totalQty, goodsValueText };
 };
 
 export const getDcAppData = () => {

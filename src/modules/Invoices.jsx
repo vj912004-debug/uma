@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import { Plus, Trash2, Calculator, Save, FileText } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
 
 const STANDARD_CHARGES = [
   { name: 'Cleaning Charges', hsn: '9988', rate: 500 },
@@ -187,7 +188,7 @@ const Invoices = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
               <div>
                 <label>Date</label>
-                <input type="date" className="input-field" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                <DateField className="input-field" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
               </div>
               <div>
                 <label>GST Rate (%)</label>

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Search, Edit2, ClipboardList } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
 
 const EWayDC = () => {
   const { data, updateItem } = useAppContext();
@@ -144,7 +145,7 @@ const EWayDC = () => {
                 </div>
                 <div>
                   <label>E-Way Bill Date *</label>
-                  <input type="date" className="input-field" required value={form.ewayBillDate} onChange={e => setForm({...form, ewayBillDate: e.target.value})} />
+                  <DateField className="input-field" required value={form.ewayBillDate} onChange={e => setForm({...form, ewayBillDate: e.target.value})} />
                 </div>
               </div>
 

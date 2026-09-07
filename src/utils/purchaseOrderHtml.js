@@ -4,7 +4,8 @@ import {
   TI_EMPTY_ROWS,
   splitPartyAddressLines,
   formatPdfDateDmy,
-  buildTiChargeAmounts
+  buildTiChargeAmounts,
+  getSplitGstRates
 } from './taxInvoiceLayout';
 import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPrintTermsHtml, DEFAULT_PO_TERMS, DEFAULT_INVOICE_DECLARATION, buildBankDetailsBox } from './printTheme';
 
@@ -44,7 +45,7 @@ export const buildPurchaseOrderHtml = (raw, profileInput) => {
     if (/^\s*total\s*$/i.test(String(desc || ''))) return;
     const sgstAmt = amt * (sgstPercent / 100);
     const cgstAmt = amt * (cgstPercent / 100);
-    const igstAmt = 0; // Purchase orders in pdfExport default to 0 IGST for now, or calculate if out of state
+    const igstAmt = amt * (igstPercent / 100);
     const rowTotal = amt + sgstAmt + cgstAmt + igstAmt;
     totalAmt += amt;
     totalSgst += sgstAmt;
@@ -81,9 +82,7 @@ export const buildPurchaseOrderHtml = (raw, profileInput) => {
       </tr>`);
   };
 
-  const taxRate = parseFloat(data.taxRate) || 18;
-  const cgstRate = taxRate / 2;
-  const sgstRate = taxRate / 2;
+  const { taxRate, sgst: sgstRate, cgst: cgstRate, igst: igstRate } = getSplitGstRates(data);
 
   if (data.productName) {
     const qty = parseFloat(data.qty) || 0;
@@ -92,13 +91,13 @@ export const buildPurchaseOrderHtml = (raw, profileInput) => {
     const specs = (data.productDescription || '').trim();
     const desc = specs ? `${data.productName} - ${specs}` : data.productName;
     
-    pushRow(desc, qty, rate, amt, sgstRate, cgstRate);
+    pushRow(desc, qty, rate, amt, sgstRate, cgstRate, igstRate);
   }
 
   TI_CHARGES_LIST.forEach((charge) => {
     const line = chargeAmounts[charge.key];
     if (!line || !(line.amt > 0 || line.rate > 0 || line.qty > 0)) return;
-    pushRow(charge.label, line.qty, line.rate, line.amt || 0, sgstRate, cgstRate);
+    pushRow(charge.label, line.qty, line.rate, line.amt || 0, sgstRate, cgstRate, igstRate);
   });
 
   (data.customCharges || []).forEach((cc) => {
@@ -111,10 +110,10 @@ export const buildPurchaseOrderHtml = (raw, profileInput) => {
     const amt = qtyNum * rate;
     const name = String(cc.name || '').trim();
     if (!name) return;
-    pushRow(name, qty, rate, amt, sgstRate, cgstRate);
+    pushRow(name, qty, rate, amt, sgstRate, cgstRate, igstRate);
   });
 
-  rows.push(buildFillerRowsHtml(12, 12));
+  rows.push(buildFillerRowsHtml(12, TI_EMPTY_ROWS));
 
   const roundedTotal = Math.round(totalAll);
   const roundOff = roundedTotal - totalAll;
@@ -739,7 +738,7 @@ export const buildPurchaseOrderHtml = (raw, profileInput) => {
         <div class="trow"><span class="tlabel">Total Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>
         <div class="trow"><span class="tlabel">CGST @ ${cgstRate}%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
         <div class="trow"><span class="tlabel">SGST @ ${sgstRate}%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
-        <div class="trow"><span class="tlabel">IGST @ 18%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
+        <div class="trow"><span class="tlabel">IGST @ ${igstRate || taxRate}%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
         <div class="trow rule"><span class="tlabel">Total Tax Amount</span><span class="tval">&#8377; ${fmtMoney(totalCgst + totalSgst + totalIgst)}</span></div>
         <div class="trow"><span class="tlabel">Round Off</span><span class="tval">&#8377; ${fmtMoney(roundOff)}</span></div>
       </div>

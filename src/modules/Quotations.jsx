@@ -5,6 +5,7 @@ import { nextAvailableDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import { formatDate } from '../utils/dateUtils';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
 import {
   RATE_UNIT_OPTIONS,
   emptyRateUnits,
@@ -12,7 +13,7 @@ import {
   defaultRateUnit,
   formatQuotedRate
 } from '../utils/quotationRates';
-import { qtyInputValue } from '../utils/documentCharges';
+import { qtyInputValue, rateInputValue, parseChargeFieldValue } from '../utils/documentCharges';
 
 const defaultValidityDate = () => {
   const d = new Date();
@@ -426,7 +427,7 @@ const Quotations = () => {
 
   const handleMaterialRateChange = (key, val) => {
     setFormData(prev => {
-      const nextRates = { ...prev.rates, [key]: parseFloat(val) || 0 };
+      const nextRates = { ...prev.rates, [key]: parseChargeFieldValue(val) };
       return {
         ...prev,
         rates: nextRates,
@@ -898,14 +899,26 @@ const Quotations = () => {
             <h2 style={{ marginBottom: '1.5rem' }}>{formData.id ? 'Edit Quotation' : 'Create Quotation'}</h2>
             <form onSubmit={handleSubmit}>
               <ChargeNoteDatalist />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label>Quotation No</label>
                   <input type="text" className="input-field" value={formData.quotationNo} onChange={e => setFormData({ ...formData, quotationNo: e.target.value })} style={{ color: 'var(--accent-primary)', fontWeight: 600 }} />
                 </div>
                 <div>
                   <label>Date</label>
-                  <input type="date" className="input-field" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                  <DateField className="input-field" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                </div>
+                <div>
+                  <label>Validity Date *</label>
+                  <DateField
+                    className="input-field"
+                    required
+                    value={formData.validityDate || ''}
+                    onChange={e => {
+                      const validityDate = e.target.value;
+                      setFormData({ ...formData, validityDate, terms: syncValidityInTerms(formData.terms, validityDate) });
+                    }}
+                  />
                 </div>
                 <div>
                   <label>Party Name *</label>
@@ -927,19 +940,19 @@ const Quotations = () => {
                   <label>Contact Person / Attn</label>
                   <input type="text" className="input-field" placeholder="e.g. Mr. Sharma" value={formData.contactPerson} onChange={e => setFormData({...formData, contactPerson: e.target.value})} />
                 </div>
-                <div style={{ gridColumn: 'span 2' }}>
+                <div style={{ gridColumn: 'span 3' }}>
                   <label>Party Address</label>
                   <textarea className="input-field" rows="2" value={formData.partyAddress} onChange={e => setFormData({...formData, partyAddress: e.target.value})}></textarea>
                 </div>
-                <div style={{ gridColumn: 'span 2' }}>
+                <div style={{ gridColumn: 'span 3' }}>
                   <label>GST Number</label>
                   <input type="text" className="input-field" value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} />
                 </div>
-                <div style={{ gridColumn: 'span 2' }}>
+                <div style={{ gridColumn: 'span 3' }}>
                   <label>Subject</label>
                   <input type="text" className="input-field" value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} />
                 </div>
-                <div style={{ gridColumn: 'span 2' }}>
+                <div style={{ gridColumn: 'span 3' }}>
                   <label>Description</label>
                   <textarea className="input-field" rows="2" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
                 </div>
@@ -947,7 +960,7 @@ const Quotations = () => {
 
               {/* Associated Products table — same as Party / Material Receipt */}
               {formData.partyId && partyProducts.length > 0 && (
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Associated Products &amp; Default Charges</h3>
                     {formData.productName && (
@@ -1049,14 +1062,7 @@ const Quotations = () => {
                   <label>PSD Requirement</label>
                   <input type="text" className="input-field" placeholder="e.g. d(0.9) < 10 Micron" value={formData.psdRequirement || ''} onChange={e => setFormData({ ...formData, psdRequirement: e.target.value })} />
                 </div>
-                <div>
-                  <label>Validity Date</label>
-                  <input type="date" className="input-field" value={formData.validityDate} onChange={e => {
-                    const validityDate = e.target.value;
-                    setFormData({ ...formData, validityDate, terms: syncValidityInTerms(formData.terms, validityDate) });
-                  }} />
-                </div>
-                <div>
+                <div style={{ gridColumn: 'span 2' }}>
                   <label>Signatory Name</label>
                   <input type="text" className="input-field" value={formData.signatoryName} onChange={e => setFormData({...formData, signatoryName: e.target.value})} />
                 </div>
@@ -1079,14 +1085,7 @@ const Quotations = () => {
                   <label>PSD Requirement</label>
                   <input type="text" className="input-field" placeholder="e.g. d(0.9) < 10 Micron" value={formData.psdRequirement || ''} onChange={e => setFormData({ ...formData, psdRequirement: e.target.value })} />
                 </div>
-                <div>
-                  <label>Validity Date</label>
-                  <input type="date" className="input-field" value={formData.validityDate} onChange={e => {
-                    const validityDate = e.target.value;
-                    setFormData({ ...formData, validityDate, terms: syncValidityInTerms(formData.terms, validityDate) });
-                  }} />
-                </div>
-                <div>
+                <div style={{ gridColumn: 'span 2' }}>
                   <label>Signatory Name</label>
                   <input type="text" className="input-field" value={formData.signatoryName} onChange={e => setFormData({...formData, signatoryName: e.target.value})} />
                 </div>
@@ -1133,7 +1132,8 @@ const Quotations = () => {
                             type="number"
                             className="input-field"
                             style={{ padding: '0.25rem', width: '90px', fontSize: '0.8rem' }}
-                            value={formData.rates?.[item.key] || 0}
+                            value={rateInputValue(formData.rates?.[item.key])}
+                            placeholder="0"
                             onChange={e => handleMaterialRateChange(item.key, e.target.value)}
                           />
                           <RateUnitSelect
@@ -1199,7 +1199,8 @@ const Quotations = () => {
                             type="number"
                             className="input-field"
                             style={{ padding: '0.25rem', width: '90px', fontSize: '0.8rem' }}
-                            value={formData.rates?.[item.key] || 0}
+                            value={rateInputValue(formData.rates?.[item.key])}
+                            placeholder="0"
                             onChange={e => handleMaterialRateChange(item.key, e.target.value)}
                           />
                           <RateUnitSelect
@@ -1241,7 +1242,7 @@ const Quotations = () => {
                 </div>
                 <div style={dropZoneStyle('mainTable')}>
                 {formData.mainCharges.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '22px 1.4fr 1.1fr 0.95fr 70px 0.8fr 0.8fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '22px 1.4fr 1.1fr 0.95fr 110px 0.8fr 0.8fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                     <div></div>
                     <div>Charge Description</div>
                     <div>Print note</div>
@@ -1253,7 +1254,7 @@ const Quotations = () => {
                   </div>
                 )}
                 {formData.mainCharges.map((charge, idx) => (
-                  <div key={charge.sourceKey || `main-${idx}`} style={{ display: 'grid', gridTemplateColumns: '22px 1.4fr 1.1fr 0.95fr 70px 0.8fr 0.8fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                  <div key={charge.sourceKey || `main-${idx}`} style={{ display: 'grid', gridTemplateColumns: '22px 1.4fr 1.1fr 0.95fr 110px 0.8fr 0.8fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                     <span
                       draggable
                       title="Drag to Optional table"
@@ -1293,7 +1294,7 @@ const Quotations = () => {
                 </div>
                 <div style={dropZoneStyle('optionalTable')}>
                 {formData.optionalCharges.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '22px 1.5fr 1.1fr 70px 1fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '22px 1.5fr 1.1fr 110px 1fr 30px', gap: '0.5rem', marginBottom: '0.25rem', padding: '0 0.25rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                     <div></div>
                     <div>Description</div>
                     <div>Print note</div>
@@ -1303,7 +1304,7 @@ const Quotations = () => {
                   </div>
                 )}
                 {formData.optionalCharges.map((charge, idx) => (
-                  <div key={charge.sourceKey || `opt-${idx}`} style={{ display: 'grid', gridTemplateColumns: '22px 1.5fr 1.1fr 70px 1fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                  <div key={charge.sourceKey || `opt-${idx}`} style={{ display: 'grid', gridTemplateColumns: '22px 1.5fr 1.1fr 110px 1fr 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                     <span
                       draggable
                       title="Drag to Main Charges table"

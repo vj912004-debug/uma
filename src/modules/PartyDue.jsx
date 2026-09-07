@@ -7,6 +7,7 @@ import { getReceiptOutstanding, getPartyOutstandingByFY, collectPartyDueEntities
 import { getCurrentFYKey, getFYKeysThroughCurrent } from '../utils/financialYear';
 import { useNavigate } from 'react-router-dom';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
 
 const PartyDue = () => {
   const { data, updateData, updateItem } = useAppContext();
@@ -262,7 +263,7 @@ const PartyDue = () => {
 
                 <div>
                   <label>Payment Date *</label>
-                  <input type="date" className="input-field" required value={paymentForm.date} onChange={e => setPaymentForm({...paymentForm, date: e.target.value})} />
+                  <DateField className="input-field" required value={paymentForm.date} onChange={e => setPaymentForm({...paymentForm, date: e.target.value})} />
                 </div>
                 <div>
                   <label>Cheque Amount Received (₹) *</label>

@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Bell, Calendar, Clock, RotateCw, CheckCircle, Trash2, Edit2 } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
+import TimeField from '../components/TimeField';
 
 const TaskManager = () => {
   const { data, updateData, updateItem, setData } = useAppContext();
@@ -226,11 +228,11 @@ const TaskManager = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label>Due Date *</label>
-                    <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+                    <DateField className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                   </div>
                   <div>
                     <label>Due Time *</label>
-                    <input type="time" className="input-field" required value={form.time} onChange={e => setForm({...form, time: e.target.value})} />
+                    <TimeField className="input-field" required value={form.time} onChange={e => setForm({...form, time: e.target.value})} />
                   </div>
                 </div>
 

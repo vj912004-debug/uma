@@ -17,20 +17,52 @@ export const TI_CHARGES_LIST = [
 export const TI_EMPTY_ROWS = 2;
 
 /**
- * Resolve invoice GST from form taxRate (e.g. 18).
- * CGST/SGST Rate columns and amounts each use half (e.g. 9% + 9% = 18% total).
+ * Resolve invoice GST from form taxRate (e.g. 18) and gstType.
+ * - cgst_sgst (default, within Gujarat): half rate each on CGST + SGST
+ * - igst (out of Gujarat / interstate): full rate on IGST only
  */
+export const GST_TYPE_CGST_SGST = 'cgst_sgst';
+export const GST_TYPE_IGST = 'igst';
+
+export const normalizeGstType = (value) => (
+  String(value || '').toLowerCase() === GST_TYPE_IGST ? GST_TYPE_IGST : GST_TYPE_CGST_SGST
+);
+
 export const getSplitGstRates = (data) => {
   const parsed = parseFloat(data?.taxRate);
   const taxRate = Number.isFinite(parsed) && parsed >= 0 ? parsed : 18;
+  const gstType = normalizeGstType(data?.gstType);
+  if (gstType === GST_TYPE_IGST) {
+    return {
+      taxRate,
+      gstType,
+      displayRate: taxRate,
+      sgst: 0,
+      cgst: 0,
+      igst: taxRate
+    };
+  }
   const half = taxRate / 2;
   return {
     taxRate,
+    gstType,
     displayRate: half,
     sgst: half,
     cgst: half,
     igst: 0
   };
+};
+
+/** Split a taxable amount into CGST/SGST/IGST rupees for form summaries. */
+export const splitTaxableGstAmount = (taxable, taxRate, gstType) => {
+  const base = Math.max(0, parseFloat(taxable) || 0);
+  const rate = Number.isFinite(parseFloat(taxRate)) ? parseFloat(taxRate) : 18;
+  const taxAmount = base * (rate / 100);
+  if (normalizeGstType(gstType) === GST_TYPE_IGST) {
+    return { taxAmount, cgst: 0, sgst: 0, igst: taxAmount };
+  }
+  const half = taxAmount / 2;
+  return { taxAmount, cgst: half, sgst: half, igst: 0 };
 };
 
 /** Split party address into compact display lines (newlines, commas, then word-wrap). */

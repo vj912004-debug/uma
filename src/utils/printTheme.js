@@ -189,7 +189,12 @@ const fillItemsBlankRowsToFit = (page, band, rowPx = 18) => {
   if (!table || !tbody) return;
 
   const tfoot = table.querySelector('tfoot');
-  const first = tbody.querySelector('tr:not(.dc-delivery-note):not(.special-row)');
+  const pinAnchor = tbody.querySelector(
+    'tr.dc-pin-start, tr.dc-delivery-note, tr.dc-goods-value, tr.special-row'
+  );
+  const first = tbody.querySelector(
+    'tr:not(.dc-delivery-note):not(.dc-goods-value):not(.dc-pin-gap):not(.special-row)'
+  );
   let colCount = 0;
   if (first) {
     [...first.children].forEach((cell) => {
@@ -201,18 +206,41 @@ const fillItemsBlankRowsToFit = (page, band, rowPx = 18) => {
   table.style.setProperty('max-height', 'none', 'important');
   table.style.setProperty('margin-bottom', '0', 'important');
 
-  const applyRowPx = (tr) => {
-    tr.style.setProperty('height', `${rowPx}px`, 'important');
+  const blankRows = () => [
+    ...tbody.querySelectorAll('tr.filler-row, tr.dc-pin-gap, tr.empty:not(.dc-delivery-note):not(.dc-goods-value)')
+  ].filter((tr, idx, arr) => arr.indexOf(tr) === idx);
+
+  const applyRowPx = (tr, px = rowPx) => {
+    tr.style.setProperty('height', `${px}px`, 'important');
+    tr.style.setProperty('min-height', `${px}px`, 'important');
+    tr.style.setProperty('max-height', `${px}px`, 'important');
     [...tr.children].forEach((td) => {
-      td.style.setProperty('height', `${rowPx}px`, 'important');
-      td.style.setProperty('min-height', `${rowPx}px`, 'important');
-      td.style.setProperty('max-height', `${rowPx}px`, 'important');
+      td.style.setProperty('height', `${px}px`, 'important');
+      td.style.setProperty('min-height', `${px}px`, 'important');
+      td.style.setProperty('max-height', `${px}px`, 'important');
+      td.style.setProperty('padding-top', '0', 'important');
+      td.style.setProperty('padding-bottom', '0', 'important');
+      td.style.setProperty('line-height', `${px}px`, 'important');
+      td.style.setProperty('font-size', '10px', 'important');
+      td.style.setProperty('color', 'transparent', 'important');
+      td.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
+      td.style.setProperty('border', '1px solid var(--lav-border, #c9bce8)', 'important');
+      td.style.setProperty('vertical-align', 'middle', 'important');
+      if (!td.innerHTML || !String(td.innerHTML).trim()) td.innerHTML = '&nbsp;';
     });
   };
-  tbody.querySelectorAll('tr.filler-row').forEach(applyRowPx);
+  blankRows().forEach((tr) => applyRowPx(tr, rowPx));
+
+  const insertFiller = (tr) => {
+    if (pinAnchor && pinAnchor.parentNode === tbody) tbody.insertBefore(tr, pinAnchor);
+    else tbody.appendChild(tr);
+  };
 
   const leftover = () => {
     void page.offsetHeight;
+    const bandH = Math.floor(band.clientHeight || 0);
+    const tableH = Math.floor(table.offsetHeight || 0);
+    if (bandH > 0) return bandH - tableH;
     const bandBox = band.getBoundingClientRect();
     const tableBox = table.getBoundingClientRect();
     const bandBottom = Math.floor(bandBox.bottom);
@@ -228,9 +256,14 @@ const fillItemsBlankRowsToFit = (page, band, rowPx = 18) => {
     return Math.max(belowTable, belowFoot, aboveFoot);
   };
 
+  const lastFiller = () => {
+    const fillers = tbody.querySelectorAll('tr.filler-row');
+    return fillers.length ? fillers[fillers.length - 1] : null;
+  };
+
   let guard = 0;
   while (leftover() < 0 && guard < 80) {
-    const last = tbody.querySelector('tr.filler-row:last-child');
+    const last = lastFiller();
     if (!last) break;
     last.remove();
     guard += 1;
@@ -238,19 +271,29 @@ const fillItemsBlankRowsToFit = (page, band, rowPx = 18) => {
   guard = 0;
   while (leftover() >= rowPx && guard < 80) {
     const tr = doc.createElement('tr');
-    tr.className = 'filler-row';
+    tr.className = 'filler-row empty';
     for (let i = 0; i < colCount; i += 1) {
       const td = doc.createElement('td');
       td.innerHTML = '&nbsp;';
       tr.appendChild(td);
     }
-    applyRowPx(tr);
-    tbody.appendChild(tr);
+    applyRowPx(tr, rowPx);
+    insertFiller(tr);
     guard += 1;
   }
   if (leftover() < 0) {
-    const last = tbody.querySelector('tr.filler-row:last-child');
+    const last = lastFiller();
     if (last) last.remove();
+  }
+
+  // Same line spacing: distribute remaining leftover evenly; all blank rows identical height.
+  const blanks = blankRows();
+  if (blanks.length) {
+    blanks.forEach((tr) => applyRowPx(tr, rowPx));
+    void page.offsetHeight;
+    const rem = Math.max(0, leftover());
+    const each = Math.max(rowPx, rowPx + Math.floor(rem / blanks.length));
+    blanks.forEach((tr) => applyRowPx(tr, each));
   }
 };
 
@@ -271,6 +314,31 @@ export const layoutFillOtherPrintPages = (doc, pageHeight) => {
 
   doc.querySelectorAll('.sheet.pdf-page:not(.page2)').forEach((page) => {
     if (page.querySelector('.items-row') || page.classList.contains('pl-page')) return;
+    // Quotation page 1: never pad blank rows or force overflow clipping here.
+    // fitQuotationToTwoPages (prepareDoc) owns compaction + A4 fit.
+    if (page.querySelector('.features')) {
+      page.querySelectorAll('tr.filler-row').forEach((tr) => tr.remove());
+      page.querySelectorAll('table.dt').forEach((el) => {
+        el.style.setProperty('height', 'auto', 'important');
+        el.style.setProperty('flex', '0 0 auto', 'important');
+        const headerRow = el.querySelector('thead tr');
+        if (!headerRow) return;
+        const qtyIndexes = [];
+        [...headerRow.children].forEach((th, idx) => {
+          const label = String(th.textContent || '').replace(/\s+/g, ' ').trim();
+          if (/^qty$/i.test(label) || th.classList.contains('qty')) qtyIndexes.push(idx);
+        });
+        qtyIndexes.reverse().forEach((colIdx) => {
+          el.querySelectorAll('tr').forEach((tr) => {
+            const cell = tr.children[colIdx];
+            if (cell) cell.remove();
+          });
+        });
+      });
+      const tablesBox = page.querySelector('.tables');
+      if (tablesBox) tablesBox.style.setProperty('flex', '0 0 auto', 'important');
+      return;
+    }
     const lastTable = [...page.querySelectorAll('table.dt')].pop();
     if (!lastTable) return;
     const wrap = lastTable.parentElement;
@@ -409,7 +477,8 @@ export const layoutFitFooterPages = (doc, pageHeight) => {
     });
     const isCnDn = page.classList.contains('cn-page') || page.classList.contains('dn-page');
     const isTiPi = page.classList.contains('ti-page') || page.classList.contains('pi-page');
-    page.querySelectorAll('tr.filler-row').forEach((tr) => {
+    page.querySelectorAll('tr.filler-row, tr.dc-pin-gap, tr.empty').forEach((tr) => {
+      if (tr.classList.contains('dc-delivery-note') || tr.classList.contains('dc-goods-value')) return;
       if (isCnDn) {
         tr.style.height = '1%';
         [...tr.children].forEach((td) => {
@@ -418,12 +487,16 @@ export const layoutFitFooterPages = (doc, pageHeight) => {
           td.style.maxHeight = 'none';
         });
       } else {
-        const rowPx = isTiPi ? '18px' : '16px';
+        const rowPx = isTiPi ? '18px' : '22px';
         tr.style.height = rowPx;
         [...tr.children].forEach((td) => {
           td.style.height = rowPx;
           td.style.minHeight = rowPx;
           td.style.maxHeight = rowPx;
+          td.style.paddingTop = '0';
+          td.style.paddingBottom = '0';
+          td.style.lineHeight = '0';
+          td.style.fontSize = '0';
         });
       }
     });
@@ -490,10 +563,14 @@ export const layoutFitFooterPages = (doc, pageHeight) => {
       });
     }
 
+    const isDc = Boolean(page.querySelector('.dc-bot')) || page.classList.contains('dc-page');
+    fillItemsBlankRowsToFit(page, itemsRow, isDc ? 22 : 18);
+
     const table = page.querySelector('table.items');
     const tableH = table ? Math.ceil(Math.max(table.scrollHeight, table.offsetHeight || 0)) : 0;
     const rowH = Math.ceil(itemsRow.clientHeight || itemsH);
-    if (tableH > rowH + 8) {
+    const fillersLeft = table?.querySelector('tr.filler-row');
+    if (tableH > rowH + 8 && !fillersLeft) {
       wrap.style.setProperty('height', 'auto', 'important');
       wrap.style.setProperty('max-height', 'none', 'important');
       wrap.style.setProperty('overflow', 'visible', 'important');
@@ -505,11 +582,7 @@ export const layoutFitFooterPages = (doc, pageHeight) => {
       page.style.setProperty('max-height', 'none', 'important');
       page.style.setProperty('min-height', `${pageHeight}px`, 'important');
       page.style.setProperty('overflow', 'visible', 'important');
-      return;
     }
-
-    const isDc = Boolean(page.querySelector('.dc-bot')) || page.classList.contains('dc-page');
-    fillItemsBlankRowsToFit(page, itemsRow, isDc ? 22 : 18);
   });
 };
 
@@ -627,16 +700,26 @@ export const ITEMS_TABLE_FILL_CSS = `
   table.items { height: 100%; }
   table.items thead,
   table.items tfoot { height: 1px; }
-  table.items tbody tr.filler-row { height: 1%; }
-    table.items tbody tr.filler-row td {
-      height: auto !important;
-      min-height: 18px;
-      padding: 2px 3px !important;
-      border: 1px solid var(--lav-border) !important;
-      line-height: 1;
-      background: #fff;
-      vertical-align: middle;
-    }
+  table.items tbody tr.filler-row,
+  table.items tbody tr.empty,
+  table.items tbody tr.dc-pin-gap {
+    height: 22px;
+  }
+  table.items tbody tr.filler-row td,
+  table.items tbody tr.empty td,
+  table.items tbody tr.dc-pin-gap td {
+    height: 22px !important;
+    min-height: 22px !important;
+    max-height: 22px !important;
+    padding: 0 3px !important;
+    border: 1px solid var(--lav-border) !important;
+    line-height: 22px !important;
+    font-size: 10px !important;
+    color: transparent !important;
+    -webkit-text-fill-color: transparent !important;
+    background: #fff;
+    vertical-align: middle;
+  }
 `;
 
 
@@ -1328,7 +1411,7 @@ export const renderHtmlToPdf = async (html, {
     ? html
     : applyPrintPrefsToHtml(html, resolvedPrefs);
   const minFitScale = resolvedPrefs ? getPrintMinFitScale(resolvedPrefs) : 0.82;
-  const density = resolvedPrefs ? getPrintDensity(resolvedPrefs) : 'base';
+  let density = resolvedPrefs ? getPrintDensity(resolvedPrefs) : 'base';
 
   // Render inside an iframe so document <style> (e.g. * { font-size })
   // cannot leak into the live ERP UI and shrink app fonts on Preview.
@@ -1379,25 +1462,26 @@ export const renderHtmlToPdf = async (html, {
           page.style.maxHeight = 'none';
           page.style.minHeight = '0';
           page.style.overflow = 'visible';
+          page.style.transform = 'none';
+          page.style.zoom = '1';
           const h = Math.max(page.scrollHeight, page.offsetHeight || 0);
           if (h > singlePageHeight + 8) needsMore = true;
         });
         if (!needsMore) break;
         tierIdx = Math.min(escalate.length - 1, tierIdx + 1);
         const nextDensity = escalate[tierIdx];
+        density = nextDensity;
         [idoc.documentElement, idoc.body].forEach((el) => {
           if (!el) return;
           el.classList.remove('print-density-base', 'print-density-sm', 'print-density-md', 'print-density-lg', 'print-density-xl');
           el.classList.add(PRINT_ROOT_CLASS, `print-density-${nextDensity}`);
         });
-        // Quotation-style compact helpers if present
-        pages.forEach((page) => {
-          if (page.classList.contains('sheet')) {
-            page.classList.add(nextDensity === 'xl' ? 'quot-compact-more' : 'quot-compact');
-            if (nextDensity === 'xl') page.classList.add('quot-compact-more');
-          }
-        });
         // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      }
+      // Re-fit after density changes (quotation compact/feature hide must re-run).
+      if (typeof prepareDoc === 'function') {
+        prepareDoc(idoc, { width, singlePageHeight, printPrefs: resolvedPrefs, density });
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       }
     }
@@ -1450,9 +1534,15 @@ export const renderHtmlToPdf = async (html, {
       target.style.boxSizing = 'border-box';
       target.style.margin = '0';
       target.style.zoom = '1';
+      target.style.transform = 'none';
       layoutFitFooterPages(idoc, singlePageHeight);
       layoutPackingListPages(idoc, singlePageHeight);
       layoutFillOtherPrintPages(idoc, singlePageHeight);
+      // Quotation page 1: re-fit after layout helpers so tables are never clipped.
+      const isQuotationPage = Boolean(target.querySelector?.('.quote-main-table'));
+      if (isQuotationPage && typeof prepareDoc === 'function') {
+        prepareDoc(idoc, { width, singlePageHeight, printPrefs: resolvedPrefs, density });
+      }
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const naturalH = Math.max(target.scrollHeight, target.offsetHeight || 0);
@@ -1460,7 +1550,14 @@ export const renderHtmlToPdf = async (html, {
       // Lock designed pages to A4 unless this sheet still overflows and splitting is allowed
       const lockThisPage = (fitPage || pageNodes.length > 0) && !(splitOverflowPages && overflows);
 
-      if (lockThisPage) {
+      if (isQuotationPage) {
+        // prepareDoc already locked/scaled the sheet — keep that result for capture.
+        fitScale = 1;
+        target.style.height = `${singlePageHeight}px`;
+        target.style.minHeight = `${singlePageHeight}px`;
+        target.style.maxHeight = `${singlePageHeight}px`;
+        target.style.overflow = 'hidden';
+      } else if (lockThisPage) {
         // Auto-fit any locked page that overflows (font/size changes included).
         fitScale = overflows
           ? Math.max(minFitScale, Math.min(1, singlePageHeight / naturalH))
@@ -1487,13 +1584,15 @@ export const renderHtmlToPdf = async (html, {
         target.style.overflow = 'hidden';
       }
 
-      layoutFitFooterPages(idoc, singlePageHeight);
-      layoutPackingListPages(idoc, singlePageHeight);
-      layoutFillOtherPrintPages(idoc, singlePageHeight);
+      if (!isQuotationPage) {
+        layoutFitFooterPages(idoc, singlePageHeight);
+        layoutPackingListPages(idoc, singlePageHeight);
+        layoutFillOtherPrintPages(idoc, singlePageHeight);
+      }
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-      const captureH = (lockThisPage || (!overflows && pageNodes.length > 0))
+      const captureH = (lockThisPage || isQuotationPage || (!overflows && pageNodes.length > 0))
         ? singlePageHeight
         : Math.max(naturalH, target.scrollHeight, singlePageHeight);
 
@@ -1511,7 +1610,7 @@ export const renderHtmlToPdf = async (html, {
         scrollY: 0,
         logging: false,
         onclone: (clonedDoc) => {
-          if (!lockThisPage && !(pageNodes.length > 0 && !overflows)) return;
+          if (!lockThisPage && !isQuotationPage && !(pageNodes.length > 0 && !overflows)) return;
           const htmlEl = clonedDoc.documentElement;
           const bodyEl = clonedDoc.body;
           if (htmlEl) {
@@ -1527,13 +1626,25 @@ export const renderHtmlToPdf = async (html, {
             bodyEl.style.overflow = 'hidden';
           }
           clonedDoc.querySelectorAll('.pdf-page, .print-host, .page').forEach((el) => {
-            el.style.width = fitScale < 1 ? `${Math.round(width / fitScale)}px` : `${width}px`;
+            const isQuote = Boolean(el.querySelector?.('.quote-main-table'));
+            const existingTransform = el.style.transform;
+            const existingZoom = el.style.zoom;
+            el.style.width = (!isQuote && fitScale < 1) ? `${Math.round(width / fitScale)}px` : (el.style.width || `${width}px`);
             el.style.height = `${singlePageHeight}px`;
             el.style.minHeight = `${singlePageHeight}px`;
             el.style.maxHeight = `${singlePageHeight}px`;
             el.style.overflow = 'hidden';
-            el.style.transform = 'none';
-            el.style.zoom = fitScale < 1 ? String(fitScale) : '1';
+            if (isQuote) {
+              // Keep prepareDoc scale/transform — do not reset to zoom.
+              if (existingTransform && existingTransform !== 'none') {
+                el.style.transform = existingTransform;
+                el.style.transformOrigin = 'top left';
+              }
+              el.style.zoom = existingZoom || '1';
+            } else {
+              el.style.transform = 'none';
+              el.style.zoom = fitScale < 1 ? String(fitScale) : '1';
+            }
             el.style.margin = '0';
             el.style.padding = '0';
             el.style.boxSizing = 'border-box';
@@ -1542,32 +1653,19 @@ export const renderHtmlToPdf = async (html, {
             el.style.marginTop = '0';
             el.style.paddingTop = '0';
             el.style.width = '100%';
-            if (el.querySelector('.quote-banner')) {
-              el.style.minHeight = '96px';
-              el.style.height = 'auto';
-              el.style.alignItems = 'stretch';
-              el.style.padding = '0 0 0 22px';
-              el.style.overflow = 'hidden';
-            } else {
-              el.style.minHeight = '0';
-              el.style.height = 'auto';
-            }
+            el.style.minHeight = '0';
+            el.style.height = 'auto';
           });
-          clonedDoc.querySelectorAll('.quote-banner').forEach((el) => {
-            el.style.margin = '0';
-            el.style.marginLeft = 'auto';
-            el.style.minHeight = '96px';
-            el.style.alignSelf = 'stretch';
-            el.style.flex = '1 1 300px';
-            el.style.width = 'auto';
-            el.style.maxWidth = 'none';
-          });
-          clonedDoc.querySelectorAll('.quote-banner .fill').forEach((el) => {
+          clonedDoc.querySelectorAll('.company-strip .dc-addr-text').forEach((el) => {
+            el.style.display = 'flex';
+            el.style.flexDirection = 'column';
+            el.style.whiteSpace = 'normal';
             el.style.minWidth = '0';
+          });
+          clonedDoc.querySelectorAll('.company-strip .dc-addr-l1, .company-strip .dc-addr-l2').forEach((el) => {
+            el.style.display = 'block';
+            el.style.whiteSpace = 'normal';
             el.style.width = '100%';
-            el.style.minHeight = '96px';
-            el.style.height = '100%';
-            el.style.padding = '0 24px 0 44px';
           });
           clonedDoc.querySelectorAll('.contact-bar').forEach((el) => {
             el.style.width = '100%';
@@ -1587,12 +1685,42 @@ export const renderHtmlToPdf = async (html, {
           clonedDoc.querySelectorAll('.contact-bar .citem.c-tight span').forEach((el) => {
             el.style.whiteSpace = 'nowrap';
           });
-          clonedDoc.querySelectorAll('.quote-banner h2').forEach((el) => {
-            const scaleRaw = getComputedStyle(clonedDoc.documentElement).getPropertyValue('--print-scale');
-            const printScale = parseFloat(scaleRaw) || 1;
-            el.style.fontSize = `${Math.round(28 * printScale)}px`;
-            el.style.lineHeight = '1';
-            el.style.margin = '0';
+          // Keep quotation tables fully visible — never clip mid-row in capture clone.
+          clonedDoc.querySelectorAll('.quote-main-table, .quote-optional-table, .tables, .tables > div').forEach((el) => {
+            el.style.maxHeight = 'none';
+            el.style.overflow = 'visible';
+            el.style.height = 'auto';
+            el.style.flex = '0 0 auto';
+          });
+          clonedDoc.querySelectorAll('.sheet.quot-features-fill .body-pad').forEach((el) => {
+            el.style.flex = '1 1 auto';
+            el.style.minHeight = '0';
+            el.style.overflow = 'visible';
+            el.style.height = 'auto';
+          });
+          clonedDoc.querySelectorAll('.sheet.quot-features-fill .features').forEach((el) => {
+            el.style.display = 'grid';
+            el.style.flex = '1 1 auto';
+            el.style.alignContent = 'stretch';
+            el.style.overflow = 'hidden';
+            // Preserve measured fill height from prepareDoc
+            if (!el.style.height || el.style.height === 'auto') {
+              el.style.minHeight = '0';
+            }
+          });
+          clonedDoc.querySelectorAll('.sheet.quot-features-fill .feat').forEach((el) => {
+            el.style.height = '100%';
+            el.style.minHeight = '0';
+          });
+          clonedDoc.querySelectorAll('.sheet:not(.quot-features-fill) .body-pad').forEach((el) => {
+            if (!el.closest('.sheet')?.querySelector('.quote-main-table')) return;
+            el.style.flex = '0 0 auto';
+            el.style.height = 'auto';
+            el.style.maxHeight = 'none';
+            el.style.overflow = 'visible';
+          });
+          clonedDoc.querySelectorAll('.sheet.quot-hide-features .features').forEach((el) => {
+            el.style.display = 'none';
           });
           clonedDoc.querySelectorAll('.content-wrapper td[valign="top"], .content-wrapper .pad-top').forEach((el) => {
             el.style.paddingTop = '4px';

@@ -2,13 +2,15 @@ import { formatDate } from '../utils/dateUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber, nextAvailableDocNumber } from '../utils/numbering';
+import DateField from '../components/DateField';
+import TimeField from '../components/TimeField';
 import { 
   FileText, Activity, UploadCloud, Package, Truck, 
   FileSpreadsheet, FileCheck, CheckCircle, Clock, X, Plus, Edit2, Download, Trash2,
   Search
 } from 'lucide-react';
 import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
-import { enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, getLinkedPITermsForTI, applyProformaFinancialsToTaxInvoice, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges, qtyInputValue } from '../utils/documentCharges';
+import { enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, getLinkedPITermsForTI, applyProformaFinancialsToTaxInvoice, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges, qtyInputValue, rateInputValue } from '../utils/documentCharges';
 import {
   getReceiptProductNames,
   getProductBatches,
@@ -33,6 +35,8 @@ import {
   enrichBPRForPrint
 } from '../utils/receiptProducts';
 import SearchableSelect from '../components/SearchableSelect';
+import GstTaxBlock from '../components/GstTaxBlock';
+import { GST_TYPE_CGST_SGST, normalizeGstType } from '../utils/taxInvoiceLayout';
 
 const CHARGE_KEYS = [
   'cleaning', 'filterBag', 'processing', 'sieving', 'psdReport',
@@ -249,8 +253,9 @@ const renderChargeRow = (item, pc, prodName, materialQty, toggleCharge, handleQt
         <input
           type="number"
           className="input-field input-compact"
-          style={{ width: '72px' }}
-          value={pc.rates[item.key] ?? 0}
+          style={{ width: '110px' }}
+          value={rateInputValue(pc.rates[item.key])}
+          placeholder="0"
           onChange={e => handleRateChange(prodName, item.key, e.target.value)}
           min="0"
         />
@@ -884,6 +889,7 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
     productCharges: initProductChargesFromMR(mr, party, prodOpts),
     discount: 0,
     taxRate: 18,
+    gstType: GST_TYPE_CGST_SGST,
     terms: 'Payment 100% advance against PI.'
   });
 
@@ -902,6 +908,7 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
         ),
         discount: editing.discount || 0,
         taxRate: editing.taxRate ?? 18,
+        gstType: normalizeGstType(editing.gstType),
         terms: editing.terms || 'Payment 100% advance against PI.'
       });
     } else {
@@ -1049,7 +1056,7 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
         </div>
         <div>
           <label>PI Date *</label>
-          <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+          <DateField className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
         </div>
         <div>
           <label>GSTIN</label>
@@ -1061,7 +1068,7 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
         </div>
         <div>
           <label>Supplier Doc Date</label>
-          <input type="date" className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
+          <DateField className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
         </div>
         <div>
           <label>Total Material Quantity</label>
@@ -1112,23 +1119,16 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
             <span>Discount (₹):</span>
             <input type="number" className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.discount} onChange={e => setForm({...form, discount: parseFloat(e.target.value) || 0})} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-            <span>GST Rate (%):</span>
-            <SearchableSelect className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
-              <option value="18">18%</option>
-              <option value="12">12%</option>
-              <option value="5">5%</option>
-              <option value="0">0%</option>
-            </SearchableSelect>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-            <span>GST Amount:</span>
-            <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100)).toFixed(2)}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
-            <span>Grand Total:</span>
-            <span>₹{(Math.max(0, getSubtotal() - form.discount) * (1 + form.taxRate / 100)).toFixed(2)}</span>
-          </div>
+          <GstTaxBlock
+            compact
+            taxable={Math.max(0, getSubtotal() - form.discount)}
+            taxRate={form.taxRate}
+            gstType={form.gstType}
+            showDiscountInput={false}
+            showSubtotal={false}
+            onTaxRateChange={(taxRate) => setForm({ ...form, taxRate })}
+            onGstTypeChange={(gstType) => setForm({ ...form, gstType })}
+          />
           <div style={{ marginTop: '0.5rem' }}>
             <label style={{ fontSize: '0.75rem' }}>Terms & Conditions</label>
             <input type="text" className="input-field" value={form.terms} onChange={e => setForm({...form, terms: e.target.value})} />
@@ -1136,7 +1136,7 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
         <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
         <button type="submit" className="btn btn-primary">Save Proforma Invoice</button>
       </div>
@@ -1456,7 +1456,7 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
             })
           )}
         </div>
-        <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
+        <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.85rem', fontWeight: 'bold', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
           <span>GRAND TOTAL {tableKey === 'receivedBatches' ? 'Received' : 'Dispatched'}:</span>
           <span style={{ display: 'flex', gap: '1rem', color: 'var(--accent-primary)' }}>
             <span>Gross: {totalGross.toFixed(2)} Kg</span>
@@ -1543,7 +1543,7 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           </div>
           <div>
             <label>BPR Date *</label>
-            <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+            <DateField className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
           </div>
           <div>
             <label>Customer Name</label>
@@ -1615,11 +1615,11 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           </div>
           <div>
             <label>Processing Start (Date)</label>
-            <input type="date" className="input-field" value={form.processingStartDate} onChange={e => setForm({ ...form, processingStartDate: e.target.value })} />
+            <DateField className="input-field" value={form.processingStartDate} onChange={e => setForm({ ...form, processingStartDate: e.target.value })} />
           </div>
           <div>
             <label>Processing Start (Time)</label>
-            <input type="time" className="input-field" value={form.processingStartTime} onChange={e => setForm({ ...form, processingStartTime: e.target.value })} />
+            <TimeField className="input-field" value={form.processingStartTime} onChange={e => setForm({ ...form, processingStartTime: e.target.value })} />
           </div>
           <div>
             <label>Processing Supervisor</label>
@@ -1776,11 +1776,11 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
           <div>
             <label>Process Completion Date</label>
-            <input type="date" className="input-field" value={form.processCompletionDate} onChange={e => setForm({ ...form, processCompletionDate: e.target.value })} />
+            <DateField className="input-field" value={form.processCompletionDate} onChange={e => setForm({ ...form, processCompletionDate: e.target.value })} />
           </div>
           <div>
             <label>Process Completion Time</label>
-            <input type="time" className="input-field" value={form.processCompletionTime} onChange={e => setForm({ ...form, processCompletionTime: e.target.value })} />
+            <TimeField className="input-field" value={form.processCompletionTime} onChange={e => setForm({ ...form, processCompletionTime: e.target.value })} />
           </div>
           <div>
             <label>Remarks</label>
@@ -1803,7 +1803,7 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         </div>
       </section>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
         <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
         <button type="submit" className="btn btn-primary">Save BPR Document</button>
       </div>
@@ -1951,7 +1951,7 @@ const PSDGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         </div>
         <div>
           <label>PSD Date</label>
-          <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+          <DateField className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
         </div>
         <div>
           <label>Customer Party</label>
@@ -2039,7 +2039,7 @@ const PSDGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         <textarea className="input-field" rows="3" value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
         <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
         <button type="submit" className="btn btn-primary">Save PSD Report(s)</button>
       </div>
@@ -2234,7 +2234,7 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         </div>
         <div>
           <label>Packing List Date</label>
-          <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+          <DateField className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
         </div>
         <div>
           <label>Party Name</label>
@@ -2407,7 +2407,7 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         )}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
         <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
         <button type="submit" className="btn btn-primary">Save Packing List</button>
       </div>
@@ -2451,7 +2451,8 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     transporterName: '',
     driverName: '',
     driverContact: '',
-    termsAndConditions: (mr.deliveryNotes || '').trim() || 'Material sent for Micronisation on Job Work basis. Goods to be returned after processing.'
+    termsAndConditions: (mr.deliveryNotes || '').trim(),
+    deliveryNotes: (mr.deliveryNotes || '').trim()
   });
 
   useEffect(() => {
@@ -2488,7 +2489,8 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       ...computed,
       value: computed.value === 0 || computed.value == null ? '' : computed.value,
       vehicleNo: mr.vehicleNo || prev.vehicleNo,
-      termsAndConditions: (mr.deliveryNotes || '').trim() || prev.termsAndConditions
+      termsAndConditions: (mr.deliveryNotes || '').trim() || prev.termsAndConditions,
+      deliveryNotes: (mr.deliveryNotes || '').trim() || prev.deliveryNotes || prev.termsAndConditions
     }));
   }, [dcFormInitKey]);
 
@@ -2513,6 +2515,8 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     const computed = buildDCFieldsFromProducts(mr, pl, prodOpts, form.selectedProducts);
+    const mrNotes = (mr.deliveryNotes || '').trim();
+    const dcNotes = (form.deliveryNotes || form.termsAndConditions || '').trim();
     const finalDoc = {
       ...form,
       productSummaries: computed.productSummaries,
@@ -2521,7 +2525,9 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       totalDrums: form.totalDrums,
       emptyDrums: computed.emptyDrums || form.emptyDrums || 0,
       value: form.value === '' || form.value == null ? '' : form.value,
-      receiptId: mr.id
+      receiptId: mr.id,
+      termsAndConditions: dcNotes || mrNotes || form.termsAndConditions,
+      deliveryNotes: dcNotes || mrNotes
     };
 
     if (editing) {
@@ -2542,7 +2548,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         </div>
         <div>
           <label>DC Date</label>
-          <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+          <DateField className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
         </div>
         <div>
           <label>Supplier Document No</label>
@@ -2550,10 +2556,10 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         </div>
         <div>
           <label>Supplier Doc Date</label>
-          <input type="date" className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
+          <DateField className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
         </div>
 
-        <div style={{ gridColumn: 'span 4', borderTop: '1px solid rgba(255,255,255,0.05)', margin: '0.5rem 0' }}></div>
+        <div style={{ gridColumn: 'span 4', borderTop: '1px solid var(--border-color)', margin: '0.5rem 0' }}></div>
 
         {availableProducts.length > 1 && (
           <div style={{ gridColumn: 'span 4', marginBottom: '0.5rem' }}>
@@ -2657,12 +2663,22 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         </div>
 
         <div style={{ gridColumn: 'span 4' }}>
-          <label>Terms & Conditions / Dispatch Description</label>
-          <textarea className="input-field" rows="2" placeholder="From Material Receipt Delivery Notes" value={form.termsAndConditions} onChange={e => setForm({...form, termsAndConditions: e.target.value})} />
+          <label>Delivery Notes</label>
+          <textarea
+            className="input-field"
+            rows="2"
+            placeholder="This text prints on the Delivery Challan"
+            value={form.deliveryNotes ?? form.termsAndConditions ?? ''}
+            onChange={e => setForm({
+              ...form,
+              deliveryNotes: e.target.value,
+              termsAndConditions: e.target.value
+            })}
+          />
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
         <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
         <button type="submit" className="btn btn-primary">Save Delivery Challan</button>
       </div>
@@ -2719,11 +2735,11 @@ const EWayDCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         </div>
         <div>
           <label>E-Way Bill Date *</label>
-          <input type="date" className="input-field" required value={form.ewayBillDate} onChange={e => setForm({...form, ewayBillDate: e.target.value})} />
+          <DateField className="input-field" required value={form.ewayBillDate} onChange={e => setForm({...form, ewayBillDate: e.target.value})} />
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
         <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
         <button type="submit" className="btn btn-primary">Save E-Way Bill details</button>
       </div>
@@ -2763,6 +2779,7 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
     customCharges: getLinkedPITermsForTI(data.invoices, mr.id)?.customCharges || [],
     discount: getLinkedPITermsForTI(data.invoices, mr.id)?.discount ?? 0,
     taxRate: getLinkedPITermsForTI(data.invoices, mr.id)?.taxRate ?? 18,
+    gstType: normalizeGstType(getLinkedPITermsForTI(data.invoices, mr.id)?.gstType),
     terms: 'Payment against delivery.'
   });
 
@@ -2791,6 +2808,7 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
           : (editing.customCharges || []),
         discount: piTerms ? piTerms.discount : (editing.discount || 0),
         taxRate: piTerms ? piTerms.taxRate : (editing.taxRate ?? 18),
+        gstType: normalizeGstType(piTerms?.gstType || editing.gstType),
         terms: editing.terms || 'Payment against delivery.'
       });
     } else {
@@ -2809,6 +2827,7 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
         customCharges: piTerms?.customCharges || [],
         discount: piTerms?.discount ?? 0,
         taxRate: piTerms?.taxRate ?? 18,
+        gstType: normalizeGstType(piTerms?.gstType),
         dcNo: dc?.dcNo || 'N/A',
         dcDate: dc?.date || 'N/A'
       }));
@@ -2948,7 +2967,7 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
         </div>
         <div>
           <label>Invoice Date *</label>
-          <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+          <DateField className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
         </div>
         <div>
           <label>Delivery Challan No</label>
@@ -3021,27 +3040,16 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
             <span>Discount (₹)</span>
             <input type="number" className="input-field input-compact" style={{ width: '100px' }} value={form.discount} onChange={e => setForm({...form, discount: parseFloat(e.target.value) || 0})} />
           </div>
-          <div className="summary-row" style={{ alignItems: 'center' }}>
-            <span>GST Rate</span>
-            <SearchableSelect className="input-field input-compact" style={{ width: '100px' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
-              <option value="18">18%</option>
-              <option value="12">12%</option>
-              <option value="5">5%</option>
-              <option value="0">0%</option>
-            </SearchableSelect>
-          </div>
-          <div className="summary-row">
-            <span>CGST @{(form.taxRate / 2)}%</span>
-            <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
-          </div>
-          <div className="summary-row">
-            <span>SGST @{(form.taxRate / 2)}%</span>
-            <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
-          </div>
-          <div className="summary-row total">
-            <span>Grand Total</span>
-            <span>₹{(Math.max(0, getSubtotal() - form.discount) * (1 + form.taxRate / 100)).toFixed(2)}</span>
-          </div>
+          <GstTaxBlock
+            compact
+            taxable={Math.max(0, getSubtotal() - form.discount)}
+            taxRate={form.taxRate}
+            gstType={form.gstType}
+            showDiscountInput={false}
+            showSubtotal={false}
+            onTaxRateChange={(taxRate) => setForm({ ...form, taxRate })}
+            onGstTypeChange={(gstType) => setForm({ ...form, gstType })}
+          />
         </div>
       </div>
 
@@ -3096,11 +3104,11 @@ const EWayTIGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         </div>
         <div>
           <label>E-Way Bill Date *</label>
-          <input type="date" className="input-field" required value={form.ewayBillDate} onChange={e => setForm({...form, ewayBillDate: e.target.value})} />
+          <DateField className="input-field" required value={form.ewayBillDate} onChange={e => setForm({...form, ewayBillDate: e.target.value})} />
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
         <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
         <button type="submit" className="btn btn-primary">Save E-Way Bill details</button>
       </div>

@@ -4,6 +4,7 @@ import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import {Eye,  Search, UploadCloud, Trash2, Calendar, ClipboardList, CheckCircle } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
 
 const PSD = () => {
   const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
@@ -200,7 +201,7 @@ const PSD = () => {
                       <td style={{ padding: '0.75rem' }}>{psd.productName}</td>
                       <td style={{ padding: '0.75rem' }}>
                         {(psd.reports || []).map((rep, idx) => (
-                          <div key={idx} style={{ marginBottom: '0.5rem', borderBottom: idx < psd.reports.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', paddingBottom: idx < psd.reports.length - 1 ? '0.5rem' : '0' }}>
+                          <div key={idx} style={{ marginBottom: '0.5rem', borderBottom: idx < psd.reports.length - 1 ? '1px solid var(--border-color)' : 'none', paddingBottom: idx < psd.reports.length - 1 ? '0.5rem' : '0' }}>
                             <span style={{ fontSize: '0.75rem', display: 'block', color: 'var(--text-muted)' }}>Batch: {rep.batchNo || '-'}</span>
                             <span style={{ fontSize: '0.75rem', display: 'block', color: 'var(--text-muted)' }}>Method: {rep.method || '-'}</span>
                             <span style={{ fontSize: '0.75rem', display: 'block', color: 'var(--text-muted)' }}>Spec: {rep.requirement}</span>
@@ -246,7 +247,7 @@ const PSD = () => {
                 </div>
                 <div>
                   <label>PSD Date</label>
-                  <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+                  <DateField className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                 </div>
                 <div>
                   <label>Customer Party</label>
@@ -329,7 +330,7 @@ const PSD = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => setIsModalOpen(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Confirm & Save</button>
               </div>

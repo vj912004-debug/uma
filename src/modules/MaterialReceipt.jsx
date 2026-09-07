@@ -5,6 +5,8 @@ import { generateDocNumber } from '../utils/numbering';
 import ExportButton from '../components/ExportButton';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import {Eye,  Plus, Search, FileDown, Edit2, Trash2, ShieldAlert, FileText } from 'lucide-react';
+import DateField from '../components/DateField';
+import TimeField from '../components/TimeField';
 import {
   getReceiptProductNames,
   getProductBatches,
@@ -15,7 +17,7 @@ import {
   getReceiptProductSummaries,
   getReceiptTotals
 } from '../utils/receiptProducts';
-import { flattenMRChargeSnapshot, qtyInputValue } from '../utils/documentCharges';
+import { flattenMRChargeSnapshot, qtyInputValue, rateInputValue, parseChargeFieldValue } from '../utils/documentCharges';
 import SearchableSelect from '../components/SearchableSelect';
 
 const CHARGE_KEYS = [
@@ -27,7 +29,7 @@ const emptyChargeFlags = () =>
   Object.fromEntries(CHARGE_KEYS.map(k => [k, false]));
 
 const emptyChargeRates = () =>
-  Object.fromEntries(CHARGE_KEYS.map(k => [k, 0]));
+  Object.fromEntries(CHARGE_KEYS.map(k => [k, '']));
 
 const emptyChargeQtys = () =>
   Object.fromEntries(CHARGE_KEYS.map(k => [k, '']));
@@ -223,7 +225,7 @@ const MaterialReceipt = () => {
     totalDrums: 0,
     totalQty: 0,
     charges: { cleaning: false, filterBag: false, processing: false, sieving: false, psdReport: false, liner: false, courier: false, fiberDrum: false, transportation: false, hdpeDrum: false, batchChangeover: false },
-    rates: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
+    rates: { cleaning: '', filterBag: '', processing: '', sieving: '', psdReport: '', liner: '', courier: '', fiberDrum: '', transportation: '', hdpeDrum: '', batchChangeover: '' },
     qtys: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
     customCharges: [],
     productSettings: {},
@@ -506,7 +508,7 @@ const MaterialReceipt = () => {
     totalDrums: 0,
     totalQty: 0,
     charges: { cleaning: false, filterBag: false, processing: false, sieving: false, psdReport: false, liner: false, courier: false, fiberDrum: false, transportation: false, hdpeDrum: false, batchChangeover: false },
-    rates: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
+    rates: { cleaning: '', filterBag: '', processing: '', sieving: '', psdReport: '', liner: '', courier: '', fiberDrum: '', transportation: '', hdpeDrum: '', batchChangeover: '' },
     qtys: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberBag: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 },
     customCharges: [],
     productSettings: {},
@@ -776,15 +778,15 @@ const MaterialReceipt = () => {
   const tdStyle = { padding: '0.4rem 0.35rem', fontSize: '0.8rem', verticalAlign: 'middle', borderBottom: '1px solid var(--border-color)' };
   const renderCommonChargeTable = (items, startIndex) => (
     <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '560px' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '720px' }}>
         <thead>
           <tr>
             <th style={{ ...thStyle, width: '36px' }}>#</th>
             <th style={thStyle}>Material / Service Name</th>
             <th style={{ ...thStyle, width: '88px' }}>Code</th>
             <th style={{ ...thStyle, width: '78px', textAlign: 'center' }}>Applicable</th>
-            <th style={{ ...thStyle, width: '72px' }}>Qty</th>
-            <th style={{ ...thStyle, width: '92px' }}>Rate (₹)</th>
+            <th style={{ ...thStyle, width: '120px' }}>Qty</th>
+            <th style={{ ...thStyle, width: '120px' }}>Rate (₹)</th>
             <th style={{ ...thStyle, width: '100px' }}>Amount (₹)</th>
             <th style={{ ...thStyle, minWidth: '140px' }}>Note</th>
           </tr>
@@ -817,7 +819,7 @@ const MaterialReceipt = () => {
                     value={qtyInputValue(formData.qtys?.[item.key])}
                     placeholder="NIL"
                     onChange={(e) => patchCommonCharges({ qtys: { [item.key]: e.target.value } })}
-                    style={{ padding: '0.25rem', fontSize: '0.8rem', width: '100%', boxSizing: 'border-box' }}
+                    style={{ padding: '0.45rem 0.55rem', fontSize: '0.88rem', width: '100%', minHeight: '38px', boxSizing: 'border-box' }}
                   />
                 </td>
                 <td style={tdStyle}>
@@ -826,9 +828,10 @@ const MaterialReceipt = () => {
                     className="input-field"
                     min="0"
                     step="any"
-                    value={formData.rates?.[item.key] || 0}
-                    onChange={(e) => patchCommonCharges({ rates: { [item.key]: parseFloat(e.target.value) || 0 } })}
-                    style={{ padding: '0.25rem', fontSize: '0.8rem', width: '100%', boxSizing: 'border-box' }}
+                    value={rateInputValue(formData.rates?.[item.key])}
+                    onChange={(e) => patchCommonCharges({ rates: { [item.key]: parseChargeFieldValue(e.target.value) } })}
+                    placeholder="0"
+                    style={{ padding: '0.45rem 0.55rem', fontSize: '0.88rem', width: '100%', minHeight: '38px', boxSizing: 'border-box' }}
                   />
                 </td>
                 <td style={{ ...tdStyle, fontWeight: 600 }}>
@@ -1025,11 +1028,11 @@ const MaterialReceipt = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label>M.R. Date *</label>
-                  <input type="date" className="input-field" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                  <DateField className="input-field" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
                 </div>
                 <div>
                   <label>M.R. Time *</label>
-                  <input type="time" className="input-field" required value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} />
+                  <TimeField className="input-field" required value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} />
                 </div>
                 <div>
                   <label>Supplier Document No *</label>
@@ -1037,10 +1040,10 @@ const MaterialReceipt = () => {
                 </div>
                 <div>
                   <label>Supplier Doc Date *</label>
-                  <input type="date" className="input-field" required value={formData.partyDocDate} onChange={e => setFormData({...formData, partyDocDate: e.target.value})} />
+                  <DateField className="input-field" required value={formData.partyDocDate} onChange={e => setFormData({...formData, partyDocDate: e.target.value})} />
                 </div>
 
-                <div style={{ gridColumn: 'span 4', borderTop: '1px solid rgba(255,255,255,0.05)', margin: '0.5rem 0' }}></div>
+                <div style={{ gridColumn: 'span 4', borderTop: '1px solid var(--border-color)', margin: '0.5rem 0' }}></div>
 
                 {/* Party Selection */}
                 <div style={{ gridColumn: 'span 2' }}>
@@ -1202,12 +1205,16 @@ const MaterialReceipt = () => {
                                   className="input-field"
                                   min="0"
                                   step="any"
-                                  value={settings.rates?.processing || 0}
-                                  onChange={e => patchProductSettings(prod.name, s => ({
-                                    ...s,
-                                    rates: { ...s.rates, processing: parseFloat(e.target.value) || 0 },
-                                    charges: { ...s.charges, processing: (parseFloat(e.target.value) || 0) > 0 ? true : s.charges.processing }
-                                  }))}
+                                  value={rateInputValue(settings.rates?.processing)}
+                                  onChange={e => patchProductSettings(prod.name, s => {
+                                    const nextRate = parseChargeFieldValue(e.target.value);
+                                    return {
+                                      ...s,
+                                      rates: { ...s.rates, processing: nextRate },
+                                      charges: { ...s.charges, processing: parseFloat(nextRate) > 0 ? true : s.charges.processing }
+                                    };
+                                  })}
+                                  placeholder="0"
                                 />
                                 <input
                                   type="text"
@@ -1240,12 +1247,12 @@ const MaterialReceipt = () => {
                     <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                         <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.85rem', fontWeight: 600 }}>Manual Custom Charges</label>
-                        <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => patchProductSettings(prod.name, s => ({ ...s, customCharges: [...(s.customCharges || []), { id: Date.now() + Math.random(), name: '', hsn: '', rate: 0, qty: '', checked: true }] }))}>
+                        <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => patchProductSettings(prod.name, s => ({ ...s, customCharges: [...(s.customCharges || []), { id: Date.now() + Math.random(), name: '', hsn: '', rate: '', qty: '', checked: true }] }))}>
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Row
                         </button>
                       </div>
                       {(settings.customCharges || []).map((charge, cIdx) => (
-                        <div key={charge.id || cIdx} style={{ display: 'grid', gridTemplateColumns: 'auto minmax(140px, 1.4fr) minmax(70px, 0.6fr) 64px 80px minmax(120px, 1fr) 28px', gap: '0.4rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                        <div key={charge.id || cIdx} style={{ display: 'grid', gridTemplateColumns: 'auto minmax(140px, 1.4fr) minmax(70px, 0.6fr) 110px 110px minmax(120px, 1fr) 28px', gap: '0.4rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                           <input type="checkbox" checked={charge.checked !== false} onChange={e => patchProductSettings(prod.name, s => {
                             const newC = [...(s.customCharges || [])];
                             newC[cIdx] = { ...newC[cIdx], checked: e.target.checked };
@@ -1266,9 +1273,9 @@ const MaterialReceipt = () => {
                             newC[cIdx] = { ...newC[cIdx], qty: e.target.value };
                             return { ...s, customCharges: newC };
                           })} min="0" step="any" />
-                          <input type="number" className="input-field" placeholder="Rate" value={charge.rate} onChange={e => patchProductSettings(prod.name, s => {
+                          <input type="number" className="input-field" placeholder="Rate" value={rateInputValue(charge.rate)} onChange={e => patchProductSettings(prod.name, s => {
                             const newC = [...(s.customCharges || [])];
-                            newC[cIdx] = { ...newC[cIdx], rate: e.target.value };
+                            newC[cIdx] = { ...newC[cIdx], rate: parseChargeFieldValue(e.target.value) };
                             return { ...s, customCharges: newC };
                           })} min="0" step="any" />
                           <input type="text" className="input-field" list="mr-charge-note-options" placeholder="Note" value={charge.note || ''} onChange={e => patchProductSettings(prod.name, s => {
@@ -1346,9 +1353,8 @@ const MaterialReceipt = () => {
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Each row has its own note box. Processing stays on the product card above.</div>
                         </div>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(520px, 1fr))', gap: '0.75rem', padding: '0.85rem' }}>
-                        {renderCommonChargeTable(COMMON_CHARGE_ITEMS.slice(0, Math.ceil(COMMON_CHARGE_ITEMS.length / 2)), 1)}
-                        {renderCommonChargeTable(COMMON_CHARGE_ITEMS.slice(Math.ceil(COMMON_CHARGE_ITEMS.length / 2)), Math.ceil(COMMON_CHARGE_ITEMS.length / 2) + 1)}
+                      <div style={{ padding: '0.85rem' }}>
+                        {renderCommonChargeTable(COMMON_CHARGE_ITEMS, 1)}
                       </div>
                     </div>
                   )}
@@ -1356,7 +1362,7 @@ const MaterialReceipt = () => {
               )}
 
               {formData.partyId && (
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Empty Drums (All Products)</h3>
                     <button type="button" className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={handleAddEmptyDrumsRow}>
@@ -1401,7 +1407,7 @@ const MaterialReceipt = () => {
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={closeReceiptModal}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={!formData.batches.some(b => !b.isEmptyDrums && b.productName)}>{isEditing ? 'Apply Updates' : 'Confirm Log Material'}</button>
               </div>

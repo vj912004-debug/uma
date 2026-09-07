@@ -4,6 +4,9 @@ import { generateDocNumber } from '../utils/numbering';
 import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus, ArrowLeft } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import DocChargeRow from '../components/DocChargeRow';
+import DateField from '../components/DateField';
+import GstTaxBlock from '../components/GstTaxBlock';
+import { GST_TYPE_CGST_SGST } from '../utils/taxInvoiceLayout';
 import {
   STANDARD_CHARGES_LIST,
   defaultChargeFlags,
@@ -13,6 +16,7 @@ import {
   calcProductChargesSubtotalWithQty,
   parseChargeFieldValue,
   qtyInputValue,
+  rateInputValue,
   mergeSavedDocCharges,
   getFreshMaterialReceipt,
   findAnyTaxInvoice,
@@ -68,6 +72,7 @@ const TaxInvoice = () => {
     qtys: emptyChargeQtys(),
     discount: 0,
     taxRate: 18,
+    gstType: GST_TYPE_CGST_SGST,
     terms: 'Payment against delivery.',
     customCharges: [] // Array of { name: '', hsn: '', rate: 0, qty: 0, checked: true }
   });
@@ -131,6 +136,7 @@ const TaxInvoice = () => {
       customCharges: piTerms?.customCharges || [],
       discount: piTerms?.discount ?? 0,
       taxRate: piTerms?.taxRate ?? 18,
+      gstType: piTerms?.gstType === 'igst' ? 'igst' : GST_TYPE_CGST_SGST,
       terms: 'Payment against delivery.'
     };
   };
@@ -171,6 +177,7 @@ const TaxInvoice = () => {
           : (editingDoc.customCharges || []),
         discount: piTerms ? piTerms.discount : (editingDoc.discount || 0),
         taxRate: piTerms ? piTerms.taxRate : (editingDoc.taxRate ?? 18),
+        gstType: (piTerms?.gstType || editingDoc.gstType) === 'igst' ? 'igst' : GST_TYPE_CGST_SGST,
         invoiceNo: prev.invoiceNo || editingDoc.invoiceNo,
         date: prev.date || editingDoc.date
       }));
@@ -193,7 +200,8 @@ const TaxInvoice = () => {
           || resolveTIProductChargesForDoc(freshMR, mrParty, data.invoices, opts),
         customCharges: piTerms?.customCharges || prev.customCharges || [],
         discount: piTerms?.discount ?? prev.discount ?? 0,
-        taxRate: piTerms?.taxRate ?? prev.taxRate ?? 18
+        taxRate: piTerms?.taxRate ?? prev.taxRate ?? 18,
+        gstType: (piTerms?.gstType || prev.gstType) === 'igst' ? 'igst' : GST_TYPE_CGST_SGST
       }));
     }
   }, [editingDoc?.id, selectedPL?.id, isModalOpen]);
@@ -307,7 +315,7 @@ const TaxInvoice = () => {
   const addCustomCharge = () => {
     setForm(prev => ({
       ...prev,
-      customCharges: [...(prev.customCharges || []), { id: Date.now(), name: '', qty: '', rate: 0, checked: true }]
+      customCharges: [...(prev.customCharges || []), { id: Date.now(), name: '', qty: '', rate: '', checked: true }]
     }));
   };
 
@@ -369,6 +377,7 @@ const TaxInvoice = () => {
       qtys: emptyChargeQtys(),
       discount: 0,
       taxRate: 18,
+      gstType: GST_TYPE_CGST_SGST,
       terms: 'Payment against delivery.',
       partyId: '',
       partyName: '',
@@ -401,6 +410,7 @@ const TaxInvoice = () => {
       qtys: emptyChargeQtys(),
       discount: 0,
       taxRate: 18,
+      gstType: GST_TYPE_CGST_SGST,
       terms: 'Payment against delivery.',
       partyId: '',
       partyName: '',
@@ -645,7 +655,7 @@ const TaxInvoice = () => {
                 </div>
                 <div>
                   <label>Invoice Date *</label>
-                  <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+                  <DateField className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                 </div>
                 <div>
                   <label>Delivery Challan No</label>
@@ -653,7 +663,11 @@ const TaxInvoice = () => {
                 </div>
                 <div>
                   <label>Delivery Challan Date</label>
-                  <input type="text" className="input-field" value={form.dcDate} onChange={e => setForm({...form, dcDate: e.target.value})} />
+                  <DateField
+                    className="input-field"
+                    value={form.dcDate && form.dcDate !== 'N/A' ? form.dcDate : ''}
+                    onChange={e => setForm({...form, dcDate: e.target.value})}
+                  />
                 </div>
                 <div>
                   <label>Supplier Doc No</label>
@@ -661,7 +675,7 @@ const TaxInvoice = () => {
                 </div>
                 <div>
                   <label>Supplier Doc Date</label>
-                  <input type="date" className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
+                  <DateField className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
                 </div>
                 <div>
                   <label>Party Name</label>
@@ -783,11 +797,11 @@ const TaxInvoice = () => {
                       </button>
                     </div>
                     {(form.customCharges || []).map(c => (
-                      <div key={c.id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 80px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                      <div key={c.id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 110px 110px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                         <input type="checkbox" checked={c.checked !== false} onChange={e => updateCustomCharge(c.id, 'checked', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-primary)' }} />
                         <input type="text" className="input-field" placeholder="Description" value={c.name} onChange={e => updateCustomCharge(c.id, 'name', e.target.value)} />
                         <input type="number" className="input-field" placeholder="NIL" value={qtyInputValue(c.qty)} onChange={e => updateCustomCharge(c.id, 'qty', e.target.value)} min="0" step="any" />
-                        <input type="number" className="input-field" placeholder="Rate" value={c.rate} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
+                        <input type="number" className="input-field" placeholder="Rate" value={rateInputValue(c.rate)} onChange={e => updateCustomCharge(c.id, 'rate', e.target.value)} min="0" step="any" />
                         <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => removeCustomCharge(c.id)}>
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                         </button>
@@ -802,39 +816,22 @@ const TaxInvoice = () => {
                 {/* Calculation Summary */}
                 <div style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--accent-primary)' }}>GST Tax Billing Calculations</h4>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span>Subtotal:</span>
-                    <span style={{ fontWeight: 600 }}>₹{getSubtotal().toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                    <span>Discount (₹):</span>
-                    <input type="number" className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.discount} onChange={e => setForm({...form, discount: parseFloat(e.target.value) || 0})} />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                    <span>GST Rate (%):</span>
-                    <SearchableSelect className="input-field" style={{ width: '100px', padding: '0.2rem', height: 'auto' }} value={form.taxRate} onChange={e => setForm({...form, taxRate: parseInt(e.target.value) || 0})}>
-                      <option value="18">18%</option>
-                      <option value="12">12%</option>
-                      <option value="5">5%</option>
-                      <option value="0">0%</option>
-                    </SearchableSelect>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span>CGST @{(form.taxRate / 2)}%:</span>
-                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span>SGST @{(form.taxRate / 2)}%:</span>
-                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (form.taxRate / 100) / 2).toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
-                    <span>Grand Total:</span>
-                    <span>₹{(Math.max(0, getSubtotal() - form.discount) * (1 + form.taxRate / 100)).toFixed(2)}</span>
-                  </div>
+                  <GstTaxBlock
+                    subtotal={getSubtotal()}
+                    taxable={Math.max(0, getSubtotal() - form.discount)}
+                    discount={form.discount}
+                    taxRate={form.taxRate}
+                    gstType={form.gstType}
+                    showDiscountInput
+                    discountValue={form.discount}
+                    onDiscountChange={(discount) => setForm({ ...form, discount })}
+                    onTaxRateChange={(taxRate) => setForm({ ...form, taxRate })}
+                    onGstTypeChange={(gstType) => setForm({ ...form, gstType })}
+                  />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={closeForm}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Tax Invoice</button>
               </div>

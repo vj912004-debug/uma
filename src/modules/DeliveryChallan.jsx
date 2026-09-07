@@ -4,6 +4,7 @@ import { generateDocNumber } from '../utils/numbering';
 import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
 import {
   buildDCFieldsFromProducts,
   getReceiptProductNames,
@@ -34,7 +35,8 @@ const emptyDCForm = (docNo = '') => ({
   transporterName: '',
   driverName: '',
   driverContact: '',
-  termsAndConditions: DEFAULT_TERMS
+  termsAndConditions: '',
+  deliveryNotes: ''
 });
 
 const DeliveryChallan = () => {
@@ -65,13 +67,18 @@ const DeliveryChallan = () => {
       const computed = activeMR
         ? buildDCFieldsFromProducts(activeMR, activePL, prodOpts, selected)
         : {};
+      const mrNotes = (activeMR?.deliveryNotes || '').trim();
+      const existingNotes = (editingDoc.termsAndConditions || editingDoc.deliveryNotes || '').trim();
+      const useMrNotes = mrNotes && (!existingNotes || existingNotes === DEFAULT_TERMS);
       setForm({
         ...editingDoc,
         selectedProducts: selected,
         ...computed,
         qty: editingDoc.qty,
         totalDrums: editingDoc.totalDrums,
-        value: parseFloat(editingDoc.value) > 0 ? editingDoc.value : (computed.value || '')
+        value: parseFloat(editingDoc.value) > 0 ? editingDoc.value : (computed.value || ''),
+        termsAndConditions: useMrNotes ? mrNotes : (existingNotes === DEFAULT_TERMS ? '' : existingNotes),
+        deliveryNotes: useMrNotes ? mrNotes : (existingNotes === DEFAULT_TERMS ? '' : existingNotes)
       });
       return;
     }
@@ -93,7 +100,8 @@ const DeliveryChallan = () => {
         gstinShip: activeMR.gstinShip,
         selectedProducts: allNames,
         vehicleNo: activeMR.vehicleNo || '',
-        termsAndConditions: (activeMR.deliveryNotes || '').trim() || DEFAULT_TERMS,
+        termsAndConditions: (activeMR.deliveryNotes || '').trim(),
+        deliveryNotes: (activeMR.deliveryNotes || '').trim(),
         ...computed
       });
     }
@@ -152,6 +160,8 @@ const DeliveryChallan = () => {
       ? buildDCFieldsFromProducts(activeMR, activePL, opts, form.selectedProducts)
       : null;
 
+    const mrNotes = (activeMR?.deliveryNotes || '').trim();
+    const dcNotes = (form.deliveryNotes || form.termsAndConditions || '').trim();
     const finalDoc = {
       ...form,
       productSummaries: computed?.productSummaries ?? form.productSummaries,
@@ -160,7 +170,9 @@ const DeliveryChallan = () => {
       totalDrums: form.totalDrums,
       emptyDrums: computed?.emptyDrums ?? form.emptyDrums ?? 0,
       value: form.value === '' || form.value == null ? '' : form.value,
-      receiptId: editingDoc?.receiptId || activeMR?.id || activePL?.receiptId || ''
+      receiptId: editingDoc?.receiptId || activeMR?.id || activePL?.receiptId || '',
+      termsAndConditions: dcNotes || mrNotes || DEFAULT_TERMS,
+      deliveryNotes: dcNotes || mrNotes
     };
 
     if (editingDoc) {
@@ -291,7 +303,7 @@ const DeliveryChallan = () => {
                 </div>
                 <div>
                   <label>DC Date</label>
-                  <input type="date" className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+                  <DateField className="input-field" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                 </div>
                 <div>
                   <label>Supplier Document No</label>
@@ -299,10 +311,10 @@ const DeliveryChallan = () => {
                 </div>
                 <div>
                   <label>Supplier Doc Date</label>
-                  <input type="date" className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
+                  <DateField className="input-field" value={form.partyDocDate} onChange={e => setForm({...form, partyDocDate: e.target.value})} />
                 </div>
 
-                <div style={{ gridColumn: 'span 4', borderTop: '1px solid rgba(255,255,255,0.05)', margin: '0.5rem 0' }}></div>
+                <div style={{ gridColumn: 'span 4', borderTop: '1px solid var(--border-color)', margin: '0.5rem 0' }}></div>
 
                 {availableProducts.length > 1 && (
                   <div style={{ gridColumn: 'span 4', marginBottom: '0.5rem' }}>
@@ -392,12 +404,22 @@ const DeliveryChallan = () => {
                 </div>
 
                 <div style={{ gridColumn: 'span 4' }}>
-                  <label>Terms & Conditions / Dispatch Description</label>
-                  <textarea className="input-field" rows="2" placeholder="From Material Receipt Delivery Notes" value={form.termsAndConditions} onChange={e => setForm({...form, termsAndConditions: e.target.value})} />
+                  <label>Delivery Notes</label>
+                  <textarea
+                    className="input-field"
+                    rows="2"
+                    placeholder="This text prints on the Delivery Challan"
+                    value={form.deliveryNotes ?? form.termsAndConditions ?? ''}
+                    onChange={e => setForm({
+                      ...form,
+                      deliveryNotes: e.target.value,
+                      termsAndConditions: e.target.value
+                    })}
+                  />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => setIsModalOpen(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Delivery Challan</button>
               </div>

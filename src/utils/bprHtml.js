@@ -605,6 +605,7 @@ export const buildBprHtml = (data, profileInput) => {
           <td>${bprMark(data.filterBagPacked)}</td>
         </tr>
       </table>
+      <div class="bpr-page1-foot">
       <div class="remark-box">
         <div class="remark-label">Remark</div>
         <div class="remark-content">${escHtml(data.remark || data.dispatchRemark || '')}</div>
@@ -618,6 +619,7 @@ export const buildBprHtml = (data, profileInput) => {
           <div class="signature-label">${penIcon} Plant Supervisor's Signature</div>
         </div>
       </div>
+      </div>
     </div>
   </div>`;
 
@@ -630,15 +632,15 @@ export const buildBprHtml = (data, profileInput) => {
   *{box-sizing:border-box;margin:0;padding:0;font-family:Cambria,Georgia,serif;}
   html,body{margin:0;padding:0;background:#fff;}
   .page{
-    width:794px;height:1123px;min-height:1123px;max-height:1123px;padding:8px;margin:0;background:#fff;
+    width:794px;height:1123px;min-height:1123px;max-height:1123px;padding:8px 8px 14px 8px;margin:0;background:#fff;
     display:flex;flex-direction:column;page-break-after:always;box-sizing:border-box;overflow:hidden;
   }
   .page.page-p2{
-    height:auto;min-height:1123px;max-height:none;overflow:visible;
+    height:auto;min-height:1123px;max-height:none;overflow:visible;padding:8px;
   }
   .sheet{
-    flex:1 1 auto;height:100%;min-height:0;border:2px solid #5a009d;padding:10px;
-    display:flex;flex-direction:column;box-sizing:border-box;position:relative;
+    flex:1 1 auto;height:auto;max-height:100%;min-height:0;border:2px solid #5a009d;padding:10px 10px 8px 10px;
+    display:flex;flex-direction:column;box-sizing:border-box;position:relative;overflow:hidden;
   }
   table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:-1px;}
   table.g th,table.g td{
@@ -697,8 +699,8 @@ export const buildBprHtml = (data, profileInput) => {
     z-index:1;
   }
   .psd-note-box{
-    flex:1;
-    min-height:48px;
+    flex:1 1 auto;
+    min-height:0;
     display:flex;
     flex-direction:column;
     border:1px solid #7c12bd;
@@ -715,7 +717,8 @@ export const buildBprHtml = (data, profileInput) => {
     flex-shrink:0;
   }
   .psd-note-body{
-    flex:1;
+    flex:1 1 auto;
+    min-height:0;
     padding:4px 8px;
     text-align:left;
     font-size:12px;
@@ -727,11 +730,11 @@ export const buildBprHtml = (data, profileInput) => {
     overflow:hidden;
   }
   .remark-box {
-    flex: 1;
+    flex: 0 0 auto;
     display: flex;
     border: 1px solid #7c12bd;
-    margin-bottom: -1px;
-    min-height: 48px;
+    margin: 0;
+    min-height: 36px;
   }
   .remark-label {
     width: 20%;
@@ -740,6 +743,7 @@ export const buildBprHtml = (data, profileInput) => {
     font-size:12px;
     font-weight: 700;
     padding: 6px;
+    flex-shrink: 0;
   }
   .remark-content {
     width: 80%;
@@ -750,16 +754,25 @@ export const buildBprHtml = (data, profileInput) => {
     white-space: pre-wrap;
     word-break: break-word;
   }
-  .page-p1 .sheet{height:100%;}
+  .page-p1 .sheet{height:auto;max-height:100%;min-height:0;overflow:hidden;}
+  .page-p1 .bpr-page1-foot{
+    flex:0 0 auto;
+    margin-top:auto;
+    display:flex;
+    flex-direction:column;
+  }
   .signature-container{
-    display:flex;justify-content:space-between;margin-top:auto;border:1px solid #7c12bd;flex-shrink:0;
+    display:flex;justify-content:space-between;margin:0;
+    border:1px solid #7c12bd;flex:0 0 auto;
   }
   .signature-box{
-    width:50%;min-height:72px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;
+    width:50%;min-height:52px;height:52px;max-height:56px;
+    display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;
+    box-sizing:border-box;
   }
   .signature-box:first-child{border-right:1px solid #7c12bd;}
   .signature-label{
-    font-size:12px;font-weight:700;color:#4a0080;display:flex;align-items:center;gap:6px;
+    font-size:11px;font-weight:700;color:#4a0080;display:flex;align-items:center;gap:6px;
   }
 
   .p2-header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #5a009d;}
@@ -950,6 +963,173 @@ export const buildBprHtml = (data, profileInput) => {
 </html>`;
 };
 
+/**
+ * Keep BPR page-1 Remark + signatures fully inside A4 (no bottom clip).
+ * Measures the foot block against the page edge — not just scrollHeight.
+ */
+const fitBprPage1ToA4 = (pageEl, pageHeightPx = 1123) => {
+  if (!pageEl || !pageEl.classList.contains('page-p1')) return;
+
+  pageEl.style.zoom = '1';
+  pageEl.style.transform = 'none';
+  pageEl.style.height = `${pageHeightPx}px`;
+  pageEl.style.minHeight = `${pageHeightPx}px`;
+  pageEl.style.maxHeight = `${pageHeightPx}px`;
+  pageEl.style.overflow = 'hidden';
+  pageEl.style.boxSizing = 'border-box';
+  pageEl.style.padding = '8px 8px 14px 8px';
+
+  const sheet = pageEl.querySelector('.sheet');
+  const foot = pageEl.querySelector('.bpr-page1-foot');
+  const remark = pageEl.querySelector('.remark-box');
+  const sig = pageEl.querySelector('.signature-container');
+  const sigBoxes = [...pageEl.querySelectorAll('.signature-box')];
+  const psdNote = pageEl.querySelector('.psd-note-box');
+
+  if (sheet) {
+    sheet.style.height = 'auto';
+    sheet.style.maxHeight = '100%';
+    sheet.style.minHeight = '0';
+    sheet.style.flex = '1 1 auto';
+    sheet.style.overflow = 'hidden';
+    sheet.style.boxSizing = 'border-box';
+    sheet.style.padding = '8px 8px 6px 8px';
+    sheet.style.display = 'flex';
+    sheet.style.flexDirection = 'column';
+  }
+  if (foot) {
+    foot.style.flex = '0 0 auto';
+    foot.style.marginTop = 'auto';
+    foot.style.flexShrink = '0';
+  }
+  if (sig) {
+    sig.style.flex = '0 0 auto';
+    sig.style.flexShrink = '0';
+    sig.style.margin = '0';
+  }
+  if (remark) {
+    remark.style.flex = '0 0 auto';
+    remark.style.minHeight = '32px';
+    remark.style.maxHeight = 'none';
+    remark.style.overflow = 'visible';
+  }
+  if (psdNote) {
+    psdNote.style.flex = '1 1 auto';
+    psdNote.style.minHeight = '0';
+  }
+
+  pageEl.querySelectorAll('table.g, .header-table, .section-badge').forEach((el) => {
+    el.style.flexShrink = '0';
+  });
+
+  const footClipped = () => {
+    void pageEl.offsetHeight;
+    const pageBox = pageEl.getBoundingClientRect();
+    const footEl = foot || sig || remark;
+    if (!footEl) {
+      return Math.max(pageEl.scrollHeight, pageEl.offsetHeight || 0) > pageHeightPx + 2;
+    }
+    const footBox = footEl.getBoundingClientRect();
+    // Need a few px of page padding under the foot border.
+    return footBox.bottom > pageBox.bottom - 4;
+  };
+
+  const steps = [
+    () => {
+      sigBoxes.forEach((el) => {
+        el.style.minHeight = '44px';
+        el.style.height = '44px';
+        el.style.maxHeight = '44px';
+        el.style.paddingBottom = '4px';
+      });
+      if (psdNote) psdNote.style.minHeight = '0';
+    },
+    () => {
+      pageEl.querySelectorAll('.section-badge').forEach((el) => {
+        el.style.margin = '2px 0 0 0';
+      });
+      pageEl.querySelectorAll('.pill-badge').forEach((el) => {
+        el.style.padding = '2px 8px';
+        el.style.fontSize = '10.5px';
+      });
+      if (remark) {
+        remark.style.minHeight = '28px';
+        remark.querySelectorAll('div').forEach((el) => {
+          el.style.padding = '4px';
+          el.style.fontSize = '11px';
+        });
+      }
+    },
+    () => {
+      pageEl.querySelectorAll('table.g td').forEach((el) => {
+        el.style.padding = '2px 2px';
+        el.style.fontSize = '10px';
+        el.style.lineHeight = '1.1';
+      });
+      pageEl.querySelectorAll('table.g tr[style*="height"]').forEach((el) => {
+        el.style.height = '22px';
+      });
+      if (sheet) sheet.style.padding = '6px 6px 4px 6px';
+    },
+    () => {
+      sigBoxes.forEach((el) => {
+        el.style.minHeight = '36px';
+        el.style.height = '36px';
+        el.style.maxHeight = '36px';
+        el.style.paddingBottom = '3px';
+      });
+      pageEl.querySelectorAll('.signature-label').forEach((el) => {
+        el.style.fontSize = '10px';
+      });
+      const brand = pageEl.querySelector('.brand-lockup');
+      if (brand) {
+        brand.style.width = '220px';
+        brand.style.height = '50px';
+      }
+      pageEl.querySelectorAll('.header-table').forEach((el) => {
+        el.style.marginBottom = '2px';
+      });
+      pageEl.querySelectorAll('.bpr-badge').forEach((el) => {
+        el.style.padding = '5px 8px';
+      });
+    },
+    () => {
+      // Collapse PSD note body if still clipped — tables + foot must win.
+      if (psdNote) {
+        psdNote.style.flex = '0 0 auto';
+        psdNote.style.maxHeight = '42px';
+        const body = psdNote.querySelector('.psd-note-body');
+        if (body) {
+          body.style.maxHeight = '22px';
+          body.style.overflow = 'hidden';
+          body.style.padding = '2px 6px';
+        }
+      }
+    }
+  ];
+
+  for (let i = 0; i < steps.length && footClipped(); i += 1) {
+    steps[i]();
+  }
+
+  // Last resort: slight scale so Remark + signatures stay on the page.
+  if (footClipped()) {
+    pageEl.style.height = 'auto';
+    pageEl.style.maxHeight = 'none';
+    pageEl.style.overflow = 'visible';
+    void pageEl.offsetHeight;
+    const natural = Math.max(pageEl.scrollHeight, pageEl.offsetHeight || 0);
+    const scale = Math.max(0.82, Math.min(1, (pageHeightPx - 2) / natural));
+    pageEl.style.width = `${Math.round(794 / scale)}px`;
+    pageEl.style.transform = `scale(${scale})`;
+    pageEl.style.transformOrigin = 'top left';
+    pageEl.style.height = `${pageHeightPx}px`;
+    pageEl.style.minHeight = `${pageHeightPx}px`;
+    pageEl.style.maxHeight = `${pageHeightPx}px`;
+    pageEl.style.overflow = 'hidden';
+  }
+};
+
 export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => {
   let printData = data;
   try {
@@ -1020,6 +1200,10 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
       if (i > 0) pdf.addPage();
       const target = pageNodes[i];
       const isP2 = target.classList.contains('page-p2');
+      if (!isP2) {
+        fitBprPage1ToA4(target, a4H);
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      }
       if (isP2) {
         layoutFillOtherPrintPages(idoc, a4H);
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -1047,28 +1231,72 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
         onclone: (clonedDoc) => {
           clonedDoc.querySelectorAll('.page').forEach((el) => {
             const p2 = el.classList.contains('page-p2');
+            const existingTransform = el.style.transform;
+            const existingWidth = el.style.width;
             if (p2 && captureH > a4H) {
               el.style.height = `${captureH}px`;
               el.style.minHeight = `${captureH}px`;
               el.style.maxHeight = 'none';
               el.style.overflow = 'visible';
+              el.style.padding = '8px';
+              el.style.transform = 'none';
             } else {
               el.style.height = '1123px';
               el.style.minHeight = '1123px';
               el.style.maxHeight = '1123px';
               el.style.overflow = 'hidden';
+              el.style.padding = p2 ? '8px' : '8px 8px 14px 8px';
+              if (!p2 && existingTransform && existingTransform !== 'none') {
+                el.style.transform = existingTransform;
+                el.style.transformOrigin = 'top left';
+                if (existingWidth) el.style.width = existingWidth;
+              } else {
+                el.style.transform = 'none';
+                el.style.width = '794px';
+              }
             }
             el.style.display = 'flex';
             el.style.flexDirection = 'column';
             el.style.boxSizing = 'border-box';
           });
           clonedDoc.querySelectorAll('.sheet').forEach((el) => {
+            const p1 = el.closest('.page-p1');
             el.style.flex = '1 1 auto';
-            el.style.height = '100%';
+            el.style.height = p1 ? 'auto' : '100%';
+            el.style.maxHeight = '100%';
             el.style.minHeight = '0';
             el.style.display = 'flex';
             el.style.flexDirection = 'column';
             el.style.boxSizing = 'border-box';
+            el.style.overflow = 'hidden';
+            if (p1) el.style.padding = el.style.padding || '8px 8px 6px 8px';
+          });
+          clonedDoc.querySelectorAll('.page-p1 .bpr-page1-foot').forEach((el) => {
+            el.style.flex = '0 0 auto';
+            el.style.marginTop = 'auto';
+            el.style.flexShrink = '0';
+            el.style.visibility = 'visible';
+          });
+          clonedDoc.querySelectorAll('.page-p1 .remark-box').forEach((el) => {
+            el.style.flex = '0 0 auto';
+            el.style.minHeight = '28px';
+            el.style.marginBottom = '0';
+            el.style.overflow = 'visible';
+            el.style.visibility = 'visible';
+          });
+          clonedDoc.querySelectorAll('.page-p1 .signature-container').forEach((el) => {
+            el.style.flex = '0 0 auto';
+            el.style.flexShrink = '0';
+            el.style.margin = '0';
+            el.style.visibility = 'visible';
+          });
+          clonedDoc.querySelectorAll('.page-p1 .signature-box').forEach((el) => {
+            el.style.visibility = 'visible';
+            el.style.boxSizing = 'border-box';
+          });
+          clonedDoc.querySelectorAll('.page-p1 .psd-note-box').forEach((el) => {
+            el.style.flex = '1 1 auto';
+            el.style.minHeight = '0';
           });
           clonedDoc.querySelectorAll('.page.page-p2 .table-wrap').forEach((el) => {
             el.style.flex = '0 0 auto';
