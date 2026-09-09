@@ -3,6 +3,7 @@ import { Type } from 'lucide-react';
 import {
   PRINT_FONTS,
   PRINT_FONT_SIZES,
+  PRINT_SHRINK_OPTIONS,
   normalizePrintPrefs
 } from '../utils/printPrefs';
 import SearchableSelect from './SearchableSelect';
@@ -23,9 +24,11 @@ const DOC_LABELS = {
 const PrintPrefsModal = ({ mode, docType, initial, onCancel, onConfirm }) => {
   const [fontFamily, setFontFamily] = useState(initial.fontFamily);
   const [fontSize, setFontSize] = useState(initial.fontSize);
+  const [shrink, setShrink] = useState(initial.shrink || 'auto');
   const [saveDefault, setSaveDefault] = useState(true);
   const docLabel = DOC_LABELS[docType] || docType || 'Document';
   const actionLabel = mode === 'view' ? 'Preview PDF' : 'Download PDF';
+  const shrinkHint = PRINT_SHRINK_OPTIONS.find((s) => s.value === shrink)?.hint || '';
 
   return (
     <div
@@ -56,7 +59,7 @@ const PrintPrefsModal = ({ mode, docType, initial, onCancel, onConfirm }) => {
           <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Print Format</h2>
         </div>
         <p style={{ margin: '0 0 1.25rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-          Choose font and size for <strong>{docLabel}</strong>, then {mode === 'view' ? 'preview' : 'download'}.
+          Choose font, size and shrink for <strong>{docLabel}</strong>, then {mode === 'view' ? 'preview' : 'download'}.
         </p>
 
         <div className="form-group" style={{ marginBottom: '1rem' }}>
@@ -90,6 +93,26 @@ const PrintPrefsModal = ({ mode, docType, initial, onCancel, onConfirm }) => {
           </SearchableSelect>
         </div>
 
+        <div className="form-group" style={{ marginBottom: '1rem' }}>
+          <label>Shrink</label>
+          <SearchableSelect
+            className="input-field"
+            value={shrink}
+            onChange={(e) => setShrink(e.target.value)}
+          >
+            {PRINT_SHRINK_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </SearchableSelect>
+          {shrinkHint && (
+            <p style={{ margin: '0.4rem 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              {shrinkHint}. Use Strong if large fonts overflow the page.
+            </p>
+          )}
+        </div>
+
         <div
           style={{
             border: '1px solid var(--border-color)',
@@ -102,6 +125,7 @@ const PrintPrefsModal = ({ mode, docType, initial, onCancel, onConfirm }) => {
           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: 6 }}>Preview</div>
           <div style={{ fontFamily, fontSize, lineHeight: 1.4, color: 'var(--text-primary, #231f20)' }}>
             UMA MICRON — Sample invoice text at {fontSize}px
+            {shrink && shrink !== 'auto' ? ` · Shrink: ${PRINT_SHRINK_OPTIONS.find((s) => s.value === shrink)?.label || shrink}` : ''}
           </div>
         </div>
 
@@ -130,7 +154,7 @@ const PrintPrefsModal = ({ mode, docType, initial, onCancel, onConfirm }) => {
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => onConfirm(normalizePrintPrefs({ fontFamily, fontSize }), saveDefault)}
+            onClick={() => onConfirm(normalizePrintPrefs({ fontFamily, fontSize, shrink }), saveDefault)}
           >
             {actionLabel}
           </button>

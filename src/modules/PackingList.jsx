@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { numberInputValue, parseOptionalNumber } from '../utils/numberInput';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
+import {Eye,  Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import SearchableSelect from '../components/SearchableSelect';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import DateField from '../components/DateField';
 import {
   getReceiptProductLabel,
@@ -20,6 +21,8 @@ import {
 const PackingList = () => {
   const { data, updateData, updateItem, incrementSerial, deleteItemSoftly } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPL, setEditingPL] = useState(null);
   const [selectedBPR, setSelectedBPR] = useState(null);
@@ -289,11 +292,23 @@ const PackingList = () => {
     return true;
   });
 
-  const filteredPLs = (data.packingLists || []).filter(pl => {
-    if (pl.isDeleted) return false;
+  const plList = (data.packingLists || []).filter((pl) => !pl.isDeleted);
+  const partyOptions = useMemo(() => uniqueSortedOptions(plList.map((pl) => pl.partyName)), [plList]);
+  const productOptions = useMemo(
+    () => uniqueSortedOptions(plList.map((pl) => getPLDisplayProductLabel(pl, data))),
+    [plList, data]
+  );
+  const filteredPLs = plList.filter((pl) => {
     const label = getPLDisplayProductLabel(pl, data);
-    return (pl.plNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      label.toLowerCase().includes(searchTerm.toLowerCase());
+    if (partyFilter && (pl.partyName || '') !== partyFilter) return false;
+    if (productFilter && label !== productFilter) return false;
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (pl.plNo || '').toLowerCase().includes(q) ||
+      (pl.partyName || '').toLowerCase().includes(q) ||
+      label.toLowerCase().includes(q)
+    );
   });
 
   const getBPRProductLabel = (bpr) => {
@@ -313,6 +328,18 @@ const PackingList = () => {
           <Plus size={18} /> Create New PL
         </button>
       </header>
+
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search PL No, party or chemical..."
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={partyOptions}
+        productFilter={productFilter}
+        onProductChange={setProductFilter}
+        productOptions={productOptions}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
         <div className="premium-card">
@@ -345,18 +372,6 @@ const PackingList = () => {
 
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Packing List Log</h3>
-
-          <div style={{ position: 'relative', marginBottom: '1rem' }}>
-            <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={16} />
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Search PL No or chemical..."
-              style={{ paddingLeft: '2.5rem', fontSize: '0.85rem', padding: '0.5rem 2.5rem' }}
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
 
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>

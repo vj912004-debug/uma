@@ -1383,10 +1383,28 @@ export const buildFooterTerms = (companyName, termsHtml, declarationHtml) => {
   </table>`;
 };
 
-export const buildStatusBar = (pageText = 'Page 1 of 1', customText = 'This is a computer-generated document.') => `
+export const PRINT_FOOTER_MESSAGES = {
+  TI: 'This is a computer-generated invoice.',
+  QT: 'We look forward to doing business with you.',
+  PO: 'Please acknowledge receipt and acceptance of this Purchase Order.',
+  PI: 'This is a computer-generated proforma invoice.',
+  DN: 'Issued for accounting and reconciliation purposes.',
+  CN: 'Issued for accounting and reconciliation purposes.',
+  BPR: 'This document is a controlled record of the batch processing activity.',
+  PL: 'Prepared for packing and dispatch reference purposes.',
+  DC: 'Goods delivered as per the details mentioned above.',
+  PFU: 'This statement is issued for payment follow-up and account reconciliation purposes.'
+};
+
+/** Purple status bar: optional Thank you + E.&O.E. | doc message | Page X of Y.
+ *  `showThanks` is for TI / CN / DN only. */
+export const buildStatusBar = (
+  pageText = 'Page 1 of 1',
+  customText = PRINT_FOOTER_MESSAGES.TI,
+  { showThanks = false } = {}
+) => `
   <div class="barfoot">
-    <span>Thank you for your business!</span>
-    <span>E. &amp; O.E.</span>
+    ${showThanks ? '<span>Thank you for your business!</span><span>E. &amp; O.E.</span>' : ''}
     <span>${escHtml(customText)}</span>
     <span>${escHtml(pageText)}</span>
   </div>`;

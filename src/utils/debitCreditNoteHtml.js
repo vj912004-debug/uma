@@ -20,7 +20,9 @@ import {
   formatPrintTermsHtml,
   DEFAULT_INVOICE_TERMS,
   buildOptionalMetaRowHtml,
-  buildBankDetailsBox
+  buildBankDetailsBox,
+  buildStatusBar,
+  PRINT_FOOTER_MESSAGES
 } from './printTheme';
 
 const NOTE_CHARGES = [...STANDARD_CHARGES_LIST, OTHER_CHARGE_ITEM];
@@ -917,12 +919,13 @@ const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
   )}
 
   <!-- BAR FOOTER -->
-  <div class="barfoot">
-    <span>Thank you for your business!</span>
-    <span>E. &amp; O.E.</span>
-    <span>This is a computer-generated ${noteType.toLowerCase()}.</span>
-    <span>Page 1 of 1</span>
-  </div>
+  ${buildStatusBar(
+    'Page 1 of 1',
+    noteType.toLowerCase().includes('debit')
+      ? PRINT_FOOTER_MESSAGES.DN
+      : PRINT_FOOTER_MESSAGES.CN,
+    { showThanks: true }
+  )}
 
   </div>
 </div>

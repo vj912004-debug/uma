@@ -6,7 +6,9 @@ import {
   buildPrintBrandHtml,
   applyPrintPrefsToHtml,
   renderHtmlToPdf,
-  loadUmaAppData
+  loadUmaAppData,
+  buildStatusBar,
+  PRINT_FOOTER_MESSAGES
 } from './printTheme';
 import {
   alignDrumRowsToProducts,
@@ -197,9 +199,9 @@ export const buildPackingListHtml = (data, profileInput) => {
       <section class="product-block">
         <div class="pl-meta">
           <div class="meta-field"><span class="lbl">Name of Product</span><span class="colon">:</span><span class="val">${escHtml(group.name) || '&nbsp;'}</span></div>
+          <div class="meta-field"><span class="lbl">Date</span><span class="colon">:</span><span class="val">${plDate || '&nbsp;'}</span></div>
           <div class="meta-field"><span class="lbl">Total Quantity</span><span class="colon">:</span><span class="val">${escHtml(qtyText) || '&nbsp;'}</span></div>
           <div class="meta-field"><span class="lbl">Total Drums</span><span class="colon">:</span><span class="val">${escHtml(drumsText)}</span></div>
-          <div class="meta-field"><span class="lbl">Date</span><span class="colon">:</span><span class="val">${plDate || '&nbsp;'}</span></div>
         </div>
         <div class="table-wrap">
           <table class="items">
@@ -303,7 +305,7 @@ export const buildPackingListHtml = (data, profileInput) => {
   .product-block:last-child{margin-bottom:8px;}
 
   .pl-meta{
-    display:flex;flex-direction:column;gap:1px;
+    display:grid;grid-template-columns:1.2fr 1fr;gap:2px 28px;
     margin:0 0 8px;padding:0;flex:0 0 auto;
     border:none;background:transparent;
   }
@@ -311,7 +313,7 @@ export const buildPackingListHtml = (data, profileInput) => {
     display:flex;align-items:baseline;min-width:0;font-size:13px;line-height:1.4;
   }
   .meta-field .lbl{
-    font-weight:700;color:var(--purple);white-space:nowrap;flex:0 0 130px;
+    font-weight:700;color:var(--purple);white-space:nowrap;flex:0 0 118px;
   }
   .meta-field .colon{
     font-weight:700;color:var(--purple);flex:0 0 auto;padding:0 8px 0 0;
@@ -384,11 +386,7 @@ export const buildPackingListHtml = (data, profileInput) => {
         ${sievingLumpsHtml}
       </div>
 
-      <div class="barfoot">
-        <span>Thank you for your business!</span>
-        <span>E. &amp; O.E.</span>
-        <span>Page 1 of 1</span>
-      </div>
+      ${buildStatusBar('Page 1 of 1', PRINT_FOOTER_MESSAGES.PL)}
     </div>
   </div>
 </body>

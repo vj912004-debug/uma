@@ -10,6 +10,7 @@ import {
 import {
   PRINT_FONTS,
   PRINT_FONT_SIZES,
+  PRINT_SHRINK_OPTIONS,
   getStoredPrintPrefs,
   setStoredPrintPrefs
 } from '../utils/printPrefs';
@@ -92,7 +93,7 @@ const CompanyProfileSettings = () => {
             Default font and size for Tax Invoice, PI, PO, DC, Quotation, Debit/Credit Note, Packing List, BPR, and Payment Follow-Up.
             You can still change them each time you preview or download.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', alignItems: 'end' }}>
             <div className="form-group" style={{ margin: 0 }}>
               <label>Default Font</label>
               <SearchableSelect
@@ -115,6 +116,18 @@ const CompanyProfileSettings = () => {
               >
                 {PRINT_FONT_SIZES.map((s) => (
                   <option key={s} value={s}>{s} px</option>
+                ))}
+              </SearchableSelect>
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>Default Shrink</label>
+              <SearchableSelect
+                className="input-field"
+                value={printPrefs.shrink || 'auto'}
+                onChange={(e) => setPrintPrefs((p) => ({ ...p, shrink: e.target.value }))}
+              >
+                {PRINT_SHRINK_OPTIONS.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
                 ))}
               </SearchableSelect>
             </div>

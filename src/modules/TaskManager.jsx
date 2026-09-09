@@ -1,16 +1,19 @@
 import { formatDate } from '../utils/dateUtils';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Bell, Calendar, Clock, RotateCw, CheckCircle, Trash2, Edit2 } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
+import ListFilterBar from '../components/ListFilterBar';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 
 const TaskManager = () => {
-  const { data, updateData, updateItem, setData } = useAppContext();
+  const { data, updateData, updateItem, deleteItemSoftly } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
 
   const [form, setForm] = useState({
     title: '',
@@ -129,9 +132,18 @@ const TaskManager = () => {
     }
   };
 
-  const filteredTasks = (data.tasks || []).filter(t => 
-    t.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const statusOptions = useMemo(() => ['Pending', 'Completed'], []);
+  const repeatOptions = useMemo(() => ['None', 'Daily', 'Weekly', 'Monthly', 'Yearly'], []);
+  const filteredTasks = (data.tasks || []).filter((t) => {
+    if (partyFilter && (t.status || '') !== partyFilter) return false;
+    if (productFilter && (t.repeat || '') !== productFilter) return false;
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (t.title || '').toLowerCase().includes(q) ||
+      (t.notes || '').toLowerCase().includes(q)
+    );
+  });
 
   const pendingTasks = filteredTasks.filter(t => t.status === 'Pending');
   const completedTasks = filteredTasks.filter(t => t.status === 'Completed');
@@ -147,6 +159,20 @@ const TaskManager = () => {
           <Plus size={18} /> Schedule Task
         </button>
       </header>
+
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search title or notes…"
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={statusOptions}
+        partyAllLabel="All Status"
+        productFilter={productFilter}
+        onProductChange={setProductFilter}
+        productOptions={repeatOptions}
+        productAllLabel="All Repeat"
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
         {/* Active Reminders */}

@@ -1,7 +1,7 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { buildDcPrintLines, getDcAppData, resolveLinkedMr } from './deliveryChallanLayout';
 import { formatPdfDateDmy, splitPartyAddressLines } from './taxInvoiceLayout';
-import { escHtml, fmtQty, buildPrintBrandHtml, renderHtmlToPdf, hasPrintVal, fillPrintPartyFields } from './printTheme';
+import { escHtml, fmtQty, buildPrintBrandHtml, renderHtmlToPdf, hasPrintVal, fillPrintPartyFields, buildStatusBar, PRINT_FOOTER_MESSAGES } from './printTheme';
 
 const DEFAULT_DC_DELIVERY_NOTE =
   'Material sent for Micronisation on Job Work basis. Goods to be returned after processing.';
@@ -815,12 +815,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
         </div>
       </div>
 
-      <div class="barfoot">
-        <span>Thank you for your business!</span>
-        <span>E. &amp; O.E.</span>
-        <span>This is a computer-generated document.</span>
-        <span>Page 1 of 1</span>
-      </div>
+      ${buildStatusBar('Page 1 of 1', PRINT_FOOTER_MESSAGES.DC)}
     </td>
   </tr>
 </table>

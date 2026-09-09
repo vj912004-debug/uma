@@ -1,13 +1,14 @@
 import { formatDate } from '../utils/dateUtils';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus, ArrowLeft } from 'lucide-react';
+import {Eye,  Edit2, Trash2, FileDown, ClipboardList, Plus, ArrowLeft } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import ExportButton from '../components/ExportButton';
 import DocChargeRow from '../components/DocChargeRow';
 import DateField from '../components/DateField';
 import GstTaxBlock from '../components/GstTaxBlock';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import { GST_TYPE_CGST_SGST, normalizeGstType } from '../utils/taxInvoiceLayout';
 import {
   STANDARD_CHARGES_LIST,
@@ -26,6 +27,8 @@ import SearchableSelect from '../components/SearchableSelect';
 const PurchaseOrders = () => {
   const { data, updateData, updateItem, deleteItemSoftly, incrementSerial } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
@@ -276,10 +279,19 @@ const PurchaseOrders = () => {
   );
 
   const poList = (data.purchaseOrders || []).filter(po => !po.isDeleted);
-  const filtered = poList.filter(po => 
-    (po.poNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (po.partyName || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const partyOptions = useMemo(() => uniqueSortedOptions(poList.map((r) => r.partyName)), [poList]);
+  const productOptions = useMemo(() => uniqueSortedOptions(poList.map((r) => r.productName)), [poList]);
+  const filtered = poList.filter((po) => {
+    if (partyFilter && (po.partyName || '') !== partyFilter) return false;
+    if (productFilter && (po.productName || '') !== productFilter) return false;
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (po.poNo || '').toLowerCase().includes(q) ||
+      (po.partyName || '').toLowerCase().includes(q) ||
+      (po.productName || '').toLowerCase().includes(q)
+    );
+  });
 
   const exportColumns = [
     { label: 'Date', key: 'date' },
@@ -464,6 +476,18 @@ const PurchaseOrders = () => {
         </div>
       </header>
 
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search by PO number, Party or Product..."
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={partyOptions}
+        productFilter={productFilter}
+        onProductChange={setProductFilter}
+        productOptions={productOptions}
+      />
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
         <div className="premium-card">
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -493,18 +517,6 @@ const PurchaseOrders = () => {
 
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Purchase Order Log</h3>
-
-          <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-            <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Search by PO number or Party Name..."
-              style={{ paddingLeft: '3rem' }}
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
 
           <div className="data-table-container">
             <table className="data-table">

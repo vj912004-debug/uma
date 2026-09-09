@@ -1,12 +1,13 @@
 import { formatDate } from '../utils/dateUtils';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import ExportButton from '../components/ExportButton';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
-import {Eye,  Plus, Search, FileDown, Edit2, Trash2, ShieldAlert, FileText } from 'lucide-react';
+import {Eye,  Plus, FileDown, Edit2, Trash2, ShieldAlert, FileText } from 'lucide-react';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import {
   getReceiptProductNames,
   getProductBatches,
@@ -203,6 +204,8 @@ const MaterialReceipt = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
 
   // Primary MR Form State
   const [formData, setFormData] = useState({
@@ -680,12 +683,21 @@ const MaterialReceipt = () => {
   );
 
   // Filtered List
-  const filteredReceipts = (data.materialReceipts || []).filter(mr => 
-    (mr.receiptNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (mr.partyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (mr.productName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (mr.partyDocNo && mr.partyDocNo.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const mrList = data.materialReceipts || [];
+  const partyOptions = useMemo(() => uniqueSortedOptions(mrList.map((r) => r.partyName)), [mrList]);
+  const productOptions = useMemo(() => uniqueSortedOptions(mrList.map((r) => r.productName)), [mrList]);
+  const filteredReceipts = mrList.filter((mr) => {
+    if (partyFilter && (mr.partyName || '') !== partyFilter) return false;
+    if (productFilter && (mr.productName || '') !== productFilter) return false;
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (mr.receiptNo || '').toLowerCase().includes(q) ||
+      (mr.partyName || '').toLowerCase().includes(q) ||
+      (mr.productName || '').toLowerCase().includes(q) ||
+      (mr.partyDocNo && mr.partyDocNo.toLowerCase().includes(q))
+    );
+  });
 
   // Active batch count (excluding Empty Drums)
   const activeBatchCount = formData.batches.filter(b => !b.isEmptyDrums).length;
@@ -871,19 +883,19 @@ const MaterialReceipt = () => {
         </div>
       </header>
 
-      <div className="premium-card">
-        <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-          <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-          <input 
-            type="text" 
-            className="input-field" 
-            placeholder="Search by M.R. No, Supplier Doc, Party or Product..." 
-            style={{ paddingLeft: '3rem' }}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search by M.R. No, Supplier Doc, Party or Product..."
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={partyOptions}
+        productFilter={productFilter}
+        onProductChange={setProductFilter}
+        productOptions={productOptions}
+      />
 
+      <div className="premium-card">
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>

@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus, ArrowLeft } from 'lucide-react';
+import {Eye,  Edit2, Trash2, FileDown, ClipboardList, Plus, ArrowLeft } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import DocChargeRow from '../components/DocChargeRow';
 import DateField from '../components/DateField';
 import GstTaxBlock from '../components/GstTaxBlock';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import { GST_TYPE_CGST_SGST } from '../utils/taxInvoiceLayout';
 import {
   STANDARD_CHARGES_LIST,
@@ -44,6 +45,8 @@ import SearchableSelect from '../components/SearchableSelect';
 const TaxInvoice = () => {
   const { data, updateData, updateItem, setData, incrementSerial, deleteItemSoftly } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedPL, setSelectedPL] = useState(null);
@@ -519,13 +522,27 @@ const TaxInvoice = () => {
     return true;
   });
 
-  const filteredInvoices = (data.invoices || []).filter(inv => {
-    if (!inv.invoiceNo?.includes('/IN/')) return false;
+  const taxInvoices = (data.invoices || []).filter(inv => inv.invoiceNo?.includes('/IN/'));
+  const partyOptions = useMemo(() => uniqueSortedOptions(taxInvoices.map((r) => r.partyName)), [taxInvoices]);
+  const productOptions = useMemo(() => uniqueSortedOptions(
+    taxInvoices.map((inv) => {
+      const mr = (data.materialReceipts || []).find(m => m.id === inv.receiptId);
+      return getDocProductLabel(inv, mr, mr ? receiptProductOptions(mr, data) : {});
+    })
+  ), [taxInvoices, data]);
+
+  const filteredInvoices = taxInvoices.filter((inv) => {
     const mr = (data.materialReceipts || []).find(m => m.id === inv.receiptId);
     const label = getDocProductLabel(inv, mr, mr ? receiptProductOptions(mr, data) : {});
-    return (inv.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (inv.partyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      label.toLowerCase().includes(searchTerm.toLowerCase()));
+    if (partyFilter && (inv.partyName || '') !== partyFilter) return false;
+    if (productFilter && label !== productFilter) return false;
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (inv.invoiceNo || '').toLowerCase().includes(q) ||
+      (inv.partyName || '').toLowerCase().includes(q) ||
+      label.toLowerCase().includes(q)
+    );
   });
 
   const chargesList = STANDARD_CHARGES_LIST;
@@ -544,6 +561,18 @@ const TaxInvoice = () => {
           <Plus size={18} /> Create New Tax Invoice
         </button>
       </header>
+
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search Invoice No, customer or chemical..."
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={partyOptions}
+        productFilter={productFilter}
+        onProductChange={setProductFilter}
+        productOptions={productOptions}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
         <div className="premium-card">
@@ -578,18 +607,6 @@ const TaxInvoice = () => {
         {/* Right Side: TI Log */}
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Tax Invoice Log History</h3>
-          
-          <div style={{ position: 'relative', marginBottom: '1rem' }}>
-            <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={16} />
-            <input 
-              type="text" 
-              className="input-field" 
-              placeholder="Search Invoice No, customer or chemical..." 
-              style={{ paddingLeft: '2.5rem', fontSize: '0.85rem', padding: '0.5rem 2.5rem' }}
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
 
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>

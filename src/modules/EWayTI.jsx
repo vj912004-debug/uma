@@ -1,12 +1,14 @@
 import { formatDate } from '../utils/dateUtils';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Search, Edit2 } from 'lucide-react';
+import { Edit2 } from 'lucide-react';
 import DateField from '../components/DateField';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 
 const EWayTI = () => {
   const { data, updateItem } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
 
@@ -34,11 +36,18 @@ const EWayTI = () => {
     setIsModalOpen(false);
   };
 
-  const filteredInvoices = (data.invoices || []).filter(inv => 
-    inv.invoiceNo?.includes('/IN/') &&
-    (inv.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inv.partyName.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const tiList = (data.invoices || []).filter((inv) => inv.invoiceNo?.includes('/IN/'));
+  const partyOptions = useMemo(() => uniqueSortedOptions(tiList.map((inv) => inv.partyName)), [tiList]);
+  const filteredInvoices = tiList.filter((inv) => {
+    if (partyFilter && (inv.partyName || '') !== partyFilter) return false;
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (inv.invoiceNo || '').toLowerCase().includes(q) ||
+      (inv.partyName || '').toLowerCase().includes(q) ||
+      (inv.ewayBillNo || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div>
@@ -47,19 +56,17 @@ const EWayTI = () => {
         <p style={{ color: 'var(--text-muted)' }}>Link government E-Way bills directly with commercial Tax Invoices.</p>
       </header>
 
-      <div className="premium-card">
-        <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-          <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-          <input 
-            type="text" 
-            className="input-field" 
-            placeholder="Search by Invoice No, customer or E-Way No..." 
-            style={{ paddingLeft: '3rem' }}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search by Invoice No, customer or E-Way No..."
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={partyOptions}
+        showProduct={false}
+      />
 
+      <div className="premium-card">
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>

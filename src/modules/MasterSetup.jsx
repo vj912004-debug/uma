@@ -1,16 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Trash2, Tag, Box, Ruler, Percent, SlidersHorizontal } from 'lucide-react';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+
+const TAB_CONFIG = {
+  Items: { key: 'items', title: 'Product Master', placeholder: 'Enter product name...', isTax: false },
+  Materials: { key: 'materials', title: 'Material Master', placeholder: 'Enter material name...', isTax: false },
+  PSDReq: { key: 'psdRequirements', title: 'PSD Requirement Master', placeholder: 'Enter PSD requirement (e.g. d(0.9) < 10 Micron)...', isTax: false },
+  Units: { key: 'units', title: 'Unit Master', placeholder: 'Enter unit (e.g. Kg)...', isTax: false },
+  Taxes: { key: 'taxes', title: 'Tax Master', isTax: true }
+};
 
 const MasterSetup = () => {
   const { data, setData } = useAppContext();
   const [activeTab, setActiveTab] = useState('Items');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [productFilter, setProductFilter] = useState('');
 
   const addItem = (type, value) => {
     if (!value) return;
     setData(prev => {
       const currentList = prev[type] || [];
-      if (currentList.includes(value)) {
+      if (type === 'taxes') {
+        if (currentList.some(t => t.name === value.name)) {
+          alert(`${value.name} already exists in ${type}`);
+          return prev;
+        }
+      } else if (currentList.includes(value)) {
         alert(`${value} already exists in ${type}`);
         return prev;
       }
@@ -28,9 +44,40 @@ const MasterSetup = () => {
     }));
   };
 
+  const tab = TAB_CONFIG[activeTab];
+  const rawItems = data[tab.key] || [];
+  const itemLabels = useMemo(
+    () => (tab.isTax ? rawItems.map((t) => t?.name) : rawItems),
+    [rawItems, tab.isTax]
+  );
+  const productOptions = useMemo(() => uniqueSortedOptions(itemLabels), [itemLabels]);
+
+  const filteredEntries = useMemo(() => (
+    rawItems
+      .map((item, idx) => ({ item, idx }))
+      .filter(({ item }) => {
+        const label = tab.isTax ? (item?.name || '') : String(item || '');
+        if (productFilter && label !== productFilter) return false;
+        if (searchTerm) {
+          const q = searchTerm.toLowerCase();
+          const hay = tab.isTax
+            ? `${item?.name || ''} ${item?.rate ?? ''}`.toLowerCase()
+            : label.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      })
+  ), [rawItems, productFilter, searchTerm, tab.isTax]);
+
+  const filteredItems = filteredEntries.map((e) => e.item);
+  const removeFiltered = (displayIdx) => {
+    const entry = filteredEntries[displayIdx];
+    if (entry) removeItem(tab.key, entry.idx);
+  };
+
   const TabButton = ({ name, icon: Icon, tabId }) => (
     <button 
-      onClick={() => setActiveTab(tabId)}
+      onClick={() => { setActiveTab(tabId); setSearchTerm(''); setProductFilter(''); }}
       className="btn"
       style={{
         background: activeTab === tabId ? 'rgba(91, 28, 133, 0.1)' : 'transparent',
@@ -58,49 +105,32 @@ const MasterSetup = () => {
         <TabButton name="Taxes" icon={Percent} tabId="Taxes" />
       </div>
 
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search master data…"
+        showParty={false}
+        productFilter={productFilter}
+        onProductChange={setProductFilter}
+        productOptions={productOptions}
+        productAllLabel="All Items"
+      />
+
       <div className="premium-card">
-        {activeTab === 'Items' && (
-          <MasterList 
-            title="Product Master" 
-            items={data.items} 
-            onAdd={(val) => addItem('items', val)} 
-            onRemove={(idx) => removeItem('items', idx)}
-            placeholder="Enter product name..."
+        {tab.isTax ? (
+          <TaxList
+            title={tab.title}
+            items={filteredItems}
+            onAdd={(val) => addItem(tab.key, val)}
+            onRemove={removeFiltered}
           />
-        )}
-        {activeTab === 'Materials' && (
-          <MasterList 
-            title="Material Master" 
-            items={data.materials} 
-            onAdd={(val) => addItem('materials', val)} 
-            onRemove={(idx) => removeItem('materials', idx)}
-            placeholder="Enter material name..."
-          />
-        )}
-        {activeTab === 'PSDReq' && (
+        ) : (
           <MasterList
-            title="PSD Requirement Master"
-            items={data.psdRequirements || []}
-            onAdd={(val) => addItem('psdRequirements', val)}
-            onRemove={(idx) => removeItem('psdRequirements', idx)}
-            placeholder="Enter PSD requirement (e.g. d(0.9) < 10 Micron)..."
-          />
-        )}
-        {activeTab === 'Units' && (
-          <MasterList 
-            title="Unit Master" 
-            items={data.units} 
-            onAdd={(val) => addItem('units', val)} 
-            onRemove={(idx) => removeItem('units', idx)}
-            placeholder="Enter unit (e.g. Kg)..."
-          />
-        )}
-        {activeTab === 'Taxes' && (
-          <TaxList 
-            title="Tax Master" 
-            items={data.taxes} 
-            onAdd={(val) => addItem('taxes', val)} 
-            onRemove={(idx) => removeItem('taxes', idx)}
+            title={tab.title}
+            items={filteredItems}
+            onAdd={(val) => addItem(tab.key, val)}
+            onRemove={removeFiltered}
+            placeholder={tab.placeholder}
           />
         )}
       </div>

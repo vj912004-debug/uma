@@ -1,9 +1,10 @@
 import { formatDate } from '../utils/dateUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Plus, Search, Edit2, Trash2, Calendar, Clock } from 'lucide-react';
+import { Plus, Edit2, Trash2, Calendar, Clock } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 import SearchableSelect from '../components/SearchableSelect';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 
@@ -263,14 +264,8 @@ const ProductionPlanning = () => {
     () => plansList.map(p => resolvePlan(p, data.materialReceipts, data.parties)),
     [plansList, data.materialReceipts, data.parties]
   );
-  const partyOptions = useMemo(() => (
-    [...new Set(resolvedPlans.map((p) => p.customer).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b))
-  ), [resolvedPlans]);
-  const productOptions = useMemo(() => (
-    [...new Set(resolvedPlans.map((p) => p.productName).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b))
-  ), [resolvedPlans]);
+  const partyOptions = useMemo(() => uniqueSortedOptions(resolvedPlans.map((p) => p.customer)), [resolvedPlans]);
+  const productOptions = useMemo(() => uniqueSortedOptions(resolvedPlans.map((p) => p.productName)), [resolvedPlans]);
   const filteredPlans = resolvedPlans.filter((p) => {
     if (partyFilter && (p.customer || '') !== partyFilter) return false;
     if (productFilter && (p.productName || '') !== productFilter) return false;
@@ -317,30 +312,6 @@ const ProductionPlanning = () => {
           <p className="page-subtitle">Schedule milling batches and track processing.</p>
         </div>
         <div className="page-toolbar" style={{ flex: '1 1 460px', justifyContent: 'flex-end', minWidth: 0 }}>
-          <div style={{ minWidth: 200, maxWidth: 280, flex: '1 1 220px' }}>
-            <SearchableSelect
-              className="input-field"
-              value={partyFilter}
-              onChange={(e) => setPartyFilter(e.target.value)}
-            >
-              <option value="">All Parties</option>
-              {partyOptions.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </SearchableSelect>
-          </div>
-          <div style={{ minWidth: 200, maxWidth: 280, flex: '1 1 220px' }}>
-            <SearchableSelect
-              className="input-field"
-              value={productFilter}
-              onChange={(e) => setProductFilter(e.target.value)}
-            >
-              <option value="">All Products</option>
-              {productOptions.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </SearchableSelect>
-          </div>
           <ExportButton data={filteredPlans} columns={visibleExportColumns} filename="Production_Plan" title="Production Plan Report" />
           {userRole === 'Admin' && (
             <button className="btn" onClick={() => setIsColumnModalOpen(true)}>
@@ -355,19 +326,19 @@ const ProductionPlanning = () => {
         </div>
       </header>
 
-      <div className="premium-card">
-        <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-          <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-          <input
-            type="text"
-            className="input-field"
-            placeholder="Search by customer, batch no, or nickname..."
-            style={{ paddingLeft: '3rem' }}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search by customer, batch no, or nickname..."
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={partyOptions}
+        productFilter={productFilter}
+        onProductChange={setProductFilter}
+        productOptions={productOptions}
+      />
 
+      <div className="premium-card">
         <div className="data-table-container">
           <table className="data-table">
             <thead>

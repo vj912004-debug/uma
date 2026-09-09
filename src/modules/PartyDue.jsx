@@ -1,18 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Search, Plus, CreditCard } from 'lucide-react';
+import { Plus, CreditCard } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 import { formatDate } from '../utils/dateUtils';
 import { getReceiptOutstanding, getPartyOutstandingByFY, collectPartyDueEntities } from '../utils/paymentTotals';
 import { getCurrentFYKey, getFYKeysThroughCurrent } from '../utils/financialYear';
 import { useNavigate } from 'react-router-dom';
 import SearchableSelect from '../components/SearchableSelect';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import DateField from '../components/DateField';
 
 const PartyDue = () => {
   const { data, updateData, updateItem } = useAppContext();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [columnFilters, setColumnFilters] = useState({});
   const fyKeys = useMemo(() => getFYKeysThroughCurrent('21-22'), []);
@@ -89,9 +91,11 @@ const PartyDue = () => {
     };
   });
 
+  const partyOptions = useMemo(() => uniqueSortedOptions(partyRows.map((p) => p.name)), [partyRows]);
   const filteredDues = partyRows.filter(p => {
+    if (partyFilter && (p.name || '') !== partyFilter) return false;
     const s = searchTerm.toLowerCase();
-    const matchesSearch = p.name.toLowerCase().includes(s);
+    const matchesSearch = !searchTerm || p.name.toLowerCase().includes(s);
 
     let matchesColumnFilters = true;
     for (const [key, filterVal] of Object.entries(columnFilters)) {
@@ -137,19 +141,18 @@ const PartyDue = () => {
         </div>
       </header>
 
-      <div className="premium-card">
-        <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-          <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-          <input 
-            type="text" 
-            className="input-field" 
-            placeholder="Search customer outstanding ledger..." 
-            style={{ paddingLeft: '3rem' }}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search customer outstanding ledger..."
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={partyOptions}
+        partyAllLabel="All Parties"
+        showProduct={false}
+      />
 
+      <div className="premium-card">
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>

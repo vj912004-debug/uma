@@ -29,6 +29,7 @@ import Quotations from './modules/Quotations';
 import PurchaseOrders from './modules/PurchaseOrders';
 import DebitNotes from './modules/DebitNotes';
 import CreditNotes from './modules/CreditNotes';
+import MonthlyBilling from './modules/MonthlyBilling';
 import RecycleBin from './modules/RecycleBin';
 import SystemLogs from './modules/SystemLogs';
 import Attendance from './modules/Attendance';
@@ -39,12 +40,16 @@ const AppLayout = () => {
   useEffect(() => {
     const main = document.querySelector('.app-main');
     if (!main) return undefined;
-    const scrollFormIntoView = () => {
-      if (main.querySelector('.page-form-overlay')) main.scrollTop = 0;
-    };
-    const observer = new MutationObserver(scrollFormIntoView);
+    // Only jump to top when a form overlay opens — not on every checkbox/field re-render inside it.
+    let hadOverlay = Boolean(main.querySelector('.page-form-overlay'));
+    if (hadOverlay) main.scrollTop = 0;
+
+    const observer = new MutationObserver(() => {
+      const hasOverlay = Boolean(main.querySelector('.page-form-overlay'));
+      if (hasOverlay && !hadOverlay) main.scrollTop = 0;
+      hadOverlay = hasOverlay;
+    });
     observer.observe(main, { childList: true, subtree: true });
-    scrollFormIntoView();
     return () => observer.disconnect();
   }, []);
 
@@ -77,6 +82,7 @@ const AppLayout = () => {
         <Route path="/purchase-orders" element={<PurchaseOrders />} />
         <Route path="/debit-notes" element={<DebitNotes />} />
         <Route path="/credit-notes" element={<CreditNotes />} />
+        <Route path="/monthly-billing" element={<MonthlyBilling />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/settings/company-profile" element={<ProtectedRoute adminOnly><CompanyProfileSettings /></ProtectedRoute>} />
         <Route path="/employees" element={<ProtectedRoute adminOnly><EmployeeManagement /></ProtectedRoute>} />

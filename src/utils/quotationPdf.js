@@ -3,7 +3,9 @@ import { formatPdfDateDmy, formatPdfDateSlash } from './taxInvoiceLayout';
 import {
   escHtml,
   renderHtmlToPdf,
-  buildPrintHeader
+  buildPrintHeader,
+  buildStatusBar,
+  PRINT_FOOTER_MESSAGES
 } from './printTheme';
 import { formatPrintRateText, formatQuotedRate, mergeRateUnits, defaultRateUnit } from './quotationRates';
 
@@ -31,15 +33,24 @@ const splitAddress = (address) => {
     .join('<br>');
 };
 
+/** Keep digits from colliding with ( ) in PDF capture (Cambria / html2canvas kerning). */
+const wrapHsnCodeHtml = (text) => {
+  const withGaps = String(text || '').replace(/\(\s*(\d[\d\s.]*)\s*\)/g, '(\u200A$1\u200A)');
+  return escHtml(withGaps).replace(
+    /\((\u200A?\d[\d\s.]*\u200A?)\)/g,
+    '<span class="hsn-code">($1)</span>'
+  );
+};
+
 const formatChargeDescriptionHtml = (c) => {
   const base = String(c?.description || '').trim();
   const note = String(c?.note || c?.chargeNote || '').trim();
   if (!base && !note) return '';
-  if (!note) return escHtml(base);
+  if (!note) return wrapHsnCodeHtml(base);
   const wrapped = /^\(.*\)$/.test(note) ? note : `(${note})`;
-  if (base && base.toLowerCase().includes(note.toLowerCase())) return escHtml(base);
-  const prefix = base ? `${escHtml(base)} ` : '';
-  return `${prefix}<b>${escHtml(wrapped)}</b>`;
+  if (base && base.toLowerCase().includes(note.toLowerCase())) return wrapHsnCodeHtml(base);
+  const prefix = base ? `${wrapHsnCodeHtml(base)} ` : '';
+  return `${prefix}<b>${wrapHsnCodeHtml(wrapped)}</b>`;
 };
 
 const rateDisplayHtml = (rateStr, sourceKey = '', rateUnits = {}) => {
@@ -185,7 +196,7 @@ export const buildQuotationHtml = (data, profileInput) => {
               <td>${i + 1}</td>
               <td class="left">${formatChargeDescriptionHtml(c)}</td>
               <td>${c.psdRequirement ? escHtml(c.psdRequirement) : ''}</td>
-              <td>${rateDisplayHtml(rateSrc, c.sourceKey, rateUnits)}</td>
+              <td class="rate">${rateDisplayHtml(rateSrc, c.sourceKey, rateUnits)}</td>
             </tr>`;
           })
           .join('')
@@ -199,7 +210,7 @@ export const buildQuotationHtml = (data, profileInput) => {
             <tr>
               <td>${i + 1}</td>
               <td class="left">${formatChargeDescriptionHtml(c)}</td>
-              <td>${rateDisplayHtml(c.rate, c.sourceKey, rateUnits)}</td>
+              <td class="rate">${rateDisplayHtml(c.rate, c.sourceKey, rateUnits)}</td>
             </tr>`
           )
           .join('')
@@ -287,7 +298,7 @@ export const buildQuotationHtml = (data, profileInput) => {
     --text:#2b2b2b;
     --muted:#5a5a5a;
   }
-  *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:Cambria,Georgia,serif;}
   body{background:#e9e9ee;padding:24px 0;color:var(--text);}
   .sheet{
     width:794px;margin:0 auto 24px auto;background:#fff;
@@ -408,7 +419,7 @@ export const buildQuotationHtml = (data, profileInput) => {
   .letter-text{
     flex:2;font-size:10px;line-height:1.45;color:#231f20;
     word-spacing:normal;letter-spacing:0.01px;white-space:normal;
-    overflow:visible;font-family:Arial,Helvetica,sans-serif;
+    overflow:visible;
   }
   .letter-text p{margin-top:5px;color:#231f20;opacity:1;-webkit-text-fill-color:#231f20;
     word-spacing:normal;letter-spacing:0.01px;white-space:normal;overflow:visible;}
@@ -422,27 +433,69 @@ export const buildQuotationHtml = (data, profileInput) => {
   .tables{display:flex;flex-direction:column;gap:10px;margin-top:8px;align-items:stretch;width:100%;flex:0 0 auto;overflow:visible;}
   .tables > div{min-width:0;display:flex;flex-direction:column;width:100%;flex:0 0 auto;overflow:visible;}
   .tbl-title{display:flex;align-items:center;gap:6px;background:var(--purple);color:#fff;
-    font-size:10px;font-weight:700;letter-spacing:.3px;padding:5px 10px;border-radius:6px 6px 0 0;
-    width:100%;box-sizing:border-box;}
+    font-size:10px;font-weight:700;letter-spacing:.3px;
+    padding:5px 10px;border-radius:6px 6px 0 0;width:100%;box-sizing:border-box;}
   .tbl-title.green{background:var(--green);}
   .tbl-title svg{width:12px;height:12px;fill:#fff;}
-  table.dt{width:100%;border-collapse:collapse;border:1px solid var(--purple-border);border-top:none;flex:0 0 auto;height:auto;max-height:none;overflow:visible;}
+  table.dt{
+    width:100%;border-collapse:collapse;border:1px solid var(--purple-border);border-top:none;
+    flex:0 0 auto;height:auto;max-height:none;overflow:visible;
+  }
   table.dt.green{border-color:#bfe0c4;}
-  table.dt th{background:var(--purple-light);color:var(--purple-dark);font-size:8.5px;font-weight:700;
-    padding:4px 3px;border:1px solid var(--purple-border);text-align:center;vertical-align:middle;
-    white-space:normal;word-break:normal;line-height:1.2;}
+  table.dt th{
+    background:var(--purple-light);color:var(--purple-dark);
+    font-size:9px;font-weight:700;
+    padding:5px 6px;border:1px solid var(--purple-border);text-align:center;vertical-align:middle;
+    white-space:normal;word-break:normal;line-height:1.25;
+    letter-spacing:normal;word-spacing:normal;
+  }
   table.dt.green th{background:#eaf7ec;color:var(--green);border-color:#bfe0c4;}
-  table.dt td{border:1px solid #e6e6e6;padding:4px 3px;font-size:9px;text-align:center;color:#231f20;
-    vertical-align:middle;word-spacing:normal;letter-spacing:normal;white-space:normal;}
+  table.dt td{
+    border:1px solid #e6e6e6;padding:5px 6px;
+    font-size:9.5px;font-weight:400;
+    text-align:center;color:#231f20;vertical-align:middle;
+    word-spacing:normal;letter-spacing:normal;white-space:normal;
+    font-kerning:none;font-feature-settings:"kern" 0,"liga" 0;
+  }
   table.dt tbody tr:nth-child(even) td{background:#f8f4fc;}
   table.dt.green tbody tr:nth-child(even) td{background:#f3faf4;}
   table.dt.green td{border-color:#dcefdf;}
-  table.dt td.left{text-align:left;}
+  table.dt td.left{text-align:left;font-weight:400;}
+  table.dt td.rate,
+  table.dt th:last-child,
+  table.dt td:last-child{
+    width:140px;white-space:nowrap;
+    font-size:9.5px;font-weight:400;letter-spacing:normal;word-spacing:normal;
+  }
   table.dt th:first-child, table.dt td:first-child{width:42px;}
-  table.dt th:last-child, table.dt td:last-child{width:140px;white-space:nowrap;}
+  /* HSN/SAC codes: same face as cell; stop digit+) collision in PDF capture */
+  table.dt .hsn-code{
+    font-family:inherit!important;
+    font-weight:inherit!important;
+    font-style:normal!important;
+    font-kerning:none;
+    font-feature-settings:"kern" 0,"liga" 0;
+    letter-spacing:.02em;
+    white-space:nowrap;
+  }
   /* Qty is not printed on quotations */
   table.dt th.qty, table.dt td.qty{display:none!important;width:0!important;padding:0!important;border:none!important;}
-  .nil{color:var(--green);font-weight:800;}
+  /* NIL matches rate text — same color/weight/size as other cells */
+  table.dt .nil,
+  .nil{
+    color:#231f20!important;
+    font-family:inherit!important;
+    font-size:inherit!important;
+    font-weight:400!important;
+    letter-spacing:normal!important;
+    word-spacing:normal!important;
+  }
+  table.dt td b,
+  table.dt td strong{
+    font-family:inherit!important;
+    font-weight:700;
+    letter-spacing:normal!important;
+  }
 
   /* ============ FEATURES (grow to fill leftover A4 space) ============ */
   .features{
@@ -660,13 +713,13 @@ export const buildQuotationHtml = (data, profileInput) => {
   .page2-notes .fr-note{flex:1;min-width:0;overflow:visible;}
   .page2-notes .fr-note > p,.page2-notes .fr-note .note-title{
     font-weight:700;font-size:11.5px;margin-bottom:6px;color:#231f20;
-    font-style:normal;font-family:Arial,Helvetica,sans-serif;
+    font-style:normal;
   }
   .page2-notes .fr-note ul{
     padding-left:16px;margin:0;list-style:disc;
     font-size:10.5px;color:#231f20;line-height:1.5;
     word-spacing:normal;letter-spacing:normal;white-space:normal;
-    overflow:visible;font-style:normal;font-family:Arial,Helvetica,sans-serif;
+    overflow:visible;font-style:normal;
   }
   .page2-notes .fr-note li{
     margin:0 0 5px 0;color:#231f20;opacity:1;-webkit-text-fill-color:#231f20;
@@ -683,14 +736,15 @@ export const buildQuotationHtml = (data, profileInput) => {
   .page2-spacer{display:none;}
   .bottom-banner{
     background:var(--purple);color:#fff;display:flex;align-items:center;justify-content:space-between;
-    padding:10px 24px;font-size:10.5px;position:relative;bottom:auto;left:auto;right:auto;
-    width:100%;box-sizing:border-box;flex-shrink:0;margin-top:0;
+    padding:7px 14px;font-size:10.5px;position:relative;bottom:auto;left:auto;right:auto;
+    width:100%;box-sizing:border-box;flex-shrink:0;margin-top:0;gap:8px;
   }
-  .bottom-banner .thankyou{font-style:italic;font-size:11.5px;}
-  .bottom-banner .items{display:flex;align-items:center;gap:14px;}
-  .bottom-banner .items span{display:flex;align-items:center;gap:6px;}
-  .bottom-banner svg{width:13px;height:13px;fill:#fff;}
-  .bottom-banner .sep{opacity:.5;}
+  .bottom-banner > span{min-width:0;}
+  .barfoot{
+    background:var(--purple);color:#fff;display:flex;align-items:center;justify-content:space-between;
+    padding:7px 14px;font-size:10.5px;width:100%;box-sizing:border-box;flex-shrink:0;margin-top:0;gap:8px;
+  }
+  .barfoot span{min-width:0;}
 
   @media print{
     body{background:#fff;padding:0;}
@@ -823,6 +877,8 @@ export const buildQuotationHtml = (data, profileInput) => {
     </div>
 
   </div>
+
+  ${buildStatusBar('Page 1 of 2', PRINT_FOOTER_MESSAGES.QT)}
 </div>
 
 <!-- ============================================================ PAGE 2 ============================================================ -->
@@ -927,14 +983,7 @@ export const buildQuotationHtml = (data, profileInput) => {
   </div>
   </div>
 
-  <div class="bottom-banner">
-    <span class="thankyou">Thank you for your business!</span>
-    <div class="items">
-      <span><svg viewBox="0 0 24 24"><path d="M12 2l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/></svg>Quality You Can Trust</span>
-      <span class="sep">|</span>
-      <span><svg viewBox="0 0 24 24"><path d="M13 2L3 14h6l-1 8 11-14h-6z"/></svg>Performance You Can Rely On</span>
-    </div>
-  </div>
+  ${buildStatusBar('Page 2 of 2', PRINT_FOOTER_MESSAGES.QT)}
 </div>
 
 </body>

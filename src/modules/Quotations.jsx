@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Eye, Plus, Search, Download, Trash2, Edit2, GripVertical, Copy } from 'lucide-react';
+import { Eye, Plus, Download, Trash2, Edit2, GripVertical, Copy } from 'lucide-react';
 import { nextAvailableDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import { formatDate } from '../utils/dateUtils';
 import SearchableSelect from '../components/SearchableSelect';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import DateField from '../components/DateField';
 import {
   RATE_UNIT_OPTIONS,
@@ -348,6 +349,8 @@ const Quotations = () => {
   const { data, updateData, updateItem, deleteItemSoftly, ensureSerialAtLeast } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [pendingEditData, setPendingEditData] = useState(null);
   
@@ -750,7 +753,12 @@ const Quotations = () => {
     transition: 'border-color 0.15s ease, background 0.15s ease'
   });
 
-  const filtered = quotationsList.filter(q => {
+  const partyOptions = useMemo(() => uniqueSortedOptions(quotationsList.map((q) => q.partyName)), [quotationsList]);
+  const productOptions = useMemo(() => uniqueSortedOptions(quotationsList.map((q) => q.productName)), [quotationsList]);
+  const filtered = quotationsList.filter((q) => {
+    if (partyFilter && (q.partyName || '') !== partyFilter) return false;
+    if (productFilter && (q.productName || '') !== productFilter) return false;
+    if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     return (
       (q.partyName || '').toLowerCase().includes(term) ||
@@ -777,19 +785,19 @@ const Quotations = () => {
         </button>
       </header>
 
-      <div className="premium-card">
-        <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-          <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-          <input 
-            type="text" 
-            className="input-field" 
-            placeholder="Search quotations..." 
-            style={{ paddingLeft: '3rem' }}
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
-        </div>
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search quotations..."
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={partyOptions}
+        productFilter={productFilter}
+        onProductChange={setProductFilter}
+        productOptions={productOptions}
+      />
 
+      <div className="premium-card">
         <div className="data-table-container">
           <table className="data-table">
             <thead>

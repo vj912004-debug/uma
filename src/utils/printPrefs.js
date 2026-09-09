@@ -16,9 +16,19 @@ export const PRINT_FONTS = [
 
 export const PRINT_FONT_SIZES = [9, 10, 11, 12, 13, 14, 16, 18];
 
+/** How aggressively to shrink layout when large fonts overflow A4. */
+export const PRINT_SHRINK_OPTIONS = [
+  { label: 'Off', value: 'off', hint: 'Never scale the page down' },
+  { label: 'Auto', value: 'auto', hint: 'Shrink only if content overflows' },
+  { label: 'Light', value: 'light', hint: 'Allow mild shrink (~12%)' },
+  { label: 'Medium', value: 'medium', hint: 'Allow moderate shrink (~22%)' },
+  { label: 'Strong', value: 'strong', hint: 'Allow strong shrink (~35%)' }
+];
+
 export const DEFAULT_PRINT_PREFS = {
   fontFamily: 'Cambria, Georgia, serif',
-  fontSize: PRINT_BASE_FONT_SIZE
+  fontSize: PRINT_BASE_FONT_SIZE,
+  shrink: 'auto'
 };
 
 const STORAGE_KEY = 'uma_print_prefs';
@@ -29,7 +39,10 @@ export const normalizePrintPrefs = (prefs) => {
     : DEFAULT_PRINT_PREFS.fontFamily;
   const rawSize = parseInt(prefs?.fontSize, 10);
   const fontSize = PRINT_FONT_SIZES.includes(rawSize) ? rawSize : DEFAULT_PRINT_PREFS.fontSize;
-  return { fontFamily, fontSize };
+  const shrink = PRINT_SHRINK_OPTIONS.some((s) => s.value === prefs?.shrink)
+    ? prefs.shrink
+    : DEFAULT_PRINT_PREFS.shrink;
+  return { fontFamily, fontSize, shrink };
 };
 
 export const getStoredPrintPrefs = () => {
@@ -55,18 +68,31 @@ export const setStoredPrintPrefs = (prefs) => {
 export const getPrintScale = (prefs) =>
   normalizePrintPrefs(prefs).fontSize / PRINT_BASE_FONT_SIZE;
 
-/** Density tier used to auto-tighten layout when font/size grows. */
+const DENSITY_ORDER = ['sm', 'base', 'md', 'lg', 'xl'];
+
+/** Density tier used to auto-tighten layout when font/size/shrink grows. */
 export const getPrintDensity = (prefs) => {
-  const { fontSize } = normalizePrintPrefs(prefs);
-  if (fontSize >= 16) return 'xl';
-  if (fontSize >= 14) return 'lg';
-  if (fontSize >= 13) return 'md';
-  if (fontSize <= 10) return 'sm';
-  return 'base';
+  const { fontSize, shrink } = normalizePrintPrefs(prefs);
+  let density = 'base';
+  if (fontSize >= 16) density = 'xl';
+  else if (fontSize >= 14) density = 'lg';
+  else if (fontSize >= 13) density = 'md';
+  else if (fontSize <= 10) density = 'sm';
+
+  const boost = shrink === 'strong' ? 2 : shrink === 'medium' ? 1 : shrink === 'light' ? 1 : 0;
+  if (!boost) return density;
+  const idx = Math.min(DENSITY_ORDER.length - 1, Math.max(0, DENSITY_ORDER.indexOf(density) + boost));
+  return DENSITY_ORDER[idx];
 };
 
 /** Minimum zoom allowed when auto-fitting a locked A4 page. */
 export const getPrintMinFitScale = (prefs) => {
+  const { shrink } = normalizePrintPrefs(prefs);
+  if (shrink === 'off') return 1;
+  if (shrink === 'light') return 0.88;
+  if (shrink === 'medium') return 0.78;
+  if (shrink === 'strong') return 0.65;
+
   const scale = getPrintScale(prefs);
   if (scale >= 1.4) return 0.68;
   if (scale >= 1.15) return 0.74;
@@ -179,6 +205,52 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .page2-body {
     font-size: ${bodyFs}px !important;
     line-height: ${lineH} !important;
+  }
+
+  /* Quotation letter + charge tables: identical face (print font preference) */
+  .uma-print-root .letter-text,
+  .uma-print-root .letter-text p,
+  .uma-print-root .letter-text b,
+  .uma-print-root .letter-text strong,
+  .uma-print-root table.dt,
+  .uma-print-root table.dt th,
+  .uma-print-root table.dt td,
+  .uma-print-root table.dt td *,
+  .uma-print-root .tbl-title,
+  .uma-print-root .quote-main-table,
+  .uma-print-root .quote-optional-table {
+    font-family: ${fontFamily} !important;
+    letter-spacing: normal !important;
+    word-spacing: normal !important;
+  }
+  .uma-print-root table.dt td,
+  .uma-print-root table.dt td.left,
+  .uma-print-root table.dt td.rate,
+  .uma-print-root table.dt td .nil,
+  .uma-print-root .nil {
+    font-weight: 400 !important;
+    color: #231f20 !important;
+    font-family: ${fontFamily} !important;
+    font-size: inherit !important;
+  }
+  .uma-print-root table.dt th {
+    font-weight: 700 !important;
+  }
+  .uma-print-root table.dt td,
+  .uma-print-root table.dt .hsn-code {
+    font-kerning: none !important;
+    font-feature-settings: "kern" 0, "liga" 0 !important;
+  }
+  .uma-print-root table.dt .hsn-code {
+    font-family: inherit !important;
+    font-weight: inherit !important;
+    font-style: normal !important;
+    letter-spacing: 0.02em !important;
+    white-space: nowrap !important;
+  }
+  .uma-print-root .letter-text b,
+  .uma-print-root .letter-text strong {
+    font-weight: 700 !important;
   }
 
   .uma-print-root .contact-bar,
@@ -1044,10 +1116,10 @@ export const buildPrintPrefsCss = (prefs) => {
     overflow: visible !important;
   }
   .uma-print-root .pl-page .pl-meta {
-    display: flex !important;
-    flex-direction: column !important;
-    grid-template-columns: none !important;
-    gap: 1px !important;
+    display: grid !important;
+    grid-template-columns: 1.2fr 1fr !important;
+    flex-direction: unset !important;
+    gap: 2px 28px !important;
     align-items: stretch !important;
     border: none !important;
     background: transparent !important;
@@ -1055,7 +1127,7 @@ export const buildPrintPrefsCss = (prefs) => {
     margin: 0 0 8px !important;
   }
   .uma-print-root.print-density-xl .pl-page .pl-meta {
-    grid-template-columns: none !important;
+    grid-template-columns: 1.2fr 1fr !important;
   }
   .uma-print-root .pl-page .product-block {
     flex: 0 0 auto !important;
@@ -1074,8 +1146,8 @@ export const buildPrintPrefsCss = (prefs) => {
     min-width: 0 !important;
   }
   .uma-print-root .pl-page .meta-field .lbl {
-    min-width: 130px !important;
-    flex: 0 0 130px !important;
+    min-width: 118px !important;
+    flex: 0 0 118px !important;
     white-space: nowrap !important;
     letter-spacing: normal !important;
     word-spacing: 0.15em !important;

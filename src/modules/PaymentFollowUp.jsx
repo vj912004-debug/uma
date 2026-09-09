@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import DateField from '../components/DateField';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import {
-  Search,
   Eye,
   ArrowLeft,
   FileDown,
@@ -20,6 +20,7 @@ import {
 import { useAppContext } from '../context/AppContext';
 import { formatDate } from '../utils/dateUtils';
 import ExportButton from '../components/ExportButton';
+import SearchableSelect from '../components/SearchableSelect';
 import {
   buildCustomerOutstanding,
   buildOutstandingInvoices,
@@ -44,7 +45,6 @@ import {
   whatsappSend,
   whatsappStatus
 } from '../api/client';
-import SearchableSelect from '../components/SearchableSelect';
 
 const FILTER_STATUS = [
   { key: 'all', label: 'All Status' },
@@ -108,6 +108,7 @@ const PaymentFollowUp = () => {
   const [view, setView] = useState('dashboard'); // dashboard | customers | detail | history
   const [asOnDate, setAsOnDate] = useState(todayISO());
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedPartyId, setSelectedPartyId] = useState(null);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
@@ -164,9 +165,11 @@ const PaymentFollowUp = () => {
     [promises]
   );
 
+  const partyOptions = useMemo(() => uniqueSortedOptions(customers.map((c) => c.partyName)), [customers]);
   const filteredCustomers = useMemo(() => {
     const s = searchTerm.trim().toLowerCase();
     return customers.filter((c) => {
+      if (partyFilter && (c.partyName || '') !== partyFilter) return false;
       if (statusFilter === 'overdue' && c.overdueAmount < 0.01) return false;
       if (statusFilter === 'due_today' && c.nextFollowUp !== today) return false;
       if (statusFilter === 'due_tomorrow' && c.nextFollowUp !== tomorrow) return false;
@@ -178,7 +181,7 @@ const PaymentFollowUp = () => {
         (c.email || '').toLowerCase().includes(s)
       );
     });
-  }, [customers, searchTerm, statusFilter, today, tomorrow, promisedPartyIds]);
+  }, [customers, searchTerm, partyFilter, statusFilter, today, tomorrow, promisedPartyIds]);
 
   const selectedCustomer = useMemo(() => {
     if (!selectedPartyId) return null;
@@ -521,7 +524,7 @@ const PaymentFollowUp = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <h3 style={{ margin: 0 }}>Customers with Pending Amount</h3>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <ExportButton data={customers} columns={customerExportCols} filename="Pending_Customers" title="Customers with Pending Amount" />
+            <ExportButton data={filteredCustomers} columns={customerExportCols} filename="Pending_Customers" title="Customers with Pending Amount" />
             <button type="button" className="btn btn-primary" onClick={() => setView('customers')}>Customer Wise List</button>
             <button type="button" className="btn" onClick={() => openPromiseModal(null)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <Handshake size={14} /> Add Promise
@@ -541,7 +544,7 @@ const PaymentFollowUp = () => {
               </tr>
             </thead>
             <tbody>
-              {customers.map((c) => (
+              {filteredCustomers.map((c) => (
                 <tr key={c.partyId || c.partyName}>
                   <td style={{ fontWeight: 600 }}>{c.partyName}</td>
                   <td>{c.pendingInvoices || c.invoices?.length || 0}</td>
@@ -555,7 +558,7 @@ const PaymentFollowUp = () => {
                   </td>
                 </tr>
               ))}
-              {customers.length === 0 && (
+              {filteredCustomers.length === 0 && (
                 <tr><td colSpan={6} style={{ textAlign: 'center', padding: '1.75rem', color: 'var(--text-muted)' }}>No pending amounts found. Check Tax Invoices / Processing Sheet outstanding.</td></tr>
               )}
             </tbody>
@@ -569,10 +572,6 @@ const PaymentFollowUp = () => {
   const renderCustomers = () => (
     <div className="premium-card">
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'flex-end' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
-          <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input className="input-field" style={{ paddingLeft: '2rem' }} placeholder="Search Customer" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-        </div>
         <div>
           <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Status</label>
           <SearchableSelect className="input-field" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -778,6 +777,18 @@ const PaymentFollowUp = () => {
           </button>
         </div>
       </header>
+
+      {(view === 'dashboard' || view === 'customers') && (
+        <ListFilterBar
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          placeholder="Search customer, phone or email…"
+          partyFilter={partyFilter}
+          onPartyChange={setPartyFilter}
+          partyOptions={partyOptions}
+          showProduct={false}
+        />
+      )}
 
       {view === 'dashboard' && renderDashboard()}
       {view === 'customers' && renderCustomers()}

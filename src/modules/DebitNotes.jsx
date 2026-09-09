@@ -1,10 +1,11 @@
 import { formatDate } from '../utils/dateUtils';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import {Eye,  Plus, Search, Edit2, Trash2, FileDown } from 'lucide-react';
+import {Eye,  Plus, Edit2, Trash2, FileDown } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import DateField from '../components/DateField';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import {
   STANDARD_CHARGES_LIST,
   OTHER_CHARGE_ITEM,
@@ -63,6 +64,7 @@ const DebitNotes = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
 
   const [form, setForm] = useState({
     noteNo: '',
@@ -219,10 +221,16 @@ const DebitNotes = () => {
   };
 
   const notesList = (data.debitNotes || []).filter(n => !n.isDeleted);
-  const filtered = notesList.filter(n =>
-    (n.noteNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (n.partyName || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const partyOptions = useMemo(() => uniqueSortedOptions(notesList.map((n) => n.partyName)), [notesList]);
+  const filtered = notesList.filter((n) => {
+    if (partyFilter && (n.partyName || '') !== partyFilter) return false;
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (n.noteNo || '').toLowerCase().includes(q) ||
+      (n.partyName || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div>
@@ -236,19 +244,17 @@ const DebitNotes = () => {
         </button>
       </header>
 
-      <div className="premium-card">
-        <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-          <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-          <input
-            type="text"
-            className="input-field"
-            placeholder="Search by Note No or Party Name..."
-            style={{ paddingLeft: '3rem' }}
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
-        </div>
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search by Note No or Party Name..."
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={partyOptions}
+        showProduct={false}
+      />
 
+      <div className="premium-card">
         <div className="data-table-container">
           <table className="data-table">
             <thead>

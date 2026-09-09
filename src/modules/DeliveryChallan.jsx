@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
+import {Eye,  Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import SearchableSelect from '../components/SearchableSelect';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import DateField from '../components/DateField';
 import {
   buildDCFieldsFromProducts,
@@ -42,6 +43,8 @@ const emptyDCForm = (docNo = '') => ({
 const DeliveryChallan = () => {
   const { data, updateData, updateItem, incrementSerial, deleteItemSoftly } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedPL, setSelectedPL] = useState(null);
@@ -188,11 +191,21 @@ const DeliveryChallan = () => {
     !(data.deliveryChallans || []).some(dc => dc.receiptId === pl.receiptId)
   );
 
-  const filteredDCs = (data.deliveryChallans || []).filter(dc =>
-    (dc.dcNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (dc.partyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (dc.productName || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const dcList = data.deliveryChallans || [];
+  const partyOptions = useMemo(() => uniqueSortedOptions(dcList.map((dc) => dc.partyName)), [dcList]);
+  const productOptions = useMemo(() => uniqueSortedOptions(dcList.map((dc) => dc.productName)), [dcList]);
+  const filteredDCs = dcList.filter((dc) => {
+    if (partyFilter && (dc.partyName || '') !== partyFilter) return false;
+    if (productFilter && (dc.productName || '') !== productFilter) return false;
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (dc.dcNo || '').toLowerCase().includes(q) ||
+      (dc.partyName || '').toLowerCase().includes(q) ||
+      (dc.productName || '').toLowerCase().includes(q) ||
+      (dc.vehicleNo || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div>
@@ -205,6 +218,18 @@ const DeliveryChallan = () => {
           <Plus size={18} /> Create New DC
         </button>
       </header>
+
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search DC No, customer or vehicle..."
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={partyOptions}
+        productFilter={productFilter}
+        onProductChange={setProductFilter}
+        productOptions={productOptions}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
         <div className="premium-card">
@@ -235,18 +260,6 @@ const DeliveryChallan = () => {
 
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Delivery Challan Log</h3>
-
-          <div style={{ position: 'relative', marginBottom: '1rem' }}>
-            <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={16} />
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Search DC No, customer or vehicle..."
-              style={{ paddingLeft: '2.5rem', fontSize: '0.85rem', padding: '0.5rem 2.5rem' }}
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
 
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>

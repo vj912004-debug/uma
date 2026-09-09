@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
-import {Eye,  Search, UploadCloud, Trash2, Calendar, ClipboardList, CheckCircle } from 'lucide-react';
+import {Eye,  UploadCloud, Trash2, Calendar, ClipboardList, CheckCircle } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import DateField from '../components/DateField';
 
 const PSD = () => {
   const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMR, setSelectedMR] = useState(null);
 
@@ -120,11 +123,20 @@ const PSD = () => {
     !(data.psds || []).some(p => p.receiptId === mr.id)
   );
 
-  const filteredPSDs = (data.psds || []).filter(p => 
-    p.psdNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.partyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.productName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const psdList = data.psds || [];
+  const partyOptions = useMemo(() => uniqueSortedOptions(psdList.map((p) => p.partyName)), [psdList]);
+  const productOptions = useMemo(() => uniqueSortedOptions(psdList.map((p) => p.productName)), [psdList]);
+  const filteredPSDs = psdList.filter((p) => {
+    if (partyFilter && (p.partyName || '') !== partyFilter) return false;
+    if (productFilter && (p.productName || '') !== productFilter) return false;
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (p.psdNo || '').toLowerCase().includes(q) ||
+      (p.partyName || '').toLowerCase().includes(q) ||
+      (p.productName || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div>
@@ -132,6 +144,18 @@ const PSD = () => {
         <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>PSD Lab Reports</h1>
         <p style={{ color: 'var(--text-muted)' }}>Upload and log Particle Size Distribution (PSD) analysis reports.</p>
       </header>
+
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search PSD No, customer or chemical..."
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={partyOptions}
+        productFilter={productFilter}
+        onProductChange={setProductFilter}
+        productOptions={productOptions}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
         {/* Left Side: Pending Receipts scheduler */}
@@ -164,18 +188,6 @@ const PSD = () => {
         {/* Right Side: PSD log */}
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Uploaded PSD Reports</h3>
-          
-          <div style={{ position: 'relative', marginBottom: '1rem' }}>
-            <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={16} />
-            <input 
-              type="text" 
-              className="input-field" 
-              placeholder="Search PSD No, customer or chemical..." 
-              style={{ paddingLeft: '2.5rem', fontSize: '0.85rem', padding: '0.5rem 2.5rem' }}
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
 
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>

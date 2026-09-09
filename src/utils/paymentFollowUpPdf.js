@@ -4,7 +4,9 @@ import {
   escHtml,
   buildPrintBrandHtml,
   buildFillerRowsHtml,
-  renderHtmlToPdf
+  renderHtmlToPdf,
+  buildStatusBar,
+  PRINT_FOOTER_MESSAGES
 } from './printTheme';
 import { applyPrintPrefsToHtml } from './printPrefs';
 import { money } from './paymentFollowUpData';
@@ -230,11 +232,7 @@ export const buildPaymentFollowUpStatementHtml = ({
         <div class="line">For ${escHtml(companyName)}<span>Authorized Signatory</span></div>
       </div>
 
-      <div class="barfoot">
-        <span>Thank you for your business!</span>
-        <span>E. &amp; O.E.</span>
-        <span>Page 1 of 1</span>
-      </div>
+      ${buildStatusBar('Page 1 of 1', PRINT_FOOTER_MESSAGES.PFU)}
     </div>
   </div>
 </body>

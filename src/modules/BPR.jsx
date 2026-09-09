@@ -5,9 +5,10 @@ import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
 import { buildBlankBprPayload } from '../utils/bprHtml';
 import { getStoredCompanyProfile } from '../utils/companyProfile';
 import ExportButton from '../components/ExportButton';
-import { Plus, Search, Edit2, Trash2, ClipboardList, FileDown, Printer, FileText } from 'lucide-react';
+import { Plus, Edit2, Trash2, ClipboardList, FileDown, Printer, FileText } from 'lucide-react';
 import { numberInputValue, parseOptionalNumber } from '../utils/numberInput';
 import SearchableSelect from '../components/SearchableSelect';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import {
@@ -86,6 +87,8 @@ const displayNet = (net, gross, tare) => {
 const BPR = () => {
   const { data, updateData, updateItem, setData, incrementSerial, deleteItemSoftly } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBPR, setEditingBPR] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
@@ -525,11 +528,20 @@ const BPR = () => {
     return jobs;
   }, [data]);
 
-  const filteredBPRs = (data.bprs || []).filter(b => 
-    (b.bprNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (b.partyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (b.productName || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const bprList = data.bprs || [];
+  const partyOptions = useMemo(() => uniqueSortedOptions(bprList.map((b) => b.partyName)), [bprList]);
+  const productOptions = useMemo(() => uniqueSortedOptions(bprList.map((b) => b.productName)), [bprList]);
+  const filteredBPRs = bprList.filter((b) => {
+    if (partyFilter && (b.partyName || '') !== partyFilter) return false;
+    if (productFilter && (b.productName || '') !== productFilter) return false;
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (b.bprNo || '').toLowerCase().includes(q) ||
+      (b.partyName || '').toLowerCase().includes(q) ||
+      (b.productName || '').toLowerCase().includes(q)
+    );
+  });
 
   const tableCols = [
     { key: 'bprNo', label: 'BPR No' },
@@ -598,6 +610,19 @@ const BPR = () => {
       </header>
 
       {listView === 'page1' && (
+      <>
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search BPR No, customer or chemical..."
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={partyOptions}
+        productFilter={productFilter}
+        onProductChange={setProductFilter}
+        productOptions={productOptions}
+      />
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
         {/* Left Side: Pending Receipts scheduler */}
         <div className="premium-card">
@@ -629,18 +654,6 @@ const BPR = () => {
         {/* Right Side: Production History */}
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>BPR Production Log</h3>
-          
-          <div style={{ position: 'relative', marginBottom: '1rem' }}>
-            <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={16} />
-            <input 
-              type="text" 
-              className="input-field" 
-              placeholder="Search BPR No, customer or chemical..." 
-              style={{ paddingLeft: '2.5rem', fontSize: '0.85rem', padding: '0.5rem 2.5rem' }}
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
 
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
@@ -687,26 +700,28 @@ const BPR = () => {
           </div>
         </div>
       </div>
+      </>
       )}
 
       {listView === 'page2' && (
+      <>
+        <ListFilterBar
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          placeholder="Search BPR No, customer or product..."
+          partyFilter={partyFilter}
+          onPartyChange={setPartyFilter}
+          partyOptions={partyOptions}
+          productFilter={productFilter}
+          onProductChange={setProductFilter}
+          productOptions={productOptions}
+        />
+
         <div className="premium-card">
           <h3 style={{ marginBottom: '0.5rem' }}>Batch Packing & Weight Records</h3>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
             Received vs dispatched drum weights. Select a record to enter or edit packing weights.
           </p>
-
-          <div style={{ position: 'relative', marginBottom: '1rem' }}>
-            <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={16} />
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Search BPR No, customer or product..."
-              style={{ paddingLeft: '2.5rem', fontSize: '0.85rem', padding: '0.5rem 2.5rem' }}
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
 
           {pendingBprJobs.length > 0 && (
             <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
@@ -766,6 +781,7 @@ const BPR = () => {
             </table>
           </div>
         </div>
+      </>
       )}
 
       {/* Embedded Generator Modal */}

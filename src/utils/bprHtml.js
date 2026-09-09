@@ -1,6 +1,6 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { formatPdfDateSlash } from './taxInvoiceLayout';
-import { escHtml, buildPrintBrandHtml, applyPrintPrefsToHtml, layoutFillOtherPrintPages } from './printTheme';
+import { escHtml, buildPrintBrandHtml, applyPrintPrefsToHtml, layoutFillOtherPrintPages, buildStatusBar, PRINT_FOOTER_MESSAGES } from './printTheme';
 import { PRINT_ROOT_CLASS } from './printPrefs';
 
 const hasWeight = (row = {}) => {
@@ -619,6 +619,7 @@ export const buildBprHtml = (data, profileInput) => {
           <div class="signature-label">${penIcon} Plant Supervisor's Signature</div>
         </div>
       </div>
+      ${buildStatusBar('Page 1 of 2', PRINT_FOOTER_MESSAGES.BPR)}
       </div>
     </div>
   </div>`;
@@ -874,7 +875,8 @@ export const buildBprHtml = (data, profileInput) => {
   .page-p2 .barfoot{
     margin:auto -10px -10px -10px !important;
   }
-  .barfoot span{white-space:nowrap;letter-spacing:0.01px;word-spacing:0.02em;}
+  .barfoot span{white-space:normal;letter-spacing:0.01px;word-spacing:0.02em;line-height:1.2;}
+  .barfoot span:last-child{white-space:nowrap;flex-shrink:0;}
   .page-p2 .signs{
     display:flex;border:1px solid #7c12bd;margin:8px 0 0 0;border-radius:4px;overflow:hidden;
     flex:0 0 32px;width:250px;max-width:34%;height:32px;min-height:32px;max-height:32px;
@@ -951,11 +953,7 @@ export const buildBprHtml = (data, profileInput) => {
         <div class="sign">${penIcon} Plant Supervisor Sign<span class="line"></span></div>
       </div>
 
-      <div class="barfoot">
-        <span>Thank&nbsp;you for your business!</span>
-        <span>E. &amp; O.E.</span>
-        <span>Page 2 of 2</span>
-      </div>
+      ${buildStatusBar('Page 2 of 2', PRINT_FOOTER_MESSAGES.BPR)}
     </div>
   </div>
 

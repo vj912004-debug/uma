@@ -1,13 +1,14 @@
 import { formatDate } from '../utils/dateUtils';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber, nextAvailableDocNumber } from '../utils/numbering';
-import {Eye,  Search, Edit2, Trash2, FileDown, ClipboardList, Plus, ArrowLeft } from 'lucide-react';
+import {Eye,  Edit2, Trash2, FileDown, ClipboardList, Plus, ArrowLeft } from 'lucide-react';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import ExportButton from '../components/ExportButton';
 import DocChargeRow from '../components/DocChargeRow';
 import DateField from '../components/DateField';
 import GstTaxBlock from '../components/GstTaxBlock';
+import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import { GST_TYPE_CGST_SGST, normalizeGstType } from '../utils/taxInvoiceLayout';
 import {
   STANDARD_CHARGES_LIST,
@@ -41,6 +42,8 @@ import SearchableSelect from '../components/SearchableSelect';
 const InvoicesPI = () => {
   const { data, updateData, updateItem, deleteItemSoftly, ensureSerialAtLeast } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
+  const [partyFilter, setPartyFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
@@ -490,10 +493,19 @@ const InvoicesPI = () => {
   );
 
   const piList = (data.invoices || []).filter(inv => inv.type === 'Proforma Invoice' && !inv.isDeleted);
-  const filtered = piList.filter(inv => 
-    (inv.invoiceNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (inv.partyName || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const partyOptions = useMemo(() => uniqueSortedOptions(piList.map((r) => r.partyName)), [piList]);
+  const productOptions = useMemo(() => uniqueSortedOptions(piList.map((r) => r.productName)), [piList]);
+  const filtered = piList.filter((inv) => {
+    if (partyFilter && (inv.partyName || '') !== partyFilter) return false;
+    if (productFilter && (inv.productName || '') !== productFilter) return false;
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (inv.invoiceNo || '').toLowerCase().includes(q) ||
+      (inv.partyName || '').toLowerCase().includes(q) ||
+      (inv.productName || '').toLowerCase().includes(q)
+    );
+  });
 
   const exportColumns = [
     { label: 'Date', key: 'date' },
@@ -522,6 +534,18 @@ const InvoicesPI = () => {
           </button>
         </div>
       </header>
+
+      <ListFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        placeholder="Search by PI number, Party or Product..."
+        partyFilter={partyFilter}
+        onPartyChange={setPartyFilter}
+        partyOptions={partyOptions}
+        productFilter={productFilter}
+        onProductChange={setProductFilter}
+        productOptions={productOptions}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
         {/* Left Side: Pending MRs scheduler */}
@@ -559,18 +583,6 @@ const InvoicesPI = () => {
         {/* Right Side: PI Log */}
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Proforma Invoice Log</h3>
-          
-          <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-            <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-            <input 
-              type="text" 
-              className="input-field" 
-              placeholder="Search by PI number or Party Name..." 
-              style={{ paddingLeft: '3rem' }}
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
 
           <div className="data-table-container">
             <table className="data-table">

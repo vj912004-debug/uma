@@ -5,7 +5,7 @@ import {
   buildTiPrintChargeRows,
   getSplitGstRates
 } from './taxInvoiceLayout';
-import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPrintTermsHtml, DEFAULT_INVOICE_TERMS, DEFAULT_INVOICE_DECLARATION, buildBankDetailsBox } from './printTheme';
+import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPrintTermsHtml, DEFAULT_INVOICE_TERMS, DEFAULT_INVOICE_DECLARATION, buildBankDetailsBox, buildStatusBar, PRINT_FOOTER_MESSAGES } from './printTheme';
 export const escHtml = (v) => String(v ?? '')
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
@@ -777,12 +777,7 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
   ${buildFooterTerms(profile.companyName || 'UMA MICRON', formatPrintTermsHtml(data.terms, DEFAULT_INVOICE_TERMS), DEFAULT_INVOICE_DECLARATION)}
 
   <!-- BAR FOOTER -->
-  <div class="barfoot">
-    <span>Thank you for your business!</span>
-    <span>E. &amp; O.E.</span>
-    <span>This is a computer-generated invoice.</span>
-    <span>Page 1 of 1</span>
-  </div>
+  ${buildStatusBar('Page 1 of 1', PRINT_FOOTER_MESSAGES.PI)}
 
   </div>
 </div>
