@@ -64,7 +64,12 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   const poNo = escHtml(data.partyDocNo || '');
   const poDate = escHtml(formatPdfDateDmy(data.partyDocDate) || '');
   const companyState = escHtml(toTitleCase(profile.state || 'Gujarat'));
-  const [addrLine1, addrLine2] = buildDcCompanyAddressLines(profile).map(escHtml);
+  const [addrLine1, addrLine2] = buildDcCompanyAddressLines(profile);
+  const companyAddressOne = escHtml([addrLine1, addrLine2].filter(Boolean).join(' '));
+  const companyWebsite = escHtml(String(profile.website || 'www.umamicron.com').replace(/^https?:\/\//i, ''));
+  const companyPhone = escHtml(profile.phone || '+91 97120 00297');
+  const companyEmail = escHtml(profile.email || 'info@umamicron.com');
+  const companyGstin = escHtml(profile.gstNumber || '');
   const shipState = escHtml(data.shipState || data.billState || data.state || companyState);
   const stateCode = escHtml(data.shipStateCode || data.billStateCode || data.stateCode || '24');
   const partyGstin = escHtml(data.gstinShip || data.gstinBill || data.gstin || '');
@@ -359,77 +364,82 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
     white-space: nowrap;
   }
 
-  /* ===== COMPANY / INVOICE INFO ROW ===== */
+  /* ===== COMPANY HEADER STRIP (address + contacts) ===== */
   .company-strip {
-    display: grid;
-    grid-template-columns: 1.05fr 1fr;
-    align-items: stretch;
-    column-gap: 14px;
-    row-gap: 0;
-    border-bottom: 2px solid var(--purple);
-    padding-bottom: 8px;
-    margin-bottom: 14px;
-    font-size: 12px;
-  }
-  .company-strip .dc-strip-left,
-  .company-strip .dc-strip-right {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    gap: 6px;
-    min-width: 0;
-  }
-  .company-strip .line {
-    display: flex;
-    align-items: flex-start;
-    gap: 5px;
-  }
-  .company-strip .line.nowrap {
-    white-space: nowrap;
-    align-items: center;
-  }
-  .company-strip .dc-contact-row {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 14px;
-    min-width: 0;
-  }
-  .company-strip .dc-contact-row .line {
-    flex: 0 1 auto;
-    min-width: 0;
-  }
-  .company-strip .dc-addr-block {
-    align-items: flex-start;
-  }
-  .company-strip .dc-addr-text {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: flex-start;
-    gap: 1px;
-    line-height: 1.35;
-    white-space: normal !important;
-    min-width: 0;
-    flex: 1 1 auto;
-  }
-  .company-strip .dc-addr-text .dc-addr-l1,
-  .company-strip .dc-addr-text .dc-addr-l2 {
-    display: block !important;
-    white-space: normal !important;
+    border-top: 1.5px solid var(--purple);
+    border-bottom: 1.5px solid var(--purple);
+    margin: 0 0 14px 0;
+    padding: 0;
+    font-size: 11.5px;
+    color: var(--purple);
     width: 100%;
-    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .company-strip .dc-strip-addr {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border-bottom: 1.5px solid var(--purple);
+    text-align: center;
+    min-width: 0;
+  }
+  .company-strip .dc-strip-addr .dc-addr-one {
+    color: var(--purple);
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: normal;
+  }
+  .company-strip .dc-strip-contacts {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0;
+    padding: 7px 4px;
+    min-width: 0;
+  }
+  .company-strip .dc-ci {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 0;
+    padding: 0 6px;
+    white-space: nowrap;
+    color: var(--purple);
+    font-weight: 600;
+  }
+  .company-strip .dc-ci strong { font-weight: 800; }
+  .company-strip .dc-sep {
+    flex: 0 0 1px;
+    align-self: stretch;
+    width: 1px;
+    background: var(--purple);
+    opacity: 0.55;
   }
   .company-strip .icon {
     color: var(--purple);
     flex-shrink: 0;
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
     display: flex;
     align-items: center;
-    margin-top: 1px;
+    justify-content: center;
   }
-  .company-strip .line.nowrap .icon { margin-top: 0; }
-  .company-strip .icon svg { width: 16px; height: 16px; display: block; fill: none; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .company-strip .icon svg {
+    width: 15px;
+    height: 15px;
+    display: block;
+    fill: none;
+    stroke: var(--purple);
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
 
   /* ===== BILL TO / SHIP TO & META DETAILS ===== */
   .parties {
@@ -701,33 +711,29 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
       </div>
 
       <div class="company-strip">
-        <div class="dc-strip-left">
-          <div class="line dc-addr-block">
-            <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></span>
-            <div class="dc-addr-text">
-              <div class="dc-addr-l1">${addrLine1}</div>
-              <div class="dc-addr-l2">${addrLine2}</div>
-            </div>
-          </div>
-          <div class="line nowrap">
-            <span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.4 3.6 5.7 3.6 9s-1.2 6.6-3.6 9c-2.4-2.4-3.6-5.7-3.6-9S9.6 5.4 12 3z"/></svg></span>
-            <span>${escHtml(profile.website || 'www.umamicron.com')}</span>
-          </div>
+        <div class="dc-strip-addr">
+          <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></span>
+          <span class="dc-addr-one">${companyAddressOne}</span>
         </div>
-        <div class="dc-strip-right">
-          <div class="line nowrap">
-            <span class="icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
-            <span><strong>GSTIN:</strong> ${escHtml(profile.gstNumber || '')}</span>
+        <div class="dc-strip-contacts">
+          <div class="dc-ci">
+            <span class="icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+            <span><strong>GSTIN:</strong> ${companyGstin}</span>
           </div>
-          <div class="dc-contact-row">
-            <div class="line nowrap">
-              <span class="icon"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 2.9c0-.5.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg></span>
-              <span>${escHtml(profile.phone || '+91 97120 00297')}</span>
-            </div>
-            <div class="line nowrap">
-              <span class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 6.5l9 7 9-7"/></svg></span>
-              <span>${escHtml(profile.email || 'umamicron@gmail.com')}</span>
-            </div>
+          <span class="dc-sep" aria-hidden="true"></span>
+          <div class="dc-ci">
+            <span class="icon"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 2.9c0-.5.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg></span>
+            <span>${companyPhone}</span>
+          </div>
+          <span class="dc-sep" aria-hidden="true"></span>
+          <div class="dc-ci">
+            <span class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 6.5l9 7 9-7"/></svg></span>
+            <span>${companyEmail}</span>
+          </div>
+          <span class="dc-sep" aria-hidden="true"></span>
+          <div class="dc-ci">
+            <span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.4 3.6 5.7 3.6 9s-1.2 6.6-3.6 9c-2.4-2.4-3.6-5.7-3.6-9S9.6 5.4 12 3z"/></svg></span>
+            <span>${companyWebsite}</span>
           </div>
         </div>
       </div>

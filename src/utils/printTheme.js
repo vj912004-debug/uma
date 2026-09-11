@@ -1674,16 +1674,25 @@ export const renderHtmlToPdf = async (html, {
             el.style.minHeight = '0';
             el.style.height = 'auto';
           });
-          clonedDoc.querySelectorAll('.company-strip .dc-addr-text').forEach((el) => {
+          clonedDoc.querySelectorAll('.company-strip').forEach((el) => {
             el.style.display = 'flex';
             el.style.flexDirection = 'column';
-            el.style.whiteSpace = 'normal';
-            el.style.minWidth = '0';
-          });
-          clonedDoc.querySelectorAll('.company-strip .dc-addr-l1, .company-strip .dc-addr-l2').forEach((el) => {
-            el.style.display = 'block';
-            el.style.whiteSpace = 'normal';
             el.style.width = '100%';
+          });
+          clonedDoc.querySelectorAll('.company-strip .dc-strip-addr').forEach((el) => {
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.justifyContent = 'center';
+            el.style.textAlign = 'center';
+          });
+          clonedDoc.querySelectorAll('.company-strip .dc-strip-contacts').forEach((el) => {
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.justifyContent = 'space-between';
+          });
+          clonedDoc.querySelectorAll('.company-strip .dc-ci').forEach((el) => {
+            el.style.whiteSpace = 'nowrap';
+            el.style.overflow = 'visible';
           });
           clonedDoc.querySelectorAll('.contact-bar').forEach((el) => {
             el.style.width = '100%';

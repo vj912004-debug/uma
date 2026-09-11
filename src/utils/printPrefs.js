@@ -545,18 +545,30 @@ export const buildPrintPrefsCss = (prefs) => {
     letter-spacing: 0.5px !important;
     white-space: nowrap !important;
   }
-  /* DC company address must stay on 2 stacked lines */
-  .uma-print-root .company-strip .dc-addr-text {
+  /* DC company strip: full-width address + contact row */
+  .uma-print-root .company-strip {
     display: flex !important;
     flex-direction: column !important;
-    white-space: normal !important;
-    min-width: 0 !important;
-  }
-  .uma-print-root .company-strip .dc-addr-l1,
-  .uma-print-root .company-strip .dc-addr-l2 {
-    display: block !important;
-    white-space: normal !important;
     width: 100% !important;
+  }
+  .uma-print-root .company-strip .dc-strip-addr {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+  .uma-print-root .company-strip .dc-addr-one {
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+  .uma-print-root .company-strip .dc-strip-contacts {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+  .uma-print-root .company-strip .dc-ci {
+    white-space: nowrap !important;
+    overflow: visible !important;
   }
   .uma-print-root .tax-invoice-box .ti-sub {
     font-size: ${subFs}px !important;
