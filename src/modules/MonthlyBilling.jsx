@@ -19,9 +19,9 @@ import SearchableSelect from '../components/SearchableSelect';
 import GstTaxBlock from '../components/GstTaxBlock';
 import { formatDate } from '../utils/dateUtils';
 import { nextAvailableDocNumber } from '../utils/numbering';
-import { findAnyTaxInvoice, findAnyProformaInvoice } from '../utils/documentCharges';
+import { findAnyTaxInvoice, findAnyProformaInvoice, enrichTIForPrint } from '../utils/documentCharges';
 import { getMRMaterialValue } from '../utils/receiptProducts';
-import { viewPDF } from '../utils/pdfExport';
+import { viewPDF, exportToPDF } from '../utils/pdfExport';
 import {
   GST_TYPE_CGST_SGST,
   GST_TYPE_IGST,
@@ -60,6 +60,45 @@ const parseMoney = (v) => {
   const n = parseFloat(v);
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
+
+/** TI print expects customCharges: { name, qty, rate, checked } */
+const buildMonthlyCustomCharges = (lines) =>
+  (lines || []).map((r, idx) => {
+    const qty = parseFloat(r.qty) || 0;
+    const amount = parseFloat(r.amount) || 0;
+    const rate = qty > 0 ? +(amount / qty).toFixed(2) : amount;
+    const product = String(r.productName || '').trim() || 'Material';
+    const dcNo = String(r.dcNo || '').trim();
+    const name = dcNo ? `${product} (${dcNo})` : product;
+    return {
+      id: r.id ? `mb-${r.id}-${idx}` : `mb-${idx}`,
+      name,
+      description: name,
+      note: r.partyDocNo || '',
+      hsn: r.hsn || '',
+      qty,
+      rate,
+      amount,
+      checked: true
+    };
+  });
+
+const normalizeMonthlyCustomCharges = (charges) =>
+  (charges || []).map((cc, idx) => {
+    const name = String(cc.name || cc.description || '').trim();
+    const qty = parseFloat(cc.qty) || 0;
+    const rate = parseFloat(cc.rate) || 0;
+    const amount = parseFloat(cc.amount) || (qty * rate);
+    return {
+      ...cc,
+      id: cc.id || `mb-cc-${idx}`,
+      name,
+      description: name,
+      qty,
+      rate: rate || (qty > 0 ? +(amount / qty).toFixed(2) : amount),
+      checked: cc.checked !== false
+    };
+  });
 
 const normName = (s) =>
   String(s || '')
@@ -458,17 +497,11 @@ const MonthlyBilling = () => {
       tiPool
     );
 
-    const customCharges = selectedRows.map((r, idx) => ({
-      id: `mb-${r.id}-${idx}`,
-      description: `${r.productName} (${r.dcNo})`,
-      note: r.partyDocNo || '',
-      qty: r.qty,
-      rate: r.qty > 0 ? +(r.amount / r.qty).toFixed(2) : r.amount,
-      amount: r.amount
-    }));
+    const customCharges = buildMonthlyCustomCharges(selectedRows);
 
     const first = selectedRows[0];
     const linkedDcIds = selectedRows.map((r) => String(r.id));
+    const dates = selectedRows.map((r) => r.date).filter(Boolean).sort();
     const finalDoc = {
       id: Date.now().toString(),
       invoiceNo: docNo,
@@ -487,7 +520,10 @@ const MonthlyBilling = () => {
       linkedDcIds,
       linkedReceiptIds: [...new Set(selectedRows.map((r) => r.receiptId).filter(Boolean))],
       dcNo: selectedRows.map((r) => r.dcNo).join(', '),
+      dcDate: dates.length ? dates[dates.length - 1] : '',
+      partyDocNo: first.partyDocNo || '',
       productName: selectedRows.map((r) => r.productName).filter(Boolean).join(', '),
+      productCharges: [],
       qty: totals.qty,
       customCharges,
       discount: parseFloat(discount) || 0,
@@ -496,7 +532,8 @@ const MonthlyBilling = () => {
       subtotal: totals.subtotal,
       taxAmount: totals.taxAmount,
       total: totals.grand,
-      terms: `Monthly consolidated invoice for ${monthLabel(billingMonth)}.`
+      terms: `Monthly consolidated invoice for ${monthLabel(billingMonth)}.`,
+      declaration: ''
     };
 
     updateData('invoices', finalDoc);
@@ -590,13 +627,86 @@ const MonthlyBilling = () => {
     setReviewStep(2);
   };
 
+  const buildMonthlyPrintPayload = () => {
+    if (!selectedParty && !generatedInvoice) return null;
+
+    if (generatedInvoice) {
+      const linked = rows.filter((r) =>
+        (generatedInvoice.linkedDcIds || []).some((id) => sameId(id, r.id))
+      );
+      const charges = normalizeMonthlyCustomCharges(
+        generatedInvoice.customCharges?.length
+          ? generatedInvoice.customCharges
+          : buildMonthlyCustomCharges(linked)
+      );
+      return {
+        ...generatedInvoice,
+        monthlyBilling: true,
+        type: 'Tax Invoice',
+        customCharges: charges,
+        productCharges: [],
+        companyProfile: data.companyProfile,
+        appData: data
+      };
+    }
+
+    if (!selectedRows.length) return null;
+
+    const charges = buildMonthlyCustomCharges(selectedRows);
+    const dates = selectedRows.map((r) => r.date).filter(Boolean).sort();
+    return {
+      invoiceNo: 'DRAFT',
+      date: new Date().toISOString().split('T')[0],
+      type: 'Tax Invoice',
+      monthlyBilling: true,
+      billingMonth,
+      billingMonthLabel: monthLabel(billingMonth),
+      partyId: selectedParty?.id || '',
+      partyName: selectedParty?.name || partyName,
+      billAddress: selectedParty?.billAddress || '',
+      shipAddress: selectedParty?.shipAddress || selectedParty?.billAddress || '',
+      gstinBill: selectedParty?.gstinBill || selectedParty?.gstin || '',
+      gstinShip: selectedParty?.gstinShip || selectedParty?.gstinBill || '',
+      linkedDcIds: selectedRows.map((r) => String(r.id)),
+      dcNo: selectedRows.map((r) => r.dcNo).join(', '),
+      dcDate: dates.length ? dates[dates.length - 1] : '',
+      partyDocNo: selectedRows[0]?.partyDocNo || '',
+      productName: selectedRows.map((r) => r.productName).filter(Boolean).join(', '),
+      productCharges: [],
+      qty: totals.qty,
+      customCharges: charges,
+      discount: parseFloat(discount) || 0,
+      taxRate,
+      gstType: normalizeGstType(gstType),
+      subtotal: totals.subtotal,
+      taxAmount: totals.taxAmount,
+      total: totals.grand,
+      terms: `Monthly consolidated invoice for ${monthLabel(billingMonth)}.`,
+      companyProfile: data.companyProfile,
+      appData: data
+    };
+  };
+
   const printInvoice = () => {
-    if (!generatedInvoice && !selectedRows.length) {
+    const payload = buildMonthlyPrintPayload();
+    if (!payload) {
       alert('Generate an invoice first, or select billable dispatches.');
       return;
     }
     setReviewStep(2);
-    setTimeout(() => window.print(), 50);
+    setActiveStep(3);
+    viewPDF('TI', enrichTIForPrint(payload, data));
+  };
+
+  const downloadPdfInvoice = () => {
+    const payload = buildMonthlyPrintPayload();
+    if (!payload) {
+      alert('Generate an invoice first, or select billable dispatches.');
+      return;
+    }
+    setReviewStep(2);
+    setActiveStep(3);
+    exportToPDF('TI', enrichTIForPrint(payload, data));
   };
 
   const displayInvoiceNo = generatedInvoice?.invoiceNo || '—';
@@ -1153,6 +1263,9 @@ const MonthlyBilling = () => {
                 <div className="mb-invoice-actions-right">
                   <button type="button" className="btn btn-primary" onClick={downloadExcel}>
                     <Download size={14} /> Download Excel
+                  </button>
+                  <button type="button" className="btn btn-primary" onClick={downloadPdfInvoice}>
+                    <Download size={14} /> Download PDF
                   </button>
                   <button type="button" className="btn btn-primary" onClick={printInvoice}>
                     <Printer size={14} /> Print

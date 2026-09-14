@@ -30,6 +30,12 @@ import PurchaseOrders from './modules/PurchaseOrders';
 import DebitNotes from './modules/DebitNotes';
 import CreditNotes from './modules/CreditNotes';
 import MonthlyBilling from './modules/MonthlyBilling';
+import PurchaseManagement from './modules/PurchaseManagement';
+import UtilityRecord from './modules/UtilityRecord';
+import UtilityRecordList from './modules/UtilityRecordList';
+import UtilityTempRecord from './modules/UtilityTempRecord';
+import UtilityTempRecordList from './modules/UtilityTempRecordList';
+import PmAirCompressor from './modules/PmAirCompressor';
 import RecycleBin from './modules/RecycleBin';
 import SystemLogs from './modules/SystemLogs';
 import Attendance from './modules/Attendance';
@@ -83,6 +89,12 @@ const AppLayout = () => {
         <Route path="/debit-notes" element={<DebitNotes />} />
         <Route path="/credit-notes" element={<CreditNotes />} />
         <Route path="/monthly-billing" element={<MonthlyBilling />} />
+        <Route path="/purchase-management" element={<PurchaseManagement />} />
+        <Route path="/utility-record" element={<UtilityRecord />} />
+        <Route path="/utility-record-list" element={<UtilityRecordList />} />
+        <Route path="/utility-temp-record" element={<UtilityTempRecord />} />
+        <Route path="/utility-temp-record-list" element={<UtilityTempRecordList />} />
+        <Route path="/pm-air-compressor" element={<PmAirCompressor />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/settings/company-profile" element={<ProtectedRoute adminOnly><CompanyProfileSettings /></ProtectedRoute>} />
         <Route path="/employees" element={<ProtectedRoute adminOnly><EmployeeManagement /></ProtectedRoute>} />

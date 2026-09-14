@@ -31,7 +31,11 @@ import {
   ChevronRight,
   X,
   Phone,
-  CalendarDays
+  CalendarDays,
+  Wrench,
+  Gauge,
+  Thermometer,
+  Fan
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -46,6 +50,7 @@ const Sidebar = () => {
     invoices: false,
     dispatch: false,
     payments: true,
+    procurement: false,
     reports: true,
     system: false
   });
@@ -101,6 +106,19 @@ const Sidebar = () => {
         { name: 'Payment Follow-Up', icon: Phone, path: '/payment-follow-up', roles: ['Admin', 'Staff'], pill: true, highlight: true },
         { name: 'Party Due', icon: DollarSign, path: '/party-due', roles: ['Admin', 'Staff'] },
         { name: 'Payments', icon: CreditCard, path: '/payments', roles: ['Admin', 'Staff'] }
+      ]
+    },
+    {
+      key: 'procurement',
+      title: 'Procurement & Maintenance',
+      icon: Wrench,
+      items: [
+        { name: 'Purchase Management', icon: ShoppingCart, path: '/purchase-management', roles: ['Admin', 'Staff'] },
+        { name: 'Utility Record', icon: Gauge, path: '/utility-record', roles: ['Admin', 'Staff'] },
+        { name: 'Utility Record List', icon: FileText, path: '/utility-record-list', roles: ['Admin', 'Staff'] },
+        { name: 'Utility Temp. Record', icon: Thermometer, path: '/utility-temp-record', roles: ['Admin', 'Staff'] },
+        { name: 'Temperature Record List', icon: FileText, path: '/utility-temp-record-list', roles: ['Admin', 'Staff'] },
+        { name: 'PM Air Compressor', icon: Fan, path: '/pm-air-compressor', roles: ['Admin', 'Staff'] }
       ]
     },
     {

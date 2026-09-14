@@ -35,6 +35,10 @@ export const createBaseState = () => ({
   debitNotes: [],
   creditNotes: [],
   purchaseOrders: [],
+  purchaseManagement: [],
+  utilityRecords: [],
+  utilityTempRecords: [],
+  pmAirCompressorRecords: [],
   auditLogs: [],
   users: [
     { id: 1, employeeId: 'EMP001', department: 'Management', name: 'Administrator', username: 'admin', role: 'Admin', active: true, passwordHash: DEFAULT_ADMIN_PASSWORD_HASH },
@@ -130,6 +134,10 @@ export const normalizeAppState = (parsed) => {
     debitNotes: parsed.debitNotes || [],
     creditNotes: parsed.creditNotes || [],
     purchaseOrders: parsed.purchaseOrders || [],
+    purchaseManagement: parsed.purchaseManagement || [],
+    utilityRecords: parsed.utilityRecords || [],
+    utilityTempRecords: parsed.utilityTempRecords || [],
+    pmAirCompressorRecords: parsed.pmAirCompressorRecords || [],
     auditLogs: parsed.auditLogs || [],
     users: (parsed.users || baseState.users).map((u, i) => {
       const isAdminUser = u.role === 'Admin' && (u.username?.toLowerCase() === 'admin' || u.id === 1);

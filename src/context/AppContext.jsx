@@ -123,11 +123,11 @@ export const AppProvider = ({ children }) => {
   };
 
   const updateData = (module, newItem) => {
-    if (!data[module]) {
-      console.error(`Module ${module} not found in state.`);
-      return;
-    }
     setData(prev => {
+      if (prev[module] != null && !Array.isArray(prev[module])) {
+        console.error(`Module ${module} is not a list collection.`);
+        return prev;
+      }
       let nextModule = [...(prev[module] || []), newItem];
       if (module === 'invoices') {
         const synced = syncAllTaxInvoicesWithProformas(nextModule);

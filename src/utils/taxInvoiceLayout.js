@@ -347,10 +347,10 @@ export const calcTiTotals = (data) => {
 
   if (data.customCharges?.length) {
     data.customCharges.forEach((cc) => {
-      if (!cc.checked) return;
+      if (cc.checked === false) return;
       const ccQty = parseFloat(cc.qty) || 0;
       const rate = parseFloat(cc.rate) || 0;
-      const amt = ccQty * rate;
+      const amt = (ccQty * rate) || parseFloat(cc.amount) || 0;
       if (amt <= 0) return;
       const sgstAmt = amt * (sgstRate / 100);
       const cgstAmt = amt * (cgstRate / 100);

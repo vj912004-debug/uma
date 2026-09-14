@@ -122,17 +122,17 @@ export const buildTaxInvoiceHtml = (raw, profileInput) => {
   });
 
   (data.customCharges || []).forEach((cc) => {
-    if (!cc.checked) return;
+    if (cc.checked === false) return;
     const rawQty = cc.qty;
     const ccQty = parseFloat(rawQty);
     const qty = (rawQty === '' || rawQty == null || !Number.isFinite(ccQty) || ccQty === 0) ? '' : ccQty;
     const qtyNum = qty === '' ? 0 : ccQty;
     const rate = parseFloat(cc.rate) || 0;
-    const amt = qtyNum * rate;
-    const name = String(cc.name || '').trim();
+    const amt = qtyNum * rate || parseFloat(cc.amount) || 0;
+    const name = String(cc.name || cc.description || '').trim();
     if (!name && amt <= 0 && qtyNum === 0 && rate === 0) return;
     if (!name) return;
-    pushRow(withHsn(name, cc.hsn), qty, rate, amt);
+    pushRow(withHsn(name, cc.hsn), qty || (amt > 0 && rate > 0 ? amt / rate : qty), rate || (qtyNum > 0 ? amt / qtyNum : rate), amt);
   });
 
   pushHsnNote(data.hsnCode || data.hsn);

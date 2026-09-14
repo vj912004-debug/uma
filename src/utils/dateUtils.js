@@ -1,5 +1,15 @@
 import { format, parseISO, isValid } from 'date-fns';
 
+/** Indian fiscal year: 1 Apr – 31 Mar */
+export const getDefaultFiscalYearRange = (refDate = new Date()) => {
+  const year = refDate.getFullYear();
+  const startYear = refDate.getMonth() >= 3 ? year : year - 1;
+  return {
+    rangeFrom: `${startYear}-04-01`,
+    rangeTo: `${startYear + 1}-03-31`
+  };
+};
+
 export const formatDate = (dateString) => {
   if (!dateString) return '';
   try {

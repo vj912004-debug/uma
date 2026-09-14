@@ -699,6 +699,39 @@ export const enrichPIForPrint = (pi, appData = {}) => {
 /** Merge MR/PI/PL data into a TI before PDF export (one bill, all products). */
 export const enrichTIForPrint = (ti, appData = {}) => {
   if (!ti) return ti;
+
+  // Monthly consolidated invoices print from customCharges only — do not rebuild from a single MR.
+  if (ti.monthlyBilling) {
+    const parties = appData.parties || [];
+    const party = parties.find((p) => String(p.id) === String(ti.partyId))
+      || parties.find((p) => String(p.name || '').trim().toLowerCase() === String(ti.partyName || '').trim().toLowerCase());
+    const charges = (ti.customCharges || []).map((cc, idx) => {
+      const name = String(cc.name || cc.description || '').trim();
+      const qty = parseFloat(cc.qty) || 0;
+      const rate = parseFloat(cc.rate) || 0;
+      const amount = parseFloat(cc.amount) || qty * rate;
+      return {
+        ...cc,
+        id: cc.id || `mb-cc-${idx}`,
+        name,
+        description: name,
+        qty,
+        rate: rate || (qty > 0 ? +(amount / qty).toFixed(2) : amount),
+        checked: cc.checked !== false
+      };
+    });
+    return fillPrintPartyFields({
+      ...ti,
+      type: 'Tax Invoice',
+      billAddress: String(ti.billAddress || '').trim() || party?.billAddress || '',
+      shipAddress: String(ti.shipAddress || '').trim() || party?.shipAddress || party?.billAddress || '',
+      gstinBill: ti.gstinBill || party?.gstinBill || party?.gstin || '',
+      gstinShip: ti.gstinShip || party?.gstinShip || party?.gstinBill || '',
+      productCharges: [],
+      customCharges: charges
+    }, appData);
+  }
+
   let next = { ...ti };
   if (ti.receiptId) {
     const mr = getFreshMaterialReceipt(appData.materialReceipts, ti.receiptId);
