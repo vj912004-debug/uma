@@ -7,6 +7,7 @@ import DocChargeRow from '../components/DocChargeRow';
 import DateField from '../components/DateField';
 import GstTaxBlock from '../components/GstTaxBlock';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+import StatusTabBar from '../components/StatusTabBar';
 import { GST_TYPE_CGST_SGST } from '../utils/taxInvoiceLayout';
 import {
   STANDARD_CHARGES_LIST,
@@ -47,6 +48,7 @@ const TaxInvoice = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedPL, setSelectedPL] = useState(null);
@@ -574,7 +576,16 @@ const TaxInvoice = () => {
         productOptions={productOptions}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
+      <StatusTabBar
+        value={statusTab}
+        onChange={setStatusTab}
+        allCount={uniquePendingPLs.length + taxInvoices.length}
+        pendingCount={uniquePendingPLs.length}
+        completedCount={taxInvoices.length}
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: statusTab === 'all' ? '1fr 2fr' : '1fr', gap: '1.5rem' }}>
+        {(statusTab === 'all' || statusTab === 'pending') && (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
@@ -603,8 +614,10 @@ const TaxInvoice = () => {
             )}
           </div>
         </div>
+        )}
 
         {/* Right Side: TI Log */}
+        {(statusTab === 'all' || statusTab === 'completed') && (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Tax Invoice Log History</h3>
 
@@ -649,6 +662,7 @@ const TaxInvoice = () => {
             </table>
           </div>
         </div>
+        )}
       </div>
       </>
       )}

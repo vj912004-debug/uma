@@ -15,9 +15,8 @@ import BPR from './modules/BPR';
 import PSD from './modules/PSD';
 import PackingList from './modules/PackingList';
 import DeliveryChallan from './modules/DeliveryChallan';
-import EWayDC from './modules/EWayDC';
+import EWay from './modules/EWay';
 import TaxInvoice from './modules/TaxInvoice';
-import EWayTI from './modules/EWayTI';
 import ProcessingSheet from './modules/ProcessingSheet';
 import PartyDue from './modules/PartyDue';
 import Payments from './modules/Payments';
@@ -36,9 +35,12 @@ import UtilityRecordList from './modules/UtilityRecordList';
 import UtilityTempRecord from './modules/UtilityTempRecord';
 import UtilityTempRecordList from './modules/UtilityTempRecordList';
 import PmAirCompressor from './modules/PmAirCompressor';
+import MarketingManagement from './modules/MarketingManagement';
+import MarketingFollowUp from './modules/MarketingFollowUp';
 import RecycleBin from './modules/RecycleBin';
 import SystemLogs from './modules/SystemLogs';
 import Attendance from './modules/Attendance';
+import SalaryCalculation from './modules/SalaryCalculation';
 import CompanyProfileSettings from './modules/CompanyProfileSettings';
 import EmployeeManagement from './modules/EmployeeManagement';
 
@@ -75,9 +77,10 @@ const AppLayout = () => {
         <Route path="/psd" element={<PSD />} />
         <Route path="/packing-list" element={<PackingList />} />
         <Route path="/dc" element={<DeliveryChallan />} />
-        <Route path="/eway-dc" element={<EWayDC />} />
+        <Route path="/eway" element={<EWay />} />
+        <Route path="/eway-dc" element={<Navigate to="/eway" replace />} />
         <Route path="/tax-invoice" element={<TaxInvoice />} />
-        <Route path="/eway-ti" element={<EWayTI />} />
+        <Route path="/eway-ti" element={<Navigate to="/eway" replace />} />
         <Route path="/processing-sheet" element={<ProcessingSheet />} />
         <Route path="/party-due" element={<ProtectedRoute><PartyDue /></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
@@ -95,7 +98,10 @@ const AppLayout = () => {
         <Route path="/utility-temp-record" element={<UtilityTempRecord />} />
         <Route path="/utility-temp-record-list" element={<UtilityTempRecordList />} />
         <Route path="/pm-air-compressor" element={<PmAirCompressor />} />
+        <Route path="/marketing" element={<MarketingManagement />} />
+        <Route path="/marketing-follow-up" element={<MarketingFollowUp />} />
         <Route path="/attendance" element={<Attendance />} />
+        <Route path="/salary-calculation" element={<SalaryCalculation />} />
         <Route path="/settings/company-profile" element={<ProtectedRoute adminOnly><CompanyProfileSettings /></ProtectedRoute>} />
         <Route path="/employees" element={<ProtectedRoute adminOnly><EmployeeManagement /></ProtectedRoute>} />
         <Route path="/recycle-bin" element={<ProtectedRoute adminOnly><RecycleBin /></ProtectedRoute>} />

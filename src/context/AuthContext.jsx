@@ -42,7 +42,8 @@ export const AuthProvider = ({ children }) => {
         role: user.role,
         employeeId: user.employeeId,
         department: user.department,
-        name: user.name
+        name: user.name,
+        permissions: user.permissions || []
       },
       settings: { ...prev.settings, userRole: user.role }
     }));
@@ -101,7 +102,8 @@ export const AuthProvider = ({ children }) => {
             role: result.user.role,
             employeeId: result.user.employeeId,
             department: result.user.department,
-            name: result.user.name
+            name: result.user.name,
+            permissions: result.user.permissions || []
           },
           settings: { ...result.state.settings, userRole: result.user.role }
         });

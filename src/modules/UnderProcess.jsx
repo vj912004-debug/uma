@@ -7,7 +7,7 @@ import TimeField from '../components/TimeField';
 import { 
   FileText, Activity, UploadCloud, Package, Truck, 
   FileSpreadsheet, FileCheck, CheckCircle, Clock, X, Plus, Edit2, Download, Trash2,
-  Search
+  Search, ArrowRightToLine, Hand
 } from 'lucide-react';
 import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
 import { enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, getLinkedPITermsForTI, applyProformaFinancialsToTaxInvoice, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges, qtyInputValue, rateInputValue } from '../utils/documentCharges';
@@ -217,6 +217,47 @@ const findTI = (data, mrId, productName = '') => {
   return findReceiptDoc(data.invoices, mrId, productName, inv => inv.invoiceNo?.includes('/IN/'));
 };
 
+const UP_SHARED_DOC_TYPES = new Set(['PI', 'PL', 'TI', 'EWTI']);
+const upProductKey = (productName = '') => String(productName || '_').trim() || '_';
+
+const isMovedToProcessingSheet = (mr, productName = '') => {
+  const flag = mr?.movedToProcessingSheet;
+  if (flag === true) return true;
+  if (!flag || typeof flag !== 'object') return false;
+  return !!flag[upProductKey(productName)];
+};
+
+const getProcessManualDone = (mr, productName = '', type) => {
+  const map = mr?.processManualDone;
+  if (!map || typeof map !== 'object') return false;
+  const key = upProductKey(productName);
+  if (map[key]?.[type]) return true;
+  if (UP_SHARED_DOC_TYPES.has(type)) {
+    return Object.values(map).some((bucket) => bucket && bucket[type]);
+  }
+  return false;
+};
+
+const isUnderProcessRowComplete = (data, mr, productName = '') => {
+  const pi = findPI(data, mr.id);
+  const bpr = findBPR(data, mr.id, productName);
+  const psd = findPSD(data, mr.id, productName);
+  const pl = findPL(data, mr.id, productName);
+  const dc = findDC(data, mr.id, productName);
+  const ti = findTI(data, mr.id, productName);
+  const m = (type) => getProcessManualDone(mr, productName, type);
+  return Boolean(
+    (pi || m('PI')) &&
+    (bpr || m('BPR')) &&
+    (psd || m('PSD')) &&
+    (pl || m('PL')) &&
+    (dc || m('DC')) &&
+    ((dc && dc.ewayBillNo) || m('EWDC')) &&
+    (ti || m('TI')) &&
+    ((ti && ti.ewayBillNo) || m('EWTI'))
+  );
+};
+
 const initProductChargesForScope = (mr, party, prodOpts, activeProductName) => {
   if (!activeProductName) return initProductChargesFromMR(mr, party, prodOpts);
   const canonical = resolveReceiptProductName(mr, activeProductName, { party, ...prodOpts });
@@ -330,12 +371,15 @@ const UnderProcess = () => {
   const [modalContext, setModalContext] = useState(null); // Active M.R. record
   const [editingDoc, setEditingDoc] = useState(null); // If editing an existing doc
   const [showDocPopover, setShowDocPopover] = useState(null); // { cellType, doc, mrId } for blue click
+  const [showPendingPopover, setShowPendingPopover] = useState(null); // { cellType, mr, productName, x, y }
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
 
   const processRows = useMemo(
-    () => buildUnderProcessRows(data.materialReceipts, data),
+    () => buildUnderProcessRows(data.materialReceipts, data).filter(
+      ({ mr, productName }) => !isMovedToProcessingSheet(mr, productName)
+    ),
     [data]
   );
   const partyOptions = useMemo(() => (
@@ -374,21 +418,38 @@ const UnderProcess = () => {
       const pl = getPL(mr.id, productName);
       const dc = getDC(mr.id, productName);
       const ti = getTI(mr.id, productName);
-      const isComplete = pi && bpr && psd && pl && dc && ti && dc.ewayBillNo && ti.ewayBillNo;
+      const m = (type) => getProcessManualDone(mr, productName, type);
+      const isComplete = isUnderProcessRowComplete(data, mr, productName);
       if (activeTab === 'Done') return isComplete;
-      if (activeTab === 'PI') return !pi;
-      if (activeTab === 'BPR') return !bpr;
-      if (activeTab === 'PSD') return !psd;
-      if (activeTab === 'PL') return !pl;
-      if (activeTab === 'DC') return !dc;
-      if (activeTab === 'EWDC') return !(dc && dc.ewayBillNo);
-      if (activeTab === 'TI') return !ti;
-      if (activeTab === 'EWTI') return !(ti && ti.ewayBillNo);
+      if (activeTab === 'Pending') return !isComplete;
+      if (activeTab === 'PI') return !(pi || m('PI'));
+      if (activeTab === 'BPR') return !(bpr || m('BPR'));
+      if (activeTab === 'PSD') return !(psd || m('PSD'));
+      if (activeTab === 'PL') return !(pl || m('PL'));
+      if (activeTab === 'DC') return !(dc || m('DC'));
+      if (activeTab === 'EWDC') return !((dc && dc.ewayBillNo) || m('EWDC'));
+      if (activeTab === 'TI') return !(ti || m('TI'));
+      if (activeTab === 'EWTI') return !((ti && ti.ewayBillNo) || m('EWTI'));
       return true;
     })
   ), [processRows, partyFilter, productFilter, searchTerm, activeTab, data]);
 
-  const handlePendingClick = (mr, type, productName = '') => {
+  const handlePendingClick = (mr, type, productName = '', e) => {
+    if (e) {
+      e.stopPropagation();
+      setShowPendingPopover({
+        cellType: type,
+        mr,
+        productName: productName || '',
+        x: e.clientX,
+        y: e.clientY
+      });
+      return;
+    }
+    openDocGenerator(mr, type, productName);
+  };
+
+  const openDocGenerator = (mr, type, productName = '') => {
     if (type === 'PI') {
       const existing = findPI(data, mr.id);
       if (existing) {
@@ -419,6 +480,56 @@ const UnderProcess = () => {
     setModalContext({ mr, productName });
     setEditingDoc(null);
     setActiveModal(type);
+  };
+
+  const setManualDoneFlag = (mr, productName, type, value) => {
+    const key = upProductKey(productName);
+    const currentMap = { ...(mr.processManualDone || {}) };
+    const bucket = { ...(currentMap[key] || {}) };
+    if (value) bucket[type] = true;
+    else delete bucket[type];
+    if (Object.keys(bucket).length) currentMap[key] = bucket;
+    else delete currentMap[key];
+    updateItem('materialReceipts', mr.id, {
+      ...mr,
+      processManualDone: currentMap
+    });
+  };
+
+  const handleMarkDoneManually = () => {
+    if (!showPendingPopover) return;
+    const { mr, productName, cellType } = showPendingPopover;
+    setManualDoneFlag(mr, productName, cellType, true);
+    setShowPendingPopover(null);
+  };
+
+  const handleClearManualDone = (mr, productName, type) => {
+    setManualDoneFlag(mr, productName, type, false);
+  };
+
+  const handleGenerateFromPending = () => {
+    if (!showPendingPopover) return;
+    const { mr, productName, cellType } = showPendingPopover;
+    setShowPendingPopover(null);
+    openDocGenerator(mr, cellType, productName);
+  };
+
+  const handleMoveToProcessingSheet = (mr, productName = '') => {
+    if (!window.confirm('Move this material from Under Process to Processing Sheet?')) return;
+    const key = upProductKey(productName);
+    const current = mr.movedToProcessingSheet;
+    let next;
+    if (current === true) return;
+    if (current && typeof current === 'object') {
+      next = { ...current, [key]: true };
+    } else {
+      next = { [key]: true };
+    }
+    updateItem('materialReceipts', mr.id, {
+      ...mr,
+      movedToProcessingSheet: next,
+      movedToProcessingSheetAt: new Date().toISOString()
+    });
   };
 
   const handleBlueClick = (mrId, cellType, doc, productName, e) => {
@@ -477,6 +588,60 @@ const UnderProcess = () => {
     setShowDocPopover(null);
   };
 
+  const renderDocCell = (mr, productName, type, doc, { printDoc, disabled = false, eway = false } = {}) => {
+    const manual = getProcessManualDone(mr, productName, type);
+    const generatedDone = eway ? !!(doc && doc.ewayBillNo) : !!doc;
+
+    if (generatedDone) {
+      return (
+        <td className="center">
+          {printDoc ? (
+            <div className="doc-done-group">
+              <button onClick={() => printDoc()} className="doc-icon-btn" title="View / Print">
+                <FileText size={14} />
+              </button>
+              <button onClick={(e) => handleBlueClick(mr.id, type, doc, productName, e)} className="doc-done">
+                <CheckCircle size={12} /> Done
+              </button>
+            </div>
+          ) : (
+            <button onClick={(e) => handleBlueClick(mr.id, type, doc, productName, e)} className="doc-done">
+              <CheckCircle size={12} /> Done
+            </button>
+          )}
+        </td>
+      );
+    }
+
+    if (manual) {
+      return (
+        <td className="center">
+          <button
+            type="button"
+            onClick={() => handleClearManualDone(mr, productName, type)}
+            className="doc-done doc-done-manual"
+            title="Marked done manually — click to undo"
+          >
+            <Hand size={12} /> Done Manually
+          </button>
+        </td>
+      );
+    }
+
+    return (
+      <td className="center">
+        <button
+          type="button"
+          onClick={(e) => handlePendingClick(mr, type, productName, e)}
+          className="doc-pending"
+          disabled={disabled}
+        >
+          <Clock size={12} /> Pending
+        </button>
+      </td>
+    );
+  };
+
   return (
     <div className="under-process-page">
       <header className="page-header">
@@ -489,6 +654,7 @@ const UnderProcess = () => {
       <div className="tab-bar">
         {[
           { id: 'All', label: 'All' },
+          { id: 'Pending', label: 'Pending' },
           { id: 'PI', label: 'PI' },
           { id: 'BPR', label: 'BPR' },
           { id: 'PSD', label: 'PSD' },
@@ -565,18 +731,19 @@ const UnderProcess = () => {
               <th className="center">E-Way DC</th>
               <th className="center">Tax Inv</th>
               <th className="center">E-Way TI</th>
+              <th className="center">Action</th>
             </tr>
           </thead>
           <tbody>
             {(data.materialReceipts || []).length === 0 ? (
               <tr>
-                <td colSpan="12" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan="13" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                   No material receipts yet. Add one from Material Receipt.
                 </td>
               </tr>
             ) : filteredProcessRows.length === 0 ? (
               <tr>
-                <td colSpan="12" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan="13" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                   No materials match this search or filter.
                 </td>
               </tr>
@@ -590,6 +757,7 @@ const UnderProcess = () => {
                 const pl = getPL(mr.id, productName);
                 const dc = getDC(mr.id, productName);
                 const ti = getTI(mr.id, productName);
+                const rowComplete = isUnderProcessRowComplete(data, mr, productName);
                 const rowQty = productName
                   ? (getProductQty(mr, productName, prodOpts)
                     || (getReceiptProductNames(mr, prodOpts).length <= 1
@@ -611,129 +779,48 @@ const UnderProcess = () => {
                     </td>
                     <td style={{ fontWeight: 600 }}>{rowQty}</td>
 
-                    <td className="center">
-                      {pi ? (
-                        <div className="doc-done-group">
-                          <button onClick={() => viewPDF('PI', enrichPIForPrint(pi, data))} className="doc-icon-btn" title="View / Print">
-                            <FileText size={14} />
-                          </button>
-                          <button onClick={(e) => handleBlueClick(mr.id, 'PI', pi, productName, e)} className="doc-done">
-                            <CheckCircle size={12} /> Done
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => handlePendingClick(mr, 'PI', productName)} className="doc-pending">
-                          <Clock size={12} /> Pending
-                        </button>
-                      )}
-                    </td>
+                    {renderDocCell(mr, productName, 'PI', pi, {
+                      printDoc: () => viewPDF('PI', enrichPIForPrint(pi, data))
+                    })}
+                    {renderDocCell(mr, productName, 'BPR', bpr, {
+                      printDoc: () => viewPDF('BPR', enrichBPRForPrint(bpr, data))
+                    })}
+                    {renderDocCell(mr, productName, 'PSD', psd, {
+                      printDoc: () => viewPDF('PSD', psd)
+                    })}
+                    {renderDocCell(mr, productName, 'PL', pl, {
+                      printDoc: () => viewPDF('PL', pl),
+                      disabled: !(bpr || getProcessManualDone(mr, productName, 'BPR'))
+                    })}
+                    {renderDocCell(mr, productName, 'DC', dc, {
+                      printDoc: () => viewPDF('DC', dc),
+                      disabled: !(pl || getProcessManualDone(mr, productName, 'PL'))
+                    })}
+                    {renderDocCell(mr, productName, 'EWDC', dc, {
+                      eway: true,
+                      disabled: !(dc || getProcessManualDone(mr, productName, 'DC'))
+                    })}
+                    {renderDocCell(mr, productName, 'TI', ti, {
+                      printDoc: () => viewPDF('TI', enrichTIForPrint(ti, data)),
+                      disabled: !(pl || getProcessManualDone(mr, productName, 'PL'))
+                    })}
+                    {renderDocCell(mr, productName, 'EWTI', ti, {
+                      eway: true,
+                      disabled: !(ti || getProcessManualDone(mr, productName, 'TI'))
+                    })}
 
                     <td className="center">
-                      {bpr ? (
-                        <div className="doc-done-group">
-                          <button onClick={() => viewPDF('BPR', enrichBPRForPrint(bpr, data))} className="doc-icon-btn" title="View / Print">
-                            <FileText size={14} />
-                          </button>
-                          <button onClick={(e) => handleBlueClick(mr.id, 'BPR', bpr, productName, e)} className="doc-done">
-                            <CheckCircle size={12} /> Done
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => handlePendingClick(mr, 'BPR', productName)} className="doc-pending">
-                          <Clock size={12} /> Pending
-                        </button>
-                      )}
-                    </td>
-
-                    <td className="center">
-                      {psd ? (
-                        <div className="doc-done-group">
-                          <button onClick={() => viewPDF('PSD', psd)} className="doc-icon-btn" title="View / Print">
-                            <FileText size={14} />
-                          </button>
-                          <button onClick={(e) => handleBlueClick(mr.id, 'PSD', psd, productName, e)} className="doc-done">
-                            <CheckCircle size={12} /> Done
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => handlePendingClick(mr, 'PSD', productName)} className="doc-pending">
-                          <Clock size={12} /> Pending
-                        </button>
-                      )}
-                    </td>
-
-                    <td className="center">
-                      {pl ? (
-                        <div className="doc-done-group">
-                          <button onClick={() => viewPDF('PL', pl)} className="doc-icon-btn" title="View / Print">
-                            <FileText size={14} />
-                          </button>
-                          <button onClick={(e) => handleBlueClick(mr.id, 'PL', pl, productName, e)} className="doc-done">
-                            <CheckCircle size={12} /> Done
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => handlePendingClick(mr, 'PL', productName)} className="doc-pending" disabled={!bpr}>
-                          <Clock size={12} /> Pending
-                        </button>
-                      )}
-                    </td>
-
-                    <td className="center">
-                      {dc ? (
-                        <div className="doc-done-group">
-                          <button onClick={() => viewPDF('DC', dc)} className="doc-icon-btn" title="View / Print">
-                            <FileText size={14} />
-                          </button>
-                          <button onClick={(e) => handleBlueClick(mr.id, 'DC', dc, productName, e)} className="doc-done">
-                            <CheckCircle size={12} /> Done
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => handlePendingClick(mr, 'DC', productName)} className="doc-pending" disabled={!pl}>
-                          <Clock size={12} /> Pending
-                        </button>
-                      )}
-                    </td>
-
-                    <td className="center">
-                      {dc && dc.ewayBillNo ? (
-                        <button onClick={(e) => handleBlueClick(mr.id, 'EWDC', dc, productName, e)} className="doc-done">
-                          <CheckCircle size={12} /> Done
+                      {rowComplete ? (
+                        <button
+                          type="button"
+                          className="btn-move-sheet"
+                          onClick={() => handleMoveToProcessingSheet(mr, productName)}
+                          title="Move to Processing Sheet"
+                        >
+                          <ArrowRightToLine size={14} /> Move to Sheet
                         </button>
                       ) : (
-                        <button onClick={() => handlePendingClick(mr, 'EWDC', productName)} className="doc-pending" disabled={!dc}>
-                          <Clock size={12} /> Pending
-                        </button>
-                      )}
-                    </td>
-
-                    <td className="center">
-                      {ti ? (
-                        <div className="doc-done-group">
-                          <button onClick={() => viewPDF('TI', enrichTIForPrint(ti, data))} className="doc-icon-btn" title="View / Print">
-                            <FileText size={14} />
-                          </button>
-                          <button onClick={(e) => handleBlueClick(mr.id, 'TI', ti, productName, e)} className="doc-done">
-                            <CheckCircle size={12} /> Done
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => handlePendingClick(mr, 'TI', productName)} className="doc-pending" disabled={!pl}>
-                          <Clock size={12} /> Pending
-                        </button>
-                      )}
-                    </td>
-
-                    <td className="center">
-                      {ti && ti.ewayBillNo ? (
-                        <button onClick={(e) => handleBlueClick(mr.id, 'EWTI', ti, productName, e)} className="doc-done">
-                          <CheckCircle size={12} /> Done
-                        </button>
-                      ) : (
-                        <button onClick={() => handlePendingClick(mr, 'EWTI', productName)} className="doc-pending" disabled={!ti}>
-                          <Clock size={12} /> Pending
-                        </button>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>—</span>
                       )}
                     </td>
                   </tr>
@@ -751,10 +838,32 @@ const UnderProcess = () => {
           </div>
           <div className="legend-item">
             <span className="legend-dot pending"></span>
-            <span>Pending — click to generate</span>
+            <span>Pending — click for Generate or Done Manually</span>
+          </div>
+          <div className="legend-item">
+            <span className="legend-dot done"></span>
+            <span>When all steps are done — Move to Processing Sheet</span>
           </div>
         </div>
       </div>
+
+      {showPendingPopover && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 110 }} onClick={() => setShowPendingPopover(null)}>
+          <div
+            className="context-menu"
+            style={{ left: `${showPendingPopover.x}px`, top: `${Math.max(12, showPendingPopover.y - 100)}px` }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="context-menu-title">{showPendingPopover.cellType} Actions</p>
+            <button className="context-menu-item" onClick={handleGenerateFromPending}>
+              <Plus size={14} /> Generate
+            </button>
+            <button className="context-menu-item" onClick={handleMarkDoneManually}>
+              <Hand size={14} /> Done Manually
+            </button>
+          </div>
+        </div>
+      )}
 
       {showDocPopover && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 110 }} onClick={() => setShowDocPopover(null)}>
@@ -2003,6 +2112,7 @@ const PSDGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                         <SearchableSelect className="input-field" value={r.method} onChange={e => updateReport(idx, { method: e.target.value })}>
                           <option value="Dry">Dry</option>
                           <option value="Wet">Wet</option>
+                          <option value="N/A">N/A</option>
                         </SearchableSelect>
                       </div>
                       <div>

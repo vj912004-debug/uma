@@ -177,13 +177,27 @@ const Dashboard = () => {
 
   const activeRows = useMemo(
     () => allRows.filter((row) => {
+      if (row.mr?.movedToProcessingSheet === true) return false;
+      const movedMap = row.mr?.movedToProcessingSheet;
+      if (movedMap && typeof movedMap === 'object') {
+        const key = String(row.productName || '_').trim() || '_';
+        if (movedMap[key]) return false;
+      }
       const pi = (data.invoices || []).find((inv) => inv.receiptId === row.mr.id && inv.invoiceNo?.includes('/PI/'));
       const bpr = (data.bprs || []).find((b) => b.receiptId === row.mr.id && b.productName === row.productName);
       const psd = (data.psds || []).find((p) => p.receiptId === row.mr.id && p.productName === row.productName);
       const pl = (data.packingLists || []).find((p) => p.receiptId === row.mr.id && p.productName === row.productName);
       const dc = (data.deliveryChallans || []).find((d) => d.receiptId === row.mr.id && d.productName === row.productName);
       const ti = (data.invoices || []).find((inv) => inv.receiptId === row.mr.id && inv.invoiceNo?.includes('/IN/') && inv.productName === row.productName);
-      return !(pi && bpr && psd && pl && dc && ti);
+      const manual = row.mr?.processManualDone?.[String(row.productName || '_').trim() || '_'] || {};
+      return !(
+        (pi || manual.PI) &&
+        (bpr || manual.BPR) &&
+        (psd || manual.PSD) &&
+        (pl || manual.PL) &&
+        (dc || manual.DC) &&
+        (ti || manual.TI)
+      );
     }),
     [allRows, data]
   );

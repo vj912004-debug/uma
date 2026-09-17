@@ -190,7 +190,7 @@ const fillItemsBlankRowsToFit = (page, band, rowPx = 18) => {
 
   const tfoot = table.querySelector('tfoot');
   const pinAnchor = tbody.querySelector(
-    'tr.dc-pin-start, tr.dc-delivery-note, tr.dc-goods-value, tr.special-row'
+    'tr.dc-pin-start, tr.bpr-pin-start, tr.dc-delivery-note, tr.dc-goods-value, tr.special-row, tr.summary-row'
   );
   const first = tbody.querySelector(
     'tr:not(.dc-delivery-note):not(.dc-goods-value):not(.dc-pin-gap):not(.special-row)'

@@ -35,15 +35,22 @@ import {
   Wrench,
   Gauge,
   Thermometer,
-  Fan
+  Fan,
+  Megaphone,
+  UserPlus,
+  PhoneCall,
+  BarChart3
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { canAccessModule } from '../utils/moduleAccess';
 
 const Sidebar = () => {
   const { data } = useAppContext();
   const { currentUser, logout } = useAuth();
   const userRole = currentUser?.role || data?.settings?.userRole || 'Staff';
+
+  const canSee = (path) => canAccessModule(currentUser || { role: userRole, permissions: [] }, path);
 
   const [expandedGroups, setExpandedGroups] = useState({
     material: true,
@@ -51,6 +58,7 @@ const Sidebar = () => {
     dispatch: false,
     payments: true,
     procurement: false,
+    marketing: true,
     reports: true,
     system: false
   });
@@ -94,8 +102,7 @@ const Sidebar = () => {
         { name: 'PSD Upload', icon: UploadCloud, path: '/psd', roles: ['Admin', 'Staff'] },
         { name: 'Packing List', icon: Package, path: '/packing-list', roles: ['Admin', 'Staff'] },
         { name: 'Delivery Challan', icon: Truck, path: '/dc', roles: ['Admin', 'Staff'] },
-        { name: 'E-Way (DC)', icon: FileSpreadsheet, path: '/eway-dc', roles: ['Admin', 'Staff'] },
-        { name: 'E-Way (TI)', icon: FileSpreadsheet, path: '/eway-ti', roles: ['Admin', 'Staff'] }
+        { name: 'E-Way', icon: FileSpreadsheet, path: '/eway', roles: ['Admin', 'Staff'], permissionIds: ['/eway', '/eway-dc', '/eway-ti'] },
       ]
     },
     {
@@ -122,6 +129,17 @@ const Sidebar = () => {
       ]
     },
     {
+      key: 'marketing',
+      title: 'Marketing',
+      icon: Megaphone,
+      items: [
+        { name: 'Lead Entry', icon: UserPlus, path: '/marketing', roles: ['Admin', 'Staff'] },
+        { name: 'Follow Up', icon: PhoneCall, path: '/marketing-follow-up', roles: ['Admin', 'Staff'], highlight: true },
+        { name: 'Enquiry Conversion', icon: FileText, path: '/marketing#mkt-convert-enquiry', roles: ['Admin', 'Staff'] },
+        { name: 'Reports & Analytics', icon: BarChart3, path: '/marketing#mkt-reports', roles: ['Admin', 'Staff'] }
+      ]
+    },
+    {
       key: 'reports',
       title: 'Reports & Logs',
       icon: Grid,
@@ -129,7 +147,8 @@ const Sidebar = () => {
         { name: 'Processing Sheet', icon: Grid, path: '/processing-sheet', roles: ['Admin', 'Staff'] },
         { name: 'Tasks', icon: Bell, path: '/tasks', roles: ['Admin', 'Staff'] },
         { name: 'Quotations', icon: PlusSquare, path: '/quotations', roles: ['Admin', 'Staff'] },
-        { name: 'Attendance', icon: UserCheck, path: '/attendance', roles: ['Admin', 'Staff'] }
+        { name: 'Attendance', icon: UserCheck, path: '/attendance', roles: ['Admin', 'Staff'] },
+        { name: 'Salary Calculation', icon: DollarSign, path: '/salary-calculation', roles: ['Admin', 'Staff'] }
       ]
     },
     {
@@ -167,7 +186,7 @@ const Sidebar = () => {
       {/* Nav Section */}
       <nav className="sidebar-nav">
         {/* Dashboard Direct Link */}
-        {userRole && (
+        {userRole && canSee('/') && (
           <NavLink
             to="/"
             end
@@ -181,7 +200,7 @@ const Sidebar = () => {
         )}
 
         {/* Master Data Direct Link */}
-        {userRole && (
+        {userRole && canSee('/parties') && (
           <NavLink
             to="/parties"
             className={({ isActive }) =>
@@ -194,7 +213,7 @@ const Sidebar = () => {
         )}
 
         {/* Production Planning Direct Link */}
-        {userRole && (
+        {userRole && canSee('/production-planning') && (
           <NavLink
             to="/production-planning"
             className={({ isActive }) =>
@@ -208,7 +227,13 @@ const Sidebar = () => {
 
         {/* Collapsible Accordion Groups */}
         {groups.map((group) => {
-          const visibleItems = group.items.filter(item => item.roles?.includes(userRole));
+          const visibleItems = group.items.filter((item) => {
+            if (!item.roles?.includes(userRole)) return false;
+            if (item.permissionIds?.length) {
+              return item.permissionIds.some((id) => canSee(id));
+            }
+            return canSee(item.path);
+          });
           if (visibleItems.length === 0) return null;
 
           const isExpanded = expandedGroups[group.key];

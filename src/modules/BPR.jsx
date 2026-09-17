@@ -9,6 +9,7 @@ import { Plus, Edit2, Trash2, ClipboardList, FileDown, Printer, FileText } from 
 import { numberInputValue, parseOptionalNumber } from '../utils/numberInput';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import {
@@ -89,6 +90,7 @@ const BPR = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBPR, setEditingBPR] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
@@ -623,8 +625,17 @@ const BPR = () => {
         productOptions={productOptions}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
+      <StatusTabBar
+        value={statusTab}
+        onChange={setStatusTab}
+        allCount={pendingBprJobs.length + bprList.length}
+        pendingCount={pendingBprJobs.length}
+        completedCount={bprList.length}
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: statusTab === 'all' ? '1fr 2fr' : '1fr', gap: '1.5rem' }}>
         {/* Left Side: Pending Receipts scheduler */}
+        {(statusTab === 'all' || statusTab === 'pending') && (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
@@ -650,8 +661,10 @@ const BPR = () => {
             )}
           </div>
         </div>
+        )}
 
         {/* Right Side: Production History */}
+        {(statusTab === 'all' || statusTab === 'completed') && (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>BPR Production Log</h3>
 
@@ -699,6 +712,7 @@ const BPR = () => {
             </table>
           </div>
         </div>
+        )}
       </div>
       </>
       )}

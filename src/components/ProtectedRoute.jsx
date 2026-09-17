@@ -1,9 +1,11 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { canAccessModule } from '../utils/moduleAccess';
 
-const ProtectedRoute = ({ children, adminOnly = false }) => {
-  const { isAuthenticated, isAdmin, isLoading } = useAuth();
+const ProtectedRoute = ({ children, adminOnly = false, modulePath }) => {
+  const { isAuthenticated, isAdmin, isLoading, currentUser } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -24,6 +26,11 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   }
 
   if (adminOnly && !isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
+  const pathToCheck = modulePath || location.pathname;
+  if (!adminOnly && !canAccessModule(currentUser, pathToCheck)) {
     return <Navigate to="/" replace />;
   }
 

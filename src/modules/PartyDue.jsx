@@ -8,6 +8,7 @@ import { getCurrentFYKey, getFYKeysThroughCurrent } from '../utils/financialYear
 import { useNavigate } from 'react-router-dom';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
 
 const PartyDue = () => {
@@ -15,6 +16,7 @@ const PartyDue = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [columnFilters, setColumnFilters] = useState({});
   const fyKeys = useMemo(() => getFYKeysThroughCurrent('21-22'), []);
@@ -92,7 +94,12 @@ const PartyDue = () => {
   });
 
   const partyOptions = useMemo(() => uniqueSortedOptions(partyRows.map((p) => p.name)), [partyRows]);
+  const isPartyPending = (p) => (parseFloat(p.totalDue) || 0) > 0.01;
+  const pendingCount = partyRows.filter(isPartyPending).length;
+  const completedCount = partyRows.filter((p) => !isPartyPending(p)).length;
   const filteredDues = partyRows.filter(p => {
+    if (statusTab === 'pending' && !isPartyPending(p)) return false;
+    if (statusTab === 'completed' && isPartyPending(p)) return false;
     if (partyFilter && (p.name || '') !== partyFilter) return false;
     const s = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || p.name.toLowerCase().includes(s);
@@ -140,6 +147,14 @@ const PartyDue = () => {
           </button>
         </div>
       </header>
+
+      <StatusTabBar
+        value={statusTab}
+        onChange={setStatusTab}
+        allCount={partyRows.length}
+        pendingCount={pendingCount}
+        completedCount={completedCount}
+      />
 
       <ListFilterBar
         searchTerm={searchTerm}

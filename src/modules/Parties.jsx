@@ -607,6 +607,7 @@ const Parties = () => {
                   >
                     <option value="Dry">Dry</option>
                     <option value="Wet">Wet</option>
+                    <option value="N/A">N/A</option>
                   </SearchableSelect>
                 </div>
                 <div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useLocation } from 'react-router-dom';
 import DateField from '../components/DateField';
@@ -23,14 +23,17 @@ import {
   getMergedSheetOverrides
 } from '../utils/paymentTotals';
 import SearchableSelect from '../components/SearchableSelect';
+import StatusTabBar from '../components/StatusTabBar';
 
-const DATE_COLUMNS = new Set(['date', 'bprDate', 'dcDate', 'invoiceDate']);
+const DATE_COLUMNS = new Set(['date', 'bprDate', 'dcDate', 'invoiceDate', 'paymentDates']);
 
 const toDateInputValue = (val) => {
   if (!val) return '';
-  const str = String(val);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-  const d = new Date(str.length === 10 ? `${str}T00:00:00` : str);
+  const str = String(val).trim();
+  // Prefer first date when history is comma-separated
+  const first = str.split(',')[0].trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(first)) return first;
+  const d = new Date(first.length === 10 ? `${first}T00:00:00` : first);
   if (Number.isNaN(d.getTime())) return '';
   return d.toISOString().split('T')[0];
 };
@@ -65,6 +68,7 @@ const ProcessingSheet = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState(location.state?.partyName || '');
   const [productFilter, setProductFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('all');
 
   useEffect(() => {
     if (location.state?.partyName) {
@@ -259,7 +263,20 @@ const ProcessingSheet = () => {
     return list;
   })();
 
+  const statusCounts = useMemo(() => {
+    let pending = 0;
+    let completed = 0;
+    rows.forEach((row) => {
+      if ((parseFloat(row.outstanding) || 0) > 0.01) pending += 1;
+      else completed += 1;
+    });
+    return { pending, completed, all: rows.length };
+  }, [rows]);
+
   const filteredRows = [...rows].reverse().filter((row) => {
+    const isPending = (parseFloat(row.outstanding) || 0) > 0.01;
+    if (statusTab === 'pending' && !isPending) return false;
+    if (statusTab === 'completed' && isPending) return false;
     const s = searchTerm.toLowerCase().trim();
     const matchesSearch = !s ||
       (row.partyName || '').toLowerCase().includes(s) ||
@@ -407,8 +424,6 @@ const ProcessingSheet = () => {
         return renderInput(row, 'paymentAmounts', value, fullTextStyle(value, 140));
       case 'paymentRef':
         return renderInput(row, 'paymentRef', value, fullTextStyle(value, 140));
-      case 'paymentDates':
-        return renderInput(row, 'paymentDates', value, fullTextStyle(value, 120));
       case 'totalBill':
         return renderInput(row, 'totalBill', value, fullTextStyle(value, 90));
       case 'receivedQty':
@@ -433,6 +448,16 @@ const ProcessingSheet = () => {
         </div>
         <ExportButton data={filteredRows} columns={tableCols} filename="Master_Processing_Sheet" title="Master Processing Sheet" />
       </header>
+
+      <StatusTabBar
+        value={statusTab}
+        onChange={setStatusTab}
+        allCount={statusCounts.all}
+        pendingCount={statusCounts.pending}
+        completedCount={statusCounts.completed}
+        pendingLabel="Pending Payment"
+        completedLabel="Cleared"
+      />
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', flex: 1, padding: '0 1rem' }}>

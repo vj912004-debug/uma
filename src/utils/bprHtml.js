@@ -73,9 +73,10 @@ const emptyBatchRow = () => ({ batchNo: '', drumNo: '', gross: '', tare: '', net
 
 /**
  * Empty handwriting rows on Batch Packing Record page 2.
- * Live data rows replace these; remaining slots stay blank. Do not stretch to fill A4.
+ * Only a small starter pad — layoutFillOtherPrintPages fills remaining space to one A4.
+ * Do NOT force ~40 rows (that caused an extra blank sheet when many drums were added).
  */
-export const BPR_PAGE2_BLANK_ROWS = 40;
+export const BPR_PAGE2_BLANK_ROWS = 8;
 /** Compact sample row height for page-2 weight boxes (do not let print prefs stretch this). */
 const BPR_P2_ROW_PX = 18;
 /** Form pad target for received/dispatched editors (not the print blank count). */
@@ -164,6 +165,7 @@ export const buildBprHtml = (data, profileInput) => {
     .join(', ');
   const primaryBatchNo = batchNos.join(', ') || fallbackBatchNo;
   const totalNoBatch = batchNos.length || data.totalNoBatch || '';
+  const psdNoteText = String(data.psdNote || '').trim();
   const pc = {
     ...(data.packingMaterials || {}),
     ...(data.packingConsumables || {})
@@ -341,6 +343,7 @@ export const buildBprHtml = (data, profileInput) => {
 
   const packingRows = [];
   batchGroups.forEach((group) => {
+    const emptyGroup = isEmptyDrumsLabel(group.batchNo);
     group.pairs.forEach(({ r: rawR, d: rawD }) => {
       const r = rawR || {};
       const d = resolveDispatchRow(r, rawD || {});
@@ -349,7 +352,7 @@ export const buildBprHtml = (data, profileInput) => {
       const dBatch = d.batchNo || r.batchNo || '';
       const dDrum = (d.drumNo != null && d.drumNo !== '') ? d.drumNo : (r.drumNo ?? '');
       packingRows.push(`
-      <tr>
+      <tr class="${emptyGroup ? 'empty-drums-row' : ''}">
         <td>${escHtml(rBatch)}</td>
         <td>${escHtml(rDrum)}</td>
         <td class="wt"></td>
@@ -362,13 +365,16 @@ export const buildBprHtml = (data, profileInput) => {
         <td class="wt"></td>
       </tr>`);
     });
+    const totalLabel = emptyGroup
+      ? 'TOTAL — Empty Drums'
+      : `TOTAL — Batch ${escHtml(group.batchNo)}`;
     packingRows.push(`
-      <tr class="batch-total-row">
-        <td colspan="2" class="batch-total-label">TOTAL — Batch ${escHtml(group.batchNo)}</td>
+      <tr class="batch-total-row${emptyGroup ? ' empty-drums-total' : ''}">
+        <td colspan="2" class="batch-total-label">${totalLabel}</td>
         <td class="wt"></td>
         <td class="wt"></td>
         <td class="wt"></td>
-        <td colspan="2" class="batch-total-label">TOTAL — Batch ${escHtml(group.batchNo)}</td>
+        <td colspan="2" class="batch-total-label">${totalLabel}</td>
         <td class="wt"></td>
         <td class="wt"></td>
         <td class="wt"></td>
@@ -387,6 +393,8 @@ export const buildBprHtml = (data, profileInput) => {
       </tr>`);
   }
 
+  // Only pad a few blank handwriting rows when the table is short.
+  // Extra fixed blanks (old 40) overflowed A4 and created a near-empty extra PDF page.
   const fillerCount = Math.max(0, BPR_PAGE2_BLANK_ROWS - packingRows.length);
   const fillerRowsHtml = Array.from({ length: fillerCount }, () => `
             <tr class="filler-row">
@@ -416,14 +424,14 @@ export const buildBprHtml = (data, profileInput) => {
   );
   const dispatchedNet = micronizedPrint && String(micronizedPrint) !== '0.00' ? String(micronizedPrint) : '';
 
-  const summaryRowHtml = (label, value) => `
-            <tr class="summary-row">
+  const summaryRowHtml = (label, value, pin = false) => `
+            <tr class="summary-row${pin ? ' bpr-pin-start' : ''}">
               <td colspan="4" class="summary-label">${escHtml(label)}</td>
               <td class="wt">${escHtml(value)}</td>
               <td colspan="5"></td>
             </tr>`;
   const summaryRowsHtml = [
-    summaryRowHtml('Micronized Material Net Weight', dispatchedNet),
+    summaryRowHtml('Micronized Material Net Weight', dispatchedNet, true),
     summaryRowHtml('Lumps Net Weight', lumpsPrint),
     summaryRowHtml('Sample Net Weight', samplePrint),
     summaryRowHtml('Irrecoverable loss', irrecoverablePrint)
@@ -522,7 +530,7 @@ export const buildBprHtml = (data, profileInput) => {
 
       <div class="psd-note-box">
         <div class="psd-note-head">PSD Note</div>
-        <div class="psd-note-body">${escHtml(data.psdNote || '')}</div>
+        <div class="psd-note-body">${escHtml(psdNoteText)}${psdNoteText ? '' : '&nbsp;'}</div>
       </div>
 
       <table class="g">
@@ -700,12 +708,13 @@ export const buildBprHtml = (data, profileInput) => {
     z-index:1;
   }
   .psd-note-box{
-    flex:1 1 auto;
-    min-height:0;
+    flex:0 0 auto;
+    min-height:48px;
     display:flex;
     flex-direction:column;
     border:1px solid #7c12bd;
     margin-bottom:-1px;
+    overflow:visible;
   }
   .psd-note-head{
     background:#e2d3f3;
@@ -718,17 +727,18 @@ export const buildBprHtml = (data, profileInput) => {
     flex-shrink:0;
   }
   .psd-note-body{
-    flex:1 1 auto;
-    min-height:0;
+    flex:0 0 auto;
+    min-height:28px;
     padding:4px 8px;
     text-align:left;
     font-size:12px;
     font-weight:700;
-    color:#4a0080;
+    color:#4a0080 !important;
+    -webkit-text-fill-color:#4a0080 !important;
     white-space:pre-wrap;
     word-break:break-word;
     line-height:1.3;
-    overflow:hidden;
+    overflow:visible;
   }
   .remark-box {
     flex: 0 0 auto;
@@ -1012,8 +1022,22 @@ const fitBprPage1ToA4 = (pageEl, pageHeightPx = 1123) => {
     remark.style.overflow = 'visible';
   }
   if (psdNote) {
-    psdNote.style.flex = '1 1 auto';
-    psdNote.style.minHeight = '0';
+    psdNote.style.flex = '0 0 auto';
+    psdNote.style.minHeight = '48px';
+    psdNote.style.maxHeight = 'none';
+    psdNote.style.overflow = 'visible';
+    psdNote.style.flexShrink = '0';
+    const body = psdNote.querySelector('.psd-note-body');
+    if (body) {
+      body.style.flex = '0 0 auto';
+      body.style.minHeight = '28px';
+      body.style.maxHeight = 'none';
+      body.style.overflow = 'visible';
+      body.style.setProperty('color', '#4a0080', 'important');
+      body.style.setProperty('-webkit-text-fill-color', '#4a0080', 'important');
+      body.style.setProperty('visibility', 'visible', 'important');
+      body.style.setProperty('opacity', '1', 'important');
+    }
   }
 
   pageEl.querySelectorAll('table.g, .header-table, .section-badge').forEach((el) => {
@@ -1092,15 +1116,20 @@ const fitBprPage1ToA4 = (pageEl, pageHeightPx = 1123) => {
       });
     },
     () => {
-      // Collapse PSD note body if still clipped — tables + foot must win.
+      // Prefer slight scale over hiding PSD note text.
       if (psdNote) {
         psdNote.style.flex = '0 0 auto';
-        psdNote.style.maxHeight = '42px';
+        psdNote.style.minHeight = '40px';
+        psdNote.style.maxHeight = '72px';
         const body = psdNote.querySelector('.psd-note-body');
         if (body) {
-          body.style.maxHeight = '22px';
+          body.style.minHeight = '22px';
+          body.style.maxHeight = '48px';
           body.style.overflow = 'hidden';
           body.style.padding = '2px 6px';
+          body.style.setProperty('color', '#4a0080', 'important');
+          body.style.setProperty('-webkit-text-fill-color', '#4a0080', 'important');
+          body.style.setProperty('visibility', 'visible', 'important');
         }
       }
     }
@@ -1172,8 +1201,9 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
     const pageNodes = [...idoc.querySelectorAll('.page')];
     const a4H = 1123;
     const addCanvasPages = (canvas) => {
-      const pageHpx = a4H * 2;
-      if (canvas.height <= pageHpx + 2) {
+      // Slice overflow at exact A4 height — using 2×A4 previously left a near-blank extra sheet.
+      const pageHpx = a4H * 2; // html2canvas scale:2 → 1123 CSS px = 2246 canvas px
+      if (canvas.height <= pageHpx + 4) {
         pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297);
         return;
       }
@@ -1181,6 +1211,8 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
       let pageIndex = 0;
       while (yPx < canvas.height - 1) {
         const sliceH = Math.min(pageHpx, canvas.height - yPx);
+        // Skip a trailing near-empty slice (leftover padding / borders)
+        if (sliceH < pageHpx * 0.08 && pageIndex > 0) break;
         const pageCanvas = document.createElement('canvas');
         pageCanvas.width = canvas.width;
         pageCanvas.height = pageHpx;
@@ -1205,35 +1237,52 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
       if (isP2) {
         layoutFillOtherPrintPages(idoc, a4H);
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        // Drop leftover fillers that still push past A4 after fit pass
+        const tbody = target.querySelector('table.items tbody');
+        let guard = 0;
+        while ((target.scrollHeight || 0) > a4H + 6 && tbody && guard < 60) {
+          const fillers = tbody.querySelectorAll('tr.filler-row');
+          if (!fillers.length) break;
+          fillers[fillers.length - 1].remove();
+          guard += 1;
+        }
         const p2Overflows = (target.scrollHeight || 0) > a4H + 8;
         if (p2Overflows) {
           target.style.height = 'auto';
           target.style.minHeight = `${a4H}px`;
           target.style.maxHeight = 'none';
           target.style.overflow = 'visible';
+        } else {
+          // Keep a clean single A4 packing page — no phantom third sheet
+          target.style.height = `${a4H}px`;
+          target.style.minHeight = `${a4H}px`;
+          target.style.maxHeight = `${a4H}px`;
+          target.style.overflow = 'hidden';
         }
       }
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const captureH = isP2
         ? Math.max(a4H, target.scrollHeight || 0, target.offsetHeight || 0)
         : a4H;
+      // Ignore tiny overflow (borders/subpixel) so we don't emit a blank continuation page
+      const captureHSafe = isP2 && captureH <= a4H + 12 ? a4H : captureH;
       const canvas = await html2canvas(target, {
         scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff',
         width: 794,
         windowWidth: 794,
-        height: captureH,
-        windowHeight: captureH,
+        height: captureHSafe,
+        windowHeight: captureHSafe,
         logging: false,
         onclone: (clonedDoc) => {
           clonedDoc.querySelectorAll('.page').forEach((el) => {
             const p2 = el.classList.contains('page-p2');
             const existingTransform = el.style.transform;
             const existingWidth = el.style.width;
-            if (p2 && captureH > a4H) {
-              el.style.height = `${captureH}px`;
-              el.style.minHeight = `${captureH}px`;
+            if (p2 && captureHSafe > a4H) {
+              el.style.height = `${captureHSafe}px`;
+              el.style.minHeight = `${captureHSafe}px`;
               el.style.maxHeight = 'none';
               el.style.overflow = 'visible';
               el.style.padding = '8px';
@@ -1293,8 +1342,23 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.boxSizing = 'border-box';
           });
           clonedDoc.querySelectorAll('.page-p1 .psd-note-box').forEach((el) => {
-            el.style.flex = '1 1 auto';
-            el.style.minHeight = '0';
+            el.style.flex = '0 0 auto';
+            el.style.minHeight = '48px';
+            el.style.maxHeight = 'none';
+            el.style.overflow = 'visible';
+            el.style.flexShrink = '0';
+            el.style.setProperty('visibility', 'visible', 'important');
+            const body = el.querySelector('.psd-note-body');
+            if (body) {
+              body.style.flex = '0 0 auto';
+              body.style.minHeight = '28px';
+              body.style.maxHeight = 'none';
+              body.style.overflow = 'visible';
+              body.style.setProperty('color', '#4a0080', 'important');
+              body.style.setProperty('-webkit-text-fill-color', '#4a0080', 'important');
+              body.style.setProperty('visibility', 'visible', 'important');
+              body.style.setProperty('opacity', '1', 'important');
+            }
           });
           clonedDoc.querySelectorAll('.page.page-p2 .table-wrap').forEach((el) => {
             el.style.flex = '0 0 auto';

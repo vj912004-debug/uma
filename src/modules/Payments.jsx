@@ -4,12 +4,14 @@ import { useAppContext } from '../context/AppContext';
 import { Plus, CreditCard, Banknote, Calendar, Search } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
 import DateField from '../components/DateField';
+import StatusTabBar from '../components/StatusTabBar';
 
 const Payments = () => {
   const { data, updateData, updateItem } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusTab, setStatusTab] = useState('all');
   
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -87,7 +89,18 @@ const Payments = () => {
         <p style={{ color: 'var(--text-muted)' }}>Track outstanding payments and record transactions.</p>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
+      <StatusTabBar
+        value={statusTab}
+        onChange={setStatusTab}
+        allCount={partyDues.length + paymentHistory.length}
+        pendingCount={partyDues.length}
+        completedCount={paymentHistory.length}
+        pendingLabel="Pending"
+        completedLabel="Completed"
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: statusTab === 'all' ? '2fr 1fr' : '1fr', gap: '1.5rem' }}>
+        {(statusTab === 'all' || statusTab === 'pending') && (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Party-Wise Dues</h3>
           <div style={{ overflowX: 'auto' }}>
@@ -132,7 +145,9 @@ const Payments = () => {
             </table>
           </div>
         </div>
+        )}
 
+        {(statusTab === 'all' || statusTab === 'completed') && (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Payment History</h3>
           <div style={{ position: 'relative', marginBottom: '1rem' }}>
@@ -172,6 +187,7 @@ const Payments = () => {
             )}
           </div>
         </div>
+        )}
       </div>
 
       {isModalOpen && (

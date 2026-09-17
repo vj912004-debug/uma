@@ -9,6 +9,7 @@ import DocChargeRow from '../components/DocChargeRow';
 import DateField from '../components/DateField';
 import GstTaxBlock from '../components/GstTaxBlock';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+import StatusTabBar from '../components/StatusTabBar';
 import { GST_TYPE_CGST_SGST, normalizeGstType } from '../utils/taxInvoiceLayout';
 import {
   STANDARD_CHARGES_LIST,
@@ -44,6 +45,7 @@ const InvoicesPI = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
@@ -547,8 +549,17 @@ const InvoicesPI = () => {
         productOptions={productOptions}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
+      <StatusTabBar
+        value={statusTab}
+        onChange={setStatusTab}
+        allCount={pendingMRs.length + piList.length}
+        pendingCount={pendingMRs.length}
+        completedCount={piList.length}
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: statusTab === 'all' ? '1fr 2fr' : '1fr', gap: '1.5rem' }}>
         {/* Left Side: Pending MRs scheduler */}
+        {(statusTab === 'all' || statusTab === 'pending') && (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
@@ -579,8 +590,10 @@ const InvoicesPI = () => {
             )}
           </div>
         </div>
+        )}
 
         {/* Right Side: PI Log */}
+        {(statusTab === 'all' || statusTab === 'completed') && (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Proforma Invoice Log</h3>
 
@@ -626,6 +639,7 @@ const InvoicesPI = () => {
             </table>
           </div>
         </div>
+        )}
       </div>
       </>
       )}

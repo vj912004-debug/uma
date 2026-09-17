@@ -452,15 +452,41 @@ export const buildBprRowsForProduct = (mr, prodName, options = {}, weightRows = 
   const overlaid = weightRows?.length
     ? overlayWeightsOnDrumSlots(rows, weightRows, name)
     : rows.map((r) => ({ ...r }));
+
+  // Optionally attach Empty Drums (All Products) onto this product's BPR table.
+  // For multi-product MRs, only attach when explicitly requested (print enrich still adds if missing).
+  const withEmpty = [...overlaid];
+  const productNames = getReceiptProductNames(mr, options);
+  const includeEmpty = options.includeEmptyDrums === true
+    || (options.includeEmptyDrums !== false && productNames.length <= 1);
+  if (includeEmpty) {
+    const emptyCount = getEmptyDrumsCount(mr);
+    const already = withEmpty.some((r) => isEmptyDrumsBatch(r) || isEmptyDrumsLabel(r.batchNo));
+    if (emptyCount > 0 && !already) {
+      for (let d = 1; d <= emptyCount; d += 1) {
+        withEmpty.push({
+          batchNo: 'Empty Drums',
+          drumNo: String(d),
+          productName: '',
+          isEmptyDrums: true,
+          gross: '',
+          tare: '',
+          net: ''
+        });
+      }
+    }
+  }
+
   return {
     productName: name,
     batches,
-    receivedRows: overlaid,
-    dispatchedRows: overlaid.map((r) => ({ ...r })),
+    receivedRows: withEmpty,
+    dispatchedRows: withEmpty.map((r) => ({ ...r })),
     qty: getProductQty(mr, name, options),
-    drums: rows.length || getProductDrums(mr, name, options),
+    drums: withEmpty.length || getProductDrums(mr, name, options),
     batchNo: batches.map((b) => b.batchNo).filter((no) => no && !isEmptyDrumsLabel(no)).join(', '),
-    totalNoBatch: batches.length
+    totalNoBatch: batches.length,
+    emptyDrums: getEmptyDrumsCount(mr)
   };
 };
 
@@ -726,9 +752,20 @@ export const getPartyProductForMR = (mr, data, productNameHint = '') => {
 /** Fill missing BPR PSD fields from party master before PDF export. */
 export const enrichBPRForPrint = (bpr, appData = {}) => {
   if (!bpr) return bpr;
-  const mr = (appData.materialReceipts || []).find(r => r.id === bpr.receiptId);
-  const prod = mr ? getPartyProductForMR(mr, appData, bpr.productName) : null;
-  const pl = findAnyPackingList(appData.packingLists, bpr.receiptId);
+  const mr = (appData.materialReceipts || []).find(r => r.id === bpr.receiptId)
+    || (appData.materialReceipts || []).find(r =>
+      String(r.partyName || '').trim().toLowerCase() === String(bpr.partyName || bpr.customerName || '').trim().toLowerCase()
+      && String(bpr.productName || '')
+      && String(r.productName || '').toLowerCase().includes(String(bpr.productName || '').trim().toLowerCase())
+    );
+  let prod = mr ? getPartyProductForMR(mr, appData, bpr.productName) : null;
+  if (!prod && bpr.productName) {
+    const party = (appData.parties || []).find((p) =>
+      String(p.name || '').trim().toLowerCase() === String(bpr.partyName || bpr.customerName || '').trim().toLowerCase()
+    );
+    if (party) prod = findPartyProduct(party, bpr.productName);
+  }
+  const pl = findAnyPackingList(appData.packingLists, bpr.receiptId || mr?.id);
 
   const sumKey = (rows, key) => (rows || []).reduce((s, r) => {
     const n = parseFloat(r[key]);
@@ -738,6 +775,27 @@ export const enrichBPRForPrint = (bpr, appData = {}) => {
 
   const receivedBatches = [...(bpr.receivedBatches || [])];
   const dispatchedBatches = [...(bpr.dispatchedBatches || [])];
+
+  // Ensure Empty Drums from Material Receipt print on BPR page 2 when missing from the table.
+  const emptyCount = getEmptyDrumsCount(mr);
+  const hasEmptyRow = [...receivedBatches, ...dispatchedBatches].some(
+    (r) => isEmptyDrumsBatch(r) || isEmptyDrumsLabel(r?.batchNo)
+  );
+  if (emptyCount > 0 && !hasEmptyRow) {
+    for (let d = 1; d <= emptyCount; d += 1) {
+      const row = {
+        batchNo: 'Empty Drums',
+        drumNo: String(d),
+        productName: '',
+        isEmptyDrums: true,
+        gross: '',
+        tare: '',
+        net: ''
+      };
+      receivedBatches.push({ ...row });
+      dispatchedBatches.push({ ...row });
+    }
+  }
 
   const sievingLumps = parseFloat(
     bpr.lumpsNetWeight ?? bpr.sievingLumps ?? pl?.sievingLumps ?? pl?.sievingLumpsNet ?? ''
@@ -777,13 +835,32 @@ export const enrichBPRForPrint = (bpr, appData = {}) => {
       || ''
   ).trim();
 
+  const prodNameKey = norm(bpr.productName || prod?.name || '');
+  const mrProductNote = prodNameKey
+    ? (mr?.productSettings?.[bpr.productName]?.psdNote
+      || Object.entries(mr?.productSettings || {}).find(([k]) => norm(k) === prodNameKey)?.[1]?.psdNote
+      || '')
+    : '';
+  const planNote = (appData.productionPlans || []).find((p) =>
+    p && !p.isDeleted
+    && String(p.receiptId) === String(bpr.receiptId || mr?.id || '')
+    && (!bpr.productName || norm(p.productName) === prodNameKey)
+    && String(p.psdNote || '').trim()
+  )?.psdNote || '';
+  const resolvedPsdNote = String(
+    bpr.psdNote || prod?.psdNote || mrProductNote || planNote || ''
+  ).trim();
+  const resolvedPsdReq = String(
+    bpr.psdRequirement || prod?.psdReq || ''
+  ).trim();
+
   return {
     ...bpr,
     partyName: bpr.partyName || bpr.customerName || mr?.partyName || '',
     customerName: bpr.customerName || bpr.partyName || mr?.partyName || '',
     productName: bpr.productName || mr?.productName || '',
-    psdNote: bpr.psdNote || prod?.psdNote || '',
-    psdRequirement: bpr.psdRequirement || prod?.psdReq || '',
+    psdNote: resolvedPsdNote,
+    psdRequirement: resolvedPsdReq || bpr.psdRequirement || prod?.psdReq || '',
     totalDrums: filledDrums || bpr.totalDrums || '',
     receivedBatches,
     dispatchedBatches,

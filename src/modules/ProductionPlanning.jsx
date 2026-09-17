@@ -5,6 +5,7 @@ import { Plus, Edit2, Trash2, Calendar, Clock } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 
@@ -98,6 +99,7 @@ const ProductionPlanning = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('all');
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
 
   const userRole = data.settings?.userRole || 'Admin';
@@ -266,7 +268,12 @@ const ProductionPlanning = () => {
   );
   const partyOptions = useMemo(() => uniqueSortedOptions(resolvedPlans.map((p) => p.customer)), [resolvedPlans]);
   const productOptions = useMemo(() => uniqueSortedOptions(resolvedPlans.map((p) => p.productName)), [resolvedPlans]);
+  const isPlanPending = (p) => p.status !== 'Done' && p.status !== 'Cancel';
+  const pendingCount = resolvedPlans.filter(isPlanPending).length;
+  const completedCount = resolvedPlans.filter((p) => p.status === 'Done').length;
   const filteredPlans = resolvedPlans.filter((p) => {
+    if (statusTab === 'pending' && !isPlanPending(p)) return false;
+    if (statusTab === 'completed' && p.status !== 'Done') return false;
     if (partyFilter && (p.customer || '') !== partyFilter) return false;
     if (productFilter && (p.productName || '') !== productFilter) return false;
     if (!searchTerm) return true;
@@ -325,6 +332,14 @@ const ProductionPlanning = () => {
           )}
         </div>
       </header>
+
+      <StatusTabBar
+        value={statusTab}
+        onChange={setStatusTab}
+        allCount={resolvedPlans.length}
+        pendingCount={pendingCount}
+        completedCount={completedCount}
+      />
 
       <ListFilterBar
         searchTerm={searchTerm}

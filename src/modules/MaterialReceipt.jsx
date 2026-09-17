@@ -8,6 +8,7 @@ import {Eye,  Plus, FileDown, Edit2, Trash2, ShieldAlert, FileText } from 'lucid
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+import StatusTabBar from '../components/StatusTabBar';
 import {
   getReceiptProductNames,
   getProductBatches,
@@ -206,6 +207,7 @@ const MaterialReceipt = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('all');
 
   // Primary MR Form State
   const [formData, setFormData] = useState({
@@ -686,7 +688,12 @@ const MaterialReceipt = () => {
   const mrList = data.materialReceipts || [];
   const partyOptions = useMemo(() => uniqueSortedOptions(mrList.map((r) => r.partyName)), [mrList]);
   const productOptions = useMemo(() => uniqueSortedOptions(mrList.map((r) => r.productName)), [mrList]);
+  const pendingCount = mrList.filter((mr) => mr.status !== 'Completed').length;
+  const completedCount = mrList.filter((mr) => mr.status === 'Completed').length;
   const filteredReceipts = mrList.filter((mr) => {
+    const isDone = mr.status === 'Completed';
+    if (statusTab === 'pending' && isDone) return false;
+    if (statusTab === 'completed' && !isDone) return false;
     if (partyFilter && (mr.partyName || '') !== partyFilter) return false;
     if (productFilter && (mr.productName || '') !== productFilter) return false;
     if (!searchTerm) return true;
@@ -765,6 +772,7 @@ const MaterialReceipt = () => {
         >
           <option value="Dry">Dry</option>
           <option value="Wet">Wet</option>
+          <option value="N/A">N/A</option>
           <option value="">None</option>
         </SearchableSelect>
       </td>
@@ -882,6 +890,14 @@ const MaterialReceipt = () => {
           </button>
         </div>
       </header>
+
+      <StatusTabBar
+        value={statusTab}
+        onChange={setStatusTab}
+        allCount={mrList.length}
+        pendingCount={pendingCount}
+        completedCount={completedCount}
+      />
 
       <ListFilterBar
         searchTerm={searchTerm}

@@ -5,6 +5,7 @@ import {Eye,  Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react'
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
 import {
   buildDCFieldsFromProducts,
@@ -46,6 +47,7 @@ const DeliveryChallan = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedPL, setSelectedPL] = useState(null);
@@ -233,7 +235,16 @@ const DeliveryChallan = () => {
         productOptions={productOptions}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
+      <StatusTabBar
+        value={statusTab}
+        onChange={setStatusTab}
+        allCount={pendingPLs.length + dcList.length}
+        pendingCount={pendingPLs.length}
+        completedCount={dcList.length}
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: statusTab === 'all' ? '1fr 2fr' : '1fr', gap: '1.5rem' }}>
+        {(statusTab === 'all' || statusTab === 'pending') && (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
@@ -259,7 +270,9 @@ const DeliveryChallan = () => {
             )}
           </div>
         </div>
+        )}
 
+        {(statusTab === 'all' || statusTab === 'completed') && (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Delivery Challan Log</h3>
 
@@ -303,6 +316,7 @@ const DeliveryChallan = () => {
             </table>
           </div>
         </div>
+        )}
       </div>
 
       {isModalOpen && (

@@ -28,6 +28,8 @@ export const createBaseState = () => ({
   paymentPromises: [],
   tasks: [],
   attendance: [],
+  salaryRates: null,
+  salaryReports: [],
   psds: [],
   productionPlans: [],
   stockAdjustments: [],
@@ -36,6 +38,11 @@ export const createBaseState = () => ({
   creditNotes: [],
   purchaseOrders: [],
   purchaseManagement: [],
+  purchaseStock: [],
+  marketingLeads: [],
+  marketingFollowUps: [],
+  marketingEnquiries: [],
+  marketingOrders: [],
   utilityRecords: [],
   utilityTempRecords: [],
   pmAirCompressorRecords: [],
@@ -50,7 +57,7 @@ export const createBaseState = () => ({
   settings: {
     userRole: 'Admin',
     theme: 'light',
-    serials: { MR: 1, BPR: 1, PL: 1, PI: 1, DC: 1, MI: 1, VC: 1, PSD: 1, TI: 1, EWDC: 1, EWTI: 1, QT: 1, DN: 1, CN: 1, PO: 1 }
+    serials: { MR: 1, BPR: 1, PL: 1, PI: 1, DC: 1, MI: 1, VC: 1, PSD: 1, TI: 1, EWDC: 1, EWTI: 1, QT: 1, DN: 1, CN: 1, PO: 1, INQ: 1 }
   },
   companyProfile: { ...DEFAULT_COMPANY_PROFILE }
 });
@@ -135,9 +142,16 @@ export const normalizeAppState = (parsed) => {
     creditNotes: parsed.creditNotes || [],
     purchaseOrders: parsed.purchaseOrders || [],
     purchaseManagement: parsed.purchaseManagement || [],
+    purchaseStock: parsed.purchaseStock || [],
+    marketingLeads: parsed.marketingLeads || [],
+    marketingFollowUps: parsed.marketingFollowUps || [],
+    marketingEnquiries: parsed.marketingEnquiries || [],
+    marketingOrders: parsed.marketingOrders || [],
     utilityRecords: parsed.utilityRecords || [],
     utilityTempRecords: parsed.utilityTempRecords || [],
     pmAirCompressorRecords: parsed.pmAirCompressorRecords || [],
+    salaryRates: parsed.salaryRates || null,
+    salaryReports: parsed.salaryReports || [],
     auditLogs: parsed.auditLogs || [],
     users: (parsed.users || baseState.users).map((u, i) => {
       const isAdminUser = u.role === 'Admin' && (u.username?.toLowerCase() === 'admin' || u.id === 1);

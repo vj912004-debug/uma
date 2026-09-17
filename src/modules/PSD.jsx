@@ -5,6 +5,7 @@ import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import {Eye,  UploadCloud, Trash2, Calendar, ClipboardList, CheckCircle } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
 
 const PSD = () => {
@@ -12,6 +13,7 @@ const PSD = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMR, setSelectedMR] = useState(null);
 
@@ -157,8 +159,17 @@ const PSD = () => {
         productOptions={productOptions}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
+      <StatusTabBar
+        value={statusTab}
+        onChange={setStatusTab}
+        allCount={pendingReceipts.length + psdList.length}
+        pendingCount={pendingReceipts.length}
+        completedCount={psdList.length}
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: statusTab === 'all' ? '1fr 2fr' : '1fr', gap: '1.5rem' }}>
         {/* Left Side: Pending Receipts scheduler */}
+        {(statusTab === 'all' || statusTab === 'pending') && (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
@@ -184,8 +195,10 @@ const PSD = () => {
             )}
           </div>
         </div>
+        )}
 
         {/* Right Side: PSD log */}
+        {(statusTab === 'all' || statusTab === 'completed') && (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Uploaded PSD Reports</h3>
 
@@ -243,6 +256,7 @@ const PSD = () => {
             </table>
           </div>
         </div>
+        )}
       </div>
 
       {/* PSD Modal Form */}
@@ -299,6 +313,7 @@ const PSD = () => {
                       }}>
                         <option value="Dry">Dry</option>
                         <option value="Wet">Wet</option>
+                        <option value="N/A">N/A</option>
                       </SearchableSelect>
                     </div>
                     <div>
