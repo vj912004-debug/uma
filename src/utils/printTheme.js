@@ -890,9 +890,9 @@ export const getSharedPrintStyles = () => `
     text-align: center;
     margin-top: 1px;
   }
-  .icon svg { width: 16px; height: 16px; display: block; fill: none; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  .m-icon svg { width: 15px; height: 15px; display: block; fill: none; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  .party-head svg, .box-head svg { width: 16px; height: 16px; display: block; fill: none; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .icon svg { width: 16px; height: 16px; display: block; fill: none; stroke: #3d2b7d; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .m-icon svg { width: 15px; height: 15px; display: block; fill: none; stroke: #3d2b7d; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .party-head svg, .box-head svg { width: 16px; height: 16px; display: block; fill: none; stroke: #3d2b7d; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .reg-details {
     margin-top: 10px;
     font-size: 12.5px;
@@ -1410,6 +1410,133 @@ export const buildStatusBar = (
     <span>${escHtml(pageText)}</span>
   </div>`;
 
+/**
+ * html2canvas often fails to paint SVG strokes/fills that rely on CSS `var(--…)`.
+ * Resolve paints onto real attributes so icons stay visible in PDF output.
+ */
+export const bakePrintSvgPaints = (root) => {
+  if (!root || typeof root.querySelectorAll !== 'function') return;
+
+  const readVar = (el, name, fallback) => {
+    try {
+      const scope = el.closest?.(':root, html, body, .page, .sheet, .pdf-page, .uma-print-root') || el;
+      const v = getComputedStyle(scope).getPropertyValue(name).trim();
+      return v || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const resolvePaint = (el, value) => {
+    if (!value || typeof value !== 'string') return value;
+    const v = value.trim();
+    if (!v.includes('var(')) return v;
+    if (v.includes('--purple-dark')) return readVar(el, '--purple-dark', '#2f2263');
+    if (v.includes('--purple-light')) return readVar(el, '--purple-light', '#efeaf7');
+    if (v.includes('--purple')) return readVar(el, '--purple', '#3d2b7d');
+    if (v.includes('--green') || v.includes('--brand-green')) return readVar(el, '--green', '#2fa84f');
+    if (v.includes('--orange')) return readVar(el, '--orange', '#f47920');
+    if (v.includes('--lav-bg')) return readVar(el, '--lav-bg', '#efeaf7');
+    if (v.includes('--text')) return readVar(el, '--text', '#231f20');
+    return v;
+  };
+
+  const applyResolvedAttrs = (el) => {
+    ['fill', 'stroke', 'color'].forEach((attr) => {
+      const raw = el.getAttribute?.(attr);
+      if (!raw) return;
+      const next = resolvePaint(el, raw);
+      if (next && next !== raw) el.setAttribute(attr, next);
+    });
+    const style = el.getAttribute?.('style');
+    if (style && style.includes('var(')) {
+      el.setAttribute(
+        'style',
+        style
+          .replace(/var\(\s*--purple-dark\s*\)/gi, readVar(el, '--purple-dark', '#2f2263'))
+          .replace(/var\(\s*--purple\s*\)/gi, readVar(el, '--purple', '#3d2b7d'))
+          .replace(/var\(\s*--green\s*\)/gi, readVar(el, '--green', '#2fa84f'))
+          .replace(/var\(\s*--brand-green\s*\)/gi, readVar(el, '--brand-green', '#2fa84f'))
+          .replace(/var\(\s*--orange\s*\)/gi, readVar(el, '--orange', '#f47920'))
+      );
+    }
+  };
+
+  const isStrokeIconHost = (svg) => Boolean(
+    svg.closest?.(
+      '.icon, .m-icon, .party-head, .box-head, .sign, .signature-label, .dc-sign-title, .company-strip .icon'
+    )
+  );
+
+  const isFilledIconHost = (svg) => Boolean(
+    svg.classList?.contains('ic')
+    || svg.classList?.contains('ticon')
+    || svg.classList?.contains('seal')
+    || svg.closest?.('.feat .circ, .tbl-title, .pill-head, .page2-header, .bottom-banner, .bbox-head, .fr-sign, .sign2')
+  );
+
+  root.querySelectorAll('svg').forEach((svg) => {
+    applyResolvedAttrs(svg);
+    svg.querySelectorAll('*').forEach(applyResolvedAttrs);
+
+    const purple = readVar(svg, '--purple', '#3d2b7d');
+
+    if (isStrokeIconHost(svg)) {
+      let stroke = purple;
+      try {
+        const cs = getComputedStyle(svg);
+        if (cs.stroke && cs.stroke !== 'none') stroke = cs.stroke;
+      } catch { /* ignore */ }
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', stroke);
+      if (!svg.getAttribute('stroke-width')) svg.setAttribute('stroke-width', '1.6');
+      if (!svg.getAttribute('stroke-linecap')) svg.setAttribute('stroke-linecap', 'round');
+      if (!svg.getAttribute('stroke-linejoin')) svg.setAttribute('stroke-linejoin', 'round');
+      svg.querySelectorAll('path, circle, rect, line, polyline, polygon, ellipse').forEach((node) => {
+        if (!node.getAttribute('fill')) node.setAttribute('fill', 'none');
+        if (!node.getAttribute('stroke')) node.setAttribute('stroke', stroke);
+      });
+    }
+
+    if (isFilledIconHost(svg)) {
+      let fill = svg.getAttribute('fill');
+      if (!fill || fill.includes('var(')) {
+        try {
+          const cs = getComputedStyle(svg);
+          fill = (cs.fill && cs.fill !== 'none') ? cs.fill : purple;
+        } catch {
+          fill = purple;
+        }
+        svg.setAttribute('fill', resolvePaint(svg, fill) || purple);
+      }
+      // White icons on purple banners must stay white
+      const onPurpleBanner = svg.closest?.('.tbl-title, .pill-head, .page2-header, .bottom-banner, .dc-title-box, .title-box');
+      if (onPurpleBanner && (!svg.getAttribute('fill') || svg.getAttribute('fill') === 'none')) {
+        svg.setAttribute('fill', '#ffffff');
+      }
+    }
+  });
+};
+
+const waitForPrintImages = async (doc, timeoutMs = 4000) => {
+  const imgs = [...(doc?.images || [])];
+  if (!imgs.length) return;
+  await Promise.all(
+    imgs.map(
+      (img) => new Promise((resolve) => {
+        if (img.complete && img.naturalWidth > 0) {
+          resolve();
+          return;
+        }
+        const done = () => resolve();
+        img.addEventListener('load', done, { once: true });
+        img.addEventListener('error', done, { once: true });
+        setTimeout(done, timeoutMs);
+      })
+    )
+  );
+};
+
 export const renderHtmlToPdf = async (html, {
   mode = 'save',
   filePrefix = 'DOC',
@@ -1460,8 +1587,10 @@ export const renderHtmlToPdf = async (html, {
         iframe.onload = () => requestAnimationFrame(() => requestAnimationFrame(r));
       }
     });
-    // Allow images/fonts inside iframe to settle
-    await new Promise((r) => setTimeout(r, 50));
+    // Allow images/fonts inside iframe to settle, then bake SVG paints for html2canvas
+    await waitForPrintImages(idoc);
+    await new Promise((r) => setTimeout(r, 80));
+    bakePrintSvgPaints(idoc.body || idoc.documentElement);
 
     const a4Ratio = 297 / 210;
     const singlePageHeight = Math.round(width * a4Ratio);
@@ -1631,6 +1760,7 @@ export const renderHtmlToPdf = async (html, {
         scrollY: 0,
         logging: false,
         onclone: (clonedDoc) => {
+          bakePrintSvgPaints(clonedDoc.body || clonedDoc.documentElement);
           if (!lockThisPage && !isQuotationPage && !(pageNodes.length > 0 && !overflows)) return;
           const htmlEl = clonedDoc.documentElement;
           const bodyEl = clonedDoc.body;

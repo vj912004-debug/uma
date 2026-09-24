@@ -376,7 +376,7 @@ export const buildQuotationHtml = (data, profileInput) => {
   .contact-bar .citem.c-tight span{
     white-space:nowrap;overflow:visible;text-overflow:clip;max-width:none;
   }
-  .ic{width:12px;height:12px;flex-shrink:0;fill:var(--purple);margin-top:2px;}
+  .ic{width:12px;height:12px;flex-shrink:0;fill:#5a2d81;fill:var(--purple);margin-top:2px;}
 
   .body-pad{padding:0 22px 4px;flex:1 1 auto;width:100%;box-sizing:border-box;min-width:0;min-height:0;overflow:visible;display:flex;flex-direction:column;}
   .sheet.quot-hide-features .body-pad{flex:0 0 auto;}
@@ -679,7 +679,7 @@ export const buildQuotationHtml = (data, profileInput) => {
     flex-direction:column;
   }
   .bbox-head{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-shrink:0;}
-  .bbox-head svg{width:14px;height:14px;fill:var(--purple-dark);flex-shrink:0;}
+  .bbox-head svg{width:14px;height:14px;fill:#2f2263;fill:var(--purple-dark);flex-shrink:0;}
   .bbox-head h4{color:var(--purple-dark);font-size:11px;font-weight:800;letter-spacing:.2px;margin:0;}
   .bbox ol{padding-left:15px;font-size:10px;line-height:1.5;color:#231f20;margin:0;flex:1 1 auto;
     word-spacing:normal;letter-spacing:normal;white-space:normal;overflow:visible;}
@@ -851,7 +851,7 @@ export const buildQuotationHtml = (data, profileInput) => {
     <!-- FEATURES -->
     <div class="features">
       <div class="feat">
-        <div class="circ" style="background:#eee6f7;"><svg viewBox="0 0 24 24" fill="var(--purple)"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm-1 13l5.5-5.5-1.4-1.4L11 12.2 8.9 10 7.5 11.5 11 15z"/></svg></div>
+        <div class="circ" style="background:#eee6f7;"><svg viewBox="0 0 24 24" fill="#5a2d81"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm-1 13l5.5-5.5-1.4-1.4L11 12.2 8.9 10 7.5 11.5 11 15z"/></svg></div>
         <p>cGMP COMPLIANT FACILITY</p>
       </div>
       <div class="feat">
@@ -859,11 +859,11 @@ export const buildQuotationHtml = (data, profileInput) => {
         <p>CONTRACT MICRONIZATION EXPERTS</p>
       </div>
       <div class="feat">
-        <div class="circ" style="background:#e3f4e5;"><svg viewBox="0 0 24 24" fill="var(--green)"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 17a7 7 0 110-14 7 7 0 010 14zm0-11a4 4 0 100 8 4 4 0 000-8zm0 6a2 2 0 110-4 2 2 0 010 4z"/></svg></div>
+        <div class="circ" style="background:#e3f4e5;"><svg viewBox="0 0 24 24" fill="#2e8b3d"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 17a7 7 0 110-14 7 7 0 010 14zm0-11a4 4 0 100 8 4 4 0 000-8zm0 6a2 2 0 110-4 2 2 0 010 4z"/></svg></div>
         <p>PARTICLE SIZE ANALYSIS &amp; DEVELOPMENT</p>
       </div>
       <div class="feat">
-        <div class="circ" style="background:#fdeadb;"><svg viewBox="0 0 24 24" fill="var(--orange)"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8zM12 5.2L18 8l-6 3.3L6 8l6-2.8zM5 9.7l6 3.3v6.5l-6-3.3V9.7zm8 9.8v-6.5l6-3.3v6.5l-6 3.3z"/></svg></div>
+        <div class="circ" style="background:#fdeadb;"><svg viewBox="0 0 24 24" fill="#f5811f"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8zM12 5.2L18 8l-6 3.3L6 8l6-2.8zM5 9.7l6 3.3v6.5l-6-3.3V9.7zm8 9.8v-6.5l6-3.3v6.5l-6 3.3z"/></svg></div>
         <p>CLEAN ROOM PROCESSING AREA</p>
       </div>
       <div class="feat">
@@ -883,13 +883,13 @@ export const buildQuotationHtml = (data, profileInput) => {
 
 <!-- ============================================================ PAGE 2 ============================================================ -->
 <div class="sheet pdf-page page2">
-  <div class="page2-header"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM6 8h12M6 12h12M6 16h8"/></svg>TERMS &amp; CONDITIONS</div>
+  <div class="page2-header"><svg viewBox="0 0 24 24" fill="#ffffff"><path d="M4 4h16v16H4zM6 8h12M6 12h12M6 16h8"/></svg>TERMS &amp; CONDITIONS</div>
 
   <div class="page2-body">
   <div class="terms-grid">
     <div class="term">
       <div class="term-head">
-        <svg class="ticon" viewBox="0 0 24 24" fill="var(--purple)"><path d="M6 2h9l5 5v15H6zm8 1.5V8h4.5z"/></svg>
+        <svg class="ticon" viewBox="0 0 24 24" fill="#5a2d81"><path d="M6 2h9l5 5v15H6zm8 1.5V8h4.5z"/></svg>
         <h4>TAXES</h4>
       </div>
       <p>GST will be charged extra as applicable.</p>
@@ -903,14 +903,14 @@ export const buildQuotationHtml = (data, profileInput) => {
     </div>
     <div class="term">
       <div class="term-head">
-        <svg class="ticon" viewBox="0 0 24 24" fill="var(--green)"><path d="M12 4V1L8 5l4 4V6a6 6 0 11-6 6H4a8 8 0 108-8z"/></svg>
+        <svg class="ticon" viewBox="0 0 24 24" fill="#2e8b3d"><path d="M12 4V1L8 5l4 4V6a6 6 0 11-6 6H4a8 8 0 108-8z"/></svg>
         <h4>BATCH / CHANGE OVER</h4>
       </div>
       <p>If same material is required to be micronized in separate batch<span class="sym">(es)</span> or different PSD specification, Change Over Charge <span class="sym">@ ₹&nbsp;500/-</span> per batch or per specification will be applicable.</p>
     </div>
     <div class="term">
       <div class="term-head">
-        <svg class="ticon" viewBox="0 0 24 24" fill="var(--orange)"><path d="M3 6h11v8H3zM14 9h4l3 3v2h-7zM6.5 19a2 2 0 100-4 2 2 0 000 4zm12 0a2 2 0 100-4 2 2 0 000 4z"/></svg>
+        <svg class="ticon" viewBox="0 0 24 24" fill="#f5811f"><path d="M3 6h11v8H3zM14 9h4l3 3v2h-7zM6.5 19a2 2 0 100-4 2 2 0 000 4zm12 0a2 2 0 100-4 2 2 0 000 4z"/></svg>
         <h4>OTHER CHARGES</h4>
       </div>
       <p>This is only processing charges. All other charges like Transportation, Insurance, Repacking material charges will be extra.</p>

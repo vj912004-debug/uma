@@ -324,6 +324,22 @@ export const buildPrintPrefsCss = (prefs) => {
     grid-column: 1 !important;
     width: 16px !important;
     flex: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #3d2b7d !important;
+  }
+  .uma-print-root .meta-row .m-icon svg,
+  .uma-print-root .icon svg,
+  .uma-print-root .party-head svg,
+  .uma-print-root .box-head svg,
+  .uma-print-root .company-strip .icon svg,
+  .uma-print-root .sign svg,
+  .uma-print-root .signature-label svg {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    overflow: visible !important;
   }
   .uma-print-root .meta-row .m-label,
   .uma-print-root .meta-row.sub .m-label,

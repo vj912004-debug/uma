@@ -313,9 +313,9 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
     text-align:center;
     margin-top:1px;
   }
-  .icon svg{width:16px;height:16px;display:block;fill:none;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
-  .m-icon svg{width:15px;height:15px;display:block;fill:none;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
-  .party-head svg, .box-head svg{width:16px;height:16px;display:block;fill:none;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .icon svg{width:16px;height:16px;display:block;fill:none;stroke:#3d2b7d;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .m-icon svg{width:15px;height:15px;display:block;fill:none;stroke:#3d2b7d;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .party-head svg, .box-head svg{width:16px;height:16px;display:block;fill:none;stroke:#3d2b7d;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
   .reg-details{
     margin-top:10px;
     font-size:12px;
@@ -413,7 +413,7 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
     gap:8px; border-bottom:1px solid var(--purple);
     border-bottom:1px solid var(--lav-border);
   }
-  .party-head svg, .box-head svg{flex-shrink:0;}
+ .party-head svg, .box-head svg{flex-shrink:0;}
   .party-body{
     padding:8px 12px;
     font-size:12px;
