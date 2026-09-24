@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import DateField from '../components/DateField';
+import StatusTabBar from '../components/StatusTabBar';
 import { formatDate, getDefaultFiscalYearRange } from '../utils/dateUtils';
 
 const PAGE_SIZE = 10;
@@ -31,6 +32,7 @@ const UtilityTempRecordList = () => {
   const { data, deleteItemSoftly } = useAppContext();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [statusTab, setStatusTab] = useState('pending');
   const [page, setPage] = useState(1);
   const [rangeFrom, setRangeFrom] = useState(DEFAULT_RANGE.rangeFrom);
   const [rangeTo, setRangeTo] = useState(DEFAULT_RANGE.rangeTo);
@@ -40,15 +42,32 @@ const UtilityTempRecordList = () => {
     [data.utilityTempRecords]
   );
 
+  const isCurrentMonth = (dateStr) => {
+    if (!dateStr) return false;
+    const d = new Date(`${dateStr}T00:00:00`);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  };
+  const isTempPending = (r) => {
+    if (String(r.status || '').toLowerCase() === 'pending') return true;
+    const incomplete = !String(r.make || '').trim() || !String(r.time || '').trim() || r.oilLevelAtRest == null || r.oilLevelAtRest === '';
+    return isCurrentMonth(r.date) && incomplete;
+  };
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
+      if (statusTab === 'pending' && !isTempPending(r)) return false;
+      if (statusTab === 'completed' && isTempPending(r)) return false;
       if (!inRange(r.date, rangeFrom, rangeTo)) return false;
       if (!q) return true;
       return [r.date, r.time, r.remarks, r.oilLevelAtRest, r.make]
         .some((v) => String(v || '').toLowerCase().includes(q));
     });
-  }, [rows, search, rangeFrom, rangeTo]);
+  }, [rows, search, rangeFrom, rangeTo, statusTab]);
+
+  const pendingCount = rows.filter(isTempPending).length;
+  const completedCount = rows.filter((r) => !isTempPending(r)).length;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -120,6 +139,14 @@ const UtilityTempRecordList = () => {
           </Link>
         </div>
       </header>
+
+      <StatusTabBar
+        value={statusTab}
+        onChange={(v) => { setStatusTab(v); setPage(1); }}
+        allCount={rows.length}
+        pendingCount={pendingCount}
+        completedCount={completedCount}
+      />
 
       <section className="premium-card pm-card">
         <div className="pm-list-head">

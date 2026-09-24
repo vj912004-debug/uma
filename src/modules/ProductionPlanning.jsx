@@ -92,6 +92,29 @@ const resolvePlan = (plan, materialReceipts = [], parties = []) => {
   return resolved;
 };
 
+const normProduct = (s) => String(s || '').trim().toLowerCase();
+
+/** True when a Delivery Challan exists for this plan's receipt (and product when set). */
+const isPlanDispatched = (plan, deliveryChallans = []) => {
+  if (!plan?.receiptId) return false;
+  const dcs = (deliveryChallans || []).filter(
+    (d) => !d.isDeleted && String(d.receiptId) === String(plan.receiptId)
+  );
+  if (!dcs.length) return false;
+  const planProduct = normProduct(plan.productName);
+  if (!planProduct) return true;
+  return dcs.some((dc) => {
+    const dcProd = normProduct(dc.productName);
+    if (!dcProd) return true;
+    return (
+      dcProd === planProduct ||
+      dcProd.includes(planProduct) ||
+      planProduct.includes(dcProd) ||
+      dcProd.split(',').some((p) => normProduct(p) === planProduct)
+    );
+  });
+};
+
 const ProductionPlanning = () => {
   const { data, updateData, updateItem, deleteItemSoftly, setData } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -99,7 +122,7 @@ const ProductionPlanning = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
-  const [statusTab, setStatusTab] = useState('all');
+  const [statusTab, setStatusTab] = useState('pending');
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
 
   const userRole = data.settings?.userRole || 'Admin';
@@ -263,8 +286,10 @@ const ProductionPlanning = () => {
 
   const plansList = (data.productionPlans || []).filter(p => !p.isDeleted);
   const resolvedPlans = useMemo(
-    () => plansList.map(p => resolvePlan(p, data.materialReceipts, data.parties)),
-    [plansList, data.materialReceipts, data.parties]
+    () => plansList
+      .map(p => resolvePlan(p, data.materialReceipts, data.parties))
+      .filter((p) => !isPlanDispatched(p, data.deliveryChallans)),
+    [plansList, data.materialReceipts, data.parties, data.deliveryChallans]
   );
   const partyOptions = useMemo(() => uniqueSortedOptions(resolvedPlans.map((p) => p.customer)), [resolvedPlans]);
   const productOptions = useMemo(() => uniqueSortedOptions(resolvedPlans.map((p) => p.productName)), [resolvedPlans]);
@@ -316,7 +341,7 @@ const ProductionPlanning = () => {
       <header className="page-header">
         <div>
           <h1 className="page-title">Production Planning</h1>
-          <p className="page-subtitle">Schedule milling batches and track processing.</p>
+          <p className="page-subtitle">Schedule milling batches and track processing. Dispatched jobs leave this list automatically.</p>
         </div>
         <div className="page-toolbar" style={{ flex: '1 1 460px', justifyContent: 'flex-end', minWidth: 0 }}>
           <ExportButton data={filteredPlans} columns={visibleExportColumns} filename="Production_Plan" title="Production Plan Report" />

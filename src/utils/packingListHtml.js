@@ -399,6 +399,8 @@ export const renderPackingListPdf = async (data, { mode = 'save', printPrefs } =
     mode,
     filePrefix: 'PL',
     docNo: data.plNo || 'N/A',
+    partyName: data.partyName || '',
+    data,
     fitPage: true,
     splitOverflowPages: true,
     printPrefs

@@ -298,8 +298,10 @@ export const renderPaymentFollowUpStatementPdf = async ({
   );
   await renderHtmlToPdf(html, {
     mode,
-    filePrefix: 'Payment_FollowUp',
-    docNo: (customer?.partyName || 'Statement').replace(/[^\w\-]+/g, '_').slice(0, 40),
+    filePrefix: 'PFU',
+    docNo: customer?.partyName || 'Statement',
+    partyName: customer?.partyName || customer?.name || '',
+    data: { partyName: customer?.partyName || customer?.name || '', invoiceNo: '01' },
     width: 794,
     fitPage: true,
     splitOverflowPages: true,

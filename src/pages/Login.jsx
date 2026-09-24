@@ -134,14 +134,20 @@ const Login = () => {
           </button>
         </form>
 
-        <p style={{
+        <div style={{
           marginTop: '1.5rem',
           textAlign: 'center',
           fontSize: '0.75rem',
-          color: 'var(--text-muted)'
+          color: 'var(--text-muted)',
+          lineHeight: 1.6
         }}>
-          Default admin: <strong style={{ color: 'var(--text-main)' }}>admin</strong> / <strong style={{ color: 'var(--text-main)' }}>admin123</strong>
-        </p>
+          <p style={{ margin: 0 }}>
+            Admin: <strong style={{ color: 'var(--text-main)' }}>admin</strong> / <strong style={{ color: 'var(--text-main)' }}>admin123</strong>
+          </p>
+          <p style={{ margin: '0.25rem 0 0' }}>
+            Staff: <strong style={{ color: 'var(--text-main)' }}>staff1</strong> / <strong style={{ color: 'var(--text-main)' }}>staff123</strong>
+          </p>
+        </div>
       </div>
     </div>
   );

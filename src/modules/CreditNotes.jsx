@@ -6,6 +6,7 @@ import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import DateField from '../components/DateField';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+import StatusTabBar from '../components/StatusTabBar';
 import {
   STANDARD_CHARGES_LIST,
   OTHER_CHARGE_ITEM,
@@ -65,6 +66,7 @@ const CreditNotes = () => {
   const [isEditing, setIsEditing] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('pending');
 
   const [form, setForm] = useState({
     noteNo: '',
@@ -222,7 +224,12 @@ const CreditNotes = () => {
 
   const notesList = (data.creditNotes || []).filter(n => !n.isDeleted);
   const partyOptions = useMemo(() => uniqueSortedOptions(notesList.map((n) => n.partyName)), [notesList]);
+  const isNotePending = (n) => !String(n.refInvoice || n.invoiceNo || '').trim();
+  const pendingCount = notesList.filter(isNotePending).length;
+  const completedCount = notesList.filter((n) => !isNotePending(n)).length;
   const filtered = notesList.filter((n) => {
+    if (statusTab === 'pending' && !isNotePending(n)) return false;
+    if (statusTab === 'completed' && isNotePending(n)) return false;
     if (partyFilter && (n.partyName || '') !== partyFilter) return false;
     if (!searchTerm) return true;
     const q = searchTerm.toLowerCase();
@@ -243,6 +250,14 @@ const CreditNotes = () => {
           <Plus size={18} /> Add Credit Note
         </button>
       </header>
+
+      <StatusTabBar
+        value={statusTab}
+        onChange={setStatusTab}
+        allCount={notesList.length}
+        pendingCount={pendingCount}
+        completedCount={completedCount}
+      />
 
       <ListFilterBar
         searchTerm={searchTerm}

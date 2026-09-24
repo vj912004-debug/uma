@@ -59,6 +59,20 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(false);
   }, [sessionUserId, currentUser]);
 
+  // Keep data.currentUser in sync when admin updates the logged-in user's permissions
+  useEffect(() => {
+    if (!currentUser) return;
+    const snap = data.currentUser;
+    const perms = currentUser.permissions || [];
+    const same =
+      snap &&
+      snap.id === currentUser.id &&
+      snap.role === currentUser.role &&
+      snap.username === currentUser.username &&
+      JSON.stringify(snap.permissions || []) === JSON.stringify(perms);
+    if (!same) syncUserToApp(currentUser);
+  }, [currentUser, data.currentUser, syncUserToApp]);
+
   const loginLocal = async (username, password) => {
     const normalized = username.trim().toLowerCase();
     const user = data.users?.find(
@@ -69,7 +83,7 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error: 'Invalid username or password.' };
     }
 
-    if (!user.passwordHash) {
+    if (!user.passwordHash || String(user.passwordHash).startsWith('000000000000')) {
       return { success: false, error: 'No login credentials set. Contact your administrator.' };
     }
 

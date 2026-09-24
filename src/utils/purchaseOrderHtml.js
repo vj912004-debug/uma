@@ -770,6 +770,8 @@ export const renderPurchaseOrderPdf = async (data, { mode = 'save', printPrefs }
     printPrefs,
     filePrefix: 'PO',
     docNo: data.poNo || 'N/A',
+    partyName: data.partyName || '',
+    data,
     width: 794,
     fitPage: true,
     splitOverflowPages: true

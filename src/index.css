@@ -4302,3 +4302,299 @@ tbody tr:hover td {
 @media print {
   .no-print { display: none !important; }
 }
+
+/* ── Employee Salary Management (eSSL) ── */
+.esm-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.esm-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.esm-flow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(91, 28, 133, 0.08), rgba(91, 28, 133, 0.02));
+  border: 1px solid rgba(91, 28, 133, 0.15);
+  color: #5b1c85;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.esm-tabs {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.esm-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg, #fff);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.esm-tab.is-active {
+  background: #5b1c85;
+  border-color: #5b1c85;
+  color: #fff;
+}
+.esm-grid-2 {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+.esm-card { padding: 0; overflow: hidden; }
+.esm-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(91, 28, 133, 0.04);
+  flex-wrap: wrap;
+}
+.esm-card-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #5b1c85;
+}
+.esm-card-head p {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.esm-card-body { padding: 1rem 1.15rem 1.25rem; }
+.esm-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #5b1c85;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.esm-toolbar {
+  display: flex;
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+}
+.esm-chip {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(91, 28, 133, 0.1);
+  color: #5b1c85;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.esm-rate-form {
+  margin-top: 1.15rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border-color);
+}
+.esm-subhead {
+  margin: 0 0 0.75rem;
+  font-size: 0.92rem;
+  font-weight: 750;
+  color: #5b1c85;
+}
+.esm-note {
+  margin: 0.65rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.esm-essl-status {
+  display: grid;
+  grid-template-columns: 1.4fr auto auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  margin-bottom: 1rem;
+}
+.esm-conn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.esm-conn.is-on { color: #15803d; }
+.esm-conn.is-off { color: #b91c1c; }
+.esm-conn strong { display: block; font-size: 0.95rem; }
+.esm-conn p { margin: 0.15rem 0 0; font-size: 0.78rem; color: var(--text-muted); }
+.esm-essl-meta span {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.esm-essl-meta strong { font-size: 0.85rem; }
+.esm-essl-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.esm-spin { animation: esm-spin 0.8s linear infinite; }
+@keyframes esm-spin { to { transform: rotate(360deg); } }
+.esm-att-layout {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 1rem;
+  align-items: start;
+}
+.esm-att-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+.esm-day-summary {
+  padding: 1rem;
+  position: sticky;
+  top: 0.5rem;
+}
+.esm-day-summary h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #5b1c85;
+}
+.esm-day-label {
+  margin: 0.25rem 0 0.85rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.esm-day-summary ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.esm-day-summary li {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.82rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  background: rgba(91, 28, 133, 0.04);
+}
+.esm-day-summary li svg { color: #5b1c85; }
+.esm-day-summary strong { font-weight: 800; color: #5b1c85; }
+.esm-auto-rates {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+.esm-auto-rates > div {
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(91, 28, 133, 0.06);
+  border: 1px solid rgba(91, 28, 133, 0.12);
+}
+.esm-auto-rates span {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.esm-auto-rates strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.95rem;
+  color: #5b1c85;
+}
+.esm-breakdown {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: #f8f5fb;
+  border: 1px solid rgba(91, 28, 133, 0.12);
+  font-size: 0.85rem;
+}
+.esm-breakdown p { margin: 0.35rem 0; }
+.esm-breakdown .esm-total {
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(91, 28, 133, 0.15);
+  color: #5b1c85;
+  font-size: 0.95rem;
+}
+.esm-benefits {
+  margin-top: 1.25rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: rgba(91, 28, 133, 0.04);
+}
+.esm-benefits h3 {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #5b1c85;
+  font-size: 0.95rem;
+}
+.esm-benefits ol {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text-main);
+}
+.esm-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+}
+.esm-checks li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #166534;
+  font-weight: 600;
+}
+@media (max-width: 1100px) {
+  .esm-grid-2,
+  .esm-att-layout,
+  .esm-benefits,
+  .esm-auto-rates,
+  .esm-essl-status {
+    grid-template-columns: 1fr;
+  }
+}

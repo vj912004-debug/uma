@@ -2,6 +2,7 @@ import { mergeCompanyProfile } from './companyProfile';
 import { formatPdfDateSlash } from './taxInvoiceLayout';
 import { escHtml, buildPrintBrandHtml, applyPrintPrefsToHtml, layoutFillOtherPrintPages, buildStatusBar, PRINT_FOOTER_MESSAGES } from './printTheme';
 import { PRINT_ROOT_CLASS } from './printPrefs';
+import { buildPdfDownloadFileName } from './pdfFileName';
 
 const hasWeight = (row = {}) => {
   const vals = [row.gross, row.tare, row.net];
@@ -888,22 +889,22 @@ export const buildBprHtml = (data, profileInput) => {
   .barfoot span{white-space:normal;letter-spacing:0.01px;word-spacing:0.02em;line-height:1.2;}
   .barfoot span:last-child{white-space:nowrap;flex-shrink:0;}
   .page-p2 .signs{
-    display:flex;border:1px solid #7c12bd;margin:8px 0 0 0;border-radius:4px;overflow:hidden;
-    flex:0 0 32px;width:250px;max-width:34%;height:32px;min-height:32px;max-height:32px;
+    display:flex;border:1.5px solid #7c12bd;margin:10px 0 0 0;border-radius:4px;overflow:hidden;
+    flex:0 0 56px;width:420px;max-width:58%;height:56px;min-height:56px;max-height:56px;
     box-sizing:border-box;align-self:flex-start;
   }
-  .page-p2 .sign{flex:1;padding:4px 10px;min-height:0;height:32px;max-height:32px;display:flex;align-items:center;gap:6px;font-size:12px;line-height:1;font-weight:700;color:#4a0080;box-sizing:border-box;}
-  .page-p2 .sign svg{width:14px;height:14px;flex-shrink:0;}
-  .page-p2 .sign .line{flex:1;border-bottom:1px solid #777;margin-left:4px;min-height:0;height:1px;align-self:center;}
+  .page-p2 .sign{flex:1;padding:10px 14px;min-height:0;height:56px;max-height:56px;display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.2;font-weight:700;color:#4a0080;box-sizing:border-box;}
+  .page-p2 .sign svg{width:18px;height:18px;flex-shrink:0;}
+  .page-p2 .sign .line{flex:1;border-bottom:1.5px solid #777;margin-left:6px;min-height:0;height:1px;align-self:center;}
   .signs{
-    display:flex;border:1px solid #7c12bd;margin:0;border-radius:4px;overflow:hidden;
-    flex:0 0 32px;width:250px;max-width:34%;height:32px;min-height:32px;max-height:32px;
+    display:flex;border:1.5px solid #7c12bd;margin:0;border-radius:4px;overflow:hidden;
+    flex:0 0 56px;width:420px;max-width:58%;height:56px;min-height:56px;max-height:56px;
     box-sizing:border-box;align-self:flex-start;
   }
-  .sign{flex:1;padding:4px 10px;min-height:0;height:32px;max-height:32px;display:flex;align-items:center;gap:6px;font-size:12px;line-height:1;font-weight:700;color:#4a0080;box-sizing:border-box;}
+  .sign{flex:1;padding:10px 14px;min-height:0;height:56px;max-height:56px;display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.2;font-weight:700;color:#4a0080;box-sizing:border-box;}
   .sign + .sign{border-left:1px solid #7c12bd;}
-  .sign svg{width:14px;height:14px;flex-shrink:0;}
-  .sign .line{flex:1;border-bottom:1px solid #777;margin-left:4px;min-height:0;height:1px;align-self:center;}
+  .sign svg{width:18px;height:18px;flex-shrink:0;}
+  .sign .line{flex:1;border-bottom:1.5px solid #777;margin-left:6px;min-height:0;height:1px;align-self:center;}
   .page-p2 .sheet{height:100%;}
 </style>
 </head>
@@ -969,6 +970,422 @@ export const buildBprHtml = (data, profileInput) => {
 
 </body>
 </html>`;
+};
+
+/**
+ * When drum/weight rows overflow one A4 packing page, move the overflow onto
+ * continuation page-p2 sheets (header + table thead repeated). Summary + supervisor
+ * sign stay on the last packing page. Updates "Page X of Y" footers.
+ *
+ * Important: do NOT trust scrollHeight while the page is locked to A4 with
+ * overflow:hidden — child .sheet clipping makes scrollHeight look like it fits
+ * even when rows are cut in half. Always measure natural (unlocked) height.
+ */
+const paginateBprWeightPages = (idoc, a4H = 1123) => {
+  const firstP2 = idoc.querySelector('.page.page-p2');
+  if (!firstP2) return;
+
+  const tbody = firstP2.querySelector('table.items tbody');
+  if (!tbody) return;
+
+  /** Leave breathing room so the last row is never flush-cut by html2canvas. */
+  const FIT_BUDGET = a4H - 24;
+
+  const unlockNatural = (pageEl) => {
+    if (!pageEl) return;
+    const sheet = pageEl.querySelector('.sheet');
+    const wrap = pageEl.querySelector('.table-wrap');
+    pageEl.style.height = 'auto';
+    pageEl.style.minHeight = '0';
+    pageEl.style.maxHeight = 'none';
+    pageEl.style.overflow = 'visible';
+    if (sheet) {
+      sheet.style.height = 'auto';
+      sheet.style.maxHeight = 'none';
+      sheet.style.minHeight = '0';
+      sheet.style.overflow = 'visible';
+      sheet.style.flex = '0 0 auto';
+    }
+    if (wrap) {
+      wrap.style.flex = '0 0 auto';
+      wrap.style.overflow = 'visible';
+      wrap.style.maxHeight = 'none';
+      wrap.style.minHeight = '0';
+    }
+    void pageEl.offsetHeight;
+  };
+
+  const naturalHeight = (pageEl) => {
+    unlockNatural(pageEl);
+    const sheet = pageEl.querySelector('.sheet');
+    return Math.ceil(Math.max(
+      pageEl.scrollHeight || 0,
+      pageEl.offsetHeight || 0,
+      sheet?.scrollHeight || 0,
+      sheet?.offsetHeight || 0
+    ));
+  };
+
+  const pageFits = (pageEl) => naturalHeight(pageEl) <= FIT_BUDGET;
+
+  const lockPage = (pageEl) => {
+    if (!pageEl) return;
+    const sheet = pageEl.querySelector('.sheet');
+    const wrap = pageEl.querySelector('.table-wrap');
+    pageEl.style.height = `${a4H}px`;
+    pageEl.style.minHeight = `${a4H}px`;
+    pageEl.style.maxHeight = `${a4H}px`;
+    pageEl.style.overflow = 'hidden';
+    pageEl.style.boxSizing = 'border-box';
+    if (sheet) {
+      sheet.style.height = '100%';
+      sheet.style.maxHeight = '100%';
+      sheet.style.minHeight = '0';
+      sheet.style.overflow = 'hidden';
+      sheet.style.flex = '1 1 auto';
+    }
+    if (wrap) {
+      wrap.style.flex = '0 0 auto';
+      wrap.style.overflow = 'visible';
+      wrap.style.maxHeight = 'none';
+    }
+    void pageEl.offsetHeight;
+  };
+
+  // Start unlocked so we can detect real overflow
+  unlockNatural(firstP2);
+  if (pageFits(firstP2)) {
+    lockPage(firstP2);
+    return;
+  }
+
+  // Overflowing — drop handwriting fillers and split real drum rows across pages
+  tbody.querySelectorAll('tr.filler-row').forEach((r) => r.remove());
+  unlockNatural(firstP2);
+  if (pageFits(firstP2)) {
+    lockPage(firstP2);
+    return;
+  }
+
+  const allRows = [...tbody.querySelectorAll('tr')];
+  const summaryRows = allRows.filter((r) => r.classList.contains('summary-row'));
+  const packingRows = allRows.filter((r) => !r.classList.contains('summary-row'));
+  tbody.innerHTML = '';
+
+  const signsHtml = firstP2.querySelector('.signs')?.outerHTML || '';
+  const cloneContinuation = (afterEl) => {
+    const clone = firstP2.cloneNode(true);
+    const ct = clone.querySelector('table.items tbody');
+    if (ct) ct.innerHTML = '';
+    clone.querySelector('.signs')?.remove();
+    afterEl.after(clone);
+    unlockNatural(clone);
+    return { page: clone, tbody: ct };
+  };
+
+  let currentPage = firstP2;
+  let currentTbody = tbody;
+  firstP2.querySelector('.signs')?.remove();
+
+  const tryAppend = (row) => {
+    currentTbody.appendChild(row);
+    if (pageFits(currentPage)) return true;
+    currentTbody.removeChild(row);
+    return false;
+  };
+
+  packingRows.forEach((row) => {
+    if (tryAppend(row)) return;
+    if (!currentTbody.children.length) {
+      // Single row taller than budget — still place it (avoid infinite empty pages)
+      currentTbody.appendChild(row);
+      return;
+    }
+    // Keep batch-total with its last drum when possible
+    if (row.classList.contains('batch-total-row') && currentTbody.children.length) {
+      const last = currentTbody.lastElementChild;
+      if (last && !last.classList.contains('batch-total-row') && !last.classList.contains('lump-row')) {
+        currentTbody.removeChild(last);
+        const next = cloneContinuation(currentPage);
+        currentPage = next.page;
+        currentTbody = next.tbody;
+        currentTbody.appendChild(last);
+        currentTbody.appendChild(row);
+        if (!pageFits(currentPage) && currentTbody.children.length > 1) {
+          // Oversized pair — leave together on this sheet
+        }
+        return;
+      }
+    }
+    const next = cloneContinuation(currentPage);
+    currentPage = next.page;
+    currentTbody = next.tbody;
+    currentTbody.appendChild(row);
+  });
+
+  summaryRows.forEach((row) => currentTbody.appendChild(row));
+
+  const attachSigns = (pageEl) => {
+    if (!signsHtml) return;
+    pageEl.querySelector('.signs')?.remove();
+    const wrap = idoc.createElement('div');
+    wrap.innerHTML = signsHtml;
+    const signsEl = wrap.firstElementChild;
+    if (!signsEl) return;
+    const barfoot = pageEl.querySelector('.barfoot');
+    if (barfoot) pageEl.querySelector('.sheet')?.insertBefore(signsEl, barfoot);
+    else pageEl.querySelector('.sheet')?.appendChild(signsEl);
+  };
+
+  attachSigns(currentPage);
+
+  // If summary + sign push past A4, peel packing rows / move footer block to next sheet(s)
+  let peelGuard = 0;
+  while (!pageFits(currentPage) && peelGuard < 80) {
+    peelGuard += 1;
+    const kids = [...currentTbody.children];
+    const packingOnPage = kids.filter((r) => !r.classList.contains('summary-row'));
+    const summariesOnPage = kids.filter((r) => r.classList.contains('summary-row'));
+
+    if (packingOnPage.length === 0) {
+      // Only summary/signs — cannot peel further
+      break;
+    }
+
+    // Prefer moving summary+signs alone onto a new page when packing still fits without them
+    if (summariesOnPage.length) {
+      summariesOnPage.forEach((r) => r.remove());
+      currentPage.querySelector('.signs')?.remove();
+      if (pageFits(currentPage)) {
+        const next = cloneContinuation(currentPage);
+        currentPage = next.page;
+        currentTbody = next.tbody;
+        summariesOnPage.forEach((r) => currentTbody.appendChild(r));
+        attachSigns(currentPage);
+        continue;
+      }
+      // Packing alone still overflows — restore summaries and peel last packing row
+      summariesOnPage.forEach((r) => currentTbody.appendChild(r));
+      attachSigns(currentPage);
+    }
+
+    const lastPack = packingOnPage[packingOnPage.length - 1];
+    if (!lastPack) break;
+    // Keep total with preceding drum when peeling
+    const toMove = [lastPack];
+    if (
+      lastPack.classList.contains('batch-total-row')
+      && packingOnPage.length >= 2
+    ) {
+      const prev = packingOnPage[packingOnPage.length - 2];
+      if (prev && !prev.classList.contains('batch-total-row')) {
+        toMove.unshift(prev);
+      }
+    }
+    toMove.forEach((r) => r.remove());
+    currentPage.querySelector('.signs')?.remove();
+    summariesOnPage.forEach((r) => r.remove());
+
+    const next = cloneContinuation(currentPage);
+    currentPage = next.page;
+    currentTbody = next.tbody;
+    toMove.forEach((r) => currentTbody.appendChild(r));
+    summariesOnPage.forEach((r) => currentTbody.appendChild(r));
+    attachSigns(currentPage);
+  }
+
+  const p2Pages = [...idoc.querySelectorAll('.page.page-p2')];
+  p2Pages.forEach((p) => lockPage(p));
+
+  const totalPages = 1 + p2Pages.length;
+  const p1 = idoc.querySelector('.page-p1');
+  const setPageLabel = (pageEl, label) => {
+    const spans = pageEl?.querySelectorAll('.barfoot > span');
+    if (!spans?.length) return;
+    spans[spans.length - 1].textContent = label;
+  };
+  setPageLabel(p1, `Page 1 of ${totalPages}`);
+  p2Pages.forEach((p, idx) => setPageLabel(p, `Page ${idx + 2} of ${totalPages}`));
+};
+
+/**
+ * After filler-row padding, re-check each packing page and push overflowing
+ * drum rows onto a new continuation sheet (never clip mid-row).
+ */
+const ensureBprP2PagesFit = (idoc, a4H = 1123) => {
+  const FIT_BUDGET = a4H - 24;
+
+  const unlockNatural = (pageEl) => {
+    const sheet = pageEl.querySelector('.sheet');
+    const wrap = pageEl.querySelector('.table-wrap');
+    pageEl.style.height = 'auto';
+    pageEl.style.minHeight = '0';
+    pageEl.style.maxHeight = 'none';
+    pageEl.style.overflow = 'visible';
+    if (sheet) {
+      sheet.style.height = 'auto';
+      sheet.style.maxHeight = 'none';
+      sheet.style.overflow = 'visible';
+      sheet.style.flex = '0 0 auto';
+    }
+    if (wrap) {
+      wrap.style.flex = '0 0 auto';
+      wrap.style.overflow = 'visible';
+      wrap.style.maxHeight = 'none';
+    }
+    void pageEl.offsetHeight;
+  };
+
+  const naturalHeight = (pageEl) => {
+    unlockNatural(pageEl);
+    const sheet = pageEl.querySelector('.sheet');
+    return Math.ceil(Math.max(
+      pageEl.scrollHeight || 0,
+      pageEl.offsetHeight || 0,
+      sheet?.scrollHeight || 0,
+      sheet?.offsetHeight || 0
+    ));
+  };
+
+  const lockPage = (pageEl) => {
+    pageEl.style.height = `${a4H}px`;
+    pageEl.style.minHeight = `${a4H}px`;
+    pageEl.style.maxHeight = `${a4H}px`;
+    pageEl.style.overflow = 'hidden';
+    const sheet = pageEl.querySelector('.sheet');
+    if (sheet) {
+      sheet.style.height = '100%';
+      sheet.style.maxHeight = '100%';
+      sheet.style.overflow = 'hidden';
+      sheet.style.flex = '1 1 auto';
+    }
+  };
+
+  let pages = [...idoc.querySelectorAll('.page.page-p2')];
+  let i = 0;
+  while (i < pages.length) {
+    const page = pages[i];
+    const tbody = page.querySelector('table.items tbody');
+    if (!tbody) {
+      lockPage(page);
+      i += 1;
+      continue;
+    }
+
+    // Prefer dropping fillers first
+    let guard = 0;
+    while (naturalHeight(page) > FIT_BUDGET && guard < 60) {
+      const fillers = tbody.querySelectorAll('tr.filler-row');
+      if (!fillers.length) break;
+      fillers[fillers.length - 1].remove();
+      guard += 1;
+    }
+
+    if (naturalHeight(page) <= FIT_BUDGET) {
+      lockPage(page);
+      i += 1;
+      continue;
+    }
+
+    // Move overflow packing rows (keep summary+signs on last sheet of this split)
+    const rows = [...tbody.querySelectorAll('tr')];
+    const summaryRows = rows.filter((r) => r.classList.contains('summary-row'));
+    const packingRows = rows.filter(
+      (r) => !r.classList.contains('summary-row') && !r.classList.contains('filler-row')
+    );
+
+    const signsHtml = page.querySelector('.signs')?.outerHTML || '';
+    const makeClone = () => {
+      const clone = page.cloneNode(true);
+      const ct = clone.querySelector('table.items tbody');
+      if (ct) ct.innerHTML = '';
+      clone.querySelector('.signs')?.remove();
+      page.after(clone);
+      return { clone, ct };
+    };
+    const attachSignsTo = (pageEl) => {
+      if (!signsHtml) return;
+      pageEl.querySelector('.signs')?.remove();
+      const wrap = idoc.createElement('div');
+      wrap.innerHTML = signsHtml;
+      const signsEl = wrap.firstElementChild;
+      if (!signsEl) return;
+      const barfoot = pageEl.querySelector('.barfoot');
+      if (barfoot) pageEl.querySelector('.sheet')?.insertBefore(signsEl, barfoot);
+      else pageEl.querySelector('.sheet')?.appendChild(signsEl);
+    };
+
+    // Only summary/signs overflowing — put them on a fresh sheet
+    if (packingRows.length <= 1 && summaryRows.length) {
+      page.querySelector('.signs')?.remove();
+      summaryRows.forEach((r) => r.remove());
+      tbody.querySelectorAll('tr.filler-row').forEach((r) => r.remove());
+      if (naturalHeight(page) <= FIT_BUDGET) {
+        const { clone, ct } = makeClone();
+        summaryRows.forEach((r) => ct.appendChild(r));
+        attachSignsTo(clone);
+        pages = [...idoc.querySelectorAll('.page.page-p2')];
+        lockPage(page);
+        i += 1;
+        continue;
+      }
+      // restore and lock — cannot split further
+      summaryRows.forEach((r) => tbody.appendChild(r));
+      attachSignsTo(page);
+      lockPage(page);
+      i += 1;
+      continue;
+    }
+
+    if (packingRows.length <= 1) {
+      lockPage(page);
+      i += 1;
+      continue;
+    }
+
+    page.querySelector('.signs')?.remove();
+    summaryRows.forEach((r) => r.remove());
+    tbody.querySelectorAll('tr.filler-row').forEach((r) => r.remove());
+
+    // Keep as many packing rows as fit, move the rest
+    const move = [...packingRows];
+    tbody.innerHTML = '';
+    while (move.length) {
+      const next = move[0];
+      tbody.appendChild(next);
+      if (naturalHeight(page) <= FIT_BUDGET) {
+        move.shift();
+      } else {
+        tbody.removeChild(next);
+        break;
+      }
+    }
+    if (!tbody.children.length && move.length) {
+      // At least one row must stay
+      tbody.appendChild(move.shift());
+    }
+
+    const { clone, ct } = makeClone();
+    move.forEach((r) => ct.appendChild(r));
+    summaryRows.forEach((r) => ct.appendChild(r));
+    attachSignsTo(clone);
+
+    pages = [...idoc.querySelectorAll('.page.page-p2')];
+    lockPage(page);
+    i += 1;
+  }
+
+  pages = [...idoc.querySelectorAll('.page.page-p2')];
+  pages.forEach((p) => lockPage(p));
+  const totalPages = 1 + pages.length;
+  const p1 = idoc.querySelector('.page-p1');
+  const setPageLabel = (pageEl, label) => {
+    const spans = pageEl?.querySelectorAll('.barfoot > span');
+    if (!spans?.length) return;
+    spans[spans.length - 1].textContent = label;
+  };
+  setPageLabel(p1, `Page 1 of ${totalPages}`);
+  pages.forEach((p, idx) => setPageLabel(p, `Page ${idx + 2} of ${totalPages}`));
 };
 
 /**
@@ -1185,8 +1602,17 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
   if (idoc.body) idoc.body.classList.add(PRINT_ROOT_CLASS);
 
   const fileBase = printData._blankSheet
-    ? `BPR_Blank`
-    : `BPR_${printData.bprNo || data.bprNo || 'N/A'}`;
+    ? buildPdfDownloadFileName({
+      filePrefix: 'BPR',
+      docNo: '01',
+      partyName: printData.partyName || data.partyName || 'Blank'
+    }).replace(/\.pdf$/i, '')
+    : buildPdfDownloadFileName({
+      filePrefix: 'BPR',
+      docNo: printData.bprNo || data.bprNo || 'N/A',
+      partyName: printData.partyName || data.partyName || '',
+      data: printData
+    }).replace(/\.pdf$/i, '');
   try {
     await new Promise((r) => {
       if (idoc.readyState === 'complete') {
@@ -1198,8 +1624,21 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
     await new Promise((r) => setTimeout(r, 50));
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageNodes = [...idoc.querySelectorAll('.page')];
     const a4H = 1123;
+    // Auto-split packing drums onto extra A4 sheets when the table overflows
+    paginateBprWeightPages(idoc, a4H);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    // Light blank-row fill only — then re-split if fillers / layout pushed past A4
+    try {
+      layoutFillOtherPrintPages(idoc, a4H);
+    } catch {
+      /* ignore fill errors */
+    }
+    ensureBprP2PagesFit(idoc, a4H);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    const pageNodes = [...idoc.querySelectorAll('.page')];
     const addCanvasPages = (canvas) => {
       // Slice overflow at exact A4 height — using 2×A4 previously left a near-blank extra sheet.
       const pageHpx = a4H * 2; // html2canvas scale:2 → 1123 CSS px = 2246 canvas px
@@ -1235,37 +1674,22 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       }
       if (isP2) {
-        layoutFillOtherPrintPages(idoc, a4H);
+        // Packing pages are already paginated to A4 — keep each sheet fixed height
+        target.style.height = `${a4H}px`;
+        target.style.minHeight = `${a4H}px`;
+        target.style.maxHeight = `${a4H}px`;
+        target.style.overflow = 'hidden';
+        const sheet = target.querySelector('.sheet');
+        if (sheet) {
+          sheet.style.height = '100%';
+          sheet.style.maxHeight = '100%';
+          sheet.style.overflow = 'hidden';
+        }
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-        // Drop leftover fillers that still push past A4 after fit pass
-        const tbody = target.querySelector('table.items tbody');
-        let guard = 0;
-        while ((target.scrollHeight || 0) > a4H + 6 && tbody && guard < 60) {
-          const fillers = tbody.querySelectorAll('tr.filler-row');
-          if (!fillers.length) break;
-          fillers[fillers.length - 1].remove();
-          guard += 1;
-        }
-        const p2Overflows = (target.scrollHeight || 0) > a4H + 8;
-        if (p2Overflows) {
-          target.style.height = 'auto';
-          target.style.minHeight = `${a4H}px`;
-          target.style.maxHeight = 'none';
-          target.style.overflow = 'visible';
-        } else {
-          // Keep a clean single A4 packing page — no phantom third sheet
-          target.style.height = `${a4H}px`;
-          target.style.minHeight = `${a4H}px`;
-          target.style.maxHeight = `${a4H}px`;
-          target.style.overflow = 'hidden';
-        }
       }
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const captureH = isP2
-        ? Math.max(a4H, target.scrollHeight || 0, target.offsetHeight || 0)
-        : a4H;
-      // Ignore tiny overflow (borders/subpixel) so we don't emit a blank continuation page
-      const captureHSafe = isP2 && captureH <= a4H + 12 ? a4H : captureH;
+      const captureH = a4H;
+      const captureHSafe = a4H;
       const canvas = await html2canvas(target, {
         scale: 2,
         useCORS: true,
@@ -1280,27 +1704,18 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             const p2 = el.classList.contains('page-p2');
             const existingTransform = el.style.transform;
             const existingWidth = el.style.width;
-            if (p2 && captureHSafe > a4H) {
-              el.style.height = `${captureHSafe}px`;
-              el.style.minHeight = `${captureHSafe}px`;
-              el.style.maxHeight = 'none';
-              el.style.overflow = 'visible';
-              el.style.padding = '8px';
-              el.style.transform = 'none';
+            el.style.height = '1123px';
+            el.style.minHeight = '1123px';
+            el.style.maxHeight = '1123px';
+            el.style.overflow = 'hidden';
+            el.style.padding = p2 ? '8px' : '8px 8px 14px 8px';
+            if (!p2 && existingTransform && existingTransform !== 'none') {
+              el.style.transform = existingTransform;
+              el.style.transformOrigin = 'top left';
+              if (existingWidth) el.style.width = existingWidth;
             } else {
-              el.style.height = '1123px';
-              el.style.minHeight = '1123px';
-              el.style.maxHeight = '1123px';
-              el.style.overflow = 'hidden';
-              el.style.padding = p2 ? '8px' : '8px 8px 14px 8px';
-              if (!p2 && existingTransform && existingTransform !== 'none') {
-                el.style.transform = existingTransform;
-                el.style.transformOrigin = 'top left';
-                if (existingWidth) el.style.width = existingWidth;
-              } else {
-                el.style.transform = 'none';
-                el.style.width = '794px';
-              }
+              el.style.transform = 'none';
+              el.style.width = '794px';
             }
             el.style.display = 'flex';
             el.style.flexDirection = 'column';
@@ -1489,25 +1904,34 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.whiteSpace = 'nowrap';
           });
           clonedDoc.querySelectorAll('.page-p2 .signs').forEach((el) => {
-            el.style.setProperty('margin', '8px 0 0 0', 'important');
-            el.style.setProperty('flex', '0 0 32px', 'important');
-            el.style.setProperty('width', '250px', 'important');
-            el.style.setProperty('max-width', '34%', 'important');
-            el.style.setProperty('height', '32px', 'important');
-            el.style.setProperty('min-height', '32px', 'important');
-            el.style.setProperty('max-height', '32px', 'important');
+            el.style.setProperty('margin', '10px 0 0 0', 'important');
+            el.style.setProperty('flex', '0 0 56px', 'important');
+            el.style.setProperty('width', '420px', 'important');
+            el.style.setProperty('max-width', '58%', 'important');
+            el.style.setProperty('height', '56px', 'important');
+            el.style.setProperty('min-height', '56px', 'important');
+            el.style.setProperty('max-height', '56px', 'important');
             el.style.setProperty('align-self', 'flex-start', 'important');
             el.style.setProperty('overflow', 'hidden', 'important');
             el.style.boxSizing = 'border-box';
           });
           clonedDoc.querySelectorAll('.page-p2 .sign').forEach((el) => {
-            el.style.setProperty('padding', '4px 10px', 'important');
-            el.style.setProperty('height', '32px', 'important');
+            el.style.setProperty('padding', '10px 14px', 'important');
+            el.style.setProperty('height', '56px', 'important');
             el.style.setProperty('min-height', '0', 'important');
-            el.style.setProperty('max-height', '32px', 'important');
-            el.style.setProperty('line-height', '1', 'important');
+            el.style.setProperty('max-height', '56px', 'important');
+            el.style.setProperty('line-height', '1.2', 'important');
+            el.style.setProperty('font-size', '14px', 'important');
             el.style.alignItems = 'center';
             el.style.boxSizing = 'border-box';
+          });
+          clonedDoc.querySelectorAll('.page-p2 .sign svg').forEach((el) => {
+            el.style.width = '18px';
+            el.style.height = '18px';
+          });
+          clonedDoc.querySelectorAll('.page-p2 .sign .line').forEach((el) => {
+            el.style.setProperty('border-bottom-width', '1.5px', 'important');
+            el.style.marginLeft = '6px';
           });
           clonedDoc.querySelectorAll('.page.page-p2 .barfoot').forEach((el) => {
             el.style.margin = 'auto -10px -10px -10px';

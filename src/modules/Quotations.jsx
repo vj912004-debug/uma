@@ -6,6 +6,7 @@ import { exportToPDF, viewPDF } from '../utils/pdfExport';
 import { formatDate } from '../utils/dateUtils';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
 import {
   RATE_UNIT_OPTIONS,
@@ -351,6 +352,7 @@ const Quotations = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('pending');
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [pendingEditData, setPendingEditData] = useState(null);
   
@@ -755,7 +757,25 @@ const Quotations = () => {
 
   const partyOptions = useMemo(() => uniqueSortedOptions(quotationsList.map((q) => q.partyName)), [quotationsList]);
   const productOptions = useMemo(() => uniqueSortedOptions(quotationsList.map((q) => q.productName)), [quotationsList]);
+
+  const isQuotePending = (q) => {
+    const status = String(q.status || '').trim();
+    if (status) {
+      const s = status.toLowerCase();
+      if (s === 'accepted' || s === 'closed') return false;
+      return true;
+    }
+    if (q.accepted === true || q.converted) return false;
+    return !String(q.partyName || '').trim() || !String(q.productName || '').trim();
+  };
+  const isQuoteCompleted = (q) => !isQuotePending(q);
+
+  const pendingCount = quotationsList.filter(isQuotePending).length;
+  const completedCount = quotationsList.filter(isQuoteCompleted).length;
+
   const filtered = quotationsList.filter((q) => {
+    if (statusTab === 'pending' && !isQuotePending(q)) return false;
+    if (statusTab === 'completed' && !isQuoteCompleted(q)) return false;
     if (partyFilter && (q.partyName || '') !== partyFilter) return false;
     if (productFilter && (q.productName || '') !== productFilter) return false;
     if (!searchTerm) return true;
@@ -784,6 +804,14 @@ const Quotations = () => {
           <Plus size={18} /> New Quotation
         </button>
       </header>
+
+      <StatusTabBar
+        value={statusTab}
+        onChange={setStatusTab}
+        allCount={quotationsList.length}
+        pendingCount={pendingCount}
+        completedCount={completedCount}
+      />
 
       <ListFilterBar
         searchTerm={searchTerm}

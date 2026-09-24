@@ -16,7 +16,7 @@ const PartyDue = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
-  const [statusTab, setStatusTab] = useState('all');
+  const [statusTab, setStatusTab] = useState('pending');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [columnFilters, setColumnFilters] = useState({});
   const fyKeys = useMemo(() => getFYKeysThroughCurrent('21-22'), []);

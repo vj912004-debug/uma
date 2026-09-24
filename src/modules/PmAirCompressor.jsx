@@ -16,6 +16,7 @@ import {
 import { useAppContext } from '../context/AppContext';
 import DateField from '../components/DateField';
 import SearchableSelect from '../components/SearchableSelect';
+import StatusTabBar from '../components/StatusTabBar';
 import { formatDate, getDefaultFiscalYearRange } from '../utils/dateUtils';
 
 const DEFAULT_RANGE = getDefaultFiscalYearRange();
@@ -68,6 +69,7 @@ const PmAirCompressor = () => {
   const [applied, setApplied] = useState(filters);
   const [rangeFrom, setRangeFrom] = useState(DEFAULT_RANGE.rangeFrom);
   const [rangeTo, setRangeTo] = useState(DEFAULT_RANGE.rangeTo);
+  const [statusTab, setStatusTab] = useState('pending');
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -85,7 +87,12 @@ const PmAirCompressor = () => {
     [data.pmAirCompressorRecords]
   );
 
+  const isPmPending = (r) => r.status !== 'Completed';
+  const isPmCompleted = (r) => r.status === 'Completed';
+
   const filtered = useMemo(() => rows.filter((r) => {
+    if (statusTab === 'pending' && !isPmPending(r)) return false;
+    if (statusTab === 'completed' && !isPmCompleted(r)) return false;
     if (!inRange(r.date, rangeFrom, rangeTo)) return false;
     if (applied.dateFrom && r.date < applied.dateFrom) return false;
     if (applied.dateTo && r.date > applied.dateTo) return false;
@@ -94,7 +101,10 @@ const PmAirCompressor = () => {
     if (applied.serialNo && !String(r.serialNo || '').toLowerCase().includes(applied.serialNo.trim().toLowerCase())) return false;
     if (applied.status && r.status !== applied.status) return false;
     return true;
-  }), [rows, applied, rangeFrom, rangeTo]);
+  }), [rows, applied, rangeFrom, rangeTo, statusTab]);
+
+  const pendingCount = rows.filter(isPmPending).length;
+  const completedCount = rows.filter(isPmCompleted).length;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -271,6 +281,14 @@ const PmAirCompressor = () => {
           )}
         </section>
       )}
+
+      <StatusTabBar
+        value={statusTab}
+        onChange={(v) => { setStatusTab(v); setPage(1); }}
+        allCount={rows.length}
+        pendingCount={pendingCount}
+        completedCount={completedCount}
+      />
 
       <section className="premium-card pm-card pm-print-root">
         <h2 className="pm-card-title">Preventive Maintenance Records</h2>

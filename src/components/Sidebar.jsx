@@ -15,6 +15,7 @@ import {
   FileCheck,
   Grid,
   DollarSign,
+  Calculator,
   CreditCard,
   Bell,
   Archive,
@@ -147,8 +148,9 @@ const Sidebar = () => {
         { name: 'Processing Sheet', icon: Grid, path: '/processing-sheet', roles: ['Admin', 'Staff'] },
         { name: 'Tasks', icon: Bell, path: '/tasks', roles: ['Admin', 'Staff'] },
         { name: 'Quotations', icon: PlusSquare, path: '/quotations', roles: ['Admin', 'Staff'] },
+        { name: 'Employee Salary', icon: DollarSign, path: '/employee-salary', roles: ['Admin', 'Staff'], highlight: true },
         { name: 'Attendance', icon: UserCheck, path: '/attendance', roles: ['Admin', 'Staff'] },
-        { name: 'Salary Calculation', icon: DollarSign, path: '/salary-calculation', roles: ['Admin', 'Staff'] }
+        { name: 'Salary Calculation', icon: Calculator, path: '/salary-calculation', roles: ['Admin', 'Staff'] }
       ]
     },
     {

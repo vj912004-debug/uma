@@ -10,7 +10,7 @@ import {
   Search, ArrowRightToLine, Hand
 } from 'lucide-react';
 import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
-import { enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, getLinkedPITermsForTI, applyProformaFinancialsToTaxInvoice, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges, qtyInputValue, rateInputValue } from '../utils/documentCharges';
+import { enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, getLinkedPITermsForTI, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges, qtyInputValue, rateInputValue } from '../utils/documentCharges';
 import {
   getReceiptProductNames,
   getProductBatches,
@@ -217,7 +217,7 @@ const findTI = (data, mrId, productName = '') => {
   return findReceiptDoc(data.invoices, mrId, productName, inv => inv.invoiceNo?.includes('/IN/'));
 };
 
-const UP_SHARED_DOC_TYPES = new Set(['PI', 'PL', 'TI', 'EWTI']);
+const UP_SHARED_DOC_TYPES = new Set(['PI', 'PL', 'TI', 'EWAY', 'EWTI']);
 const upProductKey = (productName = '') => String(productName || '_').trim() || '_';
 
 const isMovedToProcessingSheet = (mr, productName = '') => {
@@ -238,6 +238,17 @@ const getProcessManualDone = (mr, productName = '', type) => {
   return false;
 };
 
+/** Unified E-Way Bill done = DC e-way + TI e-way (or single EWAY / legacy manual flags). */
+const isEwayBillDone = (data, mr, productName = '') => {
+  const m = (type) => getProcessManualDone(mr, productName, type);
+  if (m('EWAY')) return true;
+  const dc = findDC(data, mr.id, productName);
+  const ti = findTI(data, mr.id, productName);
+  const dcOk = (dc && dc.ewayBillNo) || m('EWDC');
+  const tiOk = (ti && ti.ewayBillNo) || m('EWTI');
+  return Boolean(dcOk && tiOk);
+};
+
 const isUnderProcessRowComplete = (data, mr, productName = '') => {
   const pi = findPI(data, mr.id);
   const bpr = findBPR(data, mr.id, productName);
@@ -252,9 +263,8 @@ const isUnderProcessRowComplete = (data, mr, productName = '') => {
     (psd || m('PSD')) &&
     (pl || m('PL')) &&
     (dc || m('DC')) &&
-    ((dc && dc.ewayBillNo) || m('EWDC')) &&
     (ti || m('TI')) &&
-    ((ti && ti.ewayBillNo) || m('EWTI'))
+    isEwayBillDone(data, mr, productName)
   );
 };
 
@@ -367,7 +377,7 @@ const MRProductSummary = ({ mr, party, productOptions = {}, onlyProduct = '' }) 
 const UnderProcess = () => {
   const { data, updateData, updateItem, setData, incrementSerial, deleteItemSoftly } = useAppContext();
   const [activeModal, setActiveModal] = useState(null);
-  const [activeTab, setActiveTab] = useState('All');
+  const [activeTab, setActiveTab] = useState('Pending');
   const [modalContext, setModalContext] = useState(null); // Active M.R. record
   const [editingDoc, setEditingDoc] = useState(null); // If editing an existing doc
   const [showDocPopover, setShowDocPopover] = useState(null); // { cellType, doc, mrId } for blue click
@@ -427,9 +437,10 @@ const UnderProcess = () => {
       if (activeTab === 'PSD') return !(psd || m('PSD'));
       if (activeTab === 'PL') return !(pl || m('PL'));
       if (activeTab === 'DC') return !(dc || m('DC'));
-      if (activeTab === 'EWDC') return !((dc && dc.ewayBillNo) || m('EWDC'));
       if (activeTab === 'TI') return !(ti || m('TI'));
-      if (activeTab === 'EWTI') return !((ti && ti.ewayBillNo) || m('EWTI'));
+      if (activeTab === 'EWAY' || activeTab === 'EWDC' || activeTab === 'EWTI') {
+        return !isEwayBillDone(data, mr, productName);
+      }
       return true;
     })
   ), [processRows, partyFilter, productFilter, searchTerm, activeTab, data]);
@@ -559,16 +570,17 @@ const UnderProcess = () => {
         deleteItemSoftly('packingLists', doc.id);
       } else if (cellType === 'DC') {
         deleteItemSoftly('deliveryChallans', doc.id);
-      } else if (cellType === 'EWDC') {
+      } else if (cellType === 'EWAY' || cellType === 'EWDC' || cellType === 'EWTI') {
         const dc = getDC(mrId, productName);
-        if (dc) {
-          updateItem('deliveryChallans', dc.id, { ...dc, ewayBillNo: '', ewayBillDate: '' });
-        }
-      } else if (cellType === 'EWTI') {
         const ti = getTI(mrId, productName);
+        if (dc) {
+          updateItem('deliveryChallans', dc.id, { ...dc, ewayBillNo: '', ewayBillDate: '', ewayBillPurpose: '' });
+        }
         if (ti) {
           updateItem('invoices', ti.id, { ...ti, ewayBillNo: '', ewayBillDate: '' });
         }
+        const mrRow = data.materialReceipts.find((r) => r.id === mrId);
+        if (mrRow) setManualDoneFlag(mrRow, productName, 'EWAY', false);
       }
       setShowDocPopover(null);
     }
@@ -660,9 +672,8 @@ const UnderProcess = () => {
           { id: 'PSD', label: 'PSD' },
           { id: 'PL', label: 'PL' },
           { id: 'DC', label: 'DC' },
-          { id: 'EWDC', label: 'E-Way DC' },
           { id: 'TI', label: 'Tax Inv' },
-          { id: 'EWTI', label: 'E-Way TI' },
+          { id: 'EWAY', label: 'E-Way Bill' },
           { id: 'Done', label: 'Done' }
         ].map(tab => (
           <button
@@ -728,22 +739,21 @@ const UnderProcess = () => {
               <th className="center">PSD</th>
               <th className="center">Packing List</th>
               <th className="center">DC</th>
-              <th className="center">E-Way DC</th>
               <th className="center">Tax Inv</th>
-              <th className="center">E-Way TI</th>
+              <th className="center">E-Way Bill</th>
               <th className="center">Action</th>
             </tr>
           </thead>
           <tbody>
             {(data.materialReceipts || []).length === 0 ? (
               <tr>
-                <td colSpan="13" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan="12" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                   No material receipts yet. Add one from Material Receipt.
                 </td>
               </tr>
             ) : filteredProcessRows.length === 0 ? (
               <tr>
-                <td colSpan="13" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan="12" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                   No materials match this search or filter.
                 </td>
               </tr>
@@ -796,18 +806,57 @@ const UnderProcess = () => {
                       printDoc: () => viewPDF('DC', dc),
                       disabled: !(pl || getProcessManualDone(mr, productName, 'PL'))
                     })}
-                    {renderDocCell(mr, productName, 'EWDC', dc, {
-                      eway: true,
-                      disabled: !(dc || getProcessManualDone(mr, productName, 'DC'))
-                    })}
                     {renderDocCell(mr, productName, 'TI', ti, {
                       printDoc: () => viewPDF('TI', enrichTIForPrint(ti, data)),
                       disabled: !(pl || getProcessManualDone(mr, productName, 'PL'))
                     })}
-                    {renderDocCell(mr, productName, 'EWTI', ti, {
-                      eway: true,
-                      disabled: !(ti || getProcessManualDone(mr, productName, 'TI'))
-                    })}
+                    {(() => {
+                      const ewayDone = isEwayBillDone(data, mr, productName);
+                      const ewayManual = getProcessManualDone(mr, productName, 'EWAY')
+                        || (getProcessManualDone(mr, productName, 'EWDC') && getProcessManualDone(mr, productName, 'EWTI'));
+                      const ewayReady = !!(dc || ti
+                        || getProcessManualDone(mr, productName, 'DC')
+                        || getProcessManualDone(mr, productName, 'TI'));
+                      if (ewayDone && !ewayManual) {
+                        return (
+                          <td className="center">
+                            <button
+                              type="button"
+                              onClick={(e) => handleBlueClick(mr.id, 'EWAY', { dc, ti }, productName, e)}
+                              className="doc-done"
+                            >
+                              <CheckCircle size={12} /> Done
+                            </button>
+                          </td>
+                        );
+                      }
+                      if (ewayManual) {
+                        return (
+                          <td className="center">
+                            <button
+                              type="button"
+                              onClick={() => handleClearManualDone(mr, productName, 'EWAY')}
+                              className="doc-done doc-done-manual"
+                              title="Marked done manually — click to undo"
+                            >
+                              <Hand size={12} /> Done Manually
+                            </button>
+                          </td>
+                        );
+                      }
+                      return (
+                        <td className="center">
+                          <button
+                            type="button"
+                            onClick={(e) => handlePendingClick(mr, 'EWAY', productName, e)}
+                            className="doc-pending"
+                            disabled={!ewayReady}
+                          >
+                            <Clock size={12} /> Pending
+                          </button>
+                        </td>
+                      );
+                    })()}
 
                     <td className="center">
                       {rowComplete ? (
@@ -854,7 +903,9 @@ const UnderProcess = () => {
             style={{ left: `${showPendingPopover.x}px`, top: `${Math.max(12, showPendingPopover.y - 100)}px` }}
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="context-menu-title">{showPendingPopover.cellType} Actions</p>
+            <p className="context-menu-title">
+              {showPendingPopover.cellType === 'EWAY' ? 'E-Way Bill' : showPendingPopover.cellType} Actions
+            </p>
             <button className="context-menu-item" onClick={handleGenerateFromPending}>
               <Plus size={14} /> Generate
             </button>
@@ -872,11 +923,17 @@ const UnderProcess = () => {
             style={{ left: `${showDocPopover.x}px`, top: `${showDocPopover.y - 120}px` }}
             onClick={e => e.stopPropagation()}
           >
-            <p className="context-menu-title">{showDocPopover.cellType} Actions</p>
-            <button className="context-menu-item" onClick={handleViewPDF}><FileText size={14} /> View / Print</button>
-            <button className="context-menu-item" onClick={handleDownloadPDF}><Download size={14} /> Download PDF</button>
+            <p className="context-menu-title">{showDocPopover.cellType === 'EWAY' ? 'E-Way Bill' : showDocPopover.cellType} Actions</p>
+            {showDocPopover.cellType !== 'EWAY' && (
+              <>
+                <button className="context-menu-item" onClick={handleViewPDF}><FileText size={14} /> View / Print</button>
+                <button className="context-menu-item" onClick={handleDownloadPDF}><Download size={14} /> Download PDF</button>
+              </>
+            )}
             <button className="context-menu-item" onClick={handleEditDoc}><Edit2 size={14} /> Edit</button>
-            <button className="context-menu-item danger" onClick={handleDeleteDoc}><Trash2 size={14} /> Delete</button>
+            <button className="context-menu-item danger" onClick={handleDeleteDoc}>
+              <Trash2 size={14} /> {showDocPopover.cellType === 'EWAY' ? 'Clear E-Way' : 'Delete'}
+            </button>
           </div>
         </div>
       )}
@@ -886,7 +943,7 @@ const UnderProcess = () => {
       ---------------------------------------------------- */}
       {activeModal && (
         <ModalWrapper 
-          title={`${editingDoc ? 'Edit' : 'Create'} ${activeModal}${(modalContext?.productName ? ` — ${modalContext.productName}` : '')}`} 
+          title={`${editingDoc ? 'Edit' : 'Create'} ${activeModal === 'EWAY' || activeModal === 'EWDC' || activeModal === 'EWTI' ? 'E-Way Bill' : activeModal}${(modalContext?.productName ? ` — ${modalContext.productName}` : '')}`} 
           onClose={() => setActiveModal(null)}
         >
           {activeModal === 'PI' && (
@@ -934,27 +991,18 @@ const UnderProcess = () => {
               onClose={() => setActiveModal(null)} 
             />
           )}
-          {activeModal === 'EWDC' && (
-            <EWayDCGenerator 
-              key={`EWDC-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}`}
-              mr={modalContext?.mr ?? modalContext} 
+          {(activeModal === 'EWAY' || activeModal === 'EWDC' || activeModal === 'EWTI') && (
+            <EWayBillGenerator
+              key={`EWAY-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}`}
+              mr={modalContext?.mr ?? modalContext}
               activeProductName={modalContext?.productName || ''}
               editing={editingDoc}
-              onClose={() => setActiveModal(null)} 
+              onClose={() => setActiveModal(null)}
             />
           )}
           {activeModal === 'TI' && (
             <TaxInvoiceGenerator 
               key={`TI-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}`}
-              mr={modalContext?.mr ?? modalContext} 
-              activeProductName={modalContext?.productName || ''}
-              editing={editingDoc}
-              onClose={() => setActiveModal(null)} 
-            />
-          )}
-          {activeModal === 'EWTI' && (
-            <EWayTIGenerator 
-              key={`EWTI-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}`}
               mr={modalContext?.mr ?? modalContext} 
               activeProductName={modalContext?.productName || ''}
               editing={editingDoc}
@@ -2774,6 +2822,29 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
 
         <div style={{ gridColumn: 'span 4' }}>
           <label>Delivery Notes</label>
+          {(data.dcDeliveryNotes || []).length > 0 && (
+            <SearchableSelect
+              className="input-field"
+              value=""
+              onChange={(e) => {
+                const picked = e.target.value;
+                if (picked) {
+                  setForm({
+                    ...form,
+                    deliveryNotes: picked,
+                    termsAndConditions: picked
+                  });
+                }
+              }}
+              placeholder="Pick from master…"
+              style={{ marginBottom: '0.5rem' }}
+            >
+              <option value="">Pick from master…</option>
+              {(data.dcDeliveryNotes || []).map((n, idx) => (
+                <option key={idx} value={n}>{n}</option>
+              ))}
+            </SearchableSelect>
+          )}
           <textarea
             className="input-field"
             rows="2"
@@ -2797,61 +2868,146 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
 };
 
 // ----------------------------------------------------
-// 6. E-WAY BILL FROM DC GENERATOR FORM (Slide 12)
+// 6. UNIFIED E-WAY BILL (DC + TI)
 // ----------------------------------------------------
-const EWayDCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
+const EWayBillGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const { data, updateItem } = useAppContext();
-  const dc = findDC(data, mr.id, activeProductName);
+  const dc = editing?.dc || findDC(data, mr.id, activeProductName);
+  const ti = editing?.ti || findTI(data, mr.id, activeProductName);
 
   const [form, setForm] = useState({
-    ewayBillNo: dc?.ewayBillNo || '',
-    ewayBillDate: dc?.ewayBillDate || new Date().toISOString().split('T')[0],
-    ewayBillPurpose: 'Others - Job Work'
+    dcEwayBillNo: dc?.ewayBillNo || '',
+    dcEwayBillDate: dc?.ewayBillDate || new Date().toISOString().split('T')[0],
+    ewayBillPurpose: dc?.ewayBillPurpose || 'Others - Job Work',
+    tiEwayBillNo: ti?.ewayBillNo || '',
+    tiEwayBillDate: ti?.ewayBillDate || new Date().toISOString().split('T')[0]
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!dc) {
-      alert("No Delivery Challan exists for this receipt!");
+    if (!dc && !ti) {
+      alert('Create a Delivery Challan or Tax Invoice before linking an E-Way Bill.');
       return;
     }
-    updateItem('deliveryChallans', dc.id, {
-      ...dc,
-      ewayBillNo: form.ewayBillNo,
-      ewayBillDate: form.ewayBillDate,
-      ewayBillPurpose: form.ewayBillPurpose
-    });
+    if (dc) {
+      if (!form.dcEwayBillNo.trim()) {
+        alert('Enter E-Way Bill number for Delivery Challan.');
+        return;
+      }
+      updateItem('deliveryChallans', dc.id, {
+        ...dc,
+        ewayBillNo: form.dcEwayBillNo.trim(),
+        ewayBillDate: form.dcEwayBillDate,
+        ewayBillPurpose: form.ewayBillPurpose
+      });
+    }
+    if (ti) {
+      if (!form.tiEwayBillNo.trim()) {
+        alert('Enter E-Way Bill number for Tax Invoice.');
+        return;
+      }
+      updateItem('invoices', ti.id, {
+        ...ti,
+        ewayBillNo: form.tiEwayBillNo.trim(),
+        ewayBillDate: form.tiEwayBillDate
+      });
+    }
     onClose();
   };
 
   return (
     <form onSubmit={handleSubmit}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div>
-          <label>Delivery Challan Associated</label>
-          <input type="text" className="input-field" readOnly value={dc?.dcNo || 'None'} style={{ fontWeight: 600 }} />
+      {dc ? (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <h4 style={{ margin: '0 0 0.75rem', color: '#5b1c85', fontSize: '0.95rem' }}>Delivery Challan E-Way</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label>Delivery Challan</label>
+              <input type="text" className="input-field" readOnly value={dc.dcNo || '—'} style={{ fontWeight: 600 }} />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label>E-Way Bill Purpose *</label>
+              <SearchableSelect
+                className="input-field"
+                value={form.ewayBillPurpose}
+                onChange={(e) => setForm({ ...form, ewayBillPurpose: e.target.value })}
+              >
+                <option value="Others - Job Work">Others - Job Work</option>
+                <option value="Supply">Supply</option>
+                <option value="Export">Export</option>
+              </SearchableSelect>
+            </div>
+            <div>
+              <label>E-Way Bill Number *</label>
+              <input
+                type="text"
+                className="input-field"
+                required
+                placeholder="12 digit number"
+                value={form.dcEwayBillNo}
+                onChange={(e) => setForm({ ...form, dcEwayBillNo: e.target.value })}
+              />
+            </div>
+            <div>
+              <label>E-Way Bill Date *</label>
+              <DateField
+                className="input-field"
+                required
+                value={form.dcEwayBillDate}
+                onChange={(e) => setForm({ ...form, dcEwayBillDate: e.target.value })}
+              />
+            </div>
+          </div>
         </div>
-        <div>
-          <label>E-Way Bill Purpose *</label>
-          <SearchableSelect className="input-field" value={form.ewayBillPurpose} onChange={e => setForm({...form, ewayBillPurpose: e.target.value})}>
-            <option value="Others - Job Work">Others - Job Work</option>
-            <option value="Supply">Supply</option>
-            <option value="Export">Export</option>
-          </SearchableSelect>
+      ) : (
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+          No Delivery Challan yet — DC E-Way will appear after DC is created.
+        </p>
+      )}
+
+      {ti ? (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <h4 style={{ margin: '0 0 0.75rem', color: '#5b1c85', fontSize: '0.95rem' }}>Tax Invoice E-Way</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <label>Tax Invoice</label>
+              <input type="text" className="input-field" readOnly value={ti.invoiceNo || '—'} style={{ fontWeight: 600 }} />
+            </div>
+            <div>
+              <label>Material Qty</label>
+              <input type="text" className="input-field" readOnly value={`${ti.qty || mr.totalQty || 0} Kg`} />
+            </div>
+            <div>
+              <label>E-Way Bill Number *</label>
+              <input
+                type="text"
+                className="input-field"
+                required={!!ti}
+                placeholder="12 digit number"
+                value={form.tiEwayBillNo}
+                onChange={(e) => setForm({ ...form, tiEwayBillNo: e.target.value })}
+              />
+            </div>
+            <div>
+              <label>E-Way Bill Date *</label>
+              <DateField
+                className="input-field"
+                required={!!ti}
+                value={form.tiEwayBillDate}
+                onChange={(e) => setForm({ ...form, tiEwayBillDate: e.target.value })}
+              />
+            </div>
+          </div>
         </div>
-        <div>
-          <label>E-Way Bill Number *</label>
-          <input type="text" className="input-field" required placeholder="12 digit number" value={form.ewayBillNo} onChange={e => setForm({...form, ewayBillNo: e.target.value})} />
-        </div>
-        <div>
-          <label>E-Way Bill Date *</label>
-          <DateField className="input-field" required value={form.ewayBillDate} onChange={e => setForm({...form, ewayBillDate: e.target.value})} />
-        </div>
-      </div>
+      ) : (
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+          No Tax Invoice yet — TI E-Way will appear after Tax Invoice is created.
+        </p>
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
         <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
-        <button type="submit" className="btn btn-primary">Save E-Way Bill details</button>
+        <button type="submit" className="btn btn-primary" disabled={!dc && !ti}>Save E-Way Bill</button>
       </div>
     </form>
   );
@@ -2896,29 +3052,26 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
   useEffect(() => {
     if (editing) {
       const summaries = buildPLProductSummaries(pl, mr, prodOpts);
-      const piTerms = getLinkedPITermsForTI(data.invoices, mr.id);
+      // Prefer saved TI values so direct edits stick (do not re-pull from PI)
       setForm({
         ...editing,
         productName: editing.productName?.includes(',')
           ? editing.productName
           : getReceiptProductLabel(mr, prodOpts),
         productSummaries: editing.productSummaries?.length ? editing.productSummaries : summaries,
-        productCharges: piTerms?.productCharges
-          || (editing.productCharges && Object.keys(editing.productCharges).length
-            ? sanitizeProductCharges(editing.productCharges)
-            : normalizeProductCharges(
-              editing.productCharges,
-              editing,
-              mr,
-              prodOpts,
-              party
-            )),
-        customCharges: piTerms?.customCharges?.length
-          ? piTerms.customCharges
-          : (editing.customCharges || []),
-        discount: piTerms ? piTerms.discount : (editing.discount || 0),
-        taxRate: piTerms ? piTerms.taxRate : (editing.taxRate ?? 18),
-        gstType: normalizeGstType(piTerms?.gstType || editing.gstType),
+        productCharges: editing.productCharges && Object.keys(editing.productCharges).length
+          ? sanitizeProductCharges(editing.productCharges)
+          : normalizeProductCharges(
+            editing.productCharges,
+            editing,
+            mr,
+            prodOpts,
+            party
+          ),
+        customCharges: editing.customCharges || [],
+        discount: editing.discount || 0,
+        taxRate: editing.taxRate ?? 18,
+        gstType: normalizeGstType(editing.gstType),
         terms: editing.terms || 'Payment against delivery.'
       });
     } else {
@@ -3028,7 +3181,7 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
     const legacyQtys = sanitizedCharges[firstProd]?.qtys || emptyChargeQtys();
     const totalQty = getMRReceivedQty(mr, prodOpts) || 0;
 
-    let finalDoc = {
+    const finalDoc = {
       ...form,
       productCharges: sanitizedCharges,
       productSummaries: summaries.length ? summaries : (form.productSummaries || []),
@@ -3047,19 +3200,15 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
       ewayBillDate: editing?.ewayBillDate || ''
     };
 
-    const linkedPI = findAnyProformaInvoice(data.invoices, mr.id);
-    if (linkedPI && typeof linkedPI.total === 'number') {
-      finalDoc = applyProformaFinancialsToTaxInvoice(finalDoc, linkedPI);
-    }
-
+    // Keep form values as saved — do not overwrite with PI on submit.
     if (editing) {
-      updateItem('invoices', editing.id, finalDoc);
+      updateItem('invoices', editing.id, { ...finalDoc, preserveFinancials: true });
     } else {
       if (findAnyTaxInvoice(data.invoices, mr.id)) {
         alert('A Tax Invoice already exists for this Material Receipt. Please edit the existing TI.');
         return;
       }
-      updateData('invoices', { ...finalDoc, id: Date.now().toString() });
+      updateData('invoices', { ...finalDoc, id: Date.now().toString(), preserveFinancials: true });
       incrementSerial('TI');
     }
     onClose();
@@ -3166,61 +3315,6 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
       <div className="form-actions">
         <button type="button" className="btn" onClick={onClose}>Cancel</button>
         <button type="submit" className="btn btn-primary">Save Tax Invoice</button>
-      </div>
-    </form>
-  );
-};
-
-// ----------------------------------------------------
-// 8. E-WAY BILL FROM TAX INVOICE GENERATOR FORM (Slide 14)
-// ----------------------------------------------------
-const EWayTIGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
-  const { data, updateItem } = useAppContext();
-  const ti = findTI(data, mr.id, activeProductName);
-
-  const [form, setForm] = useState({
-    ewayBillNo: ti?.ewayBillNo || '',
-    ewayBillDate: ti?.ewayBillDate || new Date().toISOString().split('T')[0]
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!ti) {
-      alert("No Tax Invoice exists for this receipt!");
-      return;
-    }
-    updateItem('invoices', ti.id, {
-      ...ti,
-      ewayBillNo: form.ewayBillNo,
-      ewayBillDate: form.ewayBillDate
-    });
-    onClose();
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div>
-          <label>Tax Invoice Associated</label>
-          <input type="text" className="input-field" readOnly value={ti?.invoiceNo || 'None'} style={{ fontWeight: 600 }} />
-        </div>
-        <div>
-          <label>Material Qty</label>
-          <input type="text" className="input-field" readOnly value={`${ti?.qty || mr.totalQty} Kg`} />
-        </div>
-        <div>
-          <label>E-Way Bill Number *</label>
-          <input type="text" className="input-field" required placeholder="12 digit number" value={form.ewayBillNo} onChange={e => setForm({...form, ewayBillNo: e.target.value})} />
-        </div>
-        <div>
-          <label>E-Way Bill Date *</label>
-          <DateField className="input-field" required value={form.ewayBillDate} onChange={e => setForm({...form, ewayBillDate: e.target.value})} />
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-        <button type="button" className="btn" style={{ background: 'transparent', border: '1px solid var(--border-color)' }} onClick={onClose}>Cancel</button>
-        <button type="submit" className="btn btn-primary">Save E-Way Bill details</button>
       </div>
     </form>
   );

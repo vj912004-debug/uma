@@ -40,7 +40,7 @@ const EmployeeManagement = () => {
     setForm((f) => ({
       ...f,
       employeeId: generateEmployeeId(data.users || []),
-      permissions: ['/eway-dc']
+      permissions: [...ALL_STAFF_MODULE_IDS]
     }));
     setShowModal(true);
   };
@@ -56,7 +56,6 @@ const EmployeeManagement = () => {
       department: user.department || 'General',
       role: user.role || 'Staff',
       active: user.active !== false,
-      // Legacy empty permissions = full Staff access — show all checked for editing
       permissions: user.role === 'Admin' ? [] : (perms.length ? perms : [...ALL_STAFF_MODULE_IDS])
     });
     setGeneratedCreds(null);
@@ -182,7 +181,8 @@ const EmployeeManagement = () => {
   const moduleCountLabel = (user) => {
     if (user.role === 'Admin') return 'All modules';
     const n = Array.isArray(user.permissions) ? user.permissions.length : 0;
-    if (!n) return 'All modules (legacy)';
+    if (!n) return 'No modules';
+    if (n >= ALL_STAFF_MODULE_IDS.length) return 'All modules';
     return `${n} module${n === 1 ? '' : 's'}`;
   };
 
@@ -408,7 +408,7 @@ const EmployeeManagement = () => {
                         </div>
                       </div>
                       <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0 0 0.75rem' }}>
-                        Tick modules this employee can open after login. Use <strong>E-Way (DC)</strong> / <strong>E-Way (TI)</strong> for e-way linking.
+                        Tick modules this employee can open after login. Unticked modules stay hidden in their sidebar and cannot be opened by URL. Use <strong>E-Way (DC)</strong> / <strong>E-Way (TI)</strong> for e-way linking.
                       </p>
                       <div style={{
                         border: '1px solid var(--border-color)',

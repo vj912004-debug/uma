@@ -45,8 +45,12 @@ API runs at **http://localhost:3001**
 
 ## Default login
 
-- Username: `admin`
-- Password: `admin123`
+| Role  | Username | Password  |
+|-------|----------|-----------|
+| Admin | `admin`  | `admin123` |
+| Staff | `staff1` | `staff123` |
+
+Staff module access is controlled under **Employees**. Untick a module, save, then log in as that staff user — the module is hidden from the sidebar and blocked by route.
 
 ## API endpoints
 

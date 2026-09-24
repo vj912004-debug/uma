@@ -24,7 +24,7 @@ const PackingList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
-  const [statusTab, setStatusTab] = useState('all');
+  const [statusTab, setStatusTab] = useState('pending');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPL, setEditingPL] = useState(null);
   const [selectedBPR, setSelectedBPR] = useState(null);
@@ -351,38 +351,43 @@ const PackingList = () => {
         completedCount={plList.length}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: statusTab === 'all' ? '1fr 2fr' : '1fr', gap: '1.5rem' }}>
-        {(statusTab === 'all' || statusTab === 'pending') && (
+      {statusTab === 'pending' ? (
         <div className="premium-card">
-          <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
-            Pending BPR to Pack
-          </h3>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Select a completed batch to compile packing weight lists.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {uniquePendingBPRs.length === 0 ? (
-              <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', fontSize: '0.85rem' }}>No pending BPRs awaiting packing lists.</p>
-            ) : (
-              uniquePendingBPRs.map(bpr => (
-                <div
-                  key={bpr.id}
-                  className="glass-panel"
-                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.15s ease' }}
-                  onClick={() => handleCreate(bpr)}
-                >
-                  <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{bpr.bprNo}</p>
-                  <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.25rem 0' }}>{bpr.partyName}</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
-                    {getBPRProductLabel(bpr)} — {bpr.totalDispatchedNet?.toFixed(1) || 0} Kg ({bpr.dispatchedBatches?.length || 0} Drums)
-                  </p>
-                </div>
-              ))
-            )}
+          <h3 style={{ marginBottom: '1.5rem' }}>Awaiting Packing List</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>BPR No</th>
+                  <th style={{ padding: '0.75rem' }}>Party</th>
+                  <th style={{ padding: '0.75rem' }}>Product / Weight</th>
+                  <th style={{ padding: '0.75rem' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {uniquePendingBPRs.length === 0 ? (
+                  <tr><td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No BPRs awaiting packing lists.</td></tr>
+                ) : (
+                  uniquePendingBPRs.map((bpr) => (
+                    <tr key={bpr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{bpr.bprNo}</td>
+                      <td style={{ padding: '0.75rem', fontWeight: 600 }}>{bpr.partyName}</td>
+                      <td style={{ padding: '0.75rem' }}>
+                        {getBPRProductLabel(bpr)} — {bpr.totalDispatchedNet?.toFixed(1) || 0} Kg ({bpr.dispatchedBatches?.length || 0} Drums)
+                      </td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <button type="button" className="btn btn-primary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem' }} onClick={() => handleCreate(bpr)}>
+                          Generate PL
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-        )}
-
-        {(statusTab === 'all' || statusTab === 'completed') && (
+      ) : (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Packing List Log</h3>
 
@@ -422,8 +427,7 @@ const PackingList = () => {
             </table>
           </div>
         </div>
-        )}
-      </div>
+      )}
 
       {isModalOpen && (
         <div className="page-form-overlay">

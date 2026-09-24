@@ -583,20 +583,20 @@ const Parties = () => {
                 </div>
                 <div>
                   <label>PSD Requirement *</label>
-                  <input
-                    type="text"
-                    list="psdReqOptions"
+                  <SearchableSelect
                     className="input-field"
                     required
-                    placeholder="Select or type..."
-                    value={productData.psdReq}
-                    onChange={e => setProductData({ ...productData, psdReq: e.target.value })}
-                  />
-                  <datalist id="psdReqOptions">
+                    value={productData.psdReq || ''}
+                    onChange={(e) => setProductData({ ...productData, psdReq: e.target.value })}
+                  >
+                    <option value="">Select...</option>
                     {(data.psdRequirements || []).map((r, idx) => (
-                      <option key={idx} value={r} />
+                      <option key={idx} value={r}>{r}</option>
                     ))}
-                  </datalist>
+                    {!(data.psdRequirements || []).some((r) => String(r).trim().toUpperCase() === 'N/A') && (
+                      <option value="N/A">N/A</option>
+                    )}
+                  </SearchableSelect>
                 </div>
                 <div>
                   <label>Default PSD Method</label>

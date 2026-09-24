@@ -7,7 +7,11 @@ async function upsertUser(user) {
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (username) DO UPDATE SET
        employee_id = EXCLUDED.employee_id,
-       password_hash = COALESCE(EXCLUDED.password_hash, users.password_hash),
+       password_hash = CASE
+         WHEN EXCLUDED.password_hash IS NULL OR EXCLUDED.password_hash LIKE '000000000000%'
+         THEN users.password_hash
+         ELSE EXCLUDED.password_hash
+       END,
        name = EXCLUDED.name,
        department = EXCLUDED.department,
        role = EXCLUDED.role,
@@ -38,31 +42,12 @@ async function seed() {
   );
 
   for (const user of getDefaultUsers()) {
-    if (user.passwordHash) {
-      await upsertUser(user);
-    } else {
-      await query(
-        `INSERT INTO users (id, employee_id, username, password_hash, name, department, role, permissions, active)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         ON CONFLICT (username) DO NOTHING`,
-        [
-          user.id,
-          user.employeeId,
-          user.username,
-          '0000000000000000000000000000000000000000000000000000000000000000',
-          user.name,
-          user.department,
-          user.role,
-          JSON.stringify(user.permissions || []),
-          true
-        ]
-      );
-    }
+    await upsertUser(user);
   }
 
   await query(`SELECT setval(pg_get_serial_sequence('users', 'id'), GREATEST((SELECT MAX(id) FROM users), 4))`);
 
-  console.log('Seed completed. Default login: admin / admin123');
+  console.log('Seed completed. Logins: admin / admin123  |  staff1 / staff123');
 }
 
 seed()

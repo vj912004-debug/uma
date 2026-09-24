@@ -13,7 +13,7 @@ const PSD = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
-  const [statusTab, setStatusTab] = useState('all');
+  const [statusTab, setStatusTab] = useState('pending');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMR, setSelectedMR] = useState(null);
 
@@ -167,38 +167,43 @@ const PSD = () => {
         completedCount={psdList.length}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: statusTab === 'all' ? '1fr 2fr' : '1fr', gap: '1.5rem' }}>
-        {/* Left Side: Pending Receipts scheduler */}
-        {(statusTab === 'all' || statusTab === 'pending') && (
+      {statusTab === 'pending' ? (
         <div className="premium-card">
-          <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
-            Pending Lab Analysis
-          </h3>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Select a receipt to upload its particle size analysis report.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {pendingReceipts.length === 0 ? (
-              <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', fontSize: '0.85rem' }}>No pending batches awaiting lab results.</p>
-            ) : (
-              pendingReceipts.map(mr => (
-                <div 
-                  key={mr.id} 
-                  className="glass-panel" 
-                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.15s ease' }} 
-                  onClick={() => handleCreate(mr)}
-                >
-                  <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{mr.receiptNo}</p>
-                  <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.25rem 0' }}>{mr.partyName}</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>{mr.productName} - {mr.totalQty} Kg</p>
-                </div>
-              ))
-            )}
+          <h3 style={{ marginBottom: '1.5rem' }}>Awaiting Lab Analysis</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>M.R. Number</th>
+                  <th style={{ padding: '0.75rem' }}>Party</th>
+                  <th style={{ padding: '0.75rem' }}>Product</th>
+                  <th style={{ padding: '0.75rem' }}>Qty (Kg)</th>
+                  <th style={{ padding: '0.75rem' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingReceipts.length === 0 ? (
+                  <tr><td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No batches awaiting lab results.</td></tr>
+                ) : (
+                  pendingReceipts.map((mr) => (
+                    <tr key={mr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{mr.receiptNo}</td>
+                      <td style={{ padding: '0.75rem', fontWeight: 600 }}>{mr.partyName}</td>
+                      <td style={{ padding: '0.75rem' }}>{mr.productName}</td>
+                      <td style={{ padding: '0.75rem' }}>{mr.totalQty}</td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <button type="button" className="btn btn-primary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem' }} onClick={() => handleCreate(mr)}>
+                          Upload PSD
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-        )}
-
-        {/* Right Side: PSD log */}
-        {(statusTab === 'all' || statusTab === 'completed') && (
+      ) : (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Uploaded PSD Reports</h3>
 
@@ -217,7 +222,7 @@ const PSD = () => {
               </thead>
               <tbody>
                 {filteredPSDs.length === 0 ? (
-                  <tr><td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No PSD reports found.</td></tr>
+                  <tr><td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No PSD reports found.</td></tr>
                 ) : (
                   filteredPSDs.map(psd => (
                     <tr key={psd.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
@@ -256,8 +261,7 @@ const PSD = () => {
             </table>
           </div>
         </div>
-        )}
-      </div>
+      )}
 
       {/* PSD Modal Form */}
       {isModalOpen && (

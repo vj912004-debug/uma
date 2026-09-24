@@ -292,7 +292,7 @@ const MarketingFollowUp = () => {
   const mainTitle = quickFilter === 'overdue'
     ? 'Overdue Follow Ups'
     : quickFilter === 'pending'
-      ? 'Pending Follow Ups'
+      ? 'Follow Ups'
       : quickFilter === 'upcoming'
         ? 'Upcoming Follow Ups'
         : "Today's Follow Ups";
@@ -386,7 +386,7 @@ const MarketingFollowUp = () => {
               {[
                 { key: 'today', label: "Today's Follow Ups", summary: `${todayFollowUps.length} follow ups`, tone: 'yellow', icon: Phone },
                 { key: 'overdue', label: 'Overdue', summary: `${overdueFollowUps.length} overdue`, tone: 'pink', icon: AlertTriangle },
-                { key: 'pending', label: 'Pending Queue', summary: `${pendingFollowUps.length} pending`, tone: 'green', icon: Clock },
+                { key: 'pending', label: 'Queue', summary: `${pendingFollowUps.length} open`, tone: 'green', icon: Clock },
                 { key: 'upcoming', label: 'Upcoming', summary: `${upcomingFollowUps.length} scheduled`, tone: 'blue', icon: CalendarDays }
               ].map((item) => {
                 const Icon = item.icon;

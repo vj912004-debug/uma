@@ -45,7 +45,7 @@ const InvoicesPI = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
-  const [statusTab, setStatusTab] = useState('all');
+  const [statusTab, setStatusTab] = useState('pending');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
@@ -557,43 +557,47 @@ const InvoicesPI = () => {
         completedCount={piList.length}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: statusTab === 'all' ? '1fr 2fr' : '1fr', gap: '1.5rem' }}>
-        {/* Left Side: Pending MRs scheduler */}
-        {(statusTab === 'all' || statusTab === 'pending') && (
+      {statusTab === 'pending' ? (
         <div className="premium-card">
-          <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
-            Pending M.R. Queue
-          </h3>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Select a Material Receipt to generate one combined Proforma Invoice for all products.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {pendingMRs.length === 0 ? (
-              <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', fontSize: '0.85rem' }}>No pending receipts awaiting PI.</p>
-            ) : (
-              pendingMRs.map(mr => {
-                const prodOpts = receiptProductOptions(mr, data);
-                const productLabel = getReceiptProductLabel(mr, prodOpts);
-                return (
-                <div 
-                  key={mr.id} 
-                  className="glass-panel" 
-                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.15s ease' }} 
-                  onClick={() => handleCreate(mr)}
-                >
-                  <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{mr.receiptNo}</p>
-                  <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.25rem 0' }}>{mr.partyName}</p>
-                  <p style={{ fontSize: '0.8rem', margin: '0 0 0.25rem 0' }}>{productLabel || mr.productName || '—'}</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Weight: {mr.totalQty?.toFixed(1) || 0} Kg</p>
-                </div>
-                );
-              })
-            )}
+          <h3 style={{ marginBottom: '1.5rem' }}>Awaiting Proforma Invoice</h3>
+          <div className="data-table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>M.R. Number</th>
+                  <th>Party Name</th>
+                  <th>Product</th>
+                  <th>Weight (Kg)</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingMRs.length === 0 ? (
+                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>No receipts awaiting PI.</td></tr>
+                ) : (
+                  pendingMRs.map((mr) => {
+                    const prodOpts = receiptProductOptions(mr, data);
+                    const productLabel = getReceiptProductLabel(mr, prodOpts);
+                    return (
+                      <tr key={mr.id}>
+                        <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{mr.receiptNo}</td>
+                        <td style={{ fontWeight: 600 }}>{mr.partyName}</td>
+                        <td>{productLabel || mr.productName || '—'}</td>
+                        <td>{mr.totalQty?.toFixed(1) || 0}</td>
+                        <td>
+                          <button type="button" className="btn btn-primary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem' }} onClick={() => handleCreate(mr)}>
+                            Generate PI
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-        )}
-
-        {/* Right Side: PI Log */}
-        {(statusTab === 'all' || statusTab === 'completed') && (
+      ) : (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Proforma Invoice Log</h3>
 
@@ -639,8 +643,7 @@ const InvoicesPI = () => {
             </table>
           </div>
         </div>
-        )}
-      </div>
+      )}
       </>
       )}
 

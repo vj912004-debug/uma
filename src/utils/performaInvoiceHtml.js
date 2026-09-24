@@ -792,6 +792,8 @@ export const renderPerformaInvoicePdf = async (data, { mode = 'save', printPrefs
     mode,
     filePrefix: 'PI',
     docNo: data.invoiceNo || 'N/A',
+    partyName: data.partyName || '',
+    data,
     fitPage: true,
     splitOverflowPages: true,
     printPrefs

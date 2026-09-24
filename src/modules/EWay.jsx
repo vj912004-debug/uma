@@ -20,7 +20,7 @@ const EWay = () => {
     if (ewayAccess.ti && !ewayAccess.dc) return 'ti';
     return 'all';
   });
-  const [statusTab, setStatusTab] = useState('all');
+  const [statusTab, setStatusTab] = useState('pending');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selected, setSelected] = useState(null);
 

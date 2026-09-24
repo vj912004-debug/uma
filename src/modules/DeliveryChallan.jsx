@@ -47,7 +47,7 @@ const DeliveryChallan = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
-  const [statusTab, setStatusTab] = useState('all');
+  const [statusTab, setStatusTab] = useState('pending');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedPL, setSelectedPL] = useState(null);
@@ -243,36 +243,41 @@ const DeliveryChallan = () => {
         completedCount={dcList.length}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: statusTab === 'all' ? '1fr 2fr' : '1fr', gap: '1.5rem' }}>
-        {(statusTab === 'all' || statusTab === 'pending') && (
+      {statusTab === 'pending' ? (
         <div className="premium-card">
-          <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
-            Pending PL to Dispatch
-          </h3>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Select a packing list to create transport Delivery Challans.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {pendingPLs.length === 0 ? (
-              <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', fontSize: '0.85rem' }}>No pending packing lists awaiting dispatch.</p>
-            ) : (
-              pendingPLs.map(pl => (
-                <div
-                  key={pl.id}
-                  className="glass-panel"
-                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.15s ease' }}
-                  onClick={() => handleCreate(pl)}
-                >
-                  <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{pl.plNo}</p>
-                  <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.25rem 0' }}>{pl.productName}</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Weight: {pl.totalWeight?.toFixed(1) || 0} Kg ({pl.totalDrums} Drums)</p>
-                </div>
-              ))
-            )}
+          <h3 style={{ marginBottom: '1.5rem' }}>Awaiting Delivery Challan</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>PL No</th>
+                  <th style={{ padding: '0.75rem' }}>Product</th>
+                  <th style={{ padding: '0.75rem' }}>Weight / Drums</th>
+                  <th style={{ padding: '0.75rem' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingPLs.length === 0 ? (
+                  <tr><td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No packing lists awaiting dispatch.</td></tr>
+                ) : (
+                  pendingPLs.map((pl) => (
+                    <tr key={pl.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{pl.plNo}</td>
+                      <td style={{ padding: '0.75rem', fontWeight: 600 }}>{pl.productName}</td>
+                      <td style={{ padding: '0.75rem' }}>{pl.totalWeight?.toFixed(1) || 0} Kg ({pl.totalDrums} Drums)</td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <button type="button" className="btn btn-primary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem' }} onClick={() => handleCreate(pl)}>
+                          Generate DC
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-        )}
-
-        {(statusTab === 'all' || statusTab === 'completed') && (
+      ) : (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Delivery Challan Log</h3>
 
@@ -316,8 +321,7 @@ const DeliveryChallan = () => {
             </table>
           </div>
         </div>
-        )}
-      </div>
+      )}
 
       {isModalOpen && (
         <div className="page-form-overlay">
@@ -434,6 +438,29 @@ const DeliveryChallan = () => {
 
                 <div style={{ gridColumn: 'span 4' }}>
                   <label>Delivery Notes</label>
+                  {(data.dcDeliveryNotes || []).length > 0 && (
+                    <SearchableSelect
+                      className="input-field"
+                      value=""
+                      onChange={(e) => {
+                        const picked = e.target.value;
+                        if (picked) {
+                          setForm({
+                            ...form,
+                            deliveryNotes: picked,
+                            termsAndConditions: picked
+                          });
+                        }
+                      }}
+                      placeholder="Pick from master…"
+                      style={{ marginBottom: '0.5rem' }}
+                    >
+                      <option value="">Pick from master…</option>
+                      {(data.dcDeliveryNotes || []).map((n, idx) => (
+                        <option key={idx} value={n}>{n}</option>
+                      ))}
+                    </SearchableSelect>
+                  )}
                   <textarea
                     className="input-field"
                     rows="2"

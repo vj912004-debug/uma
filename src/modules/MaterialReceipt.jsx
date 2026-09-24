@@ -40,6 +40,7 @@ const buildProductSettingsFromParty = (prodConfig) => {
   if (!prodConfig) {
     return {
       nickName: '',
+      micronSize: '',
       rates: emptyChargeRates(),
       charges: emptyChargeFlags(),
       qtys: emptyChargeQtys(),
@@ -68,6 +69,7 @@ const buildProductSettingsFromParty = (prodConfig) => {
   );
   return {
     nickName: prodConfig.nickname || '',
+    micronSize: prodConfig.psdReq || '',
     rates,
     charges,
     qtys: emptyChargeQtys(),
@@ -140,13 +142,14 @@ const getProductSettings = (formData, party, prodName) =>
 const makeDefaultBatch = (prodName, party, productSettings = {}) => {
   const prodConfig = (party?.products || []).find(p => p.name === prodName);
   const settings = productSettings[prodName] || buildProductSettingsFromParty(prodConfig);
+  const micronSize = settings.micronSize || prodConfig?.psdReq || '90% < 10M';
   return {
     batchNo: '',
     drums: '',
     qty: '',
     productName: prodName,
     nickName: settings.nickName || prodConfig?.nickname || '',
-    psdReq: prodConfig?.psdReq || '90% < 10M',
+    psdReq: micronSize,
     psdReport: 'Yes',
     psdMethod: prodConfig?.psdMethodDefault || 'Dry',
     isEmptyDrums: false
@@ -207,7 +210,8 @@ const MaterialReceipt = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
-  const [statusTab, setStatusTab] = useState('all');
+  const [statusTab, setStatusTab] = useState('pending');
+  const [pendingMicronSize, setPendingMicronSize] = useState('');
 
   // Primary MR Form State
   const [formData, setFormData] = useState({
@@ -259,6 +263,7 @@ const MaterialReceipt = () => {
     const party = (data.parties || []).find(p =>
       !p.isDeleted && (p.name || '').trim().toLowerCase() === name.trim().toLowerCase()
     );
+    setPendingMicronSize('');
     if (!party) {
       setFormData(prev => ({
         ...prev,
@@ -336,13 +341,20 @@ const MaterialReceipt = () => {
     }));
   };
 
-  const handleAddBatchForProduct = (prodName) => {
+  const handleAddBatchForProduct = (prodName, micronOverride = '') => {
     setFormData(prev => {
       const party = data.parties.find(p => p.id === prev.partyId);
       const productSettings = { ...(prev.productSettings || {}) };
       if (!productSettings[prodName]) {
         const prodConfig = (party?.products || []).find(p => p.name === prodName);
         productSettings[prodName] = buildProductSettingsFromParty(prodConfig);
+      }
+      const micronSize = String(micronOverride || productSettings[prodName]?.micronSize || '').trim();
+      if (micronSize) {
+        productSettings[prodName] = {
+          ...productSettings[prodName],
+          micronSize
+        };
       }
       const defaultBatch = makeDefaultBatch(prodName, party, productSettings);
       const hasCommon = COMMON_CHARGE_KEYS.some(k => prev.charges?.[k] || (parseFloat(prev.rates?.[k]) || 0) > 0);
@@ -364,6 +376,26 @@ const MaterialReceipt = () => {
         qtys,
         productSettings: applyCommonChargesToProductSettings(productSettings, charges, rates, qtys),
         batches: [...prev.batches, defaultBatch]
+      };
+    });
+  };
+
+  const handleProductMicronSizeChange = (prodName, micronSize) => {
+    const value = String(micronSize || '').trim();
+    setFormData(prev => {
+      const party = data.parties.find(p => p.id === prev.partyId);
+      const current = getProductSettings(prev, party, prodName);
+      return {
+        ...prev,
+        productSettings: {
+          ...prev.productSettings,
+          [prodName]: { ...current, micronSize: value }
+        },
+        batches: prev.batches.map((b) => (
+          !b.isEmptyDrums && (b.productName || '') === prodName
+            ? { ...b, psdReq: value }
+            : b
+        ))
       };
     });
   };
@@ -478,12 +510,14 @@ const MaterialReceipt = () => {
       chargeNotes: { ...emptyChargeNotes(), ...(prepared.baseForm.chargeNotes || {}) }
     });
     setIsEditing(mr.id);
+    setPendingMicronSize('');
     setIsModalOpen(true);
   };
 
   const closeReceiptModal = () => {
     setIsModalOpen(false);
     setIsEditing(null);
+    setPendingMicronSize('');
   };
 
   const deleteReceipt = (id) => {
@@ -520,6 +554,7 @@ const MaterialReceipt = () => {
     chargeNotes: emptyChargeNotes()
     });
     setIsEditing(null);
+    setPendingMicronSize('');
     setIsModalOpen(true);
   };
 
@@ -743,14 +778,26 @@ const MaterialReceipt = () => {
         />
       </td>
       <td style={{ padding: '0.5rem' }}>
-        <input
-          type="text"
-          list="psdReqOptions"
+        <SearchableSelect
           className="input-field"
-          style={{ padding: '0.3rem', fontSize: '0.825rem', width: '100%', boxSizing: 'border-box' }}
+          style={{ padding: '0.3rem', fontSize: '0.825rem' }}
           value={batch.psdReq || ''}
           onChange={e => handleBatchCellChange(idx, 'psdReq', e.target.value)}
-        />
+          placeholder="Micron Size"
+        >
+          <option value="">Select…</option>
+          {(data.psdRequirements || []).map((r, optIdx) => (
+            <option key={optIdx} value={r}>{r}</option>
+          ))}
+          {!(data.psdRequirements || []).some((r) => String(r).trim().toUpperCase() === 'N/A') && (
+            <option value="N/A">N/A</option>
+          )}
+          {!!batch.psdReq
+            && !(data.psdRequirements || []).includes(batch.psdReq)
+            && String(batch.psdReq).trim().toUpperCase() !== 'N/A' && (
+            <option value={batch.psdReq}>{batch.psdReq}</option>
+          )}
+        </SearchableSelect>
       </td>
       <td style={{ padding: '0.5rem' }}>
         <SearchableSelect
@@ -1112,9 +1159,27 @@ const MaterialReceipt = () => {
 
                 <div style={{ gridColumn: 'span 4' }}>
                   <label>Delivery Notes</label>
+                  {(data.dcDeliveryNotes || []).length > 0 && (
+                    <SearchableSelect
+                      className="input-field"
+                      value=""
+                      onChange={(e) => {
+                        const picked = e.target.value;
+                        if (picked) setFormData({ ...formData, deliveryNotes: picked });
+                      }}
+                      placeholder="Pick from master…"
+                      style={{ marginBottom: '0.5rem' }}
+                    >
+                      <option value="">Pick from master…</option>
+                      {(data.dcDeliveryNotes || []).map((n, idx) => (
+                        <option key={idx} value={n}>{n}</option>
+                      ))}
+                    </SearchableSelect>
+                  )}
                   <textarea
                     className="input-field"
                     rows="2"
+                    list="dcDeliveryNoteOptions"
                     placeholder="Shown on Delivery Challan print (e.g. Material sent for Micronisation on Job Work basis.)"
                     value={formData.deliveryNotes || ''}
                     onChange={e => setFormData({ ...formData, deliveryNotes: e.target.value })}
@@ -1125,6 +1190,14 @@ const MaterialReceipt = () => {
               <datalist id="psdReqOptions">
                 {(data.psdRequirements || []).map((r, idx) => (
                   <option key={idx} value={r} />
+                ))}
+                {!(data.psdRequirements || []).some((r) => String(r).trim().toUpperCase() === 'N/A') && (
+                  <option value="N/A" />
+                )}
+              </datalist>
+              <datalist id="dcDeliveryNoteOptions">
+                {(data.dcDeliveryNotes || []).map((n, idx) => (
+                  <option key={idx} value={n} />
                 ))}
               </datalist>
               <datalist id="mr-charge-note-options">
@@ -1151,12 +1224,31 @@ const MaterialReceipt = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <SearchableSelect
                         className="input-field"
+                        style={{ minWidth: '180px' }}
+                        value={pendingMicronSize}
+                        onChange={(e) => setPendingMicronSize(e.target.value)}
+                        placeholder="Micron Size"
+                      >
+                        <option value="">Micron Size…</option>
+                        {(data.psdRequirements || []).map((r, idx) => (
+                          <option key={idx} value={r}>{r}</option>
+                        ))}
+                        {!(data.psdRequirements || []).some((r) => String(r).trim().toUpperCase() === 'N/A') && (
+                          <option value="N/A">N/A</option>
+                        )}
+                      </SearchableSelect>
+                      <SearchableSelect
+                        className="input-field"
                         style={{ minWidth: '200px' }}
                         value=""
                         disabled={productsAvailableToAdd.length === 0}
                         onChange={e => {
                           const name = e.target.value;
-                          if (name) handleAddBatchForProduct(name);
+                          if (!name) return;
+                          const prod = productsAvailableToAdd.find((p) => p.name === name);
+                          const micron = pendingMicronSize || prod?.psdReq || '';
+                          handleAddBatchForProduct(name, micron);
+                          setPendingMicronSize('');
                         }}
                       >
                         <option value="">
@@ -1219,12 +1311,36 @@ const MaterialReceipt = () => {
 
                             <div style={{ padding: '0.9rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
-                                PSD Req: {prod.psdReq || '—'} · Cleaning ₹{settings.rates?.cleaning ?? prod.charges?.cleaning ?? 0} · Processing ₹{settings.rates?.processing ?? prod.charges?.processing ?? 0} · Filter Bag ₹{settings.rates?.filterBag ?? prod.charges?.filterBag ?? 0}
+                                Cleaning ₹{settings.rates?.cleaning ?? prod.charges?.cleaning ?? 0} · Processing ₹{settings.rates?.processing ?? prod.charges?.processing ?? 0} · Filter Bag ₹{settings.rates?.filterBag ?? prod.charges?.filterBag ?? 0}
                               </p>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
                               <div>
                                 <label>Nick Name</label>
                                 <input type="text" className="input-field" value={settings.nickName || ''} onChange={e => patchProductSettings(prod.name, s => ({ ...s, nickName: e.target.value }))} />
+                              </div>
+                              <div>
+                                <label>Micron Size</label>
+                                <SearchableSelect
+                                  className="input-field"
+                                  value={settings.micronSize || prod.psdReq || ''}
+                                  onChange={(e) => handleProductMicronSizeChange(prod.name, e.target.value)}
+                                  placeholder="Select micron size…"
+                                >
+                                  <option value="">Select micron size…</option>
+                                  {(data.psdRequirements || []).map((r, idx) => (
+                                    <option key={idx} value={r}>{r}</option>
+                                  ))}
+                                  {!(data.psdRequirements || []).some((r) => String(r).trim().toUpperCase() === 'N/A') && (
+                                    <option value="N/A">N/A</option>
+                                  )}
+                                  {!!(settings.micronSize || prod.psdReq)
+                                    && !(data.psdRequirements || []).includes(settings.micronSize || prod.psdReq)
+                                    && String(settings.micronSize || prod.psdReq).trim().toUpperCase() !== 'N/A' && (
+                                    <option value={settings.micronSize || prod.psdReq}>
+                                      {settings.micronSize || prod.psdReq}
+                                    </option>
+                                  )}
+                                </SearchableSelect>
                               </div>
                               <div>
                                 <label>Processing Charges (₹)</label>
@@ -1335,7 +1451,7 @@ const MaterialReceipt = () => {
                             <th style={{ padding: '0.5rem' }}>Batch Number</th>
                             <th style={{ padding: '0.5rem', width: '120px' }}>No of Drums</th>
                             <th style={{ padding: '0.5rem', width: '150px' }}>Quantity (Kg)</th>
-                            <th style={{ padding: '0.5rem' }}>PSD Req</th>
+                            <th style={{ padding: '0.5rem' }}>Micron Size</th>
                             <th style={{ padding: '0.5rem', width: '120px' }}>PSD Report</th>
                             <th style={{ padding: '0.5rem', width: '120px' }}>PSD Method</th>
                             <th style={{ padding: '0.5rem', width: '60px' }}>Del</th>

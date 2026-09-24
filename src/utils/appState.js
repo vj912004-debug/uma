@@ -1,16 +1,23 @@
 import { DEFAULT_COMPANY_PROFILE, mergeCompanyProfile } from './companyProfile';
 import { flattenMRChargeSnapshot, syncAllTaxInvoicesWithProformas } from './documentCharges';
+import { ALL_STAFF_MODULE_IDS } from './moduleAccess';
+import { DEFAULT_ADMIN_PASSWORD_HASH, DEFAULT_STAFF_PASSWORD_HASH } from './auth';
+import { defaultEsslSettings } from './payroll';
 
 const normName = (s) => (s || '').trim().toLowerCase();
 
-export const DEFAULT_ADMIN_PASSWORD_HASH =
-  '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
+export { DEFAULT_ADMIN_PASSWORD_HASH, DEFAULT_STAFF_PASSWORD_HASH };
+
+const SEED_STAFF_USERNAMES = new Set(['staff1', 'staff2', 'staff3']);
 
 export const createBaseState = () => ({
   parties: [],
   items: [],
   materials: [],
-  psdRequirements: ['90% < 10M', 'd(0.9) < 10 Micron', 'd(0.9) < 20 Micron'],
+  psdRequirements: ['90% < 10M', 'd(0.9) < 10 Micron', 'd(0.9) < 20 Micron', 'N/A'],
+  dcDeliveryNotes: [
+    'Material sent for Micronisation on Job Work basis. Goods to be returned after processing.'
+  ],
   units: ['Kg', 'MT', 'Drum', 'Ltr', 'Pcs'],
   taxes: [
     { name: 'GST 18%', rate: 18 },
@@ -47,11 +54,31 @@ export const createBaseState = () => ({
   utilityTempRecords: [],
   pmAirCompressorRecords: [],
   auditLogs: [],
+  esslSettings: defaultEsslSettings(),
   users: [
-    { id: 1, employeeId: 'EMP001', department: 'Management', name: 'Administrator', username: 'admin', role: 'Admin', active: true, passwordHash: DEFAULT_ADMIN_PASSWORD_HASH },
-    { id: 2, employeeId: 'EMP002', department: 'Production', name: 'Staff One', username: 'staff1', role: 'Staff', permissions: [], active: true },
-    { id: 3, employeeId: 'EMP003', department: 'Packaging', name: 'Staff Two', username: 'staff2', role: 'Staff', permissions: [], active: true },
-    { id: 4, employeeId: 'EMP004', department: 'Quality Control', name: 'Staff Three', username: 'staff3', role: 'Staff', permissions: [], active: true }
+    {
+      id: 1, employeeId: 'EMP001', department: 'Management', name: 'Administrator', username: 'admin', role: 'Admin',
+      active: true, permissions: [], passwordHash: DEFAULT_ADMIN_PASSWORD_HASH,
+      esslId: '', shiftType: '9hr', perDayRate: 0, otRate: 0, effectiveFrom: '', rateHistory: []
+    },
+    {
+      id: 2, employeeId: 'EMP002', department: 'Production', name: 'Staff One', username: 'staff1', role: 'Staff',
+      permissions: [...ALL_STAFF_MODULE_IDS], active: true, passwordHash: DEFAULT_STAFF_PASSWORD_HASH,
+      esslId: '1001', shiftType: '9hr', perDayRate: 800, otRate: 100, effectiveFrom: '2025-04-01',
+      rateHistory: [{ id: 'rh-2-1', effectiveFrom: '2025-04-01', perDayRate: 800, otRate: 100 }]
+    },
+    {
+      id: 3, employeeId: 'EMP003', department: 'Packaging', name: 'Staff Two', username: 'staff2', role: 'Staff',
+      permissions: [...ALL_STAFF_MODULE_IDS], active: true, passwordHash: DEFAULT_STAFF_PASSWORD_HASH,
+      esslId: '1002', shiftType: '12hr', perDayRate: 950, otRate: 120, effectiveFrom: '2025-04-01',
+      rateHistory: [{ id: 'rh-3-1', effectiveFrom: '2025-04-01', perDayRate: 950, otRate: 120 }]
+    },
+    {
+      id: 4, employeeId: 'EMP004', department: 'Quality Control', name: 'Staff Three', username: 'staff3', role: 'Staff',
+      permissions: [...ALL_STAFF_MODULE_IDS], active: true, passwordHash: DEFAULT_STAFF_PASSWORD_HASH,
+      esslId: '1003', shiftType: '9hr', perDayRate: 850, otRate: 110, effectiveFrom: '2025-04-01',
+      rateHistory: [{ id: 'rh-4-1', effectiveFrom: '2025-04-01', perDayRate: 850, otRate: 110 }]
+    }
   ],
   currentUser: null,
   settings: {
@@ -114,6 +141,16 @@ export const normalizeAppState = (parsed) => {
     ...baseState,
     ...parsed,
     materialReceipts: migrateMaterialReceipts(parsed.materialReceipts, parsed.parties),
+    psdRequirements: (() => {
+      const list = [...(parsed.psdRequirements || baseState.psdRequirements || [])];
+      if (!list.some((r) => String(r).trim().toUpperCase() === 'N/A')) list.push('N/A');
+      return list;
+    })(),
+    dcDeliveryNotes: (() => {
+      const list = [...(parsed.dcDeliveryNotes || [])];
+      if (list.length === 0) return [...(baseState.dcDeliveryNotes || [])];
+      return list;
+    })(),
     settings: {
       ...baseState.settings,
       ...parsed.settings,
@@ -154,16 +191,62 @@ export const normalizeAppState = (parsed) => {
     salaryReports: parsed.salaryReports || [],
     auditLogs: parsed.auditLogs || [],
     users: (parsed.users || baseState.users).map((u, i) => {
-      const isAdminUser = u.role === 'Admin' && (u.username?.toLowerCase() === 'admin' || u.id === 1);
+      const username = u.username?.toLowerCase() === 'admin' ? 'admin' : u.username;
+      const isAdminUser = u.role === 'Admin' && (username === 'admin' || u.id === 1);
+      const isStaff = u.role === 'Staff' || (!isAdminUser && u.role !== 'Admin');
+      const rawPerms = Array.isArray(u.permissions) ? u.permissions.filter(Boolean) : [];
+      // Legacy Staff with empty permissions had full access — materialize explicit full list once
+      const permissions = isAdminUser
+        ? []
+        : (rawPerms.length ? rawPerms : (isStaff ? [...ALL_STAFF_MODULE_IDS] : []));
+      let passwordHash = u.passwordHash;
+      if (!passwordHash || String(passwordHash).startsWith('000000000000')) {
+        if (isAdminUser) passwordHash = DEFAULT_ADMIN_PASSWORD_HASH;
+        else if (SEED_STAFF_USERNAMES.has(String(username || '').toLowerCase())) {
+          passwordHash = DEFAULT_STAFF_PASSWORD_HASH;
+        } else {
+          passwordHash = passwordHash || undefined;
+        }
+      }
+      let rateHistory = Array.isArray(u.rateHistory) ? [...u.rateHistory] : [];
+      const shiftType = u.shiftType === '12hr' ? '12hr' : '9hr';
+      let perDayRate = Number(u.perDayRate) || 0;
+      let otRate = Number(u.otRate) || 0;
+      let effectiveFrom = u.effectiveFrom || '';
+      if (!rateHistory.length && (perDayRate || otRate)) {
+        rateHistory = [{
+          id: `rh-mig-${u.id || i}`,
+          effectiveFrom: effectiveFrom || '2025-04-01',
+          perDayRate,
+          otRate
+        }];
+        if (!effectiveFrom) effectiveFrom = '2025-04-01';
+      }
+      const seedEssl = { staff1: '1001', staff2: '1002', staff3: '1003' };
+      const esslId = u.esslId != null && u.esslId !== ''
+        ? String(u.esslId)
+        : (seedEssl[String(username || '').toLowerCase()] || '');
       return {
         ...u,
         employeeId: u.employeeId || `EMP00${i + 1}`,
         department: u.department || 'General',
         name: u.name || u.username,
-        username: u.username?.toLowerCase() === 'admin' ? 'admin' : u.username,
-        passwordHash: u.passwordHash || (isAdminUser ? DEFAULT_ADMIN_PASSWORD_HASH : undefined)
+        username,
+        role: isAdminUser ? 'Admin' : (u.role || 'Staff'),
+        permissions,
+        passwordHash,
+        esslId,
+        shiftType,
+        perDayRate,
+        otRate,
+        effectiveFrom,
+        rateHistory
       };
     }),
+    attendance: parsed.attendance || [],
+    salaryRates: parsed.salaryRates || null,
+    salaryReports: parsed.salaryReports || [],
+    esslSettings: { ...defaultEsslSettings(), ...(parsed.esslSettings || {}) },
     currentUser: null,
     companyProfile: mergeCompanyProfile(parsed.companyProfile)
   };

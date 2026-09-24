@@ -36,6 +36,7 @@ export const MODULE_OPTIONS = [
   { id: '/processing-sheet', label: 'Processing Sheet', group: 'Reports' },
   { id: '/tasks', label: 'Tasks', group: 'Reports' },
   { id: '/quotations', label: 'Quotations', group: 'Reports' },
+  { id: '/employee-salary', label: 'Employee Salary', group: 'Reports', highlight: true },
   { id: '/attendance', label: 'Attendance', group: 'Reports' },
   { id: '/salary-calculation', label: 'Salary Calculation', group: 'Reports' }
 ];
@@ -54,8 +55,7 @@ export const getUserPermissions = (user) => {
   if (!user) return [];
   if (user.role === 'Admin') return ALL_STAFF_MODULE_IDS;
   const perms = Array.isArray(user.permissions) ? user.permissions.filter(Boolean) : [];
-  // Empty = full Staff access (legacy accounts)
-  if (!perms.length) return ALL_STAFF_MODULE_IDS;
+  // Empty / missing = no module access (legacy empty lists are expanded on load in normalizeAppState)
   return perms;
 };
 
@@ -75,6 +75,14 @@ export const canAccessModule = (user, pathname) => {
 
   if (perms.includes(path)) return true;
 
+  // Employee Salary hub shares access with attendance / salary modules
+  if (path === '/employee-salary') {
+    return perms.includes('/employee-salary') || perms.includes('/attendance') || perms.includes('/salary-calculation');
+  }
+  if (path === '/attendance' || path === '/salary-calculation') {
+    return perms.includes(path) || perms.includes('/employee-salary');
+  }
+
   // Marketing hash routes share /marketing
   if (path.startsWith('/marketing')) return perms.includes('/marketing') || perms.includes(path);
 
@@ -84,8 +92,7 @@ export const canAccessModule = (user, pathname) => {
 /** Which E-Way document types this user may manage. */
 export const getEwayTypeAccess = (user) => {
   if (!user || user.role === 'Admin') return { dc: true, ti: true };
-  const perms = Array.isArray(user.permissions) ? user.permissions.filter(Boolean) : [];
-  if (!perms.length) return { dc: true, ti: true };
+  const perms = getUserPermissions(user);
   const allEway = perms.includes('/eway');
   return {
     dc: allEway || perms.includes('/eway-dc'),

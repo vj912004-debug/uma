@@ -39,8 +39,9 @@ import MarketingManagement from './modules/MarketingManagement';
 import MarketingFollowUp from './modules/MarketingFollowUp';
 import RecycleBin from './modules/RecycleBin';
 import SystemLogs from './modules/SystemLogs';
-import Attendance from './modules/Attendance';
 import SalaryCalculation from './modules/SalaryCalculation';
+import EmployeeSalaryManagement from './modules/EmployeeSalaryManagement';
+import Attendance from './modules/Attendance';
 import CompanyProfileSettings from './modules/CompanyProfileSettings';
 import EmployeeManagement from './modules/EmployeeManagement';
 
@@ -102,6 +103,7 @@ const AppLayout = () => {
         <Route path="/marketing-follow-up" element={<MarketingFollowUp />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/salary-calculation" element={<SalaryCalculation />} />
+        <Route path="/employee-salary" element={<EmployeeSalaryManagement />} />
         <Route path="/settings/company-profile" element={<ProtectedRoute adminOnly><CompanyProfileSettings /></ProtectedRoute>} />
         <Route path="/employees" element={<ProtectedRoute adminOnly><EmployeeManagement /></ProtectedRoute>} />
         <Route path="/recycle-bin" element={<ProtectedRoute adminOnly><RecycleBin /></ProtectedRoute>} />

@@ -1180,8 +1180,10 @@ export const renderQuotationPdf = async (data, { mode = 'save', printPrefs } = {
   const html = buildQuotationHtml(quote, quote.companyProfile);
   await renderHtmlToPdf(html, {
     mode,
-    filePrefix: 'QUOTATION',
-    docNo: data.quotationNo || 'N/A',
+    filePrefix: 'QT',
+    docNo: data.quotationNo || quote.quotationNo || 'N/A',
+    partyName: data.partyName || quote.partyName || '',
+    data: quote,
     width: 794,
     fitPage: true,
     printPrefs,

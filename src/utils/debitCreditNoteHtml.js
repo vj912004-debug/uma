@@ -944,11 +944,13 @@ const buildCreditNoteHtml = (data, profileInput) => {
   return buildNoteHtmlCommon(data, profileInput, 'Credit Note', ['Sales Return', 'Rate Difference', 'Discount', 'Excess Billing', 'Material Rejection']);
 };
 
-const renderPdfCommon = async (html, docNo, prefix, mode, printPrefs) => {
+const renderPdfCommon = async (html, docNo, prefix, mode, printPrefs, data = null) => {
   await renderHtmlToPdf(html, {
     mode,
     filePrefix: prefix,
     docNo,
+    partyName: data?.partyName || '',
+    data,
     fitPage: true,
     splitOverflowPages: true,
     printPrefs
@@ -957,10 +959,10 @@ const renderPdfCommon = async (html, docNo, prefix, mode, printPrefs) => {
 
 export const renderDebitNotePdf = async (data, { mode = 'save', printPrefs } = {}) => {
   const { html, docNo } = buildDebitNoteHtml(data, data.companyProfile);
-  await renderPdfCommon(html, docNo, 'DN', mode, printPrefs);
+  await renderPdfCommon(html, docNo, 'DN', mode, printPrefs, data);
 };
 
 export const renderCreditNotePdf = async (data, { mode = 'save', printPrefs } = {}) => {
   const { html, docNo } = buildCreditNoteHtml(data, data.companyProfile);
-  await renderPdfCommon(html, docNo, 'CN', mode, printPrefs);
+  await renderPdfCommon(html, docNo, 'CN', mode, printPrefs, data);
 };

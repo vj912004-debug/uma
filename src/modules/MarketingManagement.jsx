@@ -21,6 +21,7 @@ import { useAppContext } from '../context/AppContext';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import SearchableSelect from '../components/SearchableSelect';
+import StatusTabBar from '../components/StatusTabBar';
 import { formatDate } from '../utils/dateUtils';
 
 const LEAD_SOURCES = ['Website', 'Referral', 'Cold Call', 'Exhibition', 'Email', 'Walk-in', 'Other'];
@@ -121,6 +122,7 @@ const MarketingManagement = () => {
   const [leadSearch, setLeadSearch] = useState('');
   const [leadSourceFilter, setLeadSourceFilter] = useState('');
   const [leadStatusFilter, setLeadStatusFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('pending');
   const [leadPage, setLeadPage] = useState(1);
 
   const [followForm, setFollowForm] = useState(emptyFollowUp);
@@ -162,16 +164,24 @@ const MarketingManagement = () => {
     return lead ? `${lead.companyName} (${lead.contactPerson || '—'})` : '—';
   };
 
+  const isLeadPending = (r) => ['New', 'Contacted', 'Follow Up'].includes(r.status);
+  const isLeadCompleted = (r) => ['Closed', 'Converted', 'Won', 'Lost'].includes(r.status);
+
   const filteredLeads = useMemo(() => {
     const q = leadSearch.trim().toLowerCase();
     return leads.filter((r) => {
+      if (statusTab === 'pending' && !isLeadPending(r)) return false;
+      if (statusTab === 'completed' && !isLeadCompleted(r)) return false;
       if (leadSourceFilter && r.source !== leadSourceFilter) return false;
       if (leadStatusFilter && r.status !== leadStatusFilter) return false;
       if (!q) return true;
       return [r.companyName, r.contactPerson, r.mobile, r.email, r.source, r.status]
         .some((v) => String(v || '').toLowerCase().includes(q));
     });
-  }, [leads, leadSearch, leadSourceFilter, leadStatusFilter]);
+  }, [leads, leadSearch, leadSourceFilter, leadStatusFilter, statusTab]);
+
+  const pendingCount = leads.filter(isLeadPending).length;
+  const completedCount = leads.filter(isLeadCompleted).length;
 
   const leadPages = Math.max(1, Math.ceil(filteredLeads.length / PAGE_SIZE));
   const leadPageSafe = Math.min(leadPage, leadPages);
@@ -412,6 +422,13 @@ const MarketingManagement = () => {
 
         {/* 2. View / Manage Leads */}
         <Panel no="2" title="View / Manage Leads" id="mkt-leads">
+          <StatusTabBar
+            value={statusTab}
+            onChange={(v) => { setStatusTab(v); setLeadPage(1); }}
+            allCount={leads.length}
+            pendingCount={pendingCount}
+            completedCount={completedCount}
+          />
           <div className="mkt-toolbar">
             <div className="pm-search">
               <Search size={14} />

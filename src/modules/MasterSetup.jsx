@@ -1,12 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Plus, Trash2, Tag, Box, Ruler, Percent, SlidersHorizontal } from 'lucide-react';
+import { Plus, Trash2, Tag, Box, Ruler, Percent, SlidersHorizontal, FileText } from 'lucide-react';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 
 const TAB_CONFIG = {
   Items: { key: 'items', title: 'Product Master', placeholder: 'Enter product name...', isTax: false },
   Materials: { key: 'materials', title: 'Material Master', placeholder: 'Enter material name...', isTax: false },
   PSDReq: { key: 'psdRequirements', title: 'PSD Requirement Master', placeholder: 'Enter PSD requirement (e.g. d(0.9) < 10 Micron)...', isTax: false },
+  DCNotes: {
+    key: 'dcDeliveryNotes',
+    title: 'DC Delivery Notes Master',
+    placeholder: 'Enter delivery note text for Delivery Challan print...',
+    isTax: false,
+    multiline: true
+  },
   Units: { key: 'units', title: 'Unit Master', placeholder: 'Enter unit (e.g. Kg)...', isTax: false },
   Taxes: { key: 'taxes', title: 'Tax Master', isTax: true }
 };
@@ -97,10 +104,11 @@ const MasterSetup = () => {
         <p style={{ color: 'var(--text-muted)' }}>Configure your system-wide master data.</p>
       </header>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
         <TabButton name="Products" icon={Tag} tabId="Items" />
         <TabButton name="Materials" icon={Box} tabId="Materials" />
         <TabButton name="PSD Req" icon={SlidersHorizontal} tabId="PSDReq" />
+        <TabButton name="DC Notes" icon={FileText} tabId="DCNotes" />
         <TabButton name="Units" icon={Ruler} tabId="Units" />
         <TabButton name="Taxes" icon={Percent} tabId="Taxes" />
       </div>
@@ -131,6 +139,7 @@ const MasterSetup = () => {
             onAdd={(val) => addItem(tab.key, val)}
             onRemove={removeFiltered}
             placeholder={tab.placeholder}
+            multiline={!!tab.multiline}
           />
         )}
       </div>
@@ -138,22 +147,33 @@ const MasterSetup = () => {
   );
 };
 
-const MasterList = ({ title, items, onAdd, onRemove, placeholder }) => {
+const MasterList = ({ title, items, onAdd, onRemove, placeholder, multiline = false }) => {
   const [val, setVal] = useState('');
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h3>{title}</h3>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <input type="text" className="input-field" placeholder={placeholder} value={val} onChange={e => setVal(e.target.value)} />
-          <button className="btn btn-primary" onClick={() => { if(val) { onAdd(val); setVal(''); } }}><Plus size={18} /></button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: multiline ? 'flex-start' : 'center', marginBottom: '1.5rem', gap: '1rem', flexWrap: 'wrap' }}>
+        <h3 style={{ margin: 0 }}>{title}</h3>
+        <div style={{ display: 'flex', gap: '0.5rem', flex: multiline ? '1 1 420px' : undefined, alignItems: multiline ? 'flex-start' : 'center' }}>
+          {multiline ? (
+            <textarea
+              className="input-field"
+              rows="2"
+              placeholder={placeholder}
+              value={val}
+              onChange={e => setVal(e.target.value)}
+              style={{ flex: 1, minWidth: 0 }}
+            />
+          ) : (
+            <input type="text" className="input-field" placeholder={placeholder} value={val} onChange={e => setVal(e.target.value)} />
+          )}
+          <button className="btn btn-primary" onClick={() => { if (val.trim()) { onAdd(val.trim()); setVal(''); } }}><Plus size={18} /></button>
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: multiline ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
         {items.map((item, idx) => (
-          <div key={idx} className="glass-panel" style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>{item}</span>
-            <button style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }} onClick={() => onRemove(idx)}><Trash2 size={16} /></button>
+          <div key={idx} className="glass-panel" style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
+            <span style={{ whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{item}</span>
+            <button style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', flexShrink: 0 }} onClick={() => onRemove(idx)}><Trash2 size={16} /></button>
           </div>
         ))}
       </div>

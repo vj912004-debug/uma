@@ -497,27 +497,15 @@ export const applyProformaFinancialsToTaxInvoice = (ti, piOrTerms) => {
   };
 };
 
-/** Repair all TIs so each matches its linked PI total (in-memory; caller persists). */
-export const syncAllTaxInvoicesWithProformas = (invoices = []) => {
-  let changed = false;
-  const next = invoices.map((inv) => {
-    const isTI = !inv?.isDeleted && (
-      inv.type === 'Tax Invoice' || inv.invoiceNo?.includes('/IN/')
-    );
-    if (!isTI || !inv.receiptId) return inv;
-    const pi = findAnyProformaInvoice(invoices, inv.receiptId);
-    if (!pi || typeof pi.total !== 'number') return inv;
-
-    const sameTotal = Math.abs((parseFloat(inv.total) || 0) - (parseFloat(pi.total) || 0)) < 0.005;
-    const sameDiscount = Math.abs((parseFloat(inv.discount) || 0) - (parseFloat(pi.discount) || 0)) < 0.005;
-    const sameQty = Math.abs((parseFloat(inv.qty) || 0) - (parseFloat(pi.qty) || 0)) < 0.005;
-    if (sameTotal && sameDiscount && sameQty) return inv;
-
-    changed = true;
-    return applyProformaFinancialsToTaxInvoice(inv, pi);
-  });
-  return { invoices: next, changed };
-};
+/**
+ * Previously forced every TI to match its linked PI total.
+ * Disabled so direct TI edits persist in the list and print.
+ * New TIs still seed from PI in the create form.
+ */
+export const syncAllTaxInvoicesWithProformas = (invoices = []) => ({
+  invoices,
+  changed: false
+});
 
 /** TI charges: prefer exact PI product blocks, fall back to MR settings. */
 export const resolveTIProductChargesForDoc = (mr, party, invoices, prodOpts = {}) => {
@@ -739,9 +727,12 @@ export const enrichTIForPrint = (ti, appData = {}) => {
       const prodOpts = receiptProductOptions(mr, appData);
       const pl = findAnyPackingList(appData.packingLists, ti.receiptId);
       const summaries = buildPLProductSummaries(pl, mr, prodOpts);
-      const piTerms = getLinkedPITermsForTI(appData.invoices, ti.receiptId);
-      const baseCharges = piTerms?.productCharges
-        || initProductChargesFromMR(mr, prodOpts.party, prodOpts);
+      // Prefer saved TI charges for print; fall back to PI / MR only when TI has none
+      const hasTiCharges = ti.productCharges && Object.keys(sanitizeProductCharges(ti.productCharges)).length > 0;
+      const piTerms = !hasTiCharges ? getLinkedPITermsForTI(appData.invoices, ti.receiptId) : null;
+      const baseCharges = hasTiCharges
+        ? sanitizeProductCharges(ti.productCharges)
+        : (piTerms?.productCharges || initProductChargesFromMR(mr, prodOpts.party, prodOpts));
       const mergedCharges = mergeSavedChargesPreferDoc(ti.productCharges, baseCharges);
       const savedQty = parseFloat(ti.qty) || 0;
       const liveQty = getMRReceivedQty(mr, prodOpts);

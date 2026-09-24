@@ -68,7 +68,7 @@ const ProcessingSheet = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState(location.state?.partyName || '');
   const [productFilter, setProductFilter] = useState('');
-  const [statusTab, setStatusTab] = useState('all');
+  const [statusTab, setStatusTab] = useState('pending');
 
   useEffect(() => {
     if (location.state?.partyName) {

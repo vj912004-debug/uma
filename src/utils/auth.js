@@ -1,4 +1,6 @@
 export const DEFAULT_ADMIN_PASSWORD_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
+/** SHA-256 of `staff123` — default password for seed Staff accounts */
+export const DEFAULT_STAFF_PASSWORD_HASH = '10176e7b7b24d317acfcf8d2064cfd2f24e154f7b5a96603077d5ef813d6a6b6';
 
 export async function hashPassword(password) {
   const encoder = new TextEncoder();

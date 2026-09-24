@@ -837,6 +837,8 @@ export const renderDeliveryChallanPdf = async (data, { mode = 'save', printPrefs
     mode,
     filePrefix: 'DC',
     docNo: data.dcNo || 'N/A',
+    partyName: data.partyName || '',
+    data,
     width: 794,
     fitPage: true,
     splitOverflowPages: true,

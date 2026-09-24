@@ -3,6 +3,7 @@
 import { applyPrintPrefsToHtml, getStoredPrintPrefs, PRINT_ROOT_CLASS, getPrintDensity, getPrintMinFitScale, normalizePrintPrefs } from './printPrefs';
 import { DEFAULT_PRINT_LOGO_SRC } from './defaultPrintLogo';
 import { getBankDetailRows } from './companyProfile';
+import { buildPdfDownloadFileName } from './pdfFileName';
 
 export { applyPrintPrefsToHtml } from './printPrefs';
 export { DEFAULT_PRINT_LOGO_SRC } from './defaultPrintLogo';
@@ -1413,6 +1414,8 @@ export const renderHtmlToPdf = async (html, {
   mode = 'save',
   filePrefix = 'DOC',
   docNo = 'N/A',
+  partyName = '',
+  data = null,
   width = PRINT_PAGE_W,
   fitPage = false,
   printPrefs,
@@ -1868,12 +1871,20 @@ export const renderHtmlToPdf = async (html, {
       }
     }
 
+    const downloadName = buildPdfDownloadFileName({
+      filePrefix,
+      docNo,
+      partyName,
+      data
+    });
+    const titleBase = downloadName.replace(/\.pdf$/i, '');
+
     if (mode === 'view') {
       const url = pdf.output('bloburl');
       const win = window.open(url, '_blank');
-      if (win) win.document.title = `${filePrefix}_${docNo}`;
+      if (win) win.document.title = titleBase;
     } else {
-      pdf.save(`${filePrefix}_${docNo}.pdf`);
+      pdf.save(downloadName);
     }
   } finally {
     iframe.remove();

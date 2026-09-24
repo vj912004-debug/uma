@@ -11,7 +11,7 @@ const Payments = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusTab, setStatusTab] = useState('all');
+  const [statusTab, setStatusTab] = useState('pending');
   
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],

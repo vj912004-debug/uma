@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import DateField from '../components/DateField';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+import StatusTabBar from '../components/StatusTabBar';
 import {
   Eye,
   ArrowLeft,
@@ -110,6 +111,7 @@ const PaymentFollowUp = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [statusTab, setStatusTab] = useState('pending');
   const [selectedPartyId, setSelectedPartyId] = useState(null);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
 
@@ -165,10 +167,37 @@ const PaymentFollowUp = () => {
     [promises]
   );
 
-  const partyOptions = useMemo(() => uniqueSortedOptions(customers.map((c) => c.partyName)), [customers]);
+  const isCustomerPending = (c) => (parseFloat(c.outstandingAmount) || 0) > 0.01;
+
+  const tabCustomers = useMemo(() => {
+    const pendingIds = new Set(customers.map((c) => String(c.partyId)));
+    const settled = (data.parties || [])
+      .filter((p) => !p.isDeleted && !pendingIds.has(String(p.id)))
+      .map((p) => ({
+        partyId: p.id,
+        partyName: p.name,
+        outstandingAmount: 0,
+        overdueAmount: 0,
+        pendingInvoices: 0,
+        invoices: [],
+        phone: p.phone1 || p.mobile || '',
+        email: p.email1 || p.email || '',
+        lastFollowUp: '',
+        nextFollowUp: ''
+      }));
+    return [...customers, ...settled];
+  }, [customers, data.parties]);
+
+  const partyOptions = useMemo(() => uniqueSortedOptions(tabCustomers.map((c) => c.partyName)), [tabCustomers]);
+
+  const pendingCount = tabCustomers.filter(isCustomerPending).length;
+  const completedCount = tabCustomers.filter((c) => !isCustomerPending(c)).length;
+
   const filteredCustomers = useMemo(() => {
     const s = searchTerm.trim().toLowerCase();
-    return customers.filter((c) => {
+    return tabCustomers.filter((c) => {
+      if (statusTab === 'pending' && !isCustomerPending(c)) return false;
+      if (statusTab === 'completed' && isCustomerPending(c)) return false;
       if (partyFilter && (c.partyName || '') !== partyFilter) return false;
       if (statusFilter === 'overdue' && c.overdueAmount < 0.01) return false;
       if (statusFilter === 'due_today' && c.nextFollowUp !== today) return false;
@@ -181,14 +210,14 @@ const PaymentFollowUp = () => {
         (c.email || '').toLowerCase().includes(s)
       );
     });
-  }, [customers, searchTerm, partyFilter, statusFilter, today, tomorrow, promisedPartyIds]);
+  }, [tabCustomers, statusTab, searchTerm, partyFilter, statusFilter, today, tomorrow, promisedPartyIds]);
 
   const selectedCustomer = useMemo(() => {
     if (!selectedPartyId) return null;
-    return customers.find((c) => String(c.partyId) === String(selectedPartyId))
-      || customers.find((c) => c.partyName === selectedPartyId)
+    return tabCustomers.find((c) => String(c.partyId) === String(selectedPartyId))
+      || tabCustomers.find((c) => c.partyName === selectedPartyId)
       || null;
-  }, [customers, selectedPartyId]);
+  }, [tabCustomers, selectedPartyId]);
 
   const customerInvoices = useMemo(() => {
     if (!selectedCustomer) return [];
@@ -223,8 +252,8 @@ const PaymentFollowUp = () => {
   }, [data.paymentFollowUps, selectedPartyId]);
 
   const openCustomer = (partyId) => {
-    const cust = customers.find((c) => String(c.partyId) === String(partyId))
-      || customers.find((c) => c.partyName === partyId);
+    const cust = tabCustomers.find((c) => String(c.partyId) === String(partyId))
+      || tabCustomers.find((c) => c.partyName === partyId);
     setSelectedPartyId(cust?.partyId || partyId);
     const invs = (cust?.invoices || []).length
       ? cust.invoices
@@ -779,15 +808,24 @@ const PaymentFollowUp = () => {
       </header>
 
       {(view === 'dashboard' || view === 'customers') && (
-        <ListFilterBar
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          placeholder="Search customer, phone or email…"
-          partyFilter={partyFilter}
-          onPartyChange={setPartyFilter}
-          partyOptions={partyOptions}
-          showProduct={false}
-        />
+        <>
+          <StatusTabBar
+            value={statusTab}
+            onChange={setStatusTab}
+            allCount={tabCustomers.length}
+            pendingCount={pendingCount}
+            completedCount={completedCount}
+          />
+          <ListFilterBar
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            placeholder="Search customer, phone or email…"
+            partyFilter={partyFilter}
+            onPartyChange={setPartyFilter}
+            partyOptions={partyOptions}
+            showProduct={false}
+          />
+        </>
       )}
 
       {view === 'dashboard' && renderDashboard()}

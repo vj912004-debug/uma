@@ -827,6 +827,8 @@ export const renderTaxInvoicePdf = async (data, { mode = 'save', printPrefs } = 
     mode,
     filePrefix: 'TI',
     docNo: data.invoiceNo || 'N/A',
+    partyName: data.partyName || '',
+    data,
     fitPage: true,
     splitOverflowPages: true,
     printPrefs

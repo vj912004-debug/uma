@@ -28,6 +28,7 @@ import {
 import { useAppContext } from '../context/AppContext';
 import DateField from '../components/DateField';
 import SearchableSelect from '../components/SearchableSelect';
+import StatusTabBar from '../components/StatusTabBar';
 import { formatDate, getDefaultFiscalYearRange } from '../utils/dateUtils';
 
 const PAGE_SIZE = 10;
@@ -118,6 +119,7 @@ const PurchaseManagement = () => {
   const [listFrom, setListFrom] = useState('');
   const [listTo, setListTo] = useState('');
   const [listSearch, setListSearch] = useState('');
+  const [statusTab, setStatusTab] = useState('pending');
   const [page, setPage] = useState(1);
   const [activeAction, setActiveAction] = useState('new');
   const [showForm, setShowForm] = useState(false);
@@ -169,10 +171,15 @@ const PurchaseManagement = () => {
     return { total, quotes, pendingFollow, approved, inStock, lowStock };
   }, [rangedInquiries, stockItems]);
 
+  const isInquiryPending = (r) => r.status !== 'Closed';
+  const isInquiryCompleted = (r) => r.status === 'Closed';
+
   const filtered = useMemo(() => {
     const gq = globalSearch.trim().toLowerCase();
     const lq = listSearch.trim().toLowerCase();
     return rangedInquiries.filter((r) => {
+      if (statusTab === 'pending' && !isInquiryPending(r)) return false;
+      if (statusTab === 'completed' && !isInquiryCompleted(r)) return false;
       if (statusFilter && r.status !== statusFilter) return false;
       if (categoryFilter && r.category !== categoryFilter) return false;
       if (listFrom && r.date < listFrom) return false;
@@ -184,7 +191,10 @@ const PurchaseManagement = () => {
       if (lq && !hay.includes(lq)) return false;
       return true;
     });
-  }, [rangedInquiries, statusFilter, categoryFilter, listFrom, listTo, globalSearch, listSearch]);
+  }, [rangedInquiries, statusTab, statusFilter, categoryFilter, listFrom, listTo, globalSearch, listSearch]);
+
+  const pendingCount = rangedInquiries.filter(isInquiryPending).length;
+  const completedCount = rangedInquiries.filter(isInquiryCompleted).length;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -443,6 +453,14 @@ const PurchaseManagement = () => {
           })}
         </div>
       </section>
+
+      <StatusTabBar
+        value={statusTab}
+        onChange={(v) => { setStatusTab(v); setPage(1); }}
+        allCount={rangedInquiries.length}
+        pendingCount={pendingCount}
+        completedCount={completedCount}
+      />
 
       <section id="pm-inquiry-list" className="premium-card pm-card">
         <div className="pm-list-head">

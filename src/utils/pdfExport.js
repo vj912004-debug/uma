@@ -17,6 +17,7 @@ import { renderPurchaseOrderPdf } from './purchaseOrderHtml';
 import { renderDebitNotePdf, renderCreditNotePdf } from './debitCreditNoteHtml';
 import { renderDeliveryChallanPdf } from './deliveryChallanHtml';
 import { renderBprPdf, BPR_PAGE2_ROW_COUNT, BPR_PAGE2_BLANK_ROWS } from './bprHtml';
+import { buildPdfDownloadFileName } from './pdfFileName';
 export { BPR_PAGE2_ROW_COUNT, BPR_PAGE2_BLANK_ROWS };
 import { renderPackingListPdf } from './packingListHtml';
 import { renderQuotationPdf } from './quotationPdf';
@@ -2155,7 +2156,7 @@ export const exportToPDF = (docType, data, options = {}) => {
     return;
   }
   const { doc, docNo } = buildPDF(docType, enriched);
-  doc.save(`${docType}_${docNo}.pdf`);
+  doc.save(buildPdfDownloadFileName({ docType, docNo, data: enriched }));
 };
 
 export const viewPDF = (docType, data, options = {}) => {
@@ -2171,7 +2172,7 @@ export const viewPDF = (docType, data, options = {}) => {
   const url = doc.output('bloburl');
   const win = window.open(url, '_blank');
   if (win) {
-    win.document.title = `${docType}_${docNo}`;
+    win.document.title = buildPdfDownloadFileName({ docType, docNo, data: enriched }).replace(/\.pdf$/i, '');
   }
 };
 

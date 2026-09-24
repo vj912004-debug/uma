@@ -22,11 +22,8 @@ import {
   mergeSavedDocCharges,
   getFreshMaterialReceipt,
   findAnyTaxInvoice,
-  findAnyProformaInvoice,
   resolveTIProductChargesForDoc,
   getLinkedPITermsForTI,
-  applyProformaFinancialsToTaxInvoice,
-  syncAllTaxInvoicesWithProformas,
   sanitizeProductCharges,
   enrichTIForPrint
 } from '../utils/documentCharges';
@@ -44,11 +41,11 @@ import {
 import SearchableSelect from '../components/SearchableSelect';
 
 const TaxInvoice = () => {
-  const { data, updateData, updateItem, setData, incrementSerial, deleteItemSoftly } = useAppContext();
+  const { data, updateData, updateItem, incrementSerial, deleteItemSoftly } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
-  const [statusTab, setStatusTab] = useState('all');
+  const [statusTab, setStatusTab] = useState('pending');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedPL, setSelectedPL] = useState(null);
@@ -146,12 +143,6 @@ const TaxInvoice = () => {
     };
   };
 
-  // Keep every TI total identical to its linked PI (repairs existing mismatches)
-  useEffect(() => {
-    const { invoices, changed } = syncAllTaxInvoicesWithProformas(data.invoices);
-    if (changed) setData((prev) => ({ ...prev, invoices }));
-  }, [data.invoices, setData]);
-
   useEffect(() => {
     if (!isModalOpen) return;
 
@@ -164,12 +155,10 @@ const TaxInvoice = () => {
         : (editingDoc.productSummaries || []);
       const receivedQty = mr ? getMRReceivedQty(mr, opts) : (parseFloat(editingDoc.qty) || 0);
       const merged = mergeSavedDocCharges(editingDoc, receivedQty);
-      const piTerms = getLinkedPITermsForTI(data.invoices, editingDoc.receiptId);
-      // Prefer linked PI commercial terms so TI total matches PI after Save
-      const productCharges = piTerms?.productCharges
-        || (editingDoc.productCharges && Object.keys(editingDoc.productCharges).length
-          ? sanitizeProductCharges(editingDoc.productCharges)
-          : (editingDoc.productCharges || {}));
+      // Prefer saved TI values so direct edits stick (do not re-pull from PI)
+      const productCharges = editingDoc.productCharges && Object.keys(editingDoc.productCharges).length
+        ? sanitizeProductCharges(editingDoc.productCharges)
+        : (editingDoc.productCharges || {});
       setForm(prev => ({
         ...editingDoc,
         ...merged,
@@ -177,12 +166,10 @@ const TaxInvoice = () => {
         productName: mr ? getReceiptProductLabel(mr, opts) : (editingDoc.productName || ''),
         productSummaries: productSummaries.length ? productSummaries : (editingDoc.productSummaries || []),
         productCharges,
-        customCharges: piTerms?.customCharges?.length
-          ? piTerms.customCharges
-          : (editingDoc.customCharges || []),
-        discount: piTerms ? piTerms.discount : (editingDoc.discount || 0),
-        taxRate: piTerms ? piTerms.taxRate : (editingDoc.taxRate ?? 18),
-        gstType: (piTerms?.gstType || editingDoc.gstType) === 'igst' ? 'igst' : GST_TYPE_CGST_SGST,
+        customCharges: editingDoc.customCharges || [],
+        discount: editingDoc.discount || 0,
+        taxRate: editingDoc.taxRate ?? 18,
+        gstType: editingDoc.gstType === 'igst' ? 'igst' : GST_TYPE_CGST_SGST,
         invoiceNo: prev.invoiceNo || editingDoc.invoiceNo,
         date: prev.date || editingDoc.date
       }));
@@ -466,7 +453,7 @@ const TaxInvoice = () => {
     const legacyBlock = sanitizedProductCharges[firstProd] || {};
     const receiptId = activeMR?.id || activePL?.receiptId || editingDoc?.receiptId || '';
 
-    let finalDoc = {
+    const finalDoc = {
       ...form,
       receiptId,
       partyId: form.partyId || activeMR?.partyId || editingDoc?.partyId || '',
@@ -486,20 +473,15 @@ const TaxInvoice = () => {
       ewayBillDate: editingDoc?.ewayBillDate || ''
     };
 
-    // Force TI financials to match linked PI exactly
-    const linkedPI = findAnyProformaInvoice(data.invoices, receiptId);
-    if (linkedPI && typeof linkedPI.total === 'number') {
-      finalDoc = applyProformaFinancialsToTaxInvoice(finalDoc, linkedPI);
-    }
-
+    // Keep form values as saved — PI is only used to seed the create form, not to overwrite on save.
     if (editingDoc) {
-      updateItem('invoices', editingDoc.id, finalDoc);
+      updateItem('invoices', editingDoc.id, { ...finalDoc, preserveFinancials: true });
     } else {
       if (finalDoc.receiptId && findAnyTaxInvoice(data.invoices, finalDoc.receiptId)) {
         alert('A Tax Invoice already exists for this Material Receipt. Please edit the existing TI.');
         return;
       }
-      updateData('invoices', { ...finalDoc, id: Date.now().toString() });
+      updateData('invoices', { ...finalDoc, id: Date.now().toString(), preserveFinancials: true });
       incrementSerial('TI');
     }
     setIsModalOpen(false);
@@ -584,40 +566,45 @@ const TaxInvoice = () => {
         completedCount={taxInvoices.length}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: statusTab === 'all' ? '1fr 2fr' : '1fr', gap: '1.5rem' }}>
-        {(statusTab === 'all' || statusTab === 'pending') && (
+      {statusTab === 'pending' ? (
         <div className="premium-card">
-          <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
-            Pending Invoicing Queue
-          </h3>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Select a packed dispatch to generate commercial Tax Invoices.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {uniquePendingPLs.length === 0 ? (
-              <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', fontSize: '0.85rem' }}>No pending dispatches awaiting invoices.</p>
-            ) : (
-              uniquePendingPLs.map(pl => {
-                const mr = (data.materialReceipts || []).find(m => m.id === pl.receiptId);
-                const label = mr ? getReceiptProductLabel(mr, receiptProductOptions(mr, data)) : pl.productName;
-                return (
-                <div 
-                  key={pl.id} 
-                  className="glass-panel" 
-                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.15s ease' }} 
-                  onClick={() => handleCreate(pl)}
-                >
-                  <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{pl.plNo}</p>
-                  <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.25rem 0' }}>{label}</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Weight: {pl.totalWeight?.toFixed(1) || 0} Kg</p>
-                </div>
-              )})
-            )}
+          <h3 style={{ marginBottom: '1.5rem' }}>Awaiting Tax Invoice</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>PL No</th>
+                  <th style={{ padding: '0.75rem' }}>Product</th>
+                  <th style={{ padding: '0.75rem' }}>Weight (Kg)</th>
+                  <th style={{ padding: '0.75rem' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {uniquePendingPLs.length === 0 ? (
+                  <tr><td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No dispatches awaiting invoices.</td></tr>
+                ) : (
+                  uniquePendingPLs.map((pl) => {
+                    const mr = (data.materialReceipts || []).find(m => m.id === pl.receiptId);
+                    const label = mr ? getReceiptProductLabel(mr, receiptProductOptions(mr, data)) : pl.productName;
+                    return (
+                      <tr key={pl.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{pl.plNo}</td>
+                        <td style={{ padding: '0.75rem', fontWeight: 600 }}>{label}</td>
+                        <td style={{ padding: '0.75rem' }}>{pl.totalWeight?.toFixed(1) || 0}</td>
+                        <td style={{ padding: '0.75rem' }}>
+                          <button type="button" className="btn btn-primary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem' }} onClick={() => handleCreate(pl)}>
+                            Generate TI
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-        )}
-
-        {/* Right Side: TI Log */}
-        {(statusTab === 'all' || statusTab === 'completed') && (
+      ) : (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>Tax Invoice Log History</h3>
 
@@ -662,8 +649,7 @@ const TaxInvoice = () => {
             </table>
           </div>
         </div>
-        )}
-      </div>
+      )}
       </>
       )}
 

@@ -90,7 +90,7 @@ const BPR = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
-  const [statusTab, setStatusTab] = useState('all');
+  const [statusTab, setStatusTab] = useState('pending');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBPR, setEditingBPR] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
@@ -633,38 +633,43 @@ const BPR = () => {
         completedCount={bprList.length}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: statusTab === 'all' ? '1fr 2fr' : '1fr', gap: '1.5rem' }}>
-        {/* Left Side: Pending Receipts scheduler */}
-        {(statusTab === 'all' || statusTab === 'pending') && (
+      {statusTab === 'pending' ? (
         <div className="premium-card">
-          <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ClipboardList size={18} style={{ color: 'var(--accent-primary)' }} />
-            Pending M.R. Receipts
-          </h3>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Select a receipt to enter manufacturing batch weights.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {pendingBprJobs.length === 0 ? (
-              <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', fontSize: '0.85rem' }}>No pending receipts awaiting processing.</p>
-            ) : (
-              pendingBprJobs.map(job => (
-                <div 
-                  key={`${job.mr.id}_${job.productName || 'default'}`} 
-                  className="glass-panel" 
-                  style={{ padding: '1rem', cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.15s ease' }} 
-                  onClick={() => handleCreate(job.mr, job.productName)}
-                >
-                  <p style={{ fontWeight: 600, color: 'var(--accent-primary)', margin: '0 0 0.25rem 0' }}>{job.mr.receiptNo}</p>
-                  <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.25rem 0' }}>{job.mr.partyName}</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>{job.productName || job.mr.productName} - {job.qty} Kg ({job.drums} Drums)</p>
-                </div>
-              ))
-            )}
+          <h3 style={{ marginBottom: '1.5rem' }}>Awaiting BPR</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>M.R. Number</th>
+                  <th style={{ padding: '0.75rem' }}>Party</th>
+                  <th style={{ padding: '0.75rem' }}>Product</th>
+                  <th style={{ padding: '0.75rem' }}>Qty / Drums</th>
+                  <th style={{ padding: '0.75rem' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingBprJobs.length === 0 ? (
+                  <tr><td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No receipts awaiting processing.</td></tr>
+                ) : (
+                  pendingBprJobs.map((job) => (
+                    <tr key={`${job.mr.id}_${job.productName || 'default'}`} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{job.mr.receiptNo}</td>
+                      <td style={{ padding: '0.75rem', fontWeight: 600 }}>{job.mr.partyName}</td>
+                      <td style={{ padding: '0.75rem' }}>{job.productName || job.mr.productName}</td>
+                      <td style={{ padding: '0.75rem' }}>{job.qty} Kg ({job.drums} Drums)</td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <button type="button" className="btn btn-primary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem' }} onClick={() => handleCreate(job.mr, job.productName)}>
+                          Generate BPR
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-        )}
-
-        {/* Right Side: Production History */}
-        {(statusTab === 'all' || statusTab === 'completed') && (
+      ) : (
         <div className="premium-card">
           <h3 style={{ marginBottom: '1.5rem' }}>BPR Production Log</h3>
 
@@ -712,8 +717,7 @@ const BPR = () => {
             </table>
           </div>
         </div>
-        )}
-      </div>
+      )}
       </>
       )}
 
@@ -738,20 +742,38 @@ const BPR = () => {
           </p>
 
           {pendingBprJobs.length > 0 && (
-            <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-              <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Pending Weight Entry</h4>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                {pendingBprJobs.map(job => (
-                  <button
-                    key={`${job.mr.id}_${job.productName || 'default'}`}
-                    type="button"
-                    className="btn btn-secondary"
-                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
-                    onClick={() => handleCreate(job.mr, job.productName, 'page2')}
-                  >
-                    {job.mr.receiptNo} — {job.productName || job.mr.productName} ({job.drums || 0} drums)
-                  </button>
-                ))}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Weight Entry</h4>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '0.5rem 0.75rem' }}>M.R. Number</th>
+                      <th style={{ padding: '0.5rem 0.75rem' }}>Product</th>
+                      <th style={{ padding: '0.5rem 0.75rem' }}>Drums</th>
+                      <th style={{ padding: '0.5rem 0.75rem' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingBprJobs.map((job) => (
+                      <tr key={`${job.mr.id}_${job.productName || 'default'}`} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.5rem 0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{job.mr.receiptNo}</td>
+                        <td style={{ padding: '0.5rem 0.75rem' }}>{job.productName || job.mr.productName}</td>
+                        <td style={{ padding: '0.5rem 0.75rem' }}>{job.drums || 0}</td>
+                        <td style={{ padding: '0.5rem 0.75rem' }}>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                            onClick={() => handleCreate(job.mr, job.productName, 'page2')}
+                          >
+                            Enter Weights
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
