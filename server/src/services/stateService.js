@@ -2,6 +2,15 @@ import { query } from '../db/pool.js';
 import { getDefaultErpState } from '../utils/defaultState.js';
 
 function mapUserRow(row) {
+  let permissions = row.permissions || [];
+  if (typeof permissions === 'string') {
+    try {
+      permissions = JSON.parse(permissions);
+    } catch {
+      permissions = [];
+    }
+  }
+  if (!Array.isArray(permissions)) permissions = [];
   return {
     id: row.id,
     employeeId: row.employee_id,
@@ -9,7 +18,8 @@ function mapUserRow(row) {
     name: row.name,
     department: row.department,
     role: row.role,
-    permissions: row.permissions || [],
+    permissions,
+    moduleAccessConfigured: Array.isArray(permissions),
     active: row.active,
     passwordHash: row.password_hash
   };

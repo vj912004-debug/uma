@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { hashPassword, generatePassword, generateEmployeeId } from '../utils/auth';
 import { Plus, Edit2, KeyRound, UserX, UserCheck, Copy, Check, RefreshCw } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
-import { ALL_STAFF_MODULE_IDS, groupModuleOptions } from '../utils/moduleAccess';
+import { ALL_STAFF_MODULE_IDS, groupModuleOptions, parsePermissionsList } from '../utils/moduleAccess';
 
 const DEPARTMENTS = ['Management', 'Production', 'Packaging', 'Quality Control', 'Accounts', 'General'];
 const MODULE_GROUPS = groupModuleOptions();
@@ -47,7 +47,7 @@ const EmployeeManagement = () => {
 
   const openEditModal = (user) => {
     setEditingUser(user);
-    const perms = Array.isArray(user.permissions) ? [...user.permissions] : [];
+    const perms = parsePermissionsList(user.permissions);
     setForm({
       name: user.name || user.username,
       username: user.username,
@@ -56,7 +56,10 @@ const EmployeeManagement = () => {
       department: user.department || 'General',
       role: user.role || 'Staff',
       active: user.active !== false,
-      permissions: user.role === 'Admin' ? [] : (perms.length ? perms : [...ALL_STAFF_MODULE_IDS])
+      // Only show full list when access was never configured (legacy)
+      permissions: user.role === 'Admin'
+        ? []
+        : (user.moduleAccessConfigured || perms.length ? perms : [...ALL_STAFF_MODULE_IDS])
     });
     setGeneratedCreds(null);
     setShowModal(true);
@@ -123,7 +126,8 @@ const EmployeeManagement = () => {
       role: form.role,
       active: form.active,
       passwordHash,
-      permissions: form.role === 'Admin' ? [] : form.permissions
+      permissions: form.role === 'Admin' ? [] : parsePermissionsList(form.permissions),
+      moduleAccessConfigured: true
     };
 
     if (editingUser) {
@@ -180,8 +184,8 @@ const EmployeeManagement = () => {
 
   const moduleCountLabel = (user) => {
     if (user.role === 'Admin') return 'All modules';
-    const n = Array.isArray(user.permissions) ? user.permissions.length : 0;
-    if (!n) return 'No modules';
+    const n = parsePermissionsList(user.permissions).length;
+    if (!n) return user.moduleAccessConfigured ? 'No modules' : 'All modules';
     if (n >= ALL_STAFF_MODULE_IDS.length) return 'All modules';
     return `${n} module${n === 1 ? '' : 's'}`;
   };

@@ -42,16 +42,18 @@ import {
   PhoneCall,
   BarChart3
 } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { canAccessModule } from '../utils/moduleAccess';
 
 const Sidebar = () => {
-  const { data } = useAppContext();
   const { currentUser, logout } = useAuth();
-  const userRole = currentUser?.role || data?.settings?.userRole || 'Staff';
+  const userRole = currentUser?.role || 'Staff';
 
-  const canSee = (path) => canAccessModule(currentUser || { role: userRole, permissions: [] }, path);
+  // Always use the logged-in user record (with permissions). Never invent Admin access.
+  const canSee = (path) => {
+    if (!currentUser) return false;
+    return canAccessModule(currentUser, path);
+  };
 
   const [expandedGroups, setExpandedGroups] = useState({
     material: true,

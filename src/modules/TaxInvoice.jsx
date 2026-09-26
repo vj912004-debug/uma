@@ -9,6 +9,7 @@ import GstTaxBlock from '../components/GstTaxBlock';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
 import { GST_TYPE_CGST_SGST } from '../utils/taxInvoiceLayout';
+import { DEFAULT_INVOICE_TERMS_TEXT } from '../utils/printTheme';
 import {
   STANDARD_CHARGES_LIST,
   defaultChargeFlags,
@@ -75,7 +76,7 @@ const TaxInvoice = () => {
     discount: 0,
     taxRate: 18,
     gstType: GST_TYPE_CGST_SGST,
-    terms: 'Payment against delivery.',
+    terms: DEFAULT_INVOICE_TERMS_TEXT,
     customCharges: [] // Array of { name: '', hsn: '', rate: 0, qty: 0, checked: true }
   });
 
@@ -139,7 +140,7 @@ const TaxInvoice = () => {
       discount: piTerms?.discount ?? 0,
       taxRate: piTerms?.taxRate ?? 18,
       gstType: piTerms?.gstType === 'igst' ? 'igst' : GST_TYPE_CGST_SGST,
-      terms: 'Payment against delivery.'
+      terms: DEFAULT_INVOICE_TERMS_TEXT
     };
   };
 
@@ -370,7 +371,7 @@ const TaxInvoice = () => {
       discount: 0,
       taxRate: 18,
       gstType: GST_TYPE_CGST_SGST,
-      terms: 'Payment against delivery.',
+      terms: DEFAULT_INVOICE_TERMS_TEXT,
       partyId: '',
       partyName: '',
       productName: '',
@@ -403,7 +404,7 @@ const TaxInvoice = () => {
       discount: 0,
       taxRate: 18,
       gstType: GST_TYPE_CGST_SGST,
-      terms: 'Payment against delivery.',
+      terms: DEFAULT_INVOICE_TERMS_TEXT,
       partyId: '',
       partyName: '',
       productName: '',

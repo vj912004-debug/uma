@@ -1126,6 +1126,13 @@ export const getSharedPrintStyles = () => `
     white-space: normal;
     overflow-wrap: break-word;
   }
+  .f3-body .term-note {
+    margin: 0 0 8px;
+    font-weight: 700;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
   .sig-col .for-company {
     font-weight: 800;
     color: var(--purple);
@@ -1326,10 +1333,39 @@ export const buildBankDetailsBox = (profile) => {
 };
 
 export const DEFAULT_INVOICE_TERMS = [
-  'Subject to Vadodara Jurisdiction.',
-  'Payment terms as per our agreed terms.',
-  'Interest will be charged @ 24% p.a. if the amount remains unpaid from the due date.'
+  'Subject to vadodara Jurisdiction.',
+  'Payment Term as per our agree terms.',
+  'Interest will charged @ 24% per annum if amount remaining unpaid from due date.'
 ];
+
+export const DEFAULT_INVOICE_TERMS_TEXT = DEFAULT_INVOICE_TERMS
+  .map((line, i) => `${i + 1}) ${line}`)
+  .join('\n');
+
+/** Old TI/PI placeholder — treat as unset so print uses the document defaults. */
+export const isPlaceholderInvoiceTerms = (terms) =>
+  /^(payment against delivery\.?|100% advance against pi\.?|payment 100% advance against pi\.?)$/i.test(String(terms || '').trim());
+
+export const DEFAULT_PI_NOTE =
+  'PACKING MATERIALS AND TRANSPORTATION CHARGES WILL BE CHARGE EXTRA AS ACTUAL';
+
+export const DEFAULT_PI_TERMS = [
+  'Subject to vadodara Jurisdiction.',
+  'Payment 100% ADVANCE AGAINST PI'
+];
+
+export const DEFAULT_PI_TERMS_TEXT = DEFAULT_PI_TERMS
+  .map((line, i) => `${i + 1}) ${line}`)
+  .join('\n');
+
+export const formatPiPrintTermsHtml = (terms) => {
+  const noteHtml = `<div class="term-note">NOTE:<br/>${escHtml(DEFAULT_PI_NOTE)}</div>`;
+  const body = formatPrintTermsHtml(
+    isPlaceholderInvoiceTerms(terms) ? '' : terms,
+    DEFAULT_PI_TERMS
+  );
+  return `${noteHtml}${body}`;
+};
 
 export const DEFAULT_PO_TERMS = [
   'Delivery 10 days from the date of Purchase Order.',

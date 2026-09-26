@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
 import { enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, getLinkedPITermsForTI, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges, qtyInputValue, rateInputValue } from '../utils/documentCharges';
+import { DEFAULT_INVOICE_TERMS_TEXT, DEFAULT_PI_TERMS_TEXT } from '../utils/printTheme';
 import {
   getReceiptProductNames,
   getProductBatches,
@@ -1047,7 +1048,7 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
     discount: 0,
     taxRate: 18,
     gstType: GST_TYPE_CGST_SGST,
-    terms: 'Payment 100% advance against PI.'
+    terms: DEFAULT_PI_TERMS_TEXT
   });
 
   useEffect(() => {
@@ -1066,7 +1067,7 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
         discount: editing.discount || 0,
         taxRate: editing.taxRate ?? 18,
         gstType: normalizeGstType(editing.gstType),
-        terms: editing.terms || 'Payment 100% advance against PI.'
+        terms: editing.terms || DEFAULT_PI_TERMS_TEXT
       });
     } else {
       setForm(prev => ({
@@ -3046,7 +3047,7 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
     discount: getLinkedPITermsForTI(data.invoices, mr.id)?.discount ?? 0,
     taxRate: getLinkedPITermsForTI(data.invoices, mr.id)?.taxRate ?? 18,
     gstType: normalizeGstType(getLinkedPITermsForTI(data.invoices, mr.id)?.gstType),
-    terms: 'Payment against delivery.'
+    terms: DEFAULT_INVOICE_TERMS_TEXT
   });
 
   useEffect(() => {
@@ -3072,7 +3073,7 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
         discount: editing.discount || 0,
         taxRate: editing.taxRate ?? 18,
         gstType: normalizeGstType(editing.gstType),
-        terms: editing.terms || 'Payment against delivery.'
+        terms: editing.terms || DEFAULT_INVOICE_TERMS_TEXT
       });
     } else {
       const summaries = buildPLProductSummaries(pl, mr, prodOpts);

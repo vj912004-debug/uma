@@ -143,8 +143,9 @@ export const AppProvider = ({ children }) => {
 
   const updateItem = (module, id, updatedItem) => {
     setData(prev => {
-      const oldItem = (prev[module] || []).find(i => i.id === id);
-      let nextModule = (prev[module] || []).map(item => item.id === id ? updatedItem : item);
+      const matchId = (itemId) => String(itemId) === String(id);
+      const oldItem = (prev[module] || []).find(i => matchId(i.id));
+      let nextModule = (prev[module] || []).map(item => matchId(item.id) ? { ...updatedItem, id: item.id } : item);
       if (module === 'invoices') {
         const synced = syncAllTaxInvoicesWithProformas(nextModule);
         nextModule = synced.invoices;

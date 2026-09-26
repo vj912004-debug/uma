@@ -11,6 +11,7 @@ import GstTaxBlock from '../components/GstTaxBlock';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
 import { GST_TYPE_CGST_SGST, normalizeGstType } from '../utils/taxInvoiceLayout';
+import { DEFAULT_PI_TERMS_TEXT } from '../utils/printTheme';
 import {
   STANDARD_CHARGES_LIST,
   defaultChargeFlags,
@@ -72,7 +73,7 @@ const InvoicesPI = () => {
     discount: 0,
     taxRate: 18,
     gstType: GST_TYPE_CGST_SGST,
-    terms: '100% advance against PI.',
+    terms: DEFAULT_PI_TERMS_TEXT,
     customCharges: [], // Array of { name: '', hsn: '', rate: 0, qty: 0, checked: true }
     productCharges: {}
   });
@@ -119,7 +120,7 @@ const InvoicesPI = () => {
       discount: 0,
       taxRate: 18,
     gstType: GST_TYPE_CGST_SGST,
-      terms: '100% advance against PI.'
+      terms: DEFAULT_PI_TERMS_TEXT
     };
   };
 
@@ -362,7 +363,7 @@ const InvoicesPI = () => {
       discount: 0,
       taxRate: 18,
     gstType: GST_TYPE_CGST_SGST,
-      terms: '100% advance against PI.',
+      terms: DEFAULT_PI_TERMS_TEXT,
       partyName: '',
       productName: '',
     productSummaries: [],
@@ -394,7 +395,7 @@ const InvoicesPI = () => {
       discount: 0,
       taxRate: 18,
     gstType: GST_TYPE_CGST_SGST,
-      terms: '100% advance against PI.',
+      terms: DEFAULT_PI_TERMS_TEXT,
       partyName: '',
       productName: '',
     productSummaries: [],

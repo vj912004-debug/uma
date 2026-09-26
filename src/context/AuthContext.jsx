@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const currentUser = sessionUserId
-    ? data.users?.find((u) => u.id === sessionUserId && u.active !== false) || null
+    ? data.users?.find((u) => String(u.id) === String(sessionUserId) && u.active !== false) || null
     : null;
 
   const isAuthenticated = !!currentUser;

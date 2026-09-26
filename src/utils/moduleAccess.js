@@ -43,6 +43,20 @@ export const MODULE_OPTIONS = [
 
 export const ALL_STAFF_MODULE_IDS = MODULE_OPTIONS.map((m) => m.id);
 
+/** Normalize permissions from array / JSON string / null. */
+export const parsePermissionsList = (raw) => {
+  let value = raw;
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      value = [];
+    }
+  }
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((p) => String(p || '').trim()).filter(Boolean))];
+};
+
 /** Normalize legacy/alias paths to permission ids. */
 export const resolvePermissionId = (pathname = '') => {
   const path = String(pathname).split('?')[0].split('#')[0];
@@ -54,9 +68,7 @@ export const resolvePermissionId = (pathname = '') => {
 export const getUserPermissions = (user) => {
   if (!user) return [];
   if (user.role === 'Admin') return ALL_STAFF_MODULE_IDS;
-  const perms = Array.isArray(user.permissions) ? user.permissions.filter(Boolean) : [];
-  // Empty / missing = no module access (legacy empty lists are expanded on load in normalizeAppState)
-  return perms;
+  return parsePermissionsList(user.permissions);
 };
 
 export const canAccessModule = (user, pathname) => {
@@ -67,6 +79,7 @@ export const canAccessModule = (user, pathname) => {
   if (path === '/' || path === '') return true;
 
   const perms = getUserPermissions(user);
+  if (!perms.length) return false;
 
   // Unified E-Way page: allow if either DC or TI (or explicit /eway) is granted
   if (path === '/eway') {
@@ -75,16 +88,10 @@ export const canAccessModule = (user, pathname) => {
 
   if (perms.includes(path)) return true;
 
-  // Employee Salary hub shares access with attendance / salary modules
-  if (path === '/employee-salary') {
-    return perms.includes('/employee-salary') || perms.includes('/attendance') || perms.includes('/salary-calculation');
+  // Marketing hash routes share /marketing permission
+  if (path.startsWith('/marketing')) {
+    return perms.includes('/marketing') || perms.includes(path);
   }
-  if (path === '/attendance' || path === '/salary-calculation') {
-    return perms.includes(path) || perms.includes('/employee-salary');
-  }
-
-  // Marketing hash routes share /marketing
-  if (path.startsWith('/marketing')) return perms.includes('/marketing') || perms.includes(path);
 
   return false;
 };

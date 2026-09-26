@@ -946,7 +946,7 @@ const buildTaxInvoicePDF = (doc, data) => {
     tableWidth: leftWidth,
     margin: { left: PDF_MARGIN, right: 0 },
     body: [[{
-      content: 'Terms & conditions\n1. Subject to vadodara Juridiction.\n2. Payment Term as per our agree terms.\n3. Interest will charged @ 24% per annum if amount remaining unpaid from due date.',
+      content: 'Terms & conditions\n1) Subject to vadodara Jurisdiction.\n2) Payment Term as per our agree terms.\n3) Interest will charged @ 24% per annum if amount remaining unpaid from due date.',
       styles: { minCellHeight: 38, fontStyle: 'normal', lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, valign: 'top' }
     }]],
     theme: 'grid',
@@ -1555,7 +1555,7 @@ const buildPerformaInvoicePDF = (doc, data) => {
     tableWidth: leftWidth,
     margin: { left: PDF_MARGIN, right: 0 },
     body: [[{
-      content: 'NOTE:\n\nPACKING MATERIALS AND TRANSPORTATION\nCHARGES WILL BE CHAGRE EXTRA AS ACTUAL\n\nTerms & conditions\n1) Subject to vadodara Juridiction.\n2) Payment 100% ADVANCE AGAINST PI',
+      content: 'NOTE:\n\nPACKING MATERIALS AND TRANSPORTATION\nCHARGES WILL BE CHARGE EXTRA AS ACTUAL\n\nTerms & conditions\n1) Subject to vadodara Jurisdiction.\n2) Payment 100% ADVANCE AGAINST PI',
       styles: { minCellHeight: 48, fontStyle: 'bold', valign: 'top', lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, fontSize: 8 }
     }]],
     theme: 'grid',
@@ -1977,7 +1977,7 @@ const buildFormattedInvoice = (doc, docType, data) => {
     leftBody = [
       [{ content: 'OUR BANK DETAILS', styles: { fontStyle: 'bold', lineWidth: { top: 0.5, bottom: 0, left: 0.5, right: 0.5 } } }],
       [{ content: formatBankDetailsText(profile), styles: { lineWidth: { top: 0, bottom: 0.5, left: 0.5, right: 0.5 }, minCellHeight: 25 } }],
-      [{ content: 'Terms & conditions\n1) Subject to vadodara Juridiction.\n2) Payment Term as per our agree terms.\n3) Interest will charged @ 24% per annum if\namount remaining unpaid from due date.', styles: { minCellHeight: 35 } }]
+      [{ content: 'Terms & conditions\n1) Subject to vadodara Jurisdiction.\n2) Payment Term as per our agree terms.\n3) Interest will charged @ 24% per annum if\namount remaining unpaid from due date.', styles: { minCellHeight: 35 } }]
     ];
   }
 

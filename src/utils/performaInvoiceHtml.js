@@ -5,7 +5,7 @@ import {
   buildTiPrintChargeRows,
   getSplitGstRates
 } from './taxInvoiceLayout';
-import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPrintTermsHtml, DEFAULT_INVOICE_TERMS, DEFAULT_INVOICE_DECLARATION, buildBankDetailsBox, buildStatusBar, PRINT_FOOTER_MESSAGES } from './printTheme';
+import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPiPrintTermsHtml, DEFAULT_INVOICE_DECLARATION, buildBankDetailsBox, buildStatusBar, PRINT_FOOTER_MESSAGES } from './printTheme';
 export const escHtml = (v) => String(v ?? '')
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
@@ -774,7 +774,7 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
   </div>
 
   <!-- TERMS / DECLARATION / SIGNATORY -->
-  ${buildFooterTerms(profile.companyName || 'UMA MICRON', formatPrintTermsHtml(data.terms, DEFAULT_INVOICE_TERMS), DEFAULT_INVOICE_DECLARATION)}
+  ${buildFooterTerms(profile.companyName || 'UMA MICRON', formatPiPrintTermsHtml(data.terms), DEFAULT_INVOICE_DECLARATION)}
 
   <!-- BAR FOOTER -->
   ${buildStatusBar('Page 1 of 1', PRINT_FOOTER_MESSAGES.PI)}

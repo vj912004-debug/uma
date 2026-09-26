@@ -1,6 +1,6 @@
 import { DEFAULT_COMPANY_PROFILE, mergeCompanyProfile } from './companyProfile';
 import { flattenMRChargeSnapshot, syncAllTaxInvoicesWithProformas } from './documentCharges';
-import { ALL_STAFF_MODULE_IDS } from './moduleAccess';
+import { ALL_STAFF_MODULE_IDS, parsePermissionsList } from './moduleAccess';
 import { DEFAULT_ADMIN_PASSWORD_HASH, DEFAULT_STAFF_PASSWORD_HASH } from './auth';
 import { defaultEsslSettings } from './payroll';
 
@@ -58,24 +58,24 @@ export const createBaseState = () => ({
   users: [
     {
       id: 1, employeeId: 'EMP001', department: 'Management', name: 'Administrator', username: 'admin', role: 'Admin',
-      active: true, permissions: [], passwordHash: DEFAULT_ADMIN_PASSWORD_HASH,
+      active: true, permissions: [], moduleAccessConfigured: true, passwordHash: DEFAULT_ADMIN_PASSWORD_HASH,
       esslId: '', shiftType: '9hr', perDayRate: 0, otRate: 0, effectiveFrom: '', rateHistory: []
     },
     {
       id: 2, employeeId: 'EMP002', department: 'Production', name: 'Staff One', username: 'staff1', role: 'Staff',
-      permissions: [...ALL_STAFF_MODULE_IDS], active: true, passwordHash: DEFAULT_STAFF_PASSWORD_HASH,
+      permissions: [...ALL_STAFF_MODULE_IDS], moduleAccessConfigured: true, active: true, passwordHash: DEFAULT_STAFF_PASSWORD_HASH,
       esslId: '1001', shiftType: '9hr', perDayRate: 800, otRate: 100, effectiveFrom: '2025-04-01',
       rateHistory: [{ id: 'rh-2-1', effectiveFrom: '2025-04-01', perDayRate: 800, otRate: 100 }]
     },
     {
       id: 3, employeeId: 'EMP003', department: 'Packaging', name: 'Staff Two', username: 'staff2', role: 'Staff',
-      permissions: [...ALL_STAFF_MODULE_IDS], active: true, passwordHash: DEFAULT_STAFF_PASSWORD_HASH,
+      permissions: [...ALL_STAFF_MODULE_IDS], moduleAccessConfigured: true, active: true, passwordHash: DEFAULT_STAFF_PASSWORD_HASH,
       esslId: '1002', shiftType: '12hr', perDayRate: 950, otRate: 120, effectiveFrom: '2025-04-01',
       rateHistory: [{ id: 'rh-3-1', effectiveFrom: '2025-04-01', perDayRate: 950, otRate: 120 }]
     },
     {
       id: 4, employeeId: 'EMP004', department: 'Quality Control', name: 'Staff Three', username: 'staff3', role: 'Staff',
-      permissions: [...ALL_STAFF_MODULE_IDS], active: true, passwordHash: DEFAULT_STAFF_PASSWORD_HASH,
+      permissions: [...ALL_STAFF_MODULE_IDS], moduleAccessConfigured: true, active: true, passwordHash: DEFAULT_STAFF_PASSWORD_HASH,
       esslId: '1003', shiftType: '9hr', perDayRate: 850, otRate: 110, effectiveFrom: '2025-04-01',
       rateHistory: [{ id: 'rh-4-1', effectiveFrom: '2025-04-01', perDayRate: 850, otRate: 110 }]
     }
@@ -194,11 +194,13 @@ export const normalizeAppState = (parsed) => {
       const username = u.username?.toLowerCase() === 'admin' ? 'admin' : u.username;
       const isAdminUser = u.role === 'Admin' && (username === 'admin' || u.id === 1);
       const isStaff = u.role === 'Staff' || (!isAdminUser && u.role !== 'Admin');
-      const rawPerms = Array.isArray(u.permissions) ? u.permissions.filter(Boolean) : [];
-      // Legacy Staff with empty permissions had full access — materialize explicit full list once
+      const rawPerms = parsePermissionsList(u.permissions);
+      // Only expand empty → full list for legacy Staff who never had module access configured.
+      // Once admin saves (moduleAccessConfigured), respect the saved list — including after deselect.
+      const accessConfigured = u.moduleAccessConfigured === true || rawPerms.length > 0;
       const permissions = isAdminUser
         ? []
-        : (rawPerms.length ? rawPerms : (isStaff ? [...ALL_STAFF_MODULE_IDS] : []));
+        : (accessConfigured ? rawPerms : (isStaff ? [...ALL_STAFF_MODULE_IDS] : []));
       let passwordHash = u.passwordHash;
       if (!passwordHash || String(passwordHash).startsWith('000000000000')) {
         if (isAdminUser) passwordHash = DEFAULT_ADMIN_PASSWORD_HASH;
@@ -234,6 +236,7 @@ export const normalizeAppState = (parsed) => {
         username,
         role: isAdminUser ? 'Admin' : (u.role || 'Staff'),
         permissions,
+        moduleAccessConfigured: isAdminUser ? true : (accessConfigured || u.moduleAccessConfigured === true),
         passwordHash,
         esslId,
         shiftType,
