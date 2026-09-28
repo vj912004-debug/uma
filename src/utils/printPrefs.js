@@ -34,14 +34,16 @@ export const DEFAULT_PRINT_PREFS = {
 const STORAGE_KEY = 'uma_print_prefs';
 
 export const normalizePrintPrefs = (prefs) => {
-  const fontFamily = PRINT_FONTS.some((f) => f.value === prefs?.fontFamily)
-    ? prefs.fontFamily
-    : DEFAULT_PRINT_PREFS.fontFamily;
+  const typedFont = String(prefs?.fontFamily || '').trim();
+  const knownFont = PRINT_FONTS.find((f) => f.value === typedFont || f.label.toLowerCase() === typedFont.toLowerCase());
+  const fontFamily = knownFont?.value || typedFont || DEFAULT_PRINT_PREFS.fontFamily;
   const rawSize = parseInt(prefs?.fontSize, 10);
-  const fontSize = PRINT_FONT_SIZES.includes(rawSize) ? rawSize : DEFAULT_PRINT_PREFS.fontSize;
-  const shrink = PRINT_SHRINK_OPTIONS.some((s) => s.value === prefs?.shrink)
-    ? prefs.shrink
-    : DEFAULT_PRINT_PREFS.shrink;
+  const fontSize = Number.isFinite(rawSize) && rawSize >= 6 && rawSize <= 72
+    ? rawSize
+    : DEFAULT_PRINT_PREFS.fontSize;
+  const typedShrink = String(prefs?.shrink || '').trim();
+  const knownShrink = PRINT_SHRINK_OPTIONS.find((s) => s.value === typedShrink || s.label.toLowerCase() === typedShrink.toLowerCase());
+  const shrink = knownShrink?.value || typedShrink || DEFAULT_PRINT_PREFS.shrink;
   return { fontFamily, fontSize, shrink };
 };
 
@@ -693,6 +695,11 @@ export const buildPrintPrefsCss = (prefs) => {
     word-break: normal !important;
     overflow-wrap: break-word !important;
     line-height: 1.4 !important;
+  }
+  .uma-print-root .f3-body .term-line.term-highlight {
+    font-weight: 800 !important;
+    background: #fff3bf !important;
+    padding: 2px 4px !important;
   }
   .uma-print-root .ti-page .content-wrapper,
   .uma-print-root .pi-page .content-wrapper,

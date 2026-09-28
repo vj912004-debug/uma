@@ -3,7 +3,8 @@ import { AlertTriangle, Calendar, Paperclip, Pencil, Save, Search, ShoppingCart,
 import { useAppContext } from '../context/AppContext';
 import DateField from '../components/DateField';
 import SearchableSelect from '../components/SearchableSelect';
-import { formatDate, getDefaultFiscalYearRange } from '../utils/dateUtils';
+import { formatDate, getDefaultFiscalYearRange, newestFirst } from '../utils/dateUtils';
+import ExportButton from '../components/ExportButton';
 
 const DEFAULT_RANGE = getDefaultFiscalYearRange();
 const CATEGORIES = ['Compressor', 'Solar', 'General', 'Electrical', 'Spares', 'Consumables', 'Utilities', 'Services', 'Capital'];
@@ -135,13 +136,13 @@ const PurchaseManagement = () => {
   const suppliers = useMemo(() => alive(data.purchaseSuppliers).sort((a, b) => String(a.supplierName).localeCompare(String(b.supplierName))), [data.purchaseSuppliers]);
   const items = useMemo(() => alive(data.purchaseStock).sort((a, b) => String(a.itemName).localeCompare(String(b.itemName))), [data.purchaseStock]);
   const inquiries = useMemo(
-    () => alive(data.purchaseManagement).sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))),
+    () => newestFirst(alive(data.purchaseManagement)),
     [data.purchaseManagement]
   );
-  const quotes = useMemo(() => alive(data.purchaseQuotes), [data.purchaseQuotes]);
-  const followUps = useMemo(() => alive(data.purchaseFollowUps), [data.purchaseFollowUps]);
-  const receipts = useMemo(() => alive(data.purchaseReceipts), [data.purchaseReceipts]);
-  const attachments = useMemo(() => alive(data.purchaseAttachments), [data.purchaseAttachments]);
+  const quotes = useMemo(() => newestFirst(alive(data.purchaseQuotes)), [data.purchaseQuotes]);
+  const followUps = useMemo(() => newestFirst(alive(data.purchaseFollowUps)), [data.purchaseFollowUps]);
+  const receipts = useMemo(() => newestFirst(alive(data.purchaseReceipts)), [data.purchaseReceipts]);
+  const attachments = useMemo(() => newestFirst(alive(data.purchaseAttachments)), [data.purchaseAttachments]);
 
   const rangedInquiries = inquiries.filter((r) => inRange(r.date, rangeFrom, rangeTo) && hit(r.inquiryNo, r.itemDescription, r.category, r.approvedSupplier, r.contactVia));
   const selectedInquiry = inquiries.find((r) => r.id === selectedInquiryId) || null;
@@ -503,6 +504,19 @@ const PurchaseManagement = () => {
           </div>
         </div>
         <div className="pm-header-actions">
+          <ExportButton
+            data={rangedInquiries}
+            columns={[
+              { label: 'Date', key: 'date' },
+              { label: 'Inquiry No', key: 'inquiryNo' },
+              { label: 'Item', key: 'itemDescription' },
+              { label: 'Category', key: 'category' },
+              { label: 'Supplier', key: 'approvedSupplier' },
+              { label: 'Contact Via', key: 'contactVia' }
+            ]}
+            filename="Purchase_Inquiries"
+            title="Purchase Inquiries"
+          />
           <div className="pm-range">
             <Calendar size={15} />
             <DateField className="input-field" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} />

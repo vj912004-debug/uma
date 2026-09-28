@@ -1,10 +1,11 @@
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, CreditCard, Banknote, Calendar, Search } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
 import DateField from '../components/DateField';
 import StatusTabBar from '../components/StatusTabBar';
+import ExportButton from '../components/ExportButton';
 
 const Payments = () => {
   const { data, updateData, updateItem } = useAppContext();
@@ -57,7 +58,7 @@ const Payments = () => {
   };
 
   // Group by Party for the Due Dashboard
-  const partyDues = data.parties.map(party => {
+  const partyDues = newestFirst(data.parties).map(party => {
     const partyInvoices = data.invoices.filter(inv => inv.partyName === party.name);
     const unpaid = partyInvoices.filter(inv => inv.status === 'Unpaid');
     const totalDue = unpaid.reduce((acc, inv) => acc + inv.total, 0);
@@ -72,7 +73,7 @@ const Payments = () => {
     return { party, totalDue, dueByFY };
   }).filter(d => d.totalDue > 0);
 
-  const paymentHistory = (data.payments || []).slice().reverse().filter(p => {
+  const paymentHistory = newestFirst(data.payments || []).filter(p => {
     if (!searchTerm) return true;
     const s = searchTerm.toLowerCase();
     return (
@@ -84,9 +85,43 @@ const Payments = () => {
 
   return (
     <div>
-      <header style={{ marginBottom: '2.5rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Financial Dashboard</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Track outstanding payments and record transactions.</p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Financial Dashboard</h1>
+          <p style={{ color: 'var(--text-muted)' }}>Track outstanding payments and record transactions.</p>
+        </div>
+        <ExportButton
+          data={statusTab === 'completed'
+            ? paymentHistory.map((p) => ({
+              date: formatDate(p.date),
+              partyName: p.partyName,
+              invoiceNo: p.invoiceNo,
+              amount: p.amount,
+              tds: p.tds,
+              paymentMode: p.paymentMode,
+              referenceNo: p.referenceNo
+            }))
+            : partyDues.map((d) => ({
+              partyName: d.party?.name || '',
+              totalDue: d.totalDue
+            }))}
+          columns={statusTab === 'completed'
+            ? [
+              { label: 'Date', key: 'date' },
+              { label: 'Party Name', key: 'partyName' },
+              { label: 'Invoice', key: 'invoiceNo' },
+              { label: 'Amount', key: 'amount' },
+              { label: 'TDS', key: 'tds' },
+              { label: 'Mode', key: 'paymentMode' },
+              { label: 'Reference', key: 'referenceNo' }
+            ]
+            : [
+              { label: 'Party Name', key: 'partyName' },
+              { label: 'Total Due', key: 'totalDue' }
+            ]}
+          filename={statusTab === 'completed' ? 'Payment_History' : 'Party_Dues'}
+          title={statusTab === 'completed' ? 'Payment History' : 'Party-Wise Dues'}
+        />
       </header>
 
       <StatusTabBar

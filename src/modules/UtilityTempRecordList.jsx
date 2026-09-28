@@ -1,20 +1,19 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import {
   Thermometer,
   Calendar,
   Plus,
   Search,
-  Download,
   Edit2,
   Trash2,
   FileText
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import ExportButton from '../components/ExportButton';
 import DateField from '../components/DateField';
 import StatusTabBar from '../components/StatusTabBar';
-import { formatDate, getDefaultFiscalYearRange } from '../utils/dateUtils';
+import { formatDate, getDefaultFiscalYearRange, newestFirst } from '../utils/dateUtils';
 
 const PAGE_SIZE = 10;
 const DEFAULT_RANGE = getDefaultFiscalYearRange();
@@ -38,7 +37,7 @@ const UtilityTempRecordList = () => {
   const [rangeTo, setRangeTo] = useState(DEFAULT_RANGE.rangeTo);
 
   const rows = useMemo(
-    () => (data.utilityTempRecords || []).filter((r) => !r.isDeleted).sort((a, b) => String(b.date).localeCompare(String(a.date))),
+    () => newestFirst((data.utilityTempRecords || []).filter((r) => !r.isDeleted)),
     [data.utilityTempRecords]
   );
 
@@ -81,41 +80,66 @@ const UtilityTempRecordList = () => {
     if (window.confirm('Delete this temperature record?')) deleteItemSoftly('utilityTempRecords', id);
   };
 
-  const exportExcel = () => {
-    const sheet = filtered.map((r, i) => ({
-      'Sr. No': i + 1,
-      Date: formatDate(r.date),
-      Time: r.time || '',
-      Make: r.make || '',
-      'Oil Level At Rest': r.oilLevelAtRest,
-      'Total Time To Fill 12.5kg (Min)': r.fillTimeMin,
-      'Main Switch R': r.mainSwitch175A?.r,
-      'Main Switch Y': r.mainSwitch175A?.y,
-      'Main Switch B': r.mainSwitch175A?.b,
-      'Panel Main Switch R': r.panelMainSwitch?.r,
-      'Panel Main Switch Y': r.panelMainSwitch?.y,
-      'Panel Main Switch B': r.panelMainSwitch?.b,
-      'Capacitor Switch R': r.capacitorSwitch?.r,
-      'Capacitor Switch Y': r.capacitorSwitch?.y,
-      'Capacitor Switch B': r.capacitorSwitch?.b,
-      'Change Over Switch R': r.changeOverSwitch?.r,
-      'Change Over Switch Y': r.changeOverSwitch?.y,
-      'Change Over Switch B': r.changeOverSwitch?.b,
-      'Compressor Main Inputs R': r.compressorMainInputs?.r,
-      'Compressor Main Inputs Y': r.compressorMainInputs?.y,
-      'Compressor Main Inputs B': r.compressorMainInputs?.b,
-      'Comp Motor': r.newCompMotor,
-      'Oil Separator': r.oilSeparator,
-      'Air End': r.airEnd,
-      'Air Cooler': r.airCooler,
-      Tank: r.tank,
-      'Comp Air Discharge Pipe Ss': r.dischargePipe,
-      Remarks: r.remarks
-    }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheet), 'Temp Records');
-    XLSX.writeFile(wb, 'Utility_Temp_Records.xlsx');
-  };
+  const exportRows = filtered.map((r, i) => ({
+    srNo: i + 1,
+    date: formatDate(r.date),
+    time: r.time || '',
+    make: r.make || '',
+    oilLevel: r.oilLevelAtRest,
+    fillTime: r.fillTimeMin,
+    mainR: r.mainSwitch175A?.r,
+    mainY: r.mainSwitch175A?.y,
+    mainB: r.mainSwitch175A?.b,
+    panelR: r.panelMainSwitch?.r,
+    panelY: r.panelMainSwitch?.y,
+    panelB: r.panelMainSwitch?.b,
+    capR: r.capacitorSwitch?.r,
+    capY: r.capacitorSwitch?.y,
+    capB: r.capacitorSwitch?.b,
+    coR: r.changeOverSwitch?.r,
+    coY: r.changeOverSwitch?.y,
+    coB: r.changeOverSwitch?.b,
+    inR: r.compressorMainInputs?.r,
+    inY: r.compressorMainInputs?.y,
+    inB: r.compressorMainInputs?.b,
+    motor: r.newCompMotor,
+    oilSep: r.oilSeparator,
+    airEnd: r.airEnd,
+    airCooler: r.airCooler,
+    tank: r.tank,
+    pipe: r.dischargePipe,
+    remarks: r.remarks
+  }));
+  const exportColumns = [
+    { label: 'Sr. No', key: 'srNo' },
+    { label: 'Date', key: 'date' },
+    { label: 'Time', key: 'time' },
+    { label: 'Make', key: 'make' },
+    { label: 'Oil Level At Rest', key: 'oilLevel' },
+    { label: 'Total Time To Fill 12.5kg (Min)', key: 'fillTime' },
+    { label: 'Main Switch R', key: 'mainR' },
+    { label: 'Main Switch Y', key: 'mainY' },
+    { label: 'Main Switch B', key: 'mainB' },
+    { label: 'Panel Main Switch R', key: 'panelR' },
+    { label: 'Panel Main Switch Y', key: 'panelY' },
+    { label: 'Panel Main Switch B', key: 'panelB' },
+    { label: 'Capacitor Switch R', key: 'capR' },
+    { label: 'Capacitor Switch Y', key: 'capY' },
+    { label: 'Capacitor Switch B', key: 'capB' },
+    { label: 'Change Over Switch R', key: 'coR' },
+    { label: 'Change Over Switch Y', key: 'coY' },
+    { label: 'Change Over Switch B', key: 'coB' },
+    { label: 'Compressor Main Inputs R', key: 'inR' },
+    { label: 'Compressor Main Inputs Y', key: 'inY' },
+    { label: 'Compressor Main Inputs B', key: 'inB' },
+    { label: 'Comp Motor', key: 'motor' },
+    { label: 'Oil Separator', key: 'oilSep' },
+    { label: 'Air End', key: 'airEnd' },
+    { label: 'Air Cooler', key: 'airCooler' },
+    { label: 'Tank', key: 'tank' },
+    { label: 'Comp Air Discharge Pipe Ss', key: 'pipe' },
+    { label: 'Remarks', key: 'remarks' }
+  ];
 
   return (
     <div className="pm-page">
@@ -134,6 +158,7 @@ const UtilityTempRecordList = () => {
             <span>–</span>
             <DateField className="input-field" value={rangeTo} onChange={(e) => { setRangeTo(e.target.value); setPage(1); }} />
           </div>
+          <ExportButton data={exportRows} columns={exportColumns} filename="Utility_Temp_Records" title="Temperature Records" />
           <Link to="/utility-temp-record" className="btn btn-primary">
             <Plus size={15} /> Add New Record
           </Link>
@@ -163,9 +188,6 @@ const UtilityTempRecordList = () => {
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               />
             </div>
-            <button type="button" className="btn btn-primary" onClick={exportExcel}>
-              <Download size={14} /> Export
-            </button>
           </div>
         </div>
 

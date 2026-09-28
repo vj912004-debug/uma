@@ -11,6 +11,8 @@ import { useAppContext } from '../context/AppContext';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import SearchableSelect from '../components/SearchableSelect';
+import ExportButton from '../components/ExportButton';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 
 const YES_NO = ['Yes', 'No'];
 const MAKE_OPTIONS = ['Gardner Denver', 'Atlas Copco', 'Ingersoll Rand', 'Kaeser', 'Other'];
@@ -108,9 +110,61 @@ const UtilityRecord = () => {
             <p className="page-subtitle">Add and update daily utility consumption records.</p>
           </div>
         </div>
-        <Link to="/utility-record-list" className="btn pm-btn-outline">
-          <List size={15} /> View Saved Entries
-        </Link>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ExportButton
+            data={newestFirst(rows).map((r, i) => ({
+              srNo: i + 1,
+              date: formatDate(r.date),
+              time: r.time || '',
+              make: r.make || '',
+              voltage1: r.voltage1,
+              voltage2: r.voltage2,
+              voltage3: r.voltage3,
+              ampere1: r.ampere1,
+              ampere2: r.ampere2,
+              ampere3: r.ampere3,
+              dryer1: r.oldDryerStart,
+              dryer2: r.newDryerStart,
+              moisture1: r.oldMoistureSeparator,
+              moisture2: r.newMoistureSeparator,
+              tank1: r.smallTank1Pressure,
+              tank2: r.bigNewTank2Pressure,
+              loadingTime: r.loadingUnloadingTime,
+              temp1: r.tempCompressorOld,
+              temp2: r.tempCompressorNew,
+              doneBy: r.doneBy,
+              remarks: r.remarks
+            }))}
+            columns={[
+              { label: 'Sr. No', key: 'srNo' },
+              { label: 'Date', key: 'date' },
+              { label: 'Time', key: 'time' },
+              { label: 'Make', key: 'make' },
+              { label: 'Voltage - 1 (V)', key: 'voltage1' },
+              { label: 'Voltage - 2 (V)', key: 'voltage2' },
+              { label: 'Voltage - 3 (V)', key: 'voltage3' },
+              { label: 'Ampere - 1 (A)', key: 'ampere1' },
+              { label: 'Ampere - 2 (A)', key: 'ampere2' },
+              { label: 'Ampere - 3 (A)', key: 'ampere3' },
+              { label: 'Dryer Start - 1', key: 'dryer1' },
+              { label: 'Dryer Start - 2', key: 'dryer2' },
+              { label: 'Moisture Separator - 1', key: 'moisture1' },
+              { label: 'Moisture Separator - 2', key: 'moisture2' },
+              { label: 'Tank - 1 Pressure (Kg)', key: 'tank1' },
+              { label: 'Tank - 2 Pressure (Kg)', key: 'tank2' },
+              { label: 'Loading/Unloading Time', key: 'loadingTime' },
+              { label: 'Temp. Comp. - 1 (°C)', key: 'temp1' },
+              { label: 'Temp. Comp. - 2 (°C)', key: 'temp2' },
+              { label: 'Done By', key: 'doneBy' },
+              { label: 'Remarks', key: 'remarks' }
+            ]}
+            filename="Utility_Records"
+            title="Utility Records"
+          />
+          <Link to="/utility-record-list" className="btn pm-btn-outline">
+            <List size={15} /> View Saved Entries
+          </Link>
+        </div>
       </header>
 
       <section className="premium-card pm-card">

@@ -6,6 +6,7 @@ import DocDownloadButtons from '../components/DocDownloadButtons';
 import { buildBlankBprPayload } from '../utils/bprHtml';
 import { getStoredCompanyProfile } from '../utils/companyProfile';
 import ExportButton from '../components/ExportButton';
+import { newestFirst } from '../utils/dateUtils';
 import { Plus, Edit2, Trash2, Printer, FileText } from 'lucide-react';
 import { numberInputValue, parseOptionalNumber } from '../utils/numberInput';
 import SearchableSelect from '../components/SearchableSelect';
@@ -528,10 +529,10 @@ const BPR = () => {
         }
       });
     });
-    return jobs;
+    return newestFirst(jobs, (job) => job.mr);
   }, [data]);
 
-  const bprList = data.bprs || [];
+  const bprList = newestFirst(data.bprs || []);
   const partyOptions = useMemo(() => uniqueSortedOptions(bprList.map((b) => b.partyName)), [bprList]);
   const productOptions = useMemo(() => uniqueSortedOptions(bprList.map((b) => b.productName)), [bprList]);
   const filteredBPRs = bprList.filter((b) => {

@@ -588,6 +588,7 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
   .f3-body ol{margin:0;padding-left:18px;list-style-position:outside;}
   .f3-body li{white-space:normal;margin:0 0 4px;padding-left:4px;}
   .f3-body .term-line{margin:0 0 4px;white-space:normal;}
+  .f3-body .term-line.term-highlight{font-weight:800;background:#fff3bf;padding:2px 4px;}
   .sig-col .sig-body{
     display:block;
     padding-top:8px;

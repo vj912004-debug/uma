@@ -5,6 +5,8 @@ import { generateDocNumber } from '../utils/numbering';
 import { useNavigate } from 'react-router-dom';
 import SearchableSelect from '../components/SearchableSelect';
 import DateField from '../components/DateField';
+import { newestFirst } from '../utils/dateUtils';
+import ExportButton from '../components/ExportButton';
 
 const displayChargeRate = (v) => (v == null || v === '' || v === 0) ? '' : v;
 const parseChargeRateInput = (val) => (val === '' ? 0 : (parseFloat(val) || 0));
@@ -201,7 +203,7 @@ const Parties = () => {
     });
   };
 
-  const filteredParties = data.parties.filter(p => 
+  const filteredParties = newestFirst(data.parties).filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     (p.vendorCode && p.vendorCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (p.gstinBill && p.gstinBill.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -216,9 +218,29 @@ const Parties = () => {
           <h1 className="page-title">Party & Products Master</h1>
           <p className="page-subtitle">Configure party contacts, billing terms, and product standard pricing templates.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { resetPartyForm(); setIsModalOpen(true); }}>
-          <Plus size={18} /> Add Party
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ExportButton
+            data={filteredParties.map((p) => ({
+              vendorCode: p.vendorCode || '',
+              name: p.name || '',
+              type: p.type || '',
+              gstin: [p.gstinBill, p.gstinShip].filter(Boolean).join(' / '),
+              products: (p.products || []).map((prod) => prod.productName || prod.name || '').filter(Boolean).join(', ')
+            }))}
+            columns={[
+              { label: 'Vendor Code', key: 'vendorCode' },
+              { label: 'Party Name', key: 'name' },
+              { label: 'Type', key: 'type' },
+              { label: 'GSTIN (Bill / Ship)', key: 'gstin' },
+              { label: 'Products', key: 'products' }
+            ]}
+            filename="Parties"
+            title="Party & Products Master"
+          />
+          <button className="btn btn-primary" onClick={() => { resetPartyForm(); setIsModalOpen(true); }}>
+            <Plus size={18} /> Add Party
+          </button>
+        </div>
       </header>
 
       <div className="premium-card" style={{ marginBottom: '2rem' }}>

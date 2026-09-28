@@ -4,10 +4,12 @@ import { generateDocNumber } from '../utils/numbering';
 import { Eye, Edit2, Trash2, Plus } from 'lucide-react';
 import { viewPDF } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
+import ExportButton from '../components/ExportButton';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
+import { newestFirst } from '../utils/dateUtils';
 import DcPartyBoxes from '../components/DcPartyBoxes';
 import {
   buildDCFieldsFromProducts,
@@ -195,11 +197,11 @@ const DeliveryChallan = () => {
     setIsModalOpen(false);
   };
 
-  const pendingPLs = data.packingLists.filter(pl =>
+  const pendingPLs = newestFirst((data.packingLists || []).filter(pl =>
     !(data.deliveryChallans || []).some(dc => dc.receiptId === pl.receiptId)
-  );
+  ));
 
-  const dcList = data.deliveryChallans || [];
+  const dcList = newestFirst(data.deliveryChallans || []);
   const partyOptions = useMemo(() => uniqueSortedOptions(dcList.map((dc) => dc.partyName)), [dcList]);
   const productOptions = useMemo(() => uniqueSortedOptions(dcList.map((dc) => dc.productName)), [dcList]);
   const filteredDCs = dcList.filter((dc) => {
@@ -222,9 +224,24 @@ const DeliveryChallan = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Delivery Challans (D.C.)</h1>
           <p style={{ color: 'var(--text-muted)' }}>Generate transport dispatch delivery challans mapped to packing lists.</p>
         </div>
-        <button className="btn btn-primary" onClick={handleCreateNew}>
-          <Plus size={18} /> Create New DC
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ExportButton
+            data={filteredDCs}
+            columns={[
+              { label: 'DC No', key: 'dcNo' },
+              { label: 'Customer', key: 'partyName' },
+              { label: 'Product', key: 'productName' },
+              { label: 'Qty (Net)', key: 'qty' },
+              { label: 'Value (₹)', key: 'value' },
+              { label: 'Vehicle No', key: 'vehicleNo' }
+            ]}
+            filename="Delivery_Challans"
+            title="Delivery Challans"
+          />
+          <button className="btn btn-primary" onClick={handleCreateNew}>
+            <Plus size={18} /> Create New DC
+          </button>
+        </div>
       </header>
 
       <ListFilterBar

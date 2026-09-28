@@ -15,6 +15,7 @@ import {
   setStoredPrintPrefs
 } from '../utils/printPrefs';
 import SearchableSelect from '../components/SearchableSelect';
+import ExportButton from '../components/ExportButton';
 
 const Section = ({ title, children }) => (
   <div className="premium-card" style={{ marginBottom: '1.5rem' }}>
@@ -77,14 +78,34 @@ const CompanyProfileSettings = () => {
 
   return (
     <div>
-      <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Building2 size={28} style={{ color: 'var(--accent-primary)' }} />
-          Company Profile Settings
-        </h1>
-        <p style={{ color: 'var(--text-muted)' }}>
-          Manage your company details shown on invoices, delivery challans, and PDF documents.
-        </p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Building2 size={28} style={{ color: 'var(--accent-primary)' }} />
+            Company Profile Settings
+          </h1>
+          <p style={{ color: 'var(--text-muted)' }}>
+            Manage your company details shown on invoices, delivery challans, and PDF documents.
+          </p>
+        </div>
+        <ExportButton
+          data={[{
+            companyName: form.companyName,
+            address: formatCompanyAddressSingle(form),
+            phone: form.phone,
+            email: form.email,
+            gstNumber: form.gstNumber
+          }]}
+          columns={[
+            { label: 'Company Name', key: 'companyName' },
+            { label: 'Address', key: 'address' },
+            { label: 'Phone', key: 'phone' },
+            { label: 'Email', key: 'email' },
+            { label: 'GSTIN', key: 'gstNumber' }
+          ]}
+          filename="Company_Profile"
+          title="Company Profile"
+        />
       </header>
 
       <form onSubmit={handleSubmit}>

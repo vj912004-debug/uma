@@ -1,10 +1,11 @@
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Eye, Plus, Edit2, Trash2 } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
 import { viewPDF } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
+import ExportButton from '../components/ExportButton';
 import DateField from '../components/DateField';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
@@ -223,7 +224,7 @@ const CreditNotes = () => {
     setIsEditing(null);
   };
 
-  const notesList = (data.creditNotes || []).filter(n => !n.isDeleted);
+  const notesList = newestFirst((data.creditNotes || []).filter(n => !n.isDeleted));
   const partyOptions = useMemo(() => uniqueSortedOptions(notesList.map((n) => n.partyName)), [notesList]);
   const isNotePending = (n) => !String(n.refInvoice || n.invoiceNo || '').trim();
   const pendingCount = notesList.filter(isNotePending).length;
@@ -247,9 +248,24 @@ const CreditNotes = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Credit Notes</h1>
           <p style={{ color: 'var(--text-muted)' }}>Manage financial credit notes with GST calculations.</p>
         </div>
-        <button className="btn btn-primary" onClick={handleOpenModal}>
-          <Plus size={18} /> Add Credit Note
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ExportButton
+            data={filtered}
+            columns={[
+              { label: 'Date', key: 'date' },
+              { label: 'Note Number', key: 'noteNo' },
+              { label: 'Party Name', key: 'partyName' },
+              { label: 'Ref Invoice', key: 'refInvoice' },
+              { label: 'Particulars', key: 'particulars' },
+              { label: 'Amount (₹)', key: 'amount' }
+            ]}
+            filename="Credit_Notes"
+            title="Credit Notes"
+          />
+          <button className="btn btn-primary" onClick={handleOpenModal}>
+            <Plus size={18} /> Add Credit Note
+          </button>
+        </div>
       </header>
 
       <StatusTabBar

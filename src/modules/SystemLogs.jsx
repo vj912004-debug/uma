@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Download } from 'lucide-react';
+import ExportButton from '../components/ExportButton';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -113,6 +114,24 @@ const SystemLogs = () => {
           <button onClick={handlePDFBackup} className="btn" style={{ gap: '0.5rem' }}>
             <Download size={16} /> Backup PDF
           </button>
+          <ExportButton
+            data={lastActions.map((log) => ({
+              time: log.timestamp ? new Date(log.timestamp).toLocaleString() : '',
+              user: log.user || '',
+              action: log.action || '',
+              module: log.module || '',
+              details: log.message || log.details || ''
+            }))}
+            columns={[
+              { label: 'Time', key: 'time' },
+              { label: 'User', key: 'user' },
+              { label: 'Action', key: 'action' },
+              { label: 'Module', key: 'module' },
+              { label: 'Details', key: 'details' }
+            ]}
+            filename="System_Logs"
+            title="System Logs"
+          />
         </div>
       </div>
 

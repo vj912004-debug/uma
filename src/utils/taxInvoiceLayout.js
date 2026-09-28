@@ -24,9 +24,14 @@ export const TI_EMPTY_ROWS = 2;
 export const GST_TYPE_CGST_SGST = 'cgst_sgst';
 export const GST_TYPE_IGST = 'igst';
 
-export const normalizeGstType = (value) => (
-  String(value || '').toLowerCase() === GST_TYPE_IGST ? GST_TYPE_IGST : GST_TYPE_CGST_SGST
-);
+export const normalizeGstType = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return GST_TYPE_CGST_SGST;
+  const lower = raw.toLowerCase();
+  if (lower === GST_TYPE_IGST || lower.includes('igst')) return GST_TYPE_IGST;
+  if (lower === GST_TYPE_CGST_SGST || lower.includes('cgst')) return GST_TYPE_CGST_SGST;
+  return raw;
+};
 
 export const getSplitGstRates = (data) => {
   const parsed = parseFloat(data?.taxRate);

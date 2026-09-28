@@ -5,10 +5,12 @@ import { generateDocNumber } from '../utils/numbering';
 import { Eye, Edit2, Trash2, Plus } from 'lucide-react';
 import { viewPDF } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
+import ExportButton from '../components/ExportButton';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
+import { newestFirst } from '../utils/dateUtils';
 import {
   getReceiptProductLabel,
   getReceiptProductSummaries,
@@ -284,9 +286,9 @@ const PackingList = () => {
     setIsModalOpen(false);
   };
 
-  const pendingBPRs = (data.bprs || []).filter(b =>
+  const pendingBPRs = newestFirst((data.bprs || []).filter(b =>
     !findAnyPackingList(data.packingLists, b.receiptId)
-  );
+  ));
 
   const seenReceipts = new Set();
   const uniquePendingBPRs = pendingBPRs.filter(b => {
@@ -295,7 +297,7 @@ const PackingList = () => {
     return true;
   });
 
-  const plList = (data.packingLists || []).filter((pl) => !pl.isDeleted);
+  const plList = newestFirst((data.packingLists || []).filter((pl) => !pl.isDeleted));
   const partyOptions = useMemo(() => uniqueSortedOptions(plList.map((pl) => pl.partyName)), [plList]);
   const productOptions = useMemo(
     () => uniqueSortedOptions(plList.map((pl) => getPLDisplayProductLabel(pl, data))),
@@ -327,9 +329,27 @@ const PackingList = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Packing Lists (P.L.)</h1>
           <p style={{ color: 'var(--text-muted)' }}>Generate batch weight packlists carrying forward dispatched milling data.</p>
         </div>
-        <button className="btn btn-primary" onClick={handleCreateNew}>
-          <Plus size={18} /> Create New PL
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ExportButton
+            data={filteredPLs.map((pl) => ({
+              plNo: pl.plNo,
+              productName: getPLDisplayProductLabel(pl, data),
+              totalWeight: pl.totalWeight,
+              totalDrums: pl.totalDrums
+            }))}
+            columns={[
+              { label: 'PL No', key: 'plNo' },
+              { label: 'Product', key: 'productName' },
+              { label: 'Total Weight', key: 'totalWeight' },
+              { label: 'Total Drums', key: 'totalDrums' }
+            ]}
+            filename="Packing_Lists"
+            title="Packing Lists"
+          />
+          <button className="btn btn-primary" onClick={handleCreateNew}>
+            <Plus size={18} /> Create New PL
+          </button>
+        </div>
       </header>
 
       <ListFilterBar

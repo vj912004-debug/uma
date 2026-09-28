@@ -13,6 +13,7 @@ import {
   PlusSquare,
   ArrowRight
 } from 'lucide-react';
+import ExportButton from '../components/ExportButton';
 import { useNavigate } from 'react-router-dom';
 import { buildUnderProcessRows, getProductQty, receiptProductOptions } from '../utils/receiptProducts';
 import { listProcessingSheetDueRows } from '../utils/paymentTotals';
@@ -268,11 +269,31 @@ const Dashboard = () => {
 
   return (
     <div className="dash-page">
-      <header className="page-header dash-header">
+      <header className="page-header dash-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <h1 className="page-title">Dashboard</h1>
           <p className="page-subtitle">Welcome to Uma Micron Management System</p>
         </div>
+        <ExportButton
+          data={allRows.map((row) => ({
+            joNo: row.mr.receiptNo || '',
+            partyName: row.mr.partyName || '',
+            productName: row.productName || '',
+            qty: row.productName
+              ? getProductQty(row.mr, row.productName, row.prodOpts)
+              : (row.mr.totalQty || 0),
+            status: row.status || ''
+          }))}
+          columns={[
+            { label: 'JO No.', key: 'joNo' },
+            { label: 'Party Name', key: 'partyName' },
+            { label: 'Product', key: 'productName' },
+            { label: 'Qty (kg)', key: 'qty' },
+            { label: 'Status', key: 'status' }
+          ]}
+          filename="Dashboard_Job_Orders"
+          title="Job Orders"
+        />
       </header>
 
       <div className="dash-kpi-grid">

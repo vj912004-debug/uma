@@ -4,8 +4,10 @@ import { generateDocNumber } from '../utils/numbering';
 import { Eye, Edit2, Trash2, Plus, ArrowLeft } from 'lucide-react';
 import { viewPDF } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
+import ExportButton from '../components/ExportButton';
 import DocChargeRow from '../components/DocChargeRow';
 import DateField from '../components/DateField';
+import { newestFirst } from '../utils/dateUtils';
 import GstTaxBlock from '../components/GstTaxBlock';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
@@ -497,9 +499,9 @@ const TaxInvoice = () => {
     setEditingDoc(null);
   };
 
-  const pendingPLs = (data.packingLists || []).filter(pl =>
+  const pendingPLs = newestFirst((data.packingLists || []).filter(pl =>
     !findAnyTaxInvoice(data.invoices, pl.receiptId)
-  );
+  ));
 
   const seenReceipts = new Set();
   const uniquePendingPLs = pendingPLs.filter(pl => {
@@ -508,7 +510,7 @@ const TaxInvoice = () => {
     return true;
   });
 
-  const taxInvoices = (data.invoices || []).filter(inv => inv.invoiceNo?.includes('/IN/'));
+  const taxInvoices = newestFirst((data.invoices || []).filter(inv => inv.invoiceNo?.includes('/IN/')));
   const partyOptions = useMemo(() => uniqueSortedOptions(taxInvoices.map((r) => r.partyName)), [taxInvoices]);
   const productOptions = useMemo(() => uniqueSortedOptions(
     taxInvoices.map((inv) => {
@@ -533,6 +535,23 @@ const TaxInvoice = () => {
 
   const chargesList = STANDARD_CHARGES_LIST;
   const materialQty = parseFloat(form.qty) || 0;
+  const exportRows = filteredInvoices.map((inv) => {
+    const mr = (data.materialReceipts || []).find((m) => m.id === inv.receiptId);
+    return {
+      invoiceNo: inv.invoiceNo,
+      partyName: inv.partyName,
+      productName: getDocProductLabel(inv, mr, mr ? receiptProductOptions(mr, data) : {}),
+      qty: inv.qty,
+      total: inv.total
+    };
+  });
+  const exportColumns = [
+    { label: 'Invoice No', key: 'invoiceNo' },
+    { label: 'Customer', key: 'partyName' },
+    { label: 'Product', key: 'productName' },
+    { label: 'Qty', key: 'qty' },
+    { label: 'Total Amount', key: 'total' }
+  ];
 
   return (
     <div>
@@ -543,9 +562,12 @@ const TaxInvoice = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Tax Invoices</h1>
           <p style={{ color: 'var(--text-muted)' }}>Generate and manage billing against finalized delivery challans.</p>
         </div>
-        <button className="btn btn-primary" onClick={handleCreateNew}>
-          <Plus size={18} /> Create New Tax Invoice
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ExportButton data={exportRows} columns={exportColumns} filename="Tax_Invoices" title="Tax Invoices" />
+          <button className="btn btn-primary" onClick={handleCreateNew}>
+            <Plus size={18} /> Create New Tax Invoice
+          </button>
+        </div>
       </header>
 
       <ListFilterBar

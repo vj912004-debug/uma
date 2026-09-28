@@ -67,7 +67,9 @@ const PrintPrefsModal = ({ mode, docType, initial, onCancel, onConfirm }) => {
           <SearchableSelect
             className="input-field"
             value={fontFamily}
-            allowCustom={false}
+            allowCustom
+            placeholder="Type or select font"
+            memoryKey="print-font"
             onChange={(e) => setFontFamily(e.target.value)}
             style={{ fontFamily }}
           >
@@ -84,8 +86,13 @@ const PrintPrefsModal = ({ mode, docType, initial, onCancel, onConfirm }) => {
           <SearchableSelect
             className="input-field"
             value={fontSize}
-            allowCustom={false}
-            onChange={(e) => setFontSize(Number(e.target.value))}
+            allowCustom
+            placeholder="Type or select size"
+            memoryKey="print-font-size"
+            onChange={(e) => {
+              const n = parseInt(e.target.value, 10);
+              setFontSize(Number.isFinite(n) ? n : e.target.value);
+            }}
           >
             {PRINT_FONT_SIZES.map((s) => (
               <option key={s} value={s}>
@@ -100,7 +107,9 @@ const PrintPrefsModal = ({ mode, docType, initial, onCancel, onConfirm }) => {
           <SearchableSelect
             className="input-field"
             value={shrink}
-            allowCustom={false}
+            allowCustom
+            placeholder="Type or select shrink"
+            memoryKey="print-shrink"
             onChange={(e) => setShrink(e.target.value)}
           >
             {PRINT_SHRINK_OPTIONS.map((s) => (

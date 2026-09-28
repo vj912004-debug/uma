@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, CreditCard } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import { getReceiptOutstanding, getPartyOutstandingByFY, collectPartyDueEntities } from '../utils/paymentTotals';
 import { getCurrentFYKey, getFYKeysThroughCurrent } from '../utils/financialYear';
 import { useNavigate } from 'react-router-dom';
@@ -76,7 +76,7 @@ const PartyDue = () => {
   };
 
   // Outstanding = unpaid tax invoice totals (bill − received − TDS) per party
-  const partyRows = collectPartyDueEntities(data).map((party) => {
+  const partyRows = newestFirst(collectPartyDueEntities(data)).map((party) => {
     const invoiceDuesByFY = getPartyOutstandingByFY(data, party, bucketKeys, currentFY);
     const finals = {};
     fyKeys.forEach((fy) => {

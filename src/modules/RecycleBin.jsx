@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAppContext } from '../context/AppContext';
+import ExportButton from '../components/ExportButton';
 
 const RecycleBin = () => {
   const { data, restoreItem, hardDeleteItem } = useAppContext();
@@ -23,9 +24,25 @@ const RecycleBin = () => {
 
   return (
     <div className="module-container">
-      <div className="module-header">
-        <h2>Recycle Bin</h2>
-        <p>View and restore deleted records</p>
+      <div className="module-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+        <div>
+          <h2>Recycle Bin</h2>
+          <p>View and restore deleted records</p>
+        </div>
+        <ExportButton
+          data={deletedItems.map((item) => ({
+            deletedAt: item.deletedAt ? new Date(item.deletedAt).toLocaleString() : '',
+            module: item._module,
+            record: item.name || item.partyName || item.productName || item.batchNo || item.id
+          }))}
+          columns={[
+            { label: 'Deleted At', key: 'deletedAt' },
+            { label: 'Module', key: 'module' },
+            { label: 'Record ID / Name', key: 'record' }
+          ]}
+          filename="Recycle_Bin"
+          title="Recycle Bin"
+        />
       </div>
       <div className="data-table-container">
         <table className="data-table">

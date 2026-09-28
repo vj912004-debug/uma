@@ -273,22 +273,29 @@ const ProcessingSheet = () => {
     return { pending, completed, all: rows.length };
   }, [rows]);
 
-  const filteredRows = [...rows].reverse().filter((row) => {
-    const isPending = (parseFloat(row.outstanding) || 0) > 0.01;
-    if (statusTab === 'pending' && !isPending) return false;
-    if (statusTab === 'completed' && isPending) return false;
-    const s = searchTerm.toLowerCase().trim();
-    const matchesSearch = !s ||
-      (row.partyName || '').toLowerCase().includes(s) ||
-      (row.productName || '').toLowerCase().includes(s) ||
-      (row.tiNo || '').toLowerCase().includes(s) ||
-      (row.piNo || '').toLowerCase().includes(s);
-    const matchesParty = !partyFilter ||
-      (row.partyName || '').trim().toLowerCase() === partyFilter.trim().toLowerCase();
-    const matchesProduct = !productFilter ||
-      (row.productName || '').trim().toLowerCase() === productFilter.trim().toLowerCase();
-    return matchesSearch && matchesParty && matchesProduct;
-  }).map((row, idx) => ({ ...row, srNo: idx + 1 }));
+  const filteredRows = (() => {
+    const invoiced = [];
+    const awaitingTi = [];
+    [...rows].reverse().forEach((row) => {
+      const isPending = (parseFloat(row.outstanding) || 0) > 0.01;
+      if (statusTab === 'pending' && !isPending) return;
+      if (statusTab === 'completed' && isPending) return;
+      const s = searchTerm.toLowerCase().trim();
+      const matchesSearch = !s ||
+        (row.partyName || '').toLowerCase().includes(s) ||
+        (row.productName || '').toLowerCase().includes(s) ||
+        (row.tiNo || '').toLowerCase().includes(s) ||
+        (row.piNo || '').toLowerCase().includes(s);
+      const matchesParty = !partyFilter ||
+        (row.partyName || '').trim().toLowerCase() === partyFilter.trim().toLowerCase();
+      const matchesProduct = !productFilter ||
+        (row.productName || '').trim().toLowerCase() === productFilter.trim().toLowerCase();
+      if (!matchesSearch || !matchesParty || !matchesProduct) return;
+      if (!row.invoiceId) awaitingTi.push(row);
+      else invoiced.push(row);
+    });
+    return [...invoiced, ...awaitingTi].map((row, idx) => ({ ...row, srNo: idx + 1 }));
+  })();
 
   const summaryTotals = filteredRows.reduce(
     (acc, row) => {

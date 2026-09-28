@@ -1,4 +1,4 @@
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
@@ -281,7 +281,7 @@ const PurchaseOrders = () => {
     !(data.purchaseOrders || []).some(po => po.receiptId === mr.id)
   );
 
-  const poList = (data.purchaseOrders || []).filter(po => !po.isDeleted);
+  const poList = newestFirst((data.purchaseOrders || []).filter(po => !po.isDeleted));
   const partyOptions = useMemo(() => uniqueSortedOptions(poList.map((r) => r.partyName)), [poList]);
   const productOptions = useMemo(() => uniqueSortedOptions(poList.map((r) => r.productName)), [poList]);
   const filtered = poList.filter((po) => {

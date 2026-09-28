@@ -1,4 +1,4 @@
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Edit2, Trash2, Calendar, Clock } from 'lucide-react';
@@ -284,7 +284,7 @@ const ProductionPlanning = () => {
 
   const productNicknames = Array.from(new Set((data.parties || []).flatMap(p => p.products || []).map(prod => prod?.nickname).filter(Boolean)));
 
-  const plansList = (data.productionPlans || []).filter(p => !p.isDeleted);
+  const plansList = newestFirst((data.productionPlans || []).filter(p => !p.isDeleted));
   const resolvedPlans = useMemo(
     () => plansList
       .map(p => resolvePlan(p, data.materialReceipts, data.parties))

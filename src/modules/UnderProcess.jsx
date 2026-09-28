@@ -1,4 +1,4 @@
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber, nextAvailableDocNumber } from '../utils/numbering';
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { viewPDF, padBPRBatchRows } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
+import ExportButton from '../components/ExportButton';
 import { enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, getLinkedPITermsForTI, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges, qtyInputValue, rateInputValue } from '../utils/documentCharges';
 import { DEFAULT_INVOICE_TERMS_TEXT, DEFAULT_PI_TERMS_TEXT } from '../utils/printTheme';
 import {
@@ -399,8 +400,11 @@ const UnderProcess = () => {
   const [productFilter, setProductFilter] = useState('');
 
   const processRows = useMemo(
-    () => buildUnderProcessRows(data.materialReceipts, data).filter(
-      ({ mr, productName }) => !isMovedToProcessingSheet(mr, productName)
+    () => newestFirst(
+      buildUnderProcessRows(data.materialReceipts, data).filter(
+        ({ mr, productName }) => !isMovedToProcessingSheet(mr, productName)
+      ),
+      (row) => row.mr
     ),
     [data]
   );
@@ -694,13 +698,57 @@ const UnderProcess = () => {
     );
   };
 
+  const docStatus = (doc, no) => (doc ? (no || 'Done') : 'Pending');
+  const underProcessExport = filteredProcessRows.map(({ mr, productName, prodOpts }) => {
+    const pi = getPI(mr.id);
+    const bpr = getBPR(mr.id, productName);
+    const psd = getPSD(mr.id, productName);
+    const pl = getPL(mr.id, productName);
+    const dc = getDC(mr.id, productName);
+    const ti = getTI(mr.id, productName);
+    const rowQty = productName
+      ? (getProductQty(mr, productName, prodOpts) || 0)
+      : (parseFloat(mr.totalQty) || parseFloat(mr.receivedQty) || 0);
+    return {
+      date: formatDate(mr.date),
+      partyName: mr.partyName || '',
+      productName: productName || mr.productName || '',
+      qty: rowQty,
+      pi: docStatus(pi, pi?.invoiceNo),
+      bpr: docStatus(bpr, bpr?.bprNo),
+      psd: docStatus(psd, psd?.psdNo),
+      pl: docStatus(pl, pl?.plNo),
+      dc: docStatus(dc, dc?.dcNo),
+      eway: isEwayBillDone(data, mr, productName) ? 'Done' : 'Pending',
+      ti: docStatus(ti, ti?.invoiceNo)
+    };
+  });
+
   return (
     <div className="under-process-page">
-      <header className="page-header">
+      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <h1 className="page-title">Under Process</h1>
           <p className="page-subtitle">Track document generation status for materials in process</p>
         </div>
+        <ExportButton
+          data={underProcessExport}
+          columns={[
+            { label: 'Material Received Date', key: 'date' },
+            { label: 'Party Name', key: 'partyName' },
+            { label: 'Product', key: 'productName' },
+            { label: 'Qty (kg)', key: 'qty' },
+            { label: 'PI', key: 'pi' },
+            { label: 'BPR', key: 'bpr' },
+            { label: 'PSD', key: 'psd' },
+            { label: 'Packing List', key: 'pl' },
+            { label: 'DC', key: 'dc' },
+            { label: 'E-Way Bill', key: 'eway' },
+            { label: 'Tax Inv', key: 'ti' }
+          ]}
+          filename="Under_Process"
+          title="Under Process"
+        />
       </header>
 
       <div className="tab-bar">
@@ -711,8 +759,8 @@ const UnderProcess = () => {
           { id: 'BPR', label: 'BPR' },
           { id: 'PSD', label: 'PSD' },
           { id: 'PL', label: 'PL' },
-          { id: 'EWAY', label: 'E-Way Bill' },
           { id: 'DC', label: 'DC' },
+          { id: 'EWAY', label: 'E-Way Bill' },
           { id: 'TI', label: 'Tax Inv' },
           { id: 'Done', label: 'Done' }
         ].map(tab => (
@@ -778,8 +826,8 @@ const UnderProcess = () => {
               <th className="center">BPR</th>
               <th className="center">PSD</th>
               <th className="center">Packing List</th>
-              <th className="center">E-Way Bill</th>
               <th className="center">DC</th>
+              <th className="center">E-Way Bill</th>
               <th className="center">Tax Inv</th>
               <th className="center">Action</th>
             </tr>
@@ -841,6 +889,10 @@ const UnderProcess = () => {
                     {renderDocCell(mr, productName, 'PL', pl, {
                       printDoc: () => viewPDF('PL', pl),
                       disabled: !(bpr || isProcessStepPassed(mr, productName, 'BPR'))
+                    })}
+                    {renderDocCell(mr, productName, 'DC', dc, {
+                      printDoc: () => viewPDF('DC', dc),
+                      disabled: !(pl || isProcessStepPassed(mr, productName, 'PL'))
                     })}
                     {(() => {
                       const ewayNotRequired = getProcessNotRequired(mr, productName, 'EWAY');
@@ -904,10 +956,6 @@ const UnderProcess = () => {
                         </td>
                       );
                     })()}
-                    {renderDocCell(mr, productName, 'DC', dc, {
-                      printDoc: () => viewPDF('DC', dc),
-                      disabled: !(pl || isProcessStepPassed(mr, productName, 'PL'))
-                    })}
                     {renderDocCell(mr, productName, 'TI', ti, {
                       printDoc: () => viewPDF('TI', enrichTIForPrint(ti, data)),
                       disabled: !(pl || isProcessStepPassed(mr, productName, 'PL'))

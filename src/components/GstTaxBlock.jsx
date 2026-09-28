@@ -77,7 +77,9 @@ const GstTaxBlock = ({
           className="input-field"
           style={selectStyle}
           value={type}
-          allowCustom={false}
+          allowCustom
+          placeholder="Type or select GST type"
+          memoryKey="gst-type"
           onChange={(e) => onGstTypeChange?.(normalizeGstType(e.target.value))}
         >
           <option value={GST_TYPE_CGST_SGST}>CGST + SGST (Gujarat)</option>

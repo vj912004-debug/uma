@@ -1124,6 +1124,11 @@ export const getSharedPrintStyles = () => `
     white-space: normal;
     overflow-wrap: break-word;
   }
+  .f3-body .term-line.term-highlight {
+    font-weight: 800;
+    background: #fff3bf;
+    padding: 2px 4px;
+  }
   .f3-body .term-note {
     margin: 0 0 8px;
     font-weight: 700;
@@ -1384,7 +1389,8 @@ const isLegacyPiTerms = (terms) => {
 
 export const formatPiPrintTermsHtml = (terms) => formatPrintTermsHtml(
   isPlaceholderInvoiceTerms(terms) || isLegacyPiTerms(terms) ? '' : terms,
-  DEFAULT_PI_TERMS
+  DEFAULT_PI_TERMS,
+  (line) => /packing materials and transportation/i.test(line)
 );
 
 export const DEFAULT_PO_TERMS = [
@@ -1397,7 +1403,7 @@ export const DEFAULT_INVOICE_DECLARATION =
   'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.';
 
 /** Split stored terms into numbered lines (real newlines; no CSS list markers). */
-export const formatPrintTermsHtml = (terms, fallbackLines = DEFAULT_INVOICE_TERMS) => {
+export const formatPrintTermsHtml = (terms, fallbackLines = DEFAULT_INVOICE_TERMS, highlightLine = null) => {
   const raw = String(terms || '').trim();
   const source = raw ? raw.split(/\r?\n/) : fallbackLines;
   const stripNum = (line) => String(line || '')
@@ -1406,9 +1412,10 @@ export const formatPrintTermsHtml = (terms, fallbackLines = DEFAULT_INVOICE_TERM
     .trim();
   const lines = source.map(stripNum).filter(Boolean);
   const items = lines.length ? lines : fallbackLines;
-  return items.map((line, i) => (
-    `<div class="term-line">${i + 1}. ${escHtml(line)}</div>`
-  )).join('');
+  return items.map((line, i) => {
+    const mark = typeof highlightLine === 'function' && highlightLine(line);
+    return `<div class="term-line${mark ? ' term-highlight' : ''}">${i + 1}. ${escHtml(line)}</div>`;
+  }).join('');
 };
 
 export const buildFooterTerms = (companyName, termsHtml, declarationHtml, notesHtml = '') => {

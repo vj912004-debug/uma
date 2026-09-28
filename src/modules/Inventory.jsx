@@ -1,8 +1,9 @@
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Package, History, SlidersHorizontal, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
+import ExportButton from '../components/ExportButton';
 
 const Inventory = () => {
   const { data, setData } = useAppContext();
@@ -52,9 +53,41 @@ const Inventory = () => {
 
   return (
     <div>
-      <header style={{ marginBottom: '2.5rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Inventory Management</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Real-time stock register and adjustments.</p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Inventory Management</h1>
+          <p style={{ color: 'var(--text-muted)' }}>Real-time stock register and adjustments.</p>
+        </div>
+        <ExportButton
+          data={activeTab === 'History'
+            ? newestFirst(data.stockAdjustments || []).map((adj) => ({
+              date: formatDate(adj.date),
+              item: adj.item,
+              type: adj.type,
+              qty: adj.qty,
+              reason: adj.reason
+            }))
+            : Object.entries(currentStock).map(([item, qty]) => ({
+              item,
+              qty,
+              status: qty > 0 ? 'In Stock' : 'Out of Stock'
+            }))}
+          columns={activeTab === 'History'
+            ? [
+              { label: 'Date', key: 'date' },
+              { label: 'Item', key: 'item' },
+              { label: 'Type', key: 'type' },
+              { label: 'Qty', key: 'qty' },
+              { label: 'Reason', key: 'reason' }
+            ]
+            : [
+              { label: 'Item Name', key: 'item' },
+              { label: 'Current Stock', key: 'qty' },
+              { label: 'Status', key: 'status' }
+            ]}
+          filename={activeTab === 'History' ? 'Stock_Adjustments' : 'Inventory'}
+          title={activeTab === 'History' ? 'Stock Adjustment History' : 'Inventory'}
+        />
       </header>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
@@ -150,7 +183,7 @@ const Inventory = () => {
                 </tr>
               </thead>
               <tbody>
-                {data.stockAdjustments.map(adj => (
+                {newestFirst(data.stockAdjustments || []).map(adj => (
                   <tr key={adj.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td style={{ padding: '1rem' }}>{formatDate(adj.date)}</td>
                     <td style={{ padding: '1rem', fontWeight: 600 }}>{adj.item}</td>

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Trash2, Tag, Box, Ruler, Percent, SlidersHorizontal, FileText } from 'lucide-react';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+import ExportButton from '../components/ExportButton';
 
 const TAB_CONFIG = {
   Items: { key: 'items', title: 'Product Master', placeholder: 'Enter product name...', isTax: false },
@@ -99,9 +100,23 @@ const MasterSetup = () => {
 
   return (
     <div>
-      <header style={{ marginBottom: '2.5rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Master Setup</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Configure your system-wide master data.</p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Master Setup</h1>
+          <p style={{ color: 'var(--text-muted)' }}>Configure your system-wide master data.</p>
+        </div>
+        <ExportButton
+          data={filteredEntries.map(({ item }) => (
+            tab.isTax
+              ? { name: item?.name || '', rate: item?.rate ?? '' }
+              : { name: String(item || '') }
+          ))}
+          columns={tab.isTax
+            ? [{ label: 'Name', key: 'name' }, { label: 'Rate', key: 'rate' }]
+            : [{ label: tab.title, key: 'name' }]}
+          filename={`Master_${activeTab}`}
+          title={tab.title}
+        />
       </header>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>

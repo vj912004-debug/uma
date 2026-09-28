@@ -4,7 +4,8 @@ import { Eye, Plus, Trash2, Edit2, GripVertical, Copy } from 'lucide-react';
 import { nextAvailableDocNumber } from '../utils/numbering';
 import { viewPDF } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
-import { formatDate } from '../utils/dateUtils';
+import ExportButton from '../components/ExportButton';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
@@ -99,17 +100,20 @@ const ChargeNoteInput = ({ value, onChange, placeholder = 'Note e.g. Nil if Qty 
 );
 
 const RateUnitSelect = ({ chargeKey, value, onChange }) => (
-  <select
+  <SearchableSelect
+    allowCustom
     className="input-field"
     style={{ padding: '0.25rem 0.35rem', width: '96px', fontSize: '0.75rem' }}
     value={value ?? defaultRateUnit(chargeKey)}
     onChange={(e) => onChange(chargeKey, e.target.value)}
+    placeholder="Type unit"
+    memoryKey="quote-rate-unit"
     title="Printed after the rate (e.g. /Each, / Kg, /No)"
   >
     {RATE_UNIT_OPTIONS.map((opt) => (
       <option key={opt.value || 'amount'} value={opt.value}>{opt.label === 'Amount only' ? '—' : opt.label}</option>
     ))}
-  </select>
+  </SearchableSelect>
 );
 
 /** Quotation only: nothing selected until the user checks a charge. */
@@ -360,7 +364,7 @@ const Quotations = () => {
   const [formData, setFormData] = useState(getDefaultForm());
   const [dropTarget, setDropTarget] = useState(null);
 
-  const quotationsList = data.quotations?.filter(q => !q.isDeleted) || [];
+  const quotationsList = newestFirst(data.quotations?.filter(q => !q.isDeleted) || []);
 
   const nextQuoteNumber = (date, excludeId = null) => nextAvailableDocNumber(
     'QTN',
@@ -800,9 +804,23 @@ const Quotations = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Quotations</h1>
           <p style={{ color: 'var(--text-muted)' }}>Create and manage commercial proposals.</p>
         </div>
-        <button className="btn btn-primary" onClick={handleNewQuotation}>
-          <Plus size={18} /> New Quotation
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ExportButton
+            data={filtered}
+            columns={[
+              { label: 'Date', key: 'date' },
+              { label: 'Quotation No', key: 'quotationNo' },
+              { label: 'Party Name', key: 'partyName' },
+              { label: 'Product', key: 'productName' },
+              { label: 'Subject', key: 'subject' }
+            ]}
+            filename="Quotations"
+            title="Quotations"
+          />
+          <button className="btn btn-primary" onClick={handleNewQuotation}>
+            <Plus size={18} /> New Quotation
+          </button>
+        </div>
       </header>
 
       <StatusTabBar

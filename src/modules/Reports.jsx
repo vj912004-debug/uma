@@ -1,7 +1,6 @@
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Download } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 import { normalizeGstType, GST_TYPE_IGST } from '../utils/taxInvoiceLayout';
 
@@ -30,9 +29,39 @@ const Reports = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Reports & Analytics</h1>
           <p style={{ color: 'var(--text-muted)' }}>Analyze your business performance and compliance.</p>
         </div>
-        <button className="btn btn-primary" style={{ background: 'var(--accent-secondary)' }}>
-          <Download size={20} /> Export Generic
-        </button>
+        <ExportButton
+          data={activeReport === 'Payment'
+            ? newestFirst(data.payments || [])
+            : activeReport === 'Attendance'
+              ? newestFirst((data.attendance || []).filter((a) => !a.isDeleted))
+              : newestFirst(data.invoices || [])}
+          columns={activeReport === 'Payment'
+            ? [
+              { label: 'Date', key: 'date' },
+              { label: 'Invoice', key: 'invoiceNo' },
+              { label: 'Party', key: 'partyName' },
+              { label: 'Mode', key: 'paymentMode' },
+              { label: 'Reference', key: 'referenceNo' },
+              { label: 'Amount', key: 'amount' }
+            ]
+            : activeReport === 'Attendance'
+              ? [
+                { label: 'Date', key: 'date' },
+                { label: 'User', key: 'username' },
+                { label: 'Status', key: 'statusCode' },
+                { label: 'OT Hours', key: 'otHours' }
+              ]
+              : [
+                { label: 'Invoice No', key: 'invoiceNo' },
+                { label: 'Date', key: 'date' },
+                { label: 'Party', key: 'partyName' },
+                { label: 'Taxable', key: 'subtotal' },
+                { label: 'GST', key: 'taxAmount' },
+                { label: 'Total', key: 'total' }
+              ]}
+          filename={activeReport === 'Payment' ? 'Payment_Report' : activeReport === 'Attendance' ? 'Attendance_Report' : `${activeReport}_Report`}
+          title={`${activeReport} Report`}
+        />
       </header>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
@@ -45,9 +74,9 @@ const Reports = () => {
       </div>
 
       <div className="premium-card">
-        {activeReport === 'Sales' && <SalesTable data={data.invoices || []} />}
-        {activeReport === 'GST' && <GSTTable data={data.invoices || []} />}
-        {activeReport === 'Payment' && <PaymentTable data={data.payments || []} />}
+        {activeReport === 'Sales' && <SalesTable data={newestFirst(data.invoices || [])} />}
+        {activeReport === 'GST' && <GSTTable data={newestFirst(data.invoices || [])} />}
+        {activeReport === 'Payment' && <PaymentTable data={newestFirst(data.payments || [])} />}
         {activeReport === 'Stock' && <StockSummary data={data} />}
         {activeReport === 'Consumption' && <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Material Consumption analytics based on BPR logs.</div>}
         {activeReport === 'Attendance' && <AttendanceReports data={data} />}
@@ -59,7 +88,7 @@ const Reports = () => {
 // --- Attendance Reports Sub-module ---
 const AttendanceReports = ({ data }) => {
   const [subReport, setSubReport] = useState('Daily');
-  const attendance = (data.attendance || []).filter(a => !a.isDeleted);
+  const attendance = newestFirst((data.attendance || []).filter(a => !a.isDeleted));
   const users = data.users || [];
 
   const SubTab = ({ id, name }) => (
@@ -86,7 +115,7 @@ const AttendanceReports = ({ data }) => {
   }, {});
   const lateList = Object.entries(lateData).map(([name, count]) => ({ name, count })).sort((a,b) => b.count - a.count);
 
-  const otData = attendance.filter(a => parseFloat(a.otHours) > 0);
+  const otData = newestFirst(attendance.filter(a => parseFloat(a.otHours) > 0));
 
   // Leave balance simple mock: assume 20 CL per year
   const leaveBalance = users.map(u => {

@@ -3,11 +3,13 @@ import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import { viewPDF } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
+import ExportButton from '../components/ExportButton';
 import { Eye, UploadCloud, Trash2, Calendar, CheckCircle } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
+import { newestFirst } from '../utils/dateUtils';
 
 const PSD = () => {
   const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
@@ -122,11 +124,11 @@ const PSD = () => {
   };
 
   // Find receipts that do not have a PSD generated yet
-  const pendingReceipts = data.materialReceipts.filter(mr => 
+  const pendingReceipts = newestFirst(data.materialReceipts.filter(mr => 
     !(data.psds || []).some(p => p.receiptId === mr.id)
-  );
+  ));
 
-  const psdList = data.psds || [];
+  const psdList = newestFirst(data.psds || []);
   const partyOptions = useMemo(() => uniqueSortedOptions(psdList.map((p) => p.partyName)), [psdList]);
   const productOptions = useMemo(() => uniqueSortedOptions(psdList.map((p) => p.productName)), [psdList]);
   const filteredPSDs = psdList.filter((p) => {
@@ -141,11 +143,31 @@ const PSD = () => {
     );
   });
 
+  const exportRows = filteredPSDs.map((psd) => ({
+    psdNo: psd.psdNo,
+    partyName: psd.partyName,
+    productName: psd.productName,
+    specResult: (psd.reports || []).map((rep) => `Batch ${rep.batchNo || '-'}: ${rep.requirement || '-'} / ${rep.result || '-'}`).join('; '),
+    notes: psd.notes || '',
+    fileName: (psd.reports || []).map((rep) => rep.fileName).filter(Boolean).join(', ')
+  }));
+  const exportColumns = [
+    { label: 'PSD No', key: 'psdNo' },
+    { label: 'Customer', key: 'partyName' },
+    { label: 'Product', key: 'productName' },
+    { label: 'Spec vs Result', key: 'specResult' },
+    { label: 'Notes', key: 'notes' },
+    { label: 'File Name', key: 'fileName' }
+  ];
+
   return (
     <div>
-      <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>PSD Lab Reports</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Upload and log Particle Size Distribution (PSD) analysis reports.</p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>PSD Lab Reports</h1>
+          <p style={{ color: 'var(--text-muted)' }}>Upload and log Particle Size Distribution (PSD) analysis reports.</p>
+        </div>
+        <ExportButton data={exportRows} columns={exportColumns} filename="PSD_Reports" title="PSD Lab Reports" />
       </header>
 
       <ListFilterBar

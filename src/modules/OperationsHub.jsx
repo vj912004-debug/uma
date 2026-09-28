@@ -1,9 +1,10 @@
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Search, User, Package } from 'lucide-react';
 import { downloadAllDocs } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
+import ExportButton from '../components/ExportButton';
 
 const OperationsHub = () => {
   const { data } = useAppContext();
@@ -11,7 +12,7 @@ const OperationsHub = () => {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Combine all relevant data for the Processing Sheet
-  const masterList = data.materialReceipts.map(mr => {
+  const masterList = newestFirst(data.materialReceipts).map(mr => {
     const bpr = data.bprs.find(b => b.receiptId === mr.id);
     const pl = bpr ? data.packingLists.find(p => p.bprId === bpr.id) : null;
     const inv = pl ? data.invoices.find(i => i.plId === pl.id) : null;
@@ -59,9 +60,26 @@ const OperationsHub = () => {
 
   return (
     <div>
-      <header style={{ marginBottom: '2.5rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Operations Hub</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Real-time processing sheet with advanced lifecycle tracking.</p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Operations Hub</h1>
+          <p style={{ color: 'var(--text-muted)' }}>Real-time processing sheet with advanced lifecycle tracking.</p>
+        </div>
+        <ExportButton
+          data={filteredList.map((item) => ({
+            ...item,
+            documents: `${item.receiptNo} / ${item.bprNo} / ${item.plNo} / ${item.invNo}`
+          }))}
+          columns={[
+            { label: 'Date', key: 'date' },
+            { label: 'Party', key: 'partyName' },
+            { label: 'Product', key: 'productName' },
+            { label: 'Documents (MR / BPR / PL / INV)', key: 'documents' },
+            { label: 'Status', key: 'status' }
+          ]}
+          filename="Operations_Hub"
+          title="Operations Hub"
+        />
       </header>
 
       <div className="premium-card" style={{ padding: 0, overflow: 'hidden' }}>

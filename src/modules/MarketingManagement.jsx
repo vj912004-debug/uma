@@ -22,7 +22,8 @@ import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import SearchableSelect from '../components/SearchableSelect';
 import StatusTabBar from '../components/StatusTabBar';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
+import ExportButton from '../components/ExportButton';
 
 const LEAD_SOURCES = ['Website', 'Referral', 'Cold Call', 'Exhibition', 'Email', 'Walk-in', 'Other'];
 const LEAD_STATUSES = ['New', 'Contacted', 'Follow Up', 'Qualified', 'Converted', 'Lost'];
@@ -137,25 +138,22 @@ const MarketingManagement = () => {
   });
 
   const leads = useMemo(
-    () => (data.marketingLeads || []).filter((r) => !r.isDeleted)
-      .sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))),
+    () => newestFirst((data.marketingLeads || []).filter((r) => !r.isDeleted)),
     [data.marketingLeads]
   );
 
   const followUps = useMemo(
-    () => (data.marketingFollowUps || []).filter((r) => !r.isDeleted)
-      .sort((a, b) => `${b.date || ''} ${b.time || ''}`.localeCompare(`${a.date || ''} ${a.time || ''}`)),
+    () => newestFirst((data.marketingFollowUps || []).filter((r) => !r.isDeleted)),
     [data.marketingFollowUps]
   );
 
   const enquiries = useMemo(
-    () => (data.marketingEnquiries || []).filter((r) => !r.isDeleted)
-      .sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))),
+    () => newestFirst((data.marketingEnquiries || []).filter((r) => !r.isDeleted)),
     [data.marketingEnquiries]
   );
 
   const orders = useMemo(
-    () => (data.marketingOrders || []).filter((r) => !r.isDeleted),
+    () => newestFirst((data.marketingOrders || []).filter((r) => !r.isDeleted)),
     [data.marketingOrders]
   );
 
@@ -354,6 +352,20 @@ const MarketingManagement = () => {
             Track Leads <span>→</span> Follow Ups <span>→</span> Convert to Enquiries <span>→</span> Grow Your Business
           </p>
         </div>
+        <ExportButton
+          data={leads}
+          columns={[
+            { label: 'Date', key: 'date' },
+            { label: 'Company', key: 'companyName' },
+            { label: 'Contact', key: 'contactPerson' },
+            { label: 'Mobile', key: 'mobile' },
+            { label: 'Email', key: 'email' },
+            { label: 'Source', key: 'source' },
+            { label: 'Status', key: 'status' }
+          ]}
+          filename="Marketing_Leads"
+          title="Marketing Leads"
+        />
         <div className="mkt-hero-cta">
           <Target size={18} />
           <div>

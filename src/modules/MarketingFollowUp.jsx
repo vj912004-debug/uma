@@ -25,7 +25,8 @@ import { useAppContext } from '../context/AppContext';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import SearchableSelect from '../components/SearchableSelect';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
+import ExportButton from '../components/ExportButton';
 
 const FOLLOW_TYPES = ['Call', 'Meeting', 'Email', 'Visit', 'WhatsApp'];
 const FOLLOW_STATUSES = ['Pending', 'Scheduled', 'Completed', 'Cancelled'];
@@ -92,13 +93,12 @@ const MarketingFollowUp = () => {
   const [quickFilter, setQuickFilter] = useState('all');
 
   const leads = useMemo(
-    () => (data.marketingLeads || []).filter((r) => !r.isDeleted),
+    () => newestFirst((data.marketingLeads || []).filter((r) => !r.isDeleted)),
     [data.marketingLeads]
   );
 
   const followUps = useMemo(
-    () => (data.marketingFollowUps || []).filter((r) => !r.isDeleted)
-      .sort((a, b) => `${a.date || ''} ${a.time || ''}`.localeCompare(`${b.date || ''} ${b.time || ''}`)),
+    () => newestFirst((data.marketingFollowUps || []).filter((r) => !r.isDeleted)),
     [data.marketingFollowUps]
   );
 
@@ -308,6 +308,28 @@ const MarketingFollowUp = () => {
           </div>
         </div>
         <div className="fu-header-actions">
+          <ExportButton
+            data={filteredMain.map((r) => ({
+              company: leadLabel(r.leadId),
+              contact: contactOf(r.leadId),
+              mobile: mobileOf(r.leadId),
+              date: r.date,
+              time: r.time,
+              type: r.type,
+              status: r.status
+            }))}
+            columns={[
+              { label: 'Company', key: 'company' },
+              { label: 'Contact', key: 'contact' },
+              { label: 'Mobile', key: 'mobile' },
+              { label: 'Date', key: 'date' },
+              { label: 'Time', key: 'time' },
+              { label: 'Type', key: 'type' },
+              { label: 'Status', key: 'status' }
+            ]}
+            filename="Marketing_Follow_Ups"
+            title="Marketing Follow Ups"
+          />
           <div className="pm-search fu-search">
             <Search size={14} />
             <input

@@ -1,23 +1,22 @@
 import React, { useMemo, useState } from 'react';
-import * as XLSX from 'xlsx';
 import {
   Wrench,
   Calendar,
   Plus,
   Search,
   RotateCcw,
-  Download,
   Printer,
   Edit2,
   Trash2,
   Save,
   X
 } from 'lucide-react';
+import ExportButton from '../components/ExportButton';
 import { useAppContext } from '../context/AppContext';
 import DateField from '../components/DateField';
 import SearchableSelect from '../components/SearchableSelect';
 import StatusTabBar from '../components/StatusTabBar';
-import { formatDate, getDefaultFiscalYearRange } from '../utils/dateUtils';
+import { formatDate, getDefaultFiscalYearRange, newestFirst } from '../utils/dateUtils';
 
 const DEFAULT_RANGE = getDefaultFiscalYearRange();
 
@@ -82,8 +81,7 @@ const PmAirCompressor = () => {
   }, [data.users]);
 
   const rows = useMemo(
-    () => (data.pmAirCompressorRecords || []).filter((r) => !r.isDeleted)
-      .sort((a, b) => String(b.date).localeCompare(String(a.date))),
+    () => newestFirst((data.pmAirCompressorRecords || []).filter((r) => !r.isDeleted)),
     [data.pmAirCompressorRecords]
   );
 
@@ -171,25 +169,34 @@ const PmAirCompressor = () => {
     setPage(1);
   };
 
-  const exportExcel = () => {
-    const sheet = filtered.map((r, i) => ({
-      'Sr. No': i + 1,
-      Date: formatDate(r.date),
-      'Comp. Make': r.compMake,
-      'Comp. Serial No.': r.serialNo,
-      'Total Hours Run': r.totalHoursRun,
-      'Total Hours On Load': r.totalHoursOnLoad,
-      'Preventive Maintenance Details': r.maintenanceDetails,
-      Remarks: r.remarks,
-      'Next Due Date': formatDate(r.nextDueDate),
-      'Done By': r.doneBy,
-      'Checked By': r.checkedBy,
-      Status: r.status
-    }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheet), 'PM Air Compressor');
-    XLSX.writeFile(wb, 'PM_Air_Compressor.xlsx');
-  };
+  const exportRows = filtered.map((r, i) => ({
+    srNo: i + 1,
+    date: formatDate(r.date),
+    compMake: r.compMake,
+    serialNo: r.serialNo,
+    totalHoursRun: r.totalHoursRun,
+    totalHoursOnLoad: r.totalHoursOnLoad,
+    maintenanceDetails: r.maintenanceDetails,
+    remarks: r.remarks,
+    nextDueDate: formatDate(r.nextDueDate),
+    doneBy: r.doneBy,
+    checkedBy: r.checkedBy,
+    status: r.status
+  }));
+  const exportColumns = [
+    { label: 'Sr. No', key: 'srNo' },
+    { label: 'Date', key: 'date' },
+    { label: 'Comp. Make', key: 'compMake' },
+    { label: 'Comp. Serial No.', key: 'serialNo' },
+    { label: 'Total Hours Run', key: 'totalHoursRun' },
+    { label: 'Total Hours On Load', key: 'totalHoursOnLoad' },
+    { label: 'Preventive Maintenance Details', key: 'maintenanceDetails' },
+    { label: 'Remarks', key: 'remarks' },
+    { label: 'Next Due Date', key: 'nextDueDate' },
+    { label: 'Done By', key: 'doneBy' },
+    { label: 'Checked By', key: 'checkedBy' },
+    { label: 'Status', key: 'status' }
+  ];
 
   const printList = () => window.print();
 
@@ -203,11 +210,14 @@ const PmAirCompressor = () => {
             <p className="page-subtitle">Track and maintain preventive maintenance details for air compressors.</p>
           </div>
         </div>
-        <div className="pm-range">
-          <Calendar size={15} />
-          <DateField className="input-field" value={rangeFrom} onChange={(e) => { setRangeFrom(e.target.value); setPage(1); }} />
-          <span>–</span>
-          <DateField className="input-field" value={rangeTo} onChange={(e) => { setRangeTo(e.target.value); setPage(1); }} />
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ExportButton data={exportRows} columns={exportColumns} filename="PM_Air_Compressor" title="PM Air Compressor" />
+          <div className="pm-range">
+            <Calendar size={15} />
+            <DateField className="input-field" value={rangeFrom} onChange={(e) => { setRangeFrom(e.target.value); setPage(1); }} />
+            <span>–</span>
+            <DateField className="input-field" value={rangeTo} onChange={(e) => { setRangeTo(e.target.value); setPage(1); }} />
+          </div>
         </div>
       </header>
 
@@ -253,9 +263,6 @@ const PmAirCompressor = () => {
           </button>
           <button type="button" className="btn pm-btn-outline" onClick={() => setShowCalendar((v) => !v)}>
             <Calendar size={15} /> View Calendar
-          </button>
-          <button type="button" className="btn pm-btn-outline" onClick={exportExcel}>
-            <Download size={15} /> Export Excel
           </button>
           <button type="button" className="btn pm-btn-outline" onClick={printList}>
             <Printer size={15} /> Print

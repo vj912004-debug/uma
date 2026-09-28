@@ -1,4 +1,4 @@
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Bell, Calendar, Clock, RotateCw, CheckCircle, Trash2, Edit2 } from 'lucide-react';
@@ -6,6 +6,7 @@ import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar from '../components/ListFilterBar';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
+import ExportButton from '../components/ExportButton';
 
 const TaskManager = () => {
   const { data, updateData, updateItem, deleteItemSoftly } = useAppContext();
@@ -134,7 +135,7 @@ const TaskManager = () => {
 
   const statusOptions = useMemo(() => ['Pending', 'Completed'], []);
   const repeatOptions = useMemo(() => ['None', 'Daily', 'Weekly', 'Monthly', 'Yearly'], []);
-  const filteredTasks = (data.tasks || []).filter((t) => {
+  const filteredTasks = newestFirst((data.tasks || []).filter((t) => {
     if (partyFilter && (t.status || '') !== partyFilter) return false;
     if (productFilter && (t.repeat || '') !== productFilter) return false;
     if (!searchTerm) return true;
@@ -143,7 +144,7 @@ const TaskManager = () => {
       (t.title || '').toLowerCase().includes(q) ||
       (t.notes || '').toLowerCase().includes(q)
     );
-  });
+  }));
 
   const pendingTasks = filteredTasks.filter(t => t.status === 'Pending');
   const completedTasks = filteredTasks.filter(t => t.status === 'Completed');
@@ -155,9 +156,24 @@ const TaskManager = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Task Reminders & Alarms</h1>
           <p style={{ color: 'var(--text-muted)' }}>Configure calendar notifications, repeat schedules, and real-time live alarm alerts.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-          <Plus size={18} /> Schedule Task
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ExportButton
+            data={filteredTasks}
+            columns={[
+              { label: 'Title', key: 'title' },
+              { label: 'Date', key: 'date' },
+              { label: 'Time', key: 'time' },
+              { label: 'Repeat', key: 'repeat' },
+              { label: 'Status', key: 'status' },
+              { label: 'Notes', key: 'notes' }
+            ]}
+            filename="Tasks"
+            title="Task Reminders"
+          />
+          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+            <Plus size={18} /> Schedule Task
+          </button>
+        </div>
       </header>
 
       <ListFilterBar

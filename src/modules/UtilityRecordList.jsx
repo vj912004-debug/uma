@@ -1,20 +1,19 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import {
   Wrench,
   Calendar,
   Plus,
   Search,
-  Download,
   Edit2,
   Trash2,
   FileText
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import ExportButton from '../components/ExportButton';
 import DateField from '../components/DateField';
 import StatusTabBar from '../components/StatusTabBar';
-import { formatDate, getDefaultFiscalYearRange } from '../utils/dateUtils';
+import { formatDate, getDefaultFiscalYearRange, newestFirst } from '../utils/dateUtils';
 
 const PAGE_SIZE = 10;
 const DEFAULT_RANGE = getDefaultFiscalYearRange();
@@ -36,7 +35,7 @@ const UtilityRecordList = () => {
   const [rangeTo, setRangeTo] = useState(DEFAULT_RANGE.rangeTo);
 
   const rows = useMemo(
-    () => (data.utilityRecords || []).filter((r) => !r.isDeleted).sort((a, b) => String(b.date).localeCompare(String(a.date))),
+    () => newestFirst((data.utilityRecords || []).filter((r) => !r.isDeleted)),
     [data.utilityRecords]
   );
 
@@ -79,34 +78,52 @@ const UtilityRecordList = () => {
     if (window.confirm('Delete this utility record?')) deleteItemSoftly('utilityRecords', id);
   };
 
-  const exportExcel = () => {
-    const sheet = filtered.map((r, i) => ({
-      'Sr. No': i + 1,
-      Date: formatDate(r.date),
-      Time: r.time || '',
-      Make: r.make || '',
-      'Voltage - 1 (V)': r.voltage1,
-      'Voltage - 2 (V)': r.voltage2,
-      'Voltage - 3 (V)': r.voltage3,
-      'Ampere - 1 (A)': r.ampere1,
-      'Ampere - 2 (A)': r.ampere2,
-      'Ampere - 3 (A)': r.ampere3,
-      'Dryer Start - 1': r.oldDryerStart,
-      'Dryer Start - 2': r.newDryerStart,
-      'Moisture Separator Working - 1': r.oldMoistureSeparator,
-      'Moisture Separator Working - 2': r.newMoistureSeparator,
-      'Tank - 1 Pressure (Kg)': r.smallTank1Pressure,
-      'Tank - 2 Pressure (Kg)': r.bigNewTank2Pressure,
-      'Loading/Unloading Time': r.loadingUnloadingTime,
-      'Temp. of Compressor - 1 (°C)': r.tempCompressorOld,
-      'Temp. of Compressor - 2 (°C)': r.tempCompressorNew,
-      'Done By': r.doneBy,
-      Remarks: r.remarks
-    }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheet), 'Utility Records');
-    XLSX.writeFile(wb, 'Utility_Records.xlsx');
-  };
+  const exportRows = filtered.map((r, i) => ({
+    srNo: i + 1,
+    date: formatDate(r.date),
+    time: r.time || '',
+    make: r.make || '',
+    voltage1: r.voltage1,
+    voltage2: r.voltage2,
+    voltage3: r.voltage3,
+    ampere1: r.ampere1,
+    ampere2: r.ampere2,
+    ampere3: r.ampere3,
+    dryer1: r.oldDryerStart,
+    dryer2: r.newDryerStart,
+    moisture1: r.oldMoistureSeparator,
+    moisture2: r.newMoistureSeparator,
+    tank1: r.smallTank1Pressure,
+    tank2: r.bigNewTank2Pressure,
+    loadingTime: r.loadingUnloadingTime,
+    temp1: r.tempCompressorOld,
+    temp2: r.tempCompressorNew,
+    doneBy: r.doneBy,
+    remarks: r.remarks
+  }));
+  const exportColumns = [
+    { label: 'Sr. No', key: 'srNo' },
+    { label: 'Date', key: 'date' },
+    { label: 'Time', key: 'time' },
+    { label: 'Make', key: 'make' },
+    { label: 'Voltage - 1 (V)', key: 'voltage1' },
+    { label: 'Voltage - 2 (V)', key: 'voltage2' },
+    { label: 'Voltage - 3 (V)', key: 'voltage3' },
+    { label: 'Ampere - 1 (A)', key: 'ampere1' },
+    { label: 'Ampere - 2 (A)', key: 'ampere2' },
+    { label: 'Ampere - 3 (A)', key: 'ampere3' },
+    { label: 'Dryer Start - 1', key: 'dryer1' },
+    { label: 'Dryer Start - 2', key: 'dryer2' },
+    { label: 'Moisture Separator Working - 1', key: 'moisture1' },
+    { label: 'Moisture Separator Working - 2', key: 'moisture2' },
+    { label: 'Tank - 1 Pressure (Kg)', key: 'tank1' },
+    { label: 'Tank - 2 Pressure (Kg)', key: 'tank2' },
+    { label: 'Loading/Unloading Time', key: 'loadingTime' },
+    { label: 'Temp. of Compressor - 1 (°C)', key: 'temp1' },
+    { label: 'Temp. of Compressor - 2 (°C)', key: 'temp2' },
+    { label: 'Done By', key: 'doneBy' },
+    { label: 'Remarks', key: 'remarks' }
+  ];
 
   return (
     <div className="pm-page">
@@ -125,6 +142,7 @@ const UtilityRecordList = () => {
             <span>–</span>
             <DateField className="input-field" value={rangeTo} onChange={(e) => { setRangeTo(e.target.value); setPage(1); }} />
           </div>
+          <ExportButton data={exportRows} columns={exportColumns} filename="Utility_Records" title="Utility Records" />
           <Link to="/utility-record" className="btn btn-primary">
             <Plus size={15} /> Add New Record
           </Link>
@@ -154,9 +172,6 @@ const UtilityRecordList = () => {
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               />
             </div>
-            <button type="button" className="btn btn-primary" onClick={exportExcel}>
-              <Download size={14} /> Export
-            </button>
           </div>
         </div>
 

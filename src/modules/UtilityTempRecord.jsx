@@ -11,6 +11,8 @@ import { useAppContext } from '../context/AppContext';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import SearchableSelect from '../components/SearchableSelect';
+import ExportButton from '../components/ExportButton';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 
 const OIL_LEVELS = ['Low', 'Medium', 'High', 'OK'];
 const MAKE_OPTIONS = ['Gardner Denver', 'Atlas Copco', 'Ingersoll Rand', 'Kaeser', 'Other'];
@@ -134,9 +136,51 @@ const UtilityTempRecord = () => {
             <p className="page-subtitle">Add and update temperature records of utility equipment.</p>
           </div>
         </div>
-        <Link to="/utility-temp-record-list" className="btn pm-btn-outline">
-          <List size={15} /> View Saved Entries
-        </Link>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ExportButton
+            data={newestFirst(rows).map((r, i) => ({
+              srNo: i + 1,
+              date: formatDate(r.date),
+              time: r.time || '',
+              make: r.make || '',
+              oilLevel: r.oilLevelAtRest,
+              fillTime: r.fillTimeMin,
+              mainR: r.mainSwitch175A?.r,
+              mainY: r.mainSwitch175A?.y,
+              mainB: r.mainSwitch175A?.b,
+              motor: r.newCompMotor,
+              oilSep: r.oilSeparator,
+              airEnd: r.airEnd,
+              airCooler: r.airCooler,
+              tank: r.tank,
+              pipe: r.dischargePipe,
+              remarks: r.remarks
+            }))}
+            columns={[
+              { label: 'Sr. No', key: 'srNo' },
+              { label: 'Date', key: 'date' },
+              { label: 'Time', key: 'time' },
+              { label: 'Make', key: 'make' },
+              { label: 'Oil Level At Rest', key: 'oilLevel' },
+              { label: 'Fill Time (Min)', key: 'fillTime' },
+              { label: 'Main Switch R', key: 'mainR' },
+              { label: 'Main Switch Y', key: 'mainY' },
+              { label: 'Main Switch B', key: 'mainB' },
+              { label: 'Comp Motor', key: 'motor' },
+              { label: 'Oil Separator', key: 'oilSep' },
+              { label: 'Air End', key: 'airEnd' },
+              { label: 'Air Cooler', key: 'airCooler' },
+              { label: 'Tank', key: 'tank' },
+              { label: 'Discharge Pipe', key: 'pipe' },
+              { label: 'Remarks', key: 'remarks' }
+            ]}
+            filename="Utility_Temp_Records"
+            title="Temperature Records"
+          />
+          <Link to="/utility-temp-record-list" className="btn pm-btn-outline">
+            <List size={15} /> View Saved Entries
+          </Link>
+        </div>
       </header>
 
       <section className="premium-card pm-card">

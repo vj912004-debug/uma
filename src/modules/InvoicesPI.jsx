@@ -1,4 +1,4 @@
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber, nextAvailableDocNumber } from '../utils/numbering';
@@ -492,11 +492,11 @@ const InvoicesPI = () => {
     setEditingDoc(null);
   };
 
-  const pendingMRs = (data.materialReceipts || []).filter(mr =>
+  const pendingMRs = newestFirst((data.materialReceipts || []).filter(mr =>
     !findAnyProformaInvoice(data.invoices, mr.id)
-  );
+  ));
 
-  const piList = (data.invoices || []).filter(inv => inv.type === 'Proforma Invoice' && !inv.isDeleted);
+  const piList = newestFirst((data.invoices || []).filter(inv => inv.type === 'Proforma Invoice' && !inv.isDeleted));
   const partyOptions = useMemo(() => uniqueSortedOptions(piList.map((r) => r.partyName)), [piList]);
   const productOptions = useMemo(() => uniqueSortedOptions(piList.map((r) => r.productName)), [piList]);
   const filtered = piList.filter((inv) => {

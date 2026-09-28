@@ -19,7 +19,7 @@ import {
   Handshake
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import ExportButton from '../components/ExportButton';
 import DocDownloadButtons from '../components/DocDownloadButtons';
 import { downloadTablesExcel, downloadTablesWord } from '../utils/documentFileExport';
@@ -197,7 +197,7 @@ const PaymentFollowUp = () => {
 
   const filteredCustomers = useMemo(() => {
     const s = searchTerm.trim().toLowerCase();
-    return tabCustomers.filter((c) => {
+    return newestFirst(tabCustomers.filter((c) => {
       if (statusTab === 'pending' && !isCustomerPending(c)) return false;
       if (statusTab === 'completed' && isCustomerPending(c)) return false;
       if (partyFilter && (c.partyName || '') !== partyFilter) return false;
@@ -211,7 +211,7 @@ const PaymentFollowUp = () => {
         (c.phone || '').includes(s) ||
         (c.email || '').toLowerCase().includes(s)
       );
-    });
+    }), (c) => ({ id: c.partyId, date: c.lastFollowUp || c.nextFollowUp || '' }));
   }, [tabCustomers, statusTab, searchTerm, partyFilter, statusFilter, today, tomorrow, promisedPartyIds]);
 
   const selectedCustomer = useMemo(() => {

@@ -17,7 +17,8 @@ import {
 import { useAppContext } from '../context/AppContext';
 import SearchableSelect from '../components/SearchableSelect';
 import GstTaxBlock from '../components/GstTaxBlock';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
+import ExportButton from '../components/ExportButton';
 import { nextAvailableDocNumber } from '../utils/numbering';
 import { findAnyTaxInvoice, findAnyProformaInvoice, enrichTIForPrint } from '../utils/documentCharges';
 import { getMRMaterialValue } from '../utils/receiptProducts';
@@ -346,9 +347,7 @@ const MonthlyBilling = () => {
       msg = `Loaded ${matched.length} dispatch(es) for ${monthLabel(billingMonth)}.`;
     }
 
-    const next = matched
-      .map(mapDcToRow)
-      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const next = newestFirst(matched.map(mapDcToRow));
 
     setRows(next);
     setSelectedIds(next.filter((r) => r.selectable).map((r) => r.id));
@@ -802,6 +801,22 @@ const MonthlyBilling = () => {
           </p>
         </div>
         <div className="mb-top-tools">
+          <ExportButton
+            data={rows}
+            columns={[
+              { label: 'DC No', key: 'dcNo' },
+              { label: 'Date', key: 'date' },
+              { label: 'Party', key: 'partyName' },
+              { label: 'Product', key: 'productName' },
+              { label: 'Qty', key: 'qty' },
+              { label: 'Amount', key: 'amount' },
+              { label: 'Billing Status', key: 'billingStatus' },
+              { label: 'Invoice Status', key: 'invoiceStatus' },
+              { label: 'Invoice No', key: 'invoiceNo' }
+            ]}
+            filename="Monthly_Billing"
+            title="Monthly Billing"
+          />
           <div className="mb-chip">
             <Calendar size={14} />
             <span>{shortMonth(billingMonth)}</span>

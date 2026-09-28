@@ -1,4 +1,4 @@
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import DateField from '../components/DateField';
 import StatusTabBar from '../components/StatusTabBar';
+import ExportButton from '../components/ExportButton';
 import { getEwayTypeAccess } from '../utils/moduleAccess';
 
 const EWay = () => {
@@ -76,7 +77,7 @@ const EWay = () => {
           }))
       : [];
 
-    return [...dcRows, ...tiRows];
+    return newestFirst([...dcRows, ...tiRows], (row) => row.raw || row);
   }, [data.deliveryChallans, data.invoices, ewayAccess.dc, ewayAccess.ti]);
 
   const partyOptions = useMemo(
@@ -137,11 +138,35 @@ const EWay = () => {
 
   return (
     <div>
-      <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>E-Way Bills</h1>
-        <p style={{ color: 'var(--text-muted)' }}>
-          Log government E-Way Bill numbers for Delivery Challans and Tax Invoices in one place.
-        </p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>E-Way Bills</h1>
+          <p style={{ color: 'var(--text-muted)' }}>
+            Log government E-Way Bill numbers for Delivery Challans and Tax Invoices in one place.
+          </p>
+        </div>
+        <ExportButton
+          data={filteredRows.map((row) => ({
+            type: row.type,
+            docNo: row.docNo,
+            partyName: row.partyName,
+            detail: row.detail,
+            status: row.ewayBillNo ? 'Done' : 'Pending',
+            ewayBillNo: row.ewayBillNo,
+            ewayBillDate: row.ewayBillDate
+          }))}
+          columns={[
+            { label: 'Type', key: 'type' },
+            { label: 'Doc No', key: 'docNo' },
+            { label: 'Customer', key: 'partyName' },
+            { label: 'Vehicle / Qty', key: 'detail' },
+            { label: 'E-Way Status', key: 'status' },
+            { label: 'E-Way No', key: 'ewayBillNo' },
+            { label: 'E-Way Date', key: 'ewayBillDate' }
+          ]}
+          filename="EWay_Bills"
+          title="E-Way Bills"
+        />
       </header>
 
       <div className="tab-bar">

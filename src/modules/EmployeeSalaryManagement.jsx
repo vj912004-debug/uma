@@ -25,7 +25,7 @@ import ExportButton from '../components/ExportButton';
 import SearchableSelect from '../components/SearchableSelect';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import {
   SHIFTS,
   SHIFT_TYPES,
@@ -84,11 +84,11 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
 
   const allStaff = useMemo(() => (data.users || []).filter((u) => u.active !== false), [data.users]);
   const payrollUsers = useMemo(
-    () => (data.users || []).filter((u) => u.role !== 'Admin' || Number(u.perDayRate) > 0 || u.esslId),
+    () => newestFirst((data.users || []).filter((u) => u.role !== 'Admin' || Number(u.perDayRate) > 0 || u.esslId)),
     [data.users]
   );
   const departments = [...new Set((data.users || []).map((u) => u.department).filter(Boolean))];
-  const attendance = useMemo(() => (data.attendance || []).filter((r) => !r.isDeleted), [data.attendance]);
+  const attendance = useMemo(() => newestFirst((data.attendance || []).filter((r) => !r.isDeleted)), [data.attendance]);
   const essl = { ...defaultEsslSettings(), ...(data.esslSettings || {}) };
 
   /* ── Master state ── */
@@ -250,7 +250,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
     if (filters.department && r.department !== filters.department) return false;
     if (filters.status && r.statusCode !== filters.status) return false;
     return true;
-  }).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  });
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const daySummary = summarizeAttendanceDay(
@@ -476,12 +476,43 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
       {tab === 'master' && (
         <div className="esm-grid-2">
           <section className="premium-card esm-card">
-            <header className="esm-card-head">
-              <span className="esm-no">1</span>
-              <div>
-                <h2>Employee Master</h2>
-                <p>Emp. ID, eSSL ID, shift type, per-day & OT rates with effective dates</p>
+            <header className="esm-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span className="esm-no">1</span>
+                <div>
+                  <h2>Employee Master</h2>
+                  <p>Emp. ID, eSSL ID, shift type, per-day & OT rates with effective dates</p>
+                </div>
               </div>
+              <ExportButton
+                data={filteredMaster.map((u) => {
+                  const rate = getEffectiveRate(u);
+                  return {
+                    employeeId: u.employeeId,
+                    esslId: u.esslId || '',
+                    name: u.name || u.username,
+                    department: u.department || '',
+                    shiftType: u.shiftType || '9hr',
+                    perDayRate: rate.perDayRate || '',
+                    otRate: rate.otRate || '',
+                    effectiveFrom: rate.effectiveFrom ? formatDate(rate.effectiveFrom) : '',
+                    status: u.active !== false ? 'Active' : 'Inactive'
+                  };
+                })}
+                columns={[
+                  { label: 'Emp. ID', key: 'employeeId' },
+                  { label: 'eSSL ID', key: 'esslId' },
+                  { label: 'Employee Name', key: 'name' },
+                  { label: 'Department', key: 'department' },
+                  { label: 'Shift', key: 'shiftType' },
+                  { label: 'Per Day (₹)', key: 'perDayRate' },
+                  { label: 'OT / hr (₹)', key: 'otRate' },
+                  { label: 'Effective From', key: 'effectiveFrom' },
+                  { label: 'Status', key: 'status' }
+                ]}
+                filename="Employee_Master"
+                title="Employee Master"
+              />
             </header>
             <div className="esm-card-body">
               <div className="esm-toolbar">
@@ -830,12 +861,20 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
       {/* ─── 4. Salary Calculation ─── */}
       {tab === 'calculate' && (
         <section className="premium-card esm-card">
-          <header className="esm-card-head">
-            <span className="esm-no">4</span>
-            <div>
-              <h2>Salary Calculation</h2>
-              <p>Rates auto-loaded from Employee Master for the selected month</p>
+          <header className="esm-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span className="esm-no">4</span>
+              <div>
+                <h2>Salary Calculation</h2>
+                <p>Rates auto-loaded from Employee Master for the selected month</p>
+              </div>
             </div>
+            <ExportButton
+              data={summaryExportData}
+              columns={summaryExportCols}
+              filename={`Salary_Calculation_${month}`}
+              title={`Salary Calculation · ${month}`}
+            />
           </header>
           <div className="esm-card-body">
             <div className="sal-select-row">

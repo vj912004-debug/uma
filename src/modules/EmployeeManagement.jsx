@@ -5,6 +5,8 @@ import { hashPassword, generatePassword, generateEmployeeId } from '../utils/aut
 import { Plus, Edit2, KeyRound, UserX, UserCheck, Copy, Check, RefreshCw } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
 import { ALL_STAFF_MODULE_IDS, groupModuleOptions, parsePermissionsList } from '../utils/moduleAccess';
+import { newestFirst } from '../utils/dateUtils';
+import ExportButton from '../components/ExportButton';
 
 const DEPARTMENTS = ['Management', 'Production', 'Packaging', 'Quality Control', 'Accounts', 'General'];
 const MODULE_GROUPS = groupModuleOptions();
@@ -197,9 +199,33 @@ const EmployeeManagement = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Employee Management</h1>
           <p style={{ color: 'var(--text-muted)' }}>Create logins and choose which modules each employee can open.</p>
         </div>
-        <button className="btn btn-primary" onClick={openAddModal}>
-          <Plus size={18} /> Add Employee
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ExportButton
+            data={newestFirst(data.users || []).map((user) => ({
+              employeeId: user.employeeId,
+              name: user.name || user.username,
+              username: user.username,
+              department: user.department,
+              role: user.role,
+              modules: moduleCountLabel(user),
+              status: user.active !== false ? 'Active' : 'Inactive'
+            }))}
+            columns={[
+              { label: 'Employee ID', key: 'employeeId' },
+              { label: 'Name', key: 'name' },
+              { label: 'Username', key: 'username' },
+              { label: 'Department', key: 'department' },
+              { label: 'Role', key: 'role' },
+              { label: 'Modules', key: 'modules' },
+              { label: 'Status', key: 'status' }
+            ]}
+            filename="Employees"
+            title="Employee Management"
+          />
+          <button className="btn btn-primary" onClick={openAddModal}>
+            <Plus size={18} /> Add Employee
+          </button>
+        </div>
       </header>
 
       <div className="premium-card">
@@ -225,7 +251,7 @@ const EmployeeManagement = () => {
                   </td>
                 </tr>
               ) : (
-                data.users.map((user) => (
+                newestFirst(data.users || []).map((user) => (
                   <tr key={user.id}>
                     <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{user.employeeId}</td>
                     <td>{user.name || user.username}</td>

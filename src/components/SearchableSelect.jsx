@@ -62,7 +62,8 @@ const SearchableSelect = ({
   title,
   allowCustom = true,
   remember = true,
-  memoryKey
+  memoryKey,
+  onCommit
 }) => {
   const app = useContext(AppContext);
   const data = app?.data;
@@ -152,6 +153,11 @@ const SearchableSelect = ({
     });
   };
 
+  const notifyCommit = (next) => {
+    if (typeof onCommit !== 'function') return;
+    onCommit(next);
+  };
+
   const commitCustom = (raw) => {
     if (!allowCustom) return false;
     const next = String(raw || '').trim();
@@ -164,7 +170,9 @@ const SearchableSelect = ({
       o.value && (sameText(o.label, next) || sameText(o.value, next))
     );
     if (!match) persistCustom(next);
-    emit(match ? match.value : next);
+    const committed = match ? match.value : next;
+    emit(committed);
+    notifyCommit(committed);
     close();
     return true;
   };
@@ -172,6 +180,7 @@ const SearchableSelect = ({
   const pick = (opt) => {
     if (!opt || opt.disabled) return;
     emit(opt.value);
+    if (opt.value) notifyCommit(opt.value);
     close();
   };
 
@@ -328,11 +337,11 @@ const SearchableSelect = ({
           />
         )}
         <div className="searchable-select-list" style={{ maxHeight: menuPos.maxHeight }}>
+          {allowCustom && !query.trim() && (
+            <div className="searchable-select-empty">Type your own value</div>
+          )}
           {filtered.length === 0 && !allowCustom && (
             <div className="searchable-select-empty">No matches</div>
-          )}
-          {filtered.length === 0 && allowCustom && !query.trim() && (
-            <div className="searchable-select-empty">Type a new value</div>
           )}
           {allowCustom && query.trim() && !knownValue(query) && (
             <button
