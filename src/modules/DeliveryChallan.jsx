@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import {Eye,  Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
-import { exportToPDF, viewPDF } from '../utils/pdfExport';
+import { Eye, Edit2, Trash2, Plus } from 'lucide-react';
+import { viewPDF } from '../utils/pdfExport';
+import DocDownloadButtons from '../components/DocDownloadButtons';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
+import DcPartyBoxes from '../components/DcPartyBoxes';
 import {
   buildDCFieldsFromProducts,
   getReceiptProductNames,
@@ -23,6 +25,7 @@ const emptyDCForm = (docNo = '') => ({
   partyDocDate: '',
   partyId: '',
   partyName: '',
+  shipName: '',
   billAddress: '',
   shipAddress: '',
   gstinBill: '',
@@ -101,6 +104,7 @@ const DeliveryChallan = () => {
         partyDocDate: activeMR.partyDocDate || '',
         partyId: activeMR.partyId || '',
         partyName: activeMR.partyName,
+        shipName: activeMR.shipName || activeMR.partyName || '',
         billAddress: activeMR.billAddress,
         shipAddress: activeMR.shipAddress,
         gstinBill: activeMR.gstinBill,
@@ -309,7 +313,7 @@ const DeliveryChallan = () => {
                       <td style={{ padding: '0.75rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button type="button" title="Preview PDF" onClick={() => viewPDF('DC', dc)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Eye size={14} /></button>
-                          <button type="button" onClick={() => exportToPDF('DC', dc)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
+                          <DocDownloadButtons docType="DC" title="Delivery Challan" getData={() => dc} />
                           <button type="button" onClick={() => handleEdit(dc)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={14} /></button>
                           <button type="button" onClick={() => deleteDC(dc.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }}><Trash2 size={14} /></button>
                         </div>
@@ -382,21 +386,8 @@ const DeliveryChallan = () => {
                   </div>
                 )}
 
-                <div>
-                  <label>Party Name</label>
-                  <SearchableSelect
-                    allowCustom
-                    className="input-field"
-                    placeholder="Select or type party name"
-                    value={form.partyName}
-                    onChange={e => setForm({...form, partyName: e.target.value})}
-                  >
-                    <option value="">Select or type party name</option>
-                    {(data.parties || []).filter(p => !p.isDeleted).map(p => (
-                      <option key={p.id} value={p.name}>{p.name}</option>
-                    ))}
-                  </SearchableSelect>
-                </div>
+                <DcPartyBoxes form={form} setForm={setForm} parties={data.parties} />
+
                 <div>
                   <label>Product Name</label>
                   <input type="text" className="input-field" readOnly={!!activeMR} value={form.productName} onChange={e => setForm({...form, productName: e.target.value})} />

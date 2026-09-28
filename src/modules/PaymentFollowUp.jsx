@@ -21,6 +21,8 @@ import {
 import { useAppContext } from '../context/AppContext';
 import { formatDate } from '../utils/dateUtils';
 import ExportButton from '../components/ExportButton';
+import DocDownloadButtons from '../components/DocDownloadButtons';
+import { downloadTablesExcel, downloadTablesWord } from '../utils/documentFileExport';
 import SearchableSelect from '../components/SearchableSelect';
 import {
   buildCustomerOutstanding,
@@ -298,6 +300,31 @@ const PaymentFollowUp = () => {
     );
     setPdfHtml(html);
     setPdfOpen(true);
+  };
+
+  const statementSheets = () => [{
+    name: 'Statement',
+    rows: buildStatementInvoices().map((i) => ({
+      'Invoice No': i.invoiceNo || '',
+      'Invoice Date': formatDate(i.invoiceDate),
+      'Invoice Amount': i.invoiceAmount ?? '',
+      'Paid Amount': i.paidAmount ?? '',
+      'TDS Amount': i.tdsAmount ?? '',
+      Outstanding: i.outstanding ?? '',
+      'Days Overdue': i.daysOverdue ?? ''
+    }))
+  }];
+
+  const statementFileName = () => `FollowUp_${String(selectedCustomer?.partyName || 'Statement').replace(/[\\/:*?"<>|]+/g, '-')}`;
+
+  const downloadStatementExcel = () => {
+    if (!selectedCustomer) return;
+    downloadTablesExcel(statementFileName(), statementSheets());
+  };
+
+  const downloadStatementWord = () => {
+    if (!selectedCustomer) return;
+    return downloadTablesWord(statementFileName(), `Payment Follow-Up — ${selectedCustomer.partyName}`, statementSheets());
   };
 
   const downloadStatementPdf = async () => {
@@ -680,7 +707,9 @@ const PaymentFollowUp = () => {
             <h2 style={{ margin: 0 }}>{selectedCustomer.partyName}</h2>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button type="button" className="btn" onClick={openPdfPreview} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileDown size={14} /> Generate PDF</button>
+            <button type="button" className="btn" onClick={downloadStatementExcel} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileSpreadsheet size={14} /> Excel</button>
+            <button type="button" className="btn" onClick={openPdfPreview} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileDown size={14} /> PDF</button>
+            <button type="button" className="btn" onClick={downloadStatementWord} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileDown size={14} /> Word</button>
             <button type="button" className="btn" onClick={openEmailModal} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Mail size={14} /> Send Email</button>
             <button type="button" className="btn" onClick={() => setWaConnectOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><MessageCircle size={14} /> Link WhatsApp</button>
             <button type="button" className="btn" disabled={waSending} onClick={openWhatsApp} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#25D366', borderColor: '#25D366', color: '#fff', opacity: waSending ? 0.7 : 1 }}><MessageCircle size={14} /> {waSending ? 'Sending…' : 'WhatsApp'}</button>
@@ -710,6 +739,7 @@ const PaymentFollowUp = () => {
                   <th>TDS Amount</th>
                   <th>Outstanding</th>
                   <th>Days Overdue</th>
+                  <th>Downloads</th>
                 </tr>
               </thead>
               <tbody>
@@ -733,6 +763,13 @@ const PaymentFollowUp = () => {
                       }}>
                         {inv.ageDays ?? '—'}
                       </span>
+                    </td>
+                    <td>
+                      <DocDownloadButtons
+                        docType={(data.invoices || []).some((x) => x.invoiceNo === inv.invoiceNo && !x.isDeleted) ? 'TI' : 'Invoice'}
+                        title={inv.invoiceNo || 'Invoice'}
+                        getData={() => (data.invoices || []).find((x) => x.invoiceNo === inv.invoiceNo && !x.isDeleted) || inv}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -837,8 +874,14 @@ const PaymentFollowUp = () => {
       {pdfOpen && (
         <ModalShell title="Payment Follow-Up Statement — Preview" onClose={() => setPdfOpen(false)} width="860px">
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+            <button type="button" className="btn" onClick={downloadStatementExcel} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <FileSpreadsheet size={14} /> Download Excel
+            </button>
             <button type="button" className="btn btn-primary" onClick={downloadStatementPdf} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <FileDown size={14} /> Download PDF
+            </button>
+            <button type="button" className="btn" onClick={downloadStatementWord} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <FileDown size={14} /> Download Word
             </button>
             <button
               type="button"
@@ -900,7 +943,9 @@ const PaymentFollowUp = () => {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
               <button type="button" className="btn" onClick={() => setEmailOpen(false)}>Cancel</button>
+              <button type="button" className="btn" onClick={downloadStatementExcel}>Download Excel</button>
               <button type="button" className="btn" onClick={downloadStatementPdf}>Download PDF</button>
+              <button type="button" className="btn" onClick={downloadStatementWord}>Download Word</button>
               <button type="button" className="btn btn-primary" onClick={sendEmail}>Send Email</button>
             </div>
           </div>

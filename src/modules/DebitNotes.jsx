@@ -1,9 +1,10 @@
 import { formatDate } from '../utils/dateUtils';
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import {Eye,  Plus, Edit2, Trash2, FileDown } from 'lucide-react';
+import { Eye, Plus, Edit2, Trash2 } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
-import { exportToPDF, viewPDF } from '../utils/pdfExport';
+import { viewPDF } from '../utils/pdfExport';
+import DocDownloadButtons from '../components/DocDownloadButtons';
 import DateField from '../components/DateField';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
@@ -301,10 +302,7 @@ const DebitNotes = () => {
                           const party = data.parties?.find(p => p.id === note.partyId) || {};
                           viewPDF('DN', notePrintPayload(note, party));
                         }} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Eye size={16} /></button>
-                          <button onClick={() => {
-                          const party = data.parties?.find(p => p.id === note.partyId) || {};
-                          exportToPDF('DN', notePrintPayload(note, party));
-                        }} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={16} /></button>
+                        <DocDownloadButtons docType="DN" title="Debit Note" getData={() => notePrintPayload(note, data.parties?.find(p => p.id === note.partyId) || {})} />
                         <button onClick={() => handleEdit(note)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={16} /></button>
                         <button onClick={() => deleteItemSoftly('debitNotes', note.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }}><Trash2 size={16} /></button>
                       </div>

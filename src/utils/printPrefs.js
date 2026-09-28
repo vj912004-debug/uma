@@ -339,7 +339,30 @@ export const buildPrintPrefsCss = (prefs) => {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
-    overflow: visible !important;
+    width: 16px !important;
+    height: 16px !important;
+    max-width: 16px !important;
+    max-height: 16px !important;
+    flex: 0 0 16px !important;
+    fill: none !important;
+    stroke: #3d2b7d !important;
+    stroke-width: 1.6 !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+    overflow: hidden !important;
+  }
+  .uma-print-root .meta-row .m-icon svg *,
+  .uma-print-root .icon svg *,
+  .uma-print-root .party-head svg *,
+  .uma-print-root .box-head svg *,
+  .uma-print-root .company-strip .icon svg *,
+  .uma-print-root .sign svg *,
+  .uma-print-root .signature-label svg * {
+    fill: none !important;
+    stroke: #3d2b7d !important;
+    stroke-width: 1.6 !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
   }
   .uma-print-root .meta-row .m-label,
   .uma-print-root .meta-row.sub .m-label,
@@ -642,6 +665,9 @@ export const buildPrintPrefsCss = (prefs) => {
     overflow: visible !important;
     vertical-align: top !important;
     padding: 0 !important;
+  }
+  .uma-print-root .pi-page table.footer3.has-notes td.f3col {
+    width: 25% !important;
   }
   .uma-print-root table.footer3 .f3-body,
   .uma-print-root table.footer3 .sig-body {
@@ -1296,10 +1322,17 @@ export const buildPrintPrefsCss = (prefs) => {
     font-size: 11px !important;
   }
   .uma-print-root .pl-page .barfoot,
-  .uma-print-root .pl-page .sheet > .barfoot,
+  .uma-print-root .pl-page .sheet > .barfoot {
+    margin: auto -14px 0 -14px !important;
+  }
+  .uma-print-root .pfu-page,
+  .uma-print-root .pfu-page .sheet {
+    min-height: 0 !important;
+    height: auto !important;
+  }
   .uma-print-root .pfu-page .barfoot,
   .uma-print-root .pfu-page .sheet > .barfoot {
-    margin: auto -14px 0 -14px !important;
+    margin: 8px -14px 0 -14px !important;
   }
   /* BPR page-2 weight/drum table: lock compact sample row size */
   .uma-print-root .page-p2 table.items tbody td,

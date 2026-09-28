@@ -25,6 +25,7 @@ const Parties = () => {
     gstinBill: '',
     shipAddress: '',
     gstinShip: '',
+    deliveryNote: '',
     phone1: '',
     phone2: '',
     phone3: '',
@@ -188,6 +189,7 @@ const Parties = () => {
       gstinBill: '',
       shipAddress: '',
       gstinShip: '',
+      deliveryNote: '',
       phone1: '',
       phone2: '',
       phone3: '',
@@ -423,6 +425,17 @@ const Parties = () => {
                   />
                 </div>
               </div>
+            </section>
+
+            <section className="premium-card party-section-card">
+              <h3 className="party-section-title">Delivery Note</h3>
+              <textarea
+                className="input-field"
+                rows="3"
+                placeholder="Note printed on the Delivery Challan for this party"
+                value={formData.deliveryNote || ''}
+                onChange={e => setFormData({ ...formData, deliveryNote: e.target.value })}
+              />
             </section>
 
             <section className="premium-card party-section-card">

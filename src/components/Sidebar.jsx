@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -32,6 +32,7 @@ import {
   ChevronRight,
   X,
   Phone,
+  GitCompare,
   CalendarDays,
   Wrench,
   Gauge,
@@ -123,7 +124,11 @@ const Sidebar = () => {
       title: 'Procurement & Maintenance',
       icon: Wrench,
       items: [
-        { name: 'Purchase Management', icon: ShoppingCart, path: '/purchase-management', roles: ['Admin', 'Staff'] },
+        { name: 'Purchase Dashboard', icon: ShoppingCart, path: '/purchase-management', hash: '', roles: ['Admin', 'Staff'], permissionIds: ['/purchase-management'] },
+        { name: 'New Inquiry', icon: FileText, path: '/purchase-management#pm-inquiry', hash: '#pm-inquiry', roles: ['Admin', 'Staff'], permissionIds: ['/purchase-management'] },
+        { name: 'Inquiry List', icon: ClipboardList, path: '/purchase-management#pm-status', hash: '#pm-status', roles: ['Admin', 'Staff'], permissionIds: ['/purchase-management'] },
+        { name: 'Quote Follow Up', icon: Phone, path: '/purchase-management#pm-follow', hash: '#pm-follow', roles: ['Admin', 'Staff'], permissionIds: ['/purchase-management'] },
+        { name: 'Quote Comparison', icon: GitCompare, path: '/purchase-management#pm-compare', hash: '#pm-compare', roles: ['Admin', 'Staff'], permissionIds: ['/purchase-management'] },
         { name: 'Utility Record', icon: Gauge, path: '/utility-record', roles: ['Admin', 'Staff'] },
         { name: 'Utility Record List', icon: FileText, path: '/utility-record-list', roles: ['Admin', 'Staff'] },
         { name: 'Utility Temp. Record', icon: Thermometer, path: '/utility-temp-record', roles: ['Admin', 'Staff'] },
@@ -168,6 +173,7 @@ const Sidebar = () => {
     }
   ];
 
+  const location = useLocation();
   const displayName = currentUser?.name || currentUser?.username || 'User';
   const initials = displayName.slice(0, 2).toUpperCase();
 
@@ -262,16 +268,20 @@ const Sidebar = () => {
                     <NavLink
                       key={item.path}
                       to={item.path}
-                      className={({ isActive }) =>
-                        [
+                      className={({ isActive }) => {
+                        const onHash = Object.prototype.hasOwnProperty.call(item, 'hash')
+                          && location.pathname === '/purchase-management'
+                          && (location.hash || '') === item.hash;
+                        const on = Object.prototype.hasOwnProperty.call(item, 'hash') ? onHash : isActive;
+                        return [
                           'nav-link',
                           item.highlight ? 'highlight' : '',
                           item.pill ? 'nav-pill' : '',
-                          isActive ? 'active' : ''
+                          on ? 'active' : ''
                         ]
                           .filter(Boolean)
-                          .join(' ')
-                      }
+                          .join(' ');
+                      }}
                     >
                       <item.icon size={14} />
                       <span>{item.name}</span>

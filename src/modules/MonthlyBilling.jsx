@@ -22,6 +22,7 @@ import { nextAvailableDocNumber } from '../utils/numbering';
 import { findAnyTaxInvoice, findAnyProformaInvoice, enrichTIForPrint } from '../utils/documentCharges';
 import { getMRMaterialValue } from '../utils/receiptProducts';
 import { viewPDF, exportToPDF } from '../utils/pdfExport';
+import { downloadTablesWord } from '../utils/documentFileExport';
 import {
   GST_TYPE_CGST_SGST,
   GST_TYPE_IGST,
@@ -623,6 +624,63 @@ const MonthlyBilling = () => {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detail), 'Dispatches');
     const fileStub = (inv?.invoiceNo || `Monthly_${billingMonth}`).replace(/\//g, '-');
     XLSX.writeFile(wb, `${fileStub}.xlsx`);
+    setActiveStep(3);
+    setReviewStep(2);
+  };
+
+  const downloadWord = async () => {
+    const sourceRows = generatedInvoice
+      ? rows.filter((r) => (generatedInvoice.linkedDcIds || []).some((id) => sameId(id, r.id)))
+      : selectedRows;
+    if (!sourceRows.length) {
+      alert('Nothing to export. Select dispatches or generate an invoice first.');
+      return;
+    }
+
+    const inv = generatedInvoice;
+    const taxable = inv
+      ? Math.max(0, (inv.subtotal || 0) - (inv.discount || 0))
+      : totals.taxable;
+    const split = inv
+      ? splitTaxableGstAmount(taxable, inv.taxRate, inv.gstType)
+      : { cgst: totals.cgst, sgst: totals.sgst, igst: totals.igst, taxAmount: totals.taxAmount };
+    const rate = inv?.taxRate ?? taxRate;
+    const type = normalizeGstType(inv?.gstType || gstType);
+    const detail = sourceRows.map((r, i) => {
+      const lineTax = (r.amount || 0) * (rate / 100);
+      return {
+        'Sr No': i + 1,
+        'DC No': r.dcNo,
+        'Party Doc No': r.partyDocNo || '',
+        Date: formatDate(r.date),
+        Product: r.productName,
+        'Qty (Kg)': r.qty,
+        Amount: r.amount,
+        ...(type === GST_TYPE_IGST
+          ? { 'IGST %': rate, IGST: lineTax }
+          : { 'CGST %': rate / 2, CGST: lineTax / 2, 'SGST %': rate / 2, SGST: lineTax / 2 }),
+        Total: r.amount + lineTax
+      };
+    });
+    const summary = [{
+      Party: partyName || inv?.partyName || '',
+      'Billing Month': monthLabel(billingMonth),
+      'Invoice No': inv?.invoiceNo || '',
+      'Invoice Date': inv?.date ? formatDate(inv.date) : '',
+      'Total Qty': inv?.qty ?? totals.qty,
+      Subtotal: inv?.subtotal ?? totals.subtotal,
+      Discount: inv?.discount ?? discount,
+      Taxable: taxable,
+      ...(type === GST_TYPE_IGST
+        ? { IGST: split.igst }
+        : { CGST: split.cgst, SGST: split.sgst }),
+      'Grand Total': inv?.total ?? totals.grand
+    }];
+    const fileStub = (inv?.invoiceNo || `Monthly_${billingMonth}`).replace(/\//g, '-');
+    await downloadTablesWord(fileStub, 'Monthly Invoice', [
+      { name: 'Summary', rows: summary },
+      { name: 'Dispatches', rows: detail }
+    ]);
     setActiveStep(3);
     setReviewStep(2);
   };
@@ -1266,6 +1324,9 @@ const MonthlyBilling = () => {
                   </button>
                   <button type="button" className="btn btn-primary" onClick={downloadPdfInvoice}>
                     <Download size={14} /> Download PDF
+                  </button>
+                  <button type="button" className="btn btn-primary" onClick={downloadWord}>
+                    <Download size={14} /> Download Word
                   </button>
                   <button type="button" className="btn btn-primary" onClick={printInvoice}>
                     <Printer size={14} /> Print

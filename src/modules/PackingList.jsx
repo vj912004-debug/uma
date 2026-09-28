@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { numberInputValue, parseOptionalNumber } from '../utils/numberInput';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import {Eye,  Edit2, Trash2, FileDown, ClipboardList, Plus } from 'lucide-react';
-import { exportToPDF, viewPDF } from '../utils/pdfExport';
+import { Eye, Edit2, Trash2, Plus } from 'lucide-react';
+import { viewPDF } from '../utils/pdfExport';
+import DocDownloadButtons from '../components/DocDownloadButtons';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
@@ -415,7 +416,7 @@ const PackingList = () => {
                       <td style={{ padding: '0.75rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button title="Preview PDF" onClick={() => viewPDF('PL', pl)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Eye size={14} /></button>
-                          <button onClick={() => exportToPDF('PL', pl)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
+                          <DocDownloadButtons docType="PL" title="Packing List" getData={() => pl} />
                           <button onClick={() => handleEdit(pl)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={14} /></button>
                           <button onClick={() => deletePL(pl.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }}><Trash2 size={14} /></button>
                         </div>

@@ -5,7 +5,7 @@ import {
   buildTiPrintChargeRows,
   getSplitGstRates
 } from './taxInvoiceLayout';
-import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPiPrintTermsHtml, DEFAULT_INVOICE_DECLARATION, buildBankDetailsBox, buildStatusBar, PRINT_FOOTER_MESSAGES } from './printTheme';
+import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPiPrintTermsHtml, DEFAULT_INVOICE_DECLARATION, buildBankDetailsBox, buildStatusBar, PRINT_FOOTER_MESSAGES, PRINT_ICON_DOC, PRINT_ICON_CAL } from './printTheme';
 export const escHtml = (v) => String(v ?? '')
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
@@ -663,12 +663,12 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
 
     <div class="invoice-meta">
       <div class="block">
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">PI No.</span><span class="m-colon">:</span><span class="m-value">${docNo}</span></div>
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="m-label">PI Date</span><span class="m-colon">:</span><span class="m-value">${docDate}</span></div>
+        <div class="meta-row"><span class="m-icon">${PRINT_ICON_DOC}</span><span class="m-label">PI No.</span><span class="m-colon">:</span><span class="m-value">${docNo}</span></div>
+        <div class="meta-row"><span class="m-icon">${PRINT_ICON_CAL}</span><span class="m-label">PI Date</span><span class="m-colon">:</span><span class="m-value">${docDate}</span></div>
       </div>
       <div class="block">
-        ${buildOptionalMetaRowHtml('PO No.', poNoRaw, { iconHtml: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>' })}
-        ${buildOptionalMetaRowHtml('PO Date', poDateRaw, { sub: true })}
+        ${buildOptionalMetaRowHtml('PO No.', poNoRaw, { iconHtml: PRINT_ICON_DOC })}
+        ${buildOptionalMetaRowHtml('PO Date', poDateRaw, { iconHtml: PRINT_ICON_CAL })}
         </div>
     </div>
   </div>

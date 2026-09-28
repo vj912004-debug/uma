@@ -3,7 +3,6 @@ import { formatPdfDateDmy } from './taxInvoiceLayout';
 import {
   escHtml,
   buildPrintBrandHtml,
-  buildFillerRowsHtml,
   renderHtmlToPdf,
   buildStatusBar,
   PRINT_FOOTER_MESSAGES
@@ -35,8 +34,6 @@ export const buildPaymentFollowUpStatementHtml = ({
     </tr>`).join('');
 
   const totalOutstanding = list.reduce((s, i) => s + (parseFloat(i.outstanding) || 0), 0);
-  const fillerCount = Math.max(0, 34 - Math.max(list.length, 1));
-  const fillerRowsHtml = fillerCount > 0 ? buildFillerRowsHtml(8, fillerCount) : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -55,12 +52,12 @@ export const buildPaymentFollowUpStatementHtml = ({
   *{box-sizing:border-box;margin:0;padding:0;font-family:Cambria,Georgia,serif;}
   html,body{margin:0;padding:0;background:#fff;color:var(--text);}
   .page{
-    width:794px;min-height:1123px;height:auto;padding:8px;margin:0;background:#fff;
+    width:794px;min-height:0;height:auto;padding:8px;margin:0;background:#fff;
     display:flex;flex-direction:column;box-sizing:border-box;overflow:visible;
   }
   .sheet{
-    flex:1;border:2px solid var(--purple);padding:12px 14px 0;
-    display:flex;flex-direction:column;box-sizing:border-box;min-height:1090px;
+    flex:0 0 auto;border:2px solid var(--purple);padding:12px 14px 0;
+    display:flex;flex-direction:column;box-sizing:border-box;min-height:0;height:auto;
   }
 
   .header{
@@ -152,7 +149,7 @@ export const buildPaymentFollowUpStatementHtml = ({
   .sign .line span{display:block;font-weight:600;color:var(--text);margin-top:2px;}
 
   .barfoot{
-    background:var(--purple);color:#fff;margin:auto -14px 0 -14px;padding:8px 14px;
+    background:var(--purple);color:#fff;margin:8px -14px 0 -14px;padding:8px 14px;
     display:flex;justify-content:space-between;align-items:center;
     font-size:12px;flex-shrink:0;
   }
@@ -211,7 +208,6 @@ export const buildPaymentFollowUpStatementHtml = ({
           </thead>
           <tbody>
             ${rows || `<tr><td colspan="8" class="c">No outstanding invoices</td></tr>`}
-            ${fillerRowsHtml}
           </tbody>
           <tfoot>
             <tr>
@@ -239,46 +235,6 @@ export const buildPaymentFollowUpStatementHtml = ({
 </html>`;
 };
 
-const fillPfuBlankRows = (idoc, { singlePageHeight }) => {
-  const page = idoc.querySelector('.pfu-page');
-  const sheet = idoc.querySelector('.pfu-page .sheet');
-  const tbody = idoc.querySelector('.pfu-page table.items tbody');
-  const barfoot = idoc.querySelector('.pfu-page .barfoot');
-  if (!page || !sheet || !tbody) return;
-
-  const prevPageMin = page.style.minHeight;
-  const prevSheetMin = sheet.style.minHeight;
-  const prevBarMargin = barfoot ? barfoot.style.marginTop : '';
-  page.style.minHeight = '0';
-  page.style.height = 'auto';
-  sheet.style.minHeight = '0';
-  if (barfoot) barfoot.style.marginTop = '8px';
-
-  const rowH = 18;
-  let extra = Math.floor((singlePageHeight - page.scrollHeight) / rowH);
-  extra = Math.max(0, Math.min(extra, 40));
-  for (let i = 0; i < extra; i += 1) {
-    const tr = idoc.createElement('tr');
-    tr.className = 'filler-row';
-    for (let c = 0; c < 8; c += 1) {
-      const td = idoc.createElement('td');
-      td.innerHTML = '&nbsp;';
-      tr.appendChild(td);
-    }
-    tbody.appendChild(tr);
-  }
-  while (page.scrollHeight > singlePageHeight) {
-    const last = tbody.querySelector('tr.filler-row:last-child');
-    if (!last) break;
-    last.remove();
-  }
-
-  page.style.minHeight = prevPageMin;
-  page.style.height = '';
-  sheet.style.minHeight = prevSheetMin;
-  if (barfoot) barfoot.style.marginTop = prevBarMargin;
-};
-
 export const renderPaymentFollowUpStatementPdf = async ({
   customer,
   invoices,
@@ -303,9 +259,8 @@ export const renderPaymentFollowUpStatementPdf = async ({
     partyName: customer?.partyName || customer?.name || '',
     data: { partyName: customer?.partyName || customer?.name || '', invoiceNo: '01' },
     width: 794,
-    fitPage: true,
+    fitPage: false,
     splitOverflowPages: true,
-    printPrefs,
-    prepareDoc: fillPfuBlankRows
+    printPrefs
   });
 };

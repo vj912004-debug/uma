@@ -1,8 +1,9 @@
 import { formatDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Search, Filter, Download, Calendar, User, Package, FileDown } from 'lucide-react';
+import { Search, User, Package } from 'lucide-react';
 import { downloadAllDocs } from '../utils/pdfExport';
+import DocDownloadButtons from '../components/DocDownloadButtons';
 
 const OperationsHub = () => {
   const { data } = useAppContext();
@@ -137,13 +138,13 @@ const OperationsHub = () => {
                         }}>
                           {item.status}
                         </span>
-                        <button 
-                          onClick={() => downloadAllDocs(item.id, item)}
-                          style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-                          title="Download All Documents"
-                        >
-                          <FileDown size={16} />
-                        </button>
+                        <DocDownloadButtons
+                          docType="Operations"
+                          title="Operations Record"
+                          getData={() => item}
+                          onPdf={() => downloadAllDocs(item.id, item)}
+                          size={16}
+                        />
                       </div>
                     </td>
                   </tr>

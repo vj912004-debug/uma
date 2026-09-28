@@ -3,8 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import ExportButton from '../components/ExportButton';
-import { exportToPDF, viewPDF } from '../utils/pdfExport';
-import {Eye,  Plus, FileDown, Edit2, Trash2, ShieldAlert, FileText } from 'lucide-react';
+import DocDownloadButtons from '../components/DocDownloadButtons';
+import { Plus, Edit2, Trash2, FileText } from 'lucide-react';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
@@ -274,6 +274,7 @@ const MaterialReceipt = () => {
           gstinBill: '',
           shipAddress: '',
           gstinShip: '',
+          deliveryNotes: '',
           productName: '',
           nickName: '',
           batches: [],
@@ -295,6 +296,7 @@ const MaterialReceipt = () => {
         gstinBill: party.gstinBill || '',
         shipAddress: party.shipAddress || '',
         gstinShip: party.gstinShip || '',
+        deliveryNotes: party.deliveryNote || '',
         productName: '',
         nickName: '',
         batches: [],
@@ -709,6 +711,12 @@ const MaterialReceipt = () => {
   // Get active products for selected party
   const selectedPartyObj = data.parties.find(p => p.id === formData.partyId);
   const partyProducts = selectedPartyObj?.products || [];
+  const partyMicronSizes = useMemo(() => {
+    const fromProducts = (partyProducts || []).map((p) => p.psdReq);
+    const fromBatches = (formData.batches || []).map((b) => b.psdReq);
+    const fromSettings = Object.values(formData.productSettings || {}).map((s) => s?.micronSize);
+    return uniqueSortedOptions([...fromProducts, ...fromBatches, ...fromSettings, pendingMicronSize]);
+  }, [partyProducts, formData.batches, formData.productSettings, pendingMicronSize]);
   // Only products that have received / entered batch material on this receipt
   const receivedProducts = partyProducts.filter(prod =>
     formData.batches.some(
@@ -784,18 +792,14 @@ const MaterialReceipt = () => {
           value={batch.psdReq || ''}
           onChange={e => handleBatchCellChange(idx, 'psdReq', e.target.value)}
           placeholder="Micron Size"
+          memoryKey="micron-size"
         >
           <option value="">Select…</option>
-          {(data.psdRequirements || []).map((r, optIdx) => (
-            <option key={optIdx} value={r}>{r}</option>
+          {partyMicronSizes.map((r) => (
+            <option key={r} value={r}>{r}</option>
           ))}
-          {!(data.psdRequirements || []).some((r) => String(r).trim().toUpperCase() === 'N/A') && (
+          {!partyMicronSizes.some((r) => String(r).trim().toUpperCase() === 'N/A') && (
             <option value="N/A">N/A</option>
-          )}
-          {!!batch.psdReq
-            && !(data.psdRequirements || []).includes(batch.psdReq)
-            && String(batch.psdReq).trim().toUpperCase() !== 'N/A' && (
-            <option value={batch.psdReq}>{batch.psdReq}</option>
           )}
         </SearchableSelect>
       </td>
@@ -1077,7 +1081,8 @@ const MaterialReceipt = () => {
                         </span>
                       </td>
                       <td style={{ padding: '1rem' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <DocDownloadButtons docType="Material Receipt" title="Material Receipt" getData={() => mr} size={16} />
                           <button onClick={() => handleEdit(mr)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={16} /></button>
                           <button onClick={() => deleteReceipt(mr.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }}><Trash2 size={16} /></button>
                         </div>
@@ -1228,12 +1233,13 @@ const MaterialReceipt = () => {
                         value={pendingMicronSize}
                         onChange={(e) => setPendingMicronSize(e.target.value)}
                         placeholder="Micron Size"
+                        memoryKey="micron-size"
                       >
                         <option value="">Micron Size…</option>
-                        {(data.psdRequirements || []).map((r, idx) => (
-                          <option key={idx} value={r}>{r}</option>
+                        {partyMicronSizes.map((r) => (
+                          <option key={r} value={r}>{r}</option>
                         ))}
-                        {!(data.psdRequirements || []).some((r) => String(r).trim().toUpperCase() === 'N/A') && (
+                        {!partyMicronSizes.some((r) => String(r).trim().toUpperCase() === 'N/A') && (
                           <option value="N/A">N/A</option>
                         )}
                       </SearchableSelect>
@@ -1325,20 +1331,14 @@ const MaterialReceipt = () => {
                                   value={settings.micronSize || prod.psdReq || ''}
                                   onChange={(e) => handleProductMicronSizeChange(prod.name, e.target.value)}
                                   placeholder="Select micron size…"
+                                  memoryKey="micron-size"
                                 >
                                   <option value="">Select micron size…</option>
-                                  {(data.psdRequirements || []).map((r, idx) => (
-                                    <option key={idx} value={r}>{r}</option>
+                                  {partyMicronSizes.map((r) => (
+                                    <option key={r} value={r}>{r}</option>
                                   ))}
-                                  {!(data.psdRequirements || []).some((r) => String(r).trim().toUpperCase() === 'N/A') && (
+                                  {!partyMicronSizes.some((r) => String(r).trim().toUpperCase() === 'N/A') && (
                                     <option value="N/A">N/A</option>
-                                  )}
-                                  {!!(settings.micronSize || prod.psdReq)
-                                    && !(data.psdRequirements || []).includes(settings.micronSize || prod.psdReq)
-                                    && String(settings.micronSize || prod.psdReq).trim().toUpperCase() !== 'N/A' && (
-                                    <option value={settings.micronSize || prod.psdReq}>
-                                      {settings.micronSize || prod.psdReq}
-                                    </option>
                                   )}
                                 </SearchableSelect>
                               </div>

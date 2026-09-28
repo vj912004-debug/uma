@@ -2,10 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
 import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
+import DocDownloadButtons from '../components/DocDownloadButtons';
 import { buildBlankBprPayload } from '../utils/bprHtml';
 import { getStoredCompanyProfile } from '../utils/companyProfile';
 import ExportButton from '../components/ExportButton';
-import { Plus, Edit2, Trash2, ClipboardList, FileDown, Printer, FileText } from 'lucide-react';
+import { Plus, Edit2, Trash2, Printer, FileText } from 'lucide-react';
 import { numberInputValue, parseOptionalNumber } from '../utils/numberInput';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
@@ -705,7 +706,7 @@ const BPR = () => {
                       <td style={{ padding: '0.75rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                           <button type="button" onClick={() => viewPDF('BPR', enrichBPRForPrint(bpr, data))} title="Print" style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer' }}><Printer size={14} /></button>
-                          <button type="button" onClick={() => exportToPDF('BPR', enrichBPRForPrint(bpr, data))} title="Download PDF" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
+                          <DocDownloadButtons docType="BPR" title="Batch Processing Record" getData={() => enrichBPRForPrint(bpr, data)} />
                           <button type="button" onClick={() => handleEdit(bpr)} title="Edit" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={14} /></button>
                           <button type="button" onClick={() => deleteBPR(bpr.id)} title="Delete" style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }}><Trash2 size={14} /></button>
                         </div>
@@ -807,7 +808,7 @@ const BPR = () => {
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                           <button type="button" className="btn btn-primary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleEdit(bpr, 'page2')}>Edit Weights</button>
                           <button type="button" onClick={() => viewPDF('BPR', enrichBPRForPrint(bpr, data))} title="Print" style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer' }}><Printer size={14} /></button>
-                          <button type="button" onClick={() => exportToPDF('BPR', enrichBPRForPrint(bpr, data))} title="Download PDF" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
+                          <DocDownloadButtons docType="BPR" title="Batch Processing Record" getData={() => enrichBPRForPrint(bpr, data)} />
                         </div>
                       </td>
                     </tr>

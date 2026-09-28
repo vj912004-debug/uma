@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import {Eye,  Edit2, Trash2, FileDown, ClipboardList, Plus, ArrowLeft } from 'lucide-react';
-import { exportToPDF, viewPDF } from '../utils/pdfExport';
+import { Eye, Edit2, Trash2, Plus, ArrowLeft } from 'lucide-react';
+import { viewPDF } from '../utils/pdfExport';
+import DocDownloadButtons from '../components/DocDownloadButtons';
 import DocChargeRow from '../components/DocChargeRow';
 import DateField from '../components/DateField';
 import GstTaxBlock from '../components/GstTaxBlock';
@@ -638,7 +639,7 @@ const TaxInvoice = () => {
                       <td style={{ padding: '0.75rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button title="Preview PDF" onClick={() => viewPDF('TI', enrichTIForExport(inv))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Eye size={14} /></button>
-                          <button onClick={() => exportToPDF('TI', enrichTIForExport(inv))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><FileDown size={14} /></button>
+                          <DocDownloadButtons docType="TI" title="Tax Invoice" getData={() => enrichTIForExport(inv)} />
                           <button onClick={() => handleEdit(inv)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={14} /></button>
                           <button onClick={() => deleteTI(inv.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }}><Trash2 size={14} /></button>
                         </div>

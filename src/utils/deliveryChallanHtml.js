@@ -1,7 +1,7 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { buildDcPrintLines, getDcAppData, resolveLinkedMr } from './deliveryChallanLayout';
 import { formatPdfDateDmy, splitPartyAddressLines } from './taxInvoiceLayout';
-import { escHtml, fmtQty, buildPrintBrandHtml, renderHtmlToPdf, hasPrintVal, fillPrintPartyFields, buildStatusBar, PRINT_FOOTER_MESSAGES } from './printTheme';
+import { escHtml, fmtQty, buildPrintBrandHtml, renderHtmlToPdf, hasPrintVal, fillPrintPartyFields, buildStatusBar, PRINT_FOOTER_MESSAGES, PRINT_ICON_DOC, PRINT_ICON_CAL } from './printTheme';
 
 const DEFAULT_DC_DELIVERY_NOTE =
   'Material sent for Micronisation on Job Work basis. Goods to be returned after processing.';
@@ -72,9 +72,12 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   const companyGstin = escHtml(profile.gstNumber || '');
   const shipState = escHtml(data.shipState || data.billState || data.state || companyState);
   const stateCode = escHtml(data.shipStateCode || data.billStateCode || data.stateCode || '24');
-  const partyGstin = escHtml(data.gstinShip || data.gstinBill || data.gstin || '');
-  const partyName = escHtml(data.partyName || '');
-  const addressLines = splitPartyAddressLines(data.shipAddress || data.billAddress || data.address || '', 42);
+  const billName = escHtml(data.partyName || '');
+  const shipName = escHtml(data.shipName || data.partyName || '');
+  const billLines = splitPartyAddressLines(data.billAddress || data.address || '', 42);
+  const shipLines = splitPartyAddressLines(data.shipAddress || data.billAddress || data.address || '', 42);
+  const billGstin = escHtml(data.gstinBill || data.gstin || '');
+  const shipGstin = escHtml(data.gstinShip || data.gstinBill || data.gstin || '');
 
   let companyPan = escHtml(profile.panNumber || '');
   if (!companyPan && profile.gstNumber && profile.gstNumber.length >= 15) {
@@ -741,31 +744,39 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
 
       <div class="parties">
         <div class="party">
-          <div class="party-head"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> SHIP TO</div>
-          <div class="party-body"><div class="cname">${partyName}</div>${addressLines.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
+          <div class="party-head"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg> BILL TO</div>
+          <div class="party-body"><div class="cname">${billName}</div>${billLines.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
           <div class="party-foot">
-            <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>${partyGstin}</span></div>
+            <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>${billGstin}</span></div>
+          </div>
+        </div>
+        <div class="party">
+          <div class="party-head"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> SHIP TO</div>
+          <div class="party-body"><div class="cname">${shipName}</div>${shipLines.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
+          <div class="party-foot">
+            <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>${shipGstin}</span></div>
             <div class="frow"><span class="flabel">State</span><span class="fcolon">:</span><span>${shipState} (${stateCode})</span></div>
           </div>
         </div>
-
-        <div class="party">
+      </div>
+      <div class="parties">
+        <div class="party" style="flex:0 1 460px;">
           <div class="party-head"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> DELIVERY CHALLAN DETAILS</div>
           <div class="invoice-meta">
             <div class="meta-row">
-              <span class="m-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
+              <span class="m-icon">${PRINT_ICON_DOC}</span>
               <span class="m-label">Challan No.</span><span class="m-colon">:</span><span class="m-value">&nbsp;${dcNo}</span>
             </div>
             <div class="meta-row">
-              <span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+              <span class="m-icon">${PRINT_ICON_CAL}</span>
               <span class="m-label">Challan Date</span><span class="m-colon">:</span><span class="m-value">&nbsp;${dcDate}</span>
             </div>
             ${hasPrintVal(poNo) ? `<div class="meta-row" style="margin-top:8px;">
-              <span class="m-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
+              <span class="m-icon">${PRINT_ICON_DOC}</span>
               <span class="m-label">PO No.</span><span class="m-colon">:</span><span class="m-value">&nbsp;${poNo}</span>
             </div>` : ''}
             ${hasPrintVal(poDate) ? `<div class="meta-row">
-              <span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+              <span class="m-icon">${PRINT_ICON_CAL}</span>
               <span class="m-label">PO Date</span><span class="m-colon">:</span><span class="m-value">&nbsp;${poDate}</span>
             </div>` : ''}
           </div>

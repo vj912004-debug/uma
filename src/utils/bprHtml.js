@@ -80,6 +80,7 @@ const emptyBatchRow = () => ({ batchNo: '', drumNo: '', gross: '', tare: '', net
 export const BPR_PAGE2_BLANK_ROWS = 8;
 /** Compact sample row height for page-2 weight boxes (do not let print prefs stretch this). */
 const BPR_P2_ROW_PX = 18;
+const BPR_P2_SIGN_PX = 72;
 /** Form pad target for received/dispatched editors (not the print blank count). */
 export const BPR_PAGE2_ROW_COUNT = 14;
 
@@ -890,18 +891,18 @@ export const buildBprHtml = (data, profileInput) => {
   .barfoot span:last-child{white-space:nowrap;flex-shrink:0;}
   .page-p2 .signs{
     display:flex;border:1.5px solid #7c12bd;margin:10px 0 0 0;border-radius:4px;overflow:hidden;
-    flex:0 0 56px;width:420px;max-width:58%;height:56px;min-height:56px;max-height:56px;
+    flex:0 0 ${BPR_P2_SIGN_PX}px;width:420px;max-width:58%;height:${BPR_P2_SIGN_PX}px;min-height:${BPR_P2_SIGN_PX}px;max-height:${BPR_P2_SIGN_PX}px;
     box-sizing:border-box;align-self:flex-start;
   }
-  .page-p2 .sign{flex:1;padding:10px 14px;min-height:0;height:56px;max-height:56px;display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.2;font-weight:700;color:#4a0080;box-sizing:border-box;}
+  .page-p2 .sign{flex:1;padding:10px 14px;min-height:0;height:${BPR_P2_SIGN_PX}px;max-height:${BPR_P2_SIGN_PX}px;display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.2;font-weight:700;color:#4a0080;box-sizing:border-box;}
   .page-p2 .sign svg{width:18px;height:18px;flex-shrink:0;}
   .page-p2 .sign .line{flex:1;border-bottom:1.5px solid #777;margin-left:6px;min-height:0;height:1px;align-self:center;}
   .signs{
     display:flex;border:1.5px solid #7c12bd;margin:0;border-radius:4px;overflow:hidden;
-    flex:0 0 56px;width:420px;max-width:58%;height:56px;min-height:56px;max-height:56px;
+    flex:0 0 ${BPR_P2_SIGN_PX}px;width:420px;max-width:58%;height:${BPR_P2_SIGN_PX}px;min-height:${BPR_P2_SIGN_PX}px;max-height:${BPR_P2_SIGN_PX}px;
     box-sizing:border-box;align-self:flex-start;
   }
-  .sign{flex:1;padding:10px 14px;min-height:0;height:56px;max-height:56px;display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.2;font-weight:700;color:#4a0080;box-sizing:border-box;}
+  .sign{flex:1;padding:10px 14px;min-height:0;height:${BPR_P2_SIGN_PX}px;max-height:${BPR_P2_SIGN_PX}px;display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.2;font-weight:700;color:#4a0080;box-sizing:border-box;}
   .sign + .sign{border-left:1px solid #7c12bd;}
   .sign svg{width:18px;height:18px;flex-shrink:0;}
   .sign .line{flex:1;border-bottom:1.5px solid #777;margin-left:6px;min-height:0;height:1px;align-self:center;}
@@ -1905,21 +1906,21 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
           });
           clonedDoc.querySelectorAll('.page-p2 .signs').forEach((el) => {
             el.style.setProperty('margin', '10px 0 0 0', 'important');
-            el.style.setProperty('flex', '0 0 56px', 'important');
+            el.style.setProperty('flex', `0 0 ${BPR_P2_SIGN_PX}px`, 'important');
             el.style.setProperty('width', '420px', 'important');
             el.style.setProperty('max-width', '58%', 'important');
-            el.style.setProperty('height', '56px', 'important');
-            el.style.setProperty('min-height', '56px', 'important');
-            el.style.setProperty('max-height', '56px', 'important');
+            el.style.setProperty('height', `${BPR_P2_SIGN_PX}px`, 'important');
+            el.style.setProperty('min-height', `${BPR_P2_SIGN_PX}px`, 'important');
+            el.style.setProperty('max-height', `${BPR_P2_SIGN_PX}px`, 'important');
             el.style.setProperty('align-self', 'flex-start', 'important');
             el.style.setProperty('overflow', 'hidden', 'important');
             el.style.boxSizing = 'border-box';
           });
           clonedDoc.querySelectorAll('.page-p2 .sign').forEach((el) => {
             el.style.setProperty('padding', '10px 14px', 'important');
-            el.style.setProperty('height', '56px', 'important');
+            el.style.setProperty('height', `${BPR_P2_SIGN_PX}px`, 'important');
             el.style.setProperty('min-height', '0', 'important');
-            el.style.setProperty('max-height', '56px', 'important');
+            el.style.setProperty('max-height', `${BPR_P2_SIGN_PX}px`, 'important');
             el.style.setProperty('line-height', '1.2', 'important');
             el.style.setProperty('font-size', '14px', 'important');
             el.style.alignItems = 'center';

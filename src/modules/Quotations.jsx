@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Eye, Plus, Download, Trash2, Edit2, GripVertical, Copy } from 'lucide-react';
+import { Eye, Plus, Trash2, Edit2, GripVertical, Copy } from 'lucide-react';
 import { nextAvailableDocNumber } from '../utils/numbering';
-import { exportToPDF, viewPDF } from '../utils/pdfExport';
+import { viewPDF } from '../utils/pdfExport';
+import DocDownloadButtons from '../components/DocDownloadButtons';
 import { formatDate } from '../utils/dateUtils';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
@@ -478,7 +479,6 @@ const Quotations = () => {
   };
 
   const previewQuotation = (q) => viewPDF('QUOTATION', quotationPrintData(q));
-  const downloadQuotation = (q) => exportToPDF('QUOTATION', quotationPrintData(q));
 
   const selectedParty = data.parties.find(p => p.id === formData.partyId);
   const partyProducts = selectedParty?.products || [];
@@ -851,9 +851,7 @@ const Quotations = () => {
                       <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }} onClick={() => previewQuotation(q)} title="Preview PDF">
                         <Eye size={14} /> Preview
                       </button>
-                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }} onClick={() => downloadQuotation(q)}>
-                        <Download size={14} /> PDF
-                      </button>
+                      <DocDownloadButtons docType="QUOTATION" title="Quotation" getData={() => quotationPrintData(q)} size={14} />
                       <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(16, 185, 129, 0.12)', color: '#059669' }} onClick={() => handleCopyAsNew(q)} title="New quotation for the same company and product">
                         <Copy size={14} />
                       </button>

@@ -291,8 +291,14 @@ const ProductionPlanning = () => {
       .filter((p) => !isPlanDispatched(p, data.deliveryChallans)),
     [plansList, data.materialReceipts, data.parties, data.deliveryChallans]
   );
-  const partyOptions = useMemo(() => uniqueSortedOptions(resolvedPlans.map((p) => p.customer)), [resolvedPlans]);
-  const productOptions = useMemo(() => uniqueSortedOptions(resolvedPlans.map((p) => p.productName)), [resolvedPlans]);
+  const partyOptions = useMemo(() => uniqueSortedOptions([
+    ...resolvedPlans.map((p) => p.customer),
+    ...(data.parties || []).map((p) => p.name)
+  ]), [resolvedPlans, data.parties]);
+  const productOptions = useMemo(() => uniqueSortedOptions([
+    ...resolvedPlans.map((p) => p.productName),
+    ...(data.parties || []).flatMap((p) => (p.products || []).map((prod) => prod.name))
+  ]), [resolvedPlans, data.parties]);
   const isPlanPending = (p) => p.status !== 'Done' && p.status !== 'Cancel';
   const pendingCount = resolvedPlans.filter(isPlanPending).length;
   const completedCount = resolvedPlans.filter((p) => p.status === 'Done').length;

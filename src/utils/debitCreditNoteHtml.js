@@ -20,6 +20,8 @@ import {
   formatPrintTermsHtml,
   DEFAULT_INVOICE_TERMS,
   buildOptionalMetaRowHtml,
+  PRINT_ICON_DOC,
+  PRINT_ICON_CAL,
   buildBankDetailsBox,
   buildStatusBar,
   PRINT_FOOTER_MESSAGES
@@ -786,14 +788,14 @@ const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
 
     <div class="invoice-meta">
       <div class="block">
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></span><span class="m-label">${noteType} No.</span><span class="m-colon">:</span><span class="m-value">${docNo}</span></div>
-        <div class="meta-row"><span class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="m-label">${noteType} Date</span><span class="m-colon">:</span><span class="m-value">${docDate}</span></div>
+        <div class="meta-row"><span class="m-icon">${PRINT_ICON_DOC}</span><span class="m-label">${noteType} No.</span><span class="m-colon">:</span><span class="m-value">${docNo}</span></div>
+        <div class="meta-row"><span class="m-icon">${PRINT_ICON_CAL}</span><span class="m-label">${noteType} Date</span><span class="m-colon">:</span><span class="m-value">${docDate}</span></div>
       </div>
       <div class="block">
-        ${buildOptionalMetaRowHtml('Original Invoice No.', refInvoiceRaw, { iconHtml: '<svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg>' })}
-        ${buildOptionalMetaRowHtml('Original Invoice Date', refDateRaw, { sub: true })}
-        ${buildOptionalMetaRowHtml('Customer PO No.', poNoRaw, { sub: true })}
-        ${buildOptionalMetaRowHtml('Reference', refRaw, { sub: true })}
+        ${buildOptionalMetaRowHtml('Original Invoice No.', refInvoiceRaw, { iconHtml: PRINT_ICON_DOC })}
+        ${buildOptionalMetaRowHtml('Original Invoice Date', refDateRaw, { iconHtml: PRINT_ICON_CAL })}
+        ${buildOptionalMetaRowHtml('Customer PO No.', poNoRaw, { iconHtml: PRINT_ICON_DOC })}
+        ${buildOptionalMetaRowHtml('Reference', refRaw, { iconHtml: PRINT_ICON_DOC })}
       </div>
     </div>
   </div>

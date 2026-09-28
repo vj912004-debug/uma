@@ -1,6 +1,31 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
+import { AppContext } from '../context/AppContext';
+
+const sameText = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+
+const dropdownMemoryKey = ({ memoryKey, name, id, placeholder, builtin, reactId }) => {
+  if (memoryKey) return String(memoryKey).slice(0, 160);
+  const blank = (builtin || []).find((o) => o.value === '');
+  const anchor = [name, id, placeholder, blank?.label].filter(Boolean).join('|').trim();
+  if (anchor) return anchor.slice(0, 160);
+  return String(reactId || '').slice(0, 160);
+};
+
+const mergeRemembered = (builtin, saved) => {
+  const extras = (Array.isArray(saved) ? saved : [])
+    .map((v) => String(v || '').trim())
+    .filter((v) => v && !builtin.some((o) => sameText(o.value, v) || sameText(o.label, v)));
+  if (!extras.length) return builtin;
+  const blank = builtin.filter((o) => o.value === '');
+  const rest = builtin.filter((o) => o.value !== '');
+  return [
+    ...blank,
+    ...extras.map((v) => ({ value: v, label: v, disabled: false })),
+    ...rest
+  ];
+};
 
 const readOptions = (children, optionsProp) => {
   if (Array.isArray(optionsProp) && optionsProp.length) {
@@ -35,17 +60,34 @@ const SearchableSelect = ({
   id,
   placeholder,
   title,
-  allowCustom = false
+  allowCustom = true,
+  remember = true,
+  memoryKey
 }) => {
+  const app = useContext(AppContext);
+  const data = app?.data;
+  const setData = app?.setData;
+  const isReady = Boolean(app?.isReady);
+  const reactId = useId();
   const wrapRef = useRef(null);
   const searchRef = useRef(null);
   const listRef = useRef(null);
+  const skipSave = useRef(false);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [typing, setTyping] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const [menuPos, setMenuPos] = useState(null);
 
-  const opts = useMemo(() => readOptions(children, options), [children, options]);
+  const builtin = useMemo(() => readOptions(children, options), [children, options]);
+  const memoryId = useMemo(
+    () => dropdownMemoryKey({ memoryKey, name, id, placeholder, builtin, reactId }),
+    [memoryKey, name, id, placeholder, builtin, reactId]
+  );
+  const saved = remember && allowCustom && memoryId
+    ? data?.settings?.dropdownMemory?.[memoryId]
+    : [];
+  const opts = useMemo(() => mergeRemembered(builtin, saved), [builtin, saved]);
   const strValue = value == null ? '' : String(value);
   const selected = opts.find((o) => o.value === strValue) || null;
   const blank = opts.find((o) => o.value === '');
@@ -62,11 +104,13 @@ const SearchableSelect = ({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return opts;
+    const blankLabel = String(blank?.label || '').trim().toLowerCase();
+    // Opening "All Parties" must not search for that label, or every party disappears.
+    if (!typing || !q || (blankLabel && q === blankLabel)) return opts;
     return opts.filter((o) =>
       o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q)
     );
-  }, [opts, query]);
+  }, [opts, query, typing, blank]);
 
   const emit = (next) => {
     if (typeof onChange !== 'function') return;
@@ -79,7 +123,33 @@ const SearchableSelect = ({
   const close = () => {
     setOpen(false);
     setQuery('');
+    setTyping(false);
     setActiveIdx(0);
+  };
+
+  const knownValue = (raw) => opts.some((o) =>
+    o.value && (sameText(o.label, raw) || sameText(o.value, raw))
+  );
+
+  const persistCustom = (raw) => {
+    const label = String(raw || '').trim();
+    if (!remember || !allowCustom || !memoryId || !label || label.length > 80 || typeof setData !== 'function') return;
+    if (builtin.some((o) => sameText(o.value, label) || sameText(o.label, label))) return;
+    setData((prev) => {
+      const memory = prev.settings?.dropdownMemory || {};
+      const list = Array.isArray(memory[memoryId]) ? memory[memoryId] : [];
+      if (list.some((v) => sameText(v, label))) return prev;
+      return {
+        ...prev,
+        settings: {
+          ...prev.settings,
+          dropdownMemory: {
+            ...memory,
+            [memoryId]: [...list, label].slice(-200)
+          }
+        }
+      };
+    });
   };
 
   const commitCustom = (raw) => {
@@ -91,8 +161,9 @@ const SearchableSelect = ({
       return true;
     }
     const match = opts.find((o) =>
-      o.value && (o.label.toLowerCase() === next.toLowerCase() || o.value.toLowerCase() === next.toLowerCase())
+      o.value && (sameText(o.label, next) || sameText(o.value, next))
     );
+    if (!match) persistCustom(next);
     emit(match ? match.value : next);
     close();
     return true;
@@ -106,7 +177,8 @@ const SearchableSelect = ({
 
   const openMenu = () => {
     if (disabled) return;
-    setQuery(allowCustom ? strValue : '');
+    setQuery('');
+    setTyping(false);
     setOpen(true);
   };
 
@@ -137,16 +209,30 @@ const SearchableSelect = ({
   }, [open, filtered.length]);
 
   useEffect(() => {
+    if (!isReady || !allowCustom || !remember || open) return;
+    if (skipSave.current) {
+      skipSave.current = false;
+      return;
+    }
+    const label = strValue.trim();
+    if (!label || label.length > 80) return;
+    if (builtin.some((o) => sameText(o.value, label) || sameText(o.label, label))) return;
+    persistCustom(label);
+    // Save a value already stored on the form once the menu is closed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [strValue, open, isReady, memoryId, allowCustom, remember]);
+
+  useEffect(() => {
     if (!open) return;
     const onDoc = (e) => {
       if (wrapRef.current?.contains(e.target)) return;
       if (listRef.current?.contains(e.target)) return;
-      if (allowCustom) commitCustom(query);
+      if (allowCustom && typing) commitCustom(query);
       else close();
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [open, allowCustom, query]);
+  }, [open, allowCustom, query, typing]);
 
   useEffect(() => {
     if (!open) return;
@@ -177,6 +263,7 @@ const SearchableSelect = ({
   const onSearchKey = (e) => {
     if (e.key === 'Escape') {
       e.preventDefault();
+      skipSave.current = true;
       close();
       wrapRef.current?.querySelector('.searchable-select-trigger')?.focus();
       return;
@@ -194,12 +281,19 @@ const SearchableSelect = ({
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (filtered[activeIdx] && filtered[activeIdx].value !== '') {
-        pick(filtered[activeIdx]);
+      const typed = query.trim();
+      const exact = opts.find((o) => o.value && (sameText(o.label, typed) || sameText(o.value, typed)));
+      if (typing && typed && !exact) {
+        commitCustom(typed);
         return;
       }
-      if (filtered[activeIdx] && !allowCustom) {
-        pick(filtered[activeIdx]);
+      if (exact) {
+        pick(exact);
+        return;
+      }
+      const highlighted = filtered[activeIdx];
+      if (highlighted && !highlighted.disabled) {
+        pick(highlighted);
         return;
       }
       commitCustom(query);
@@ -233,16 +327,14 @@ const SearchableSelect = ({
             onKeyDown={onSearchKey}
           />
         )}
-        <div className="searchable-select-list">
+        <div className="searchable-select-list" style={{ maxHeight: menuPos.maxHeight }}>
           {filtered.length === 0 && !allowCustom && (
             <div className="searchable-select-empty">No matches</div>
           )}
           {filtered.length === 0 && allowCustom && !query.trim() && (
-            <div className="searchable-select-empty">No parties yet — type a name</div>
+            <div className="searchable-select-empty">Type a new value</div>
           )}
-          {allowCustom && query.trim() && !opts.some((o) =>
-            o.label.toLowerCase() === query.trim().toLowerCase() || o.value.toLowerCase() === query.trim().toLowerCase()
-          ) && (
+          {allowCustom && query.trim() && !knownValue(query) && (
             <button
               type="button"
               className={`searchable-select-option${filtered.length === 0 ? ' is-active' : ''}`}
@@ -301,13 +393,18 @@ const SearchableSelect = ({
             disabled={disabled}
             className={`searchable-select-trigger searchable-select-combo-input ${className || ''}`.trim()}
             style={{ ...(style || {}), width: '100%' }}
-            placeholder={placeholder || 'Select or type party name'}
-            value={open ? query : (selected?.label || strValue)}
+            placeholder={placeholder || blank?.label || 'Select or type…'}
+            value={open && typing ? query : ((selected && selected.value !== '') ? selected.label : (customActive ? strValue : ''))}
             onChange={(e) => {
               const v = e.target.value;
+              setTyping(true);
               setQuery(v);
               setActiveIdx(0);
               if (!open) setOpen(true);
+              if (blank && sameText(v, blank.label)) {
+                emit('');
+                return;
+              }
               const match = opts.find((o) =>
                 o.value && (
                   o.label.toLowerCase() === v.trim().toLowerCase()
@@ -318,7 +415,8 @@ const SearchableSelect = ({
             }}
             onFocus={() => {
               if (disabled || open) return;
-              setQuery(strValue);
+              setQuery('');
+              setTyping(false);
               setOpen(true);
             }}
             onKeyDown={onSearchKey}
@@ -331,8 +429,10 @@ const SearchableSelect = ({
             onMouseDown={(e) => {
               e.preventDefault();
               if (disabled) return;
-              if (open) close();
-              else openMenu();
+              if (open) {
+                if (allowCustom && typing && query.trim()) commitCustom(query);
+                else close();
+              } else openMenu();
             }}
           >
             <ChevronDown size={16} className="searchable-select-caret" />

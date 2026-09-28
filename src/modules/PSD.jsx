@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { exportToPDF, viewPDF } from '../utils/pdfExport';
-import {Eye,  UploadCloud, Trash2, Calendar, ClipboardList, CheckCircle } from 'lucide-react';
+import { viewPDF } from '../utils/pdfExport';
+import DocDownloadButtons from '../components/DocDownloadButtons';
+import { Eye, UploadCloud, Trash2, Calendar, CheckCircle } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
@@ -250,7 +251,7 @@ const PSD = () => {
                       <td style={{ padding: '0.75rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button onClick={() => viewPDF('PSD', psd)} style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer' }} title="Preview PDF"><Eye size={16} /></button>
-                          <button onClick={() => exportToPDF('PSD', psd)} style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer' }} title="Download PDF"><ClipboardList size={16} /></button>
+                          <DocDownloadButtons docType="PSD" title="PSD Report" getData={() => psd} size={16} />
                           <button onClick={() => deletePSD(psd.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }} title="Delete"><Trash2 size={16} /></button>
                         </div>
                       </td>

@@ -9,7 +9,7 @@ import { loadStateFromLocalStorage, normalizeAppState } from '../utils/appState'
 import { mergeCompanyProfile } from '../utils/companyProfile';
 import { syncAllTaxInvoicesWithProformas } from '../utils/documentCharges';
 
-const AppContext = createContext();
+export const AppContext = createContext(null);
 
 const SERIAL_KEY_ALIASES = {
   QUOTATION: 'QT',

@@ -351,14 +351,6 @@ export const layoutFillOtherPrintPages = (doc, pageHeight) => {
     fillItemsBlankRowsToFit(page, wrap || lastTable, 16);
   });
 
-  doc.querySelectorAll('.pfu-page').forEach((page) => {
-    const table = page.querySelector('table.items');
-    const wrap = table?.parentElement;
-    if (!wrap) return;
-    page.style.setProperty('height', `${pageHeight}px`, 'important');
-    page.style.setProperty('min-height', `${pageHeight}px`, 'important');
-    fillItemsBlankRowsToFit(page, wrap, 18);
-  });
 };
 
 /** Pages that pin Terms/Declaration/Signatory inside A4 without html2canvas flex clipping. */
@@ -427,6 +419,9 @@ export const FIT_FOOTER_CSS = `
     border: 1px solid var(--lav-border);
     vertical-align: top;
     padding: 0;
+  }
+  .pi-page table.footer3.has-notes td.f3col {
+    width: 25%;
   }
   table.footer3 .f3-body {
     display: block;
@@ -1099,6 +1094,9 @@ export const getSharedPrintStyles = () => `
     vertical-align: top;
     overflow: visible;
   }
+  .pi-page table.footer3.has-notes td.f3col {
+    width: 25%;
+  }
   .f3-body {
     padding: 6px 10px;
     font-size: 11px;
@@ -1297,6 +1295,18 @@ export const buildPartyFootHtml = (gstin, state, stateCode) => {
   return rows.length ? `<div class="party-foot">${rows.join('')}</div>` : '';
 };
 
+/** Stroke icons with real paint attributes so they stay visible in print and PDF. */
+const printStrokeIcon = (inner) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3d2b7d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+
+export const PRINT_ICON_DOC = printStrokeIcon(
+  '<path d="M6 2h9l5 5v15H6z" fill="none" stroke="#3d2b7d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 2v5h5" fill="none" stroke="#3d2b7d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+);
+
+export const PRINT_ICON_CAL = printStrokeIcon(
+  '<rect x="3" y="4.5" width="18" height="16" rx="1.5" fill="none" stroke="#3d2b7d" stroke-width="1.6"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4" fill="none" stroke="#3d2b7d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+);
+
 export const buildOptionalMetaRowHtml = (label, value, { iconHtml = '', sub = false } = {}) => {
   if (!hasPrintVal(value)) return '';
   return `<div class="meta-row${sub ? ' sub' : ''}"><span class="m-icon">${iconHtml || ''}</span><span class="m-label">${escHtml(label)}</span><span class="m-colon">:</span><span class="m-value">${escHtml(value)}</span></div>`;
@@ -1350,22 +1360,32 @@ export const DEFAULT_PI_NOTE =
   'PACKING MATERIALS AND TRANSPORTATION CHARGES WILL BE CHARGE EXTRA AS ACTUAL';
 
 export const DEFAULT_PI_TERMS = [
-  'Subject to vadodara Jurisdiction.',
-  'Payment 100% ADVANCE AGAINST PI'
+  'Packing materials and transportation charges will be charge extra as actual.',
+  'Payment 100% advance against PI.',
+  'Subject to Vadodara Jurisdiction.'
 ];
 
 export const DEFAULT_PI_TERMS_TEXT = DEFAULT_PI_TERMS
   .map((line, i) => `${i + 1}) ${line}`)
   .join('\n');
 
-export const formatPiPrintTermsHtml = (terms) => {
-  const noteHtml = `<div class="term-note">NOTE:<br/>${escHtml(DEFAULT_PI_NOTE)}</div>`;
-  const body = formatPrintTermsHtml(
-    isPlaceholderInvoiceTerms(terms) ? '' : terms,
-    DEFAULT_PI_TERMS
-  );
-  return `${noteHtml}${body}`;
+/** Earlier PI default (jurisdiction + advance only) should print the current three lines. */
+const isLegacyPiTerms = (terms) => {
+  const lines = String(terms || '')
+    .split(/\r?\n/)
+    .map((line) => String(line || '').replace(/^\s*\d{1,2}[.)]\s*/, '').trim())
+    .filter(Boolean);
+  if (lines.length !== 2) return false;
+  const hasJurisdiction = lines.some((line) => /vadodara\s+jurisdiction/i.test(line));
+  const hasAdvance = lines.some((line) => /100%\s*advance against pi/i.test(line));
+  const hasPacking = lines.some((line) => /packing materials/i.test(line));
+  return hasJurisdiction && hasAdvance && !hasPacking;
 };
+
+export const formatPiPrintTermsHtml = (terms) => formatPrintTermsHtml(
+  isPlaceholderInvoiceTerms(terms) || isLegacyPiTerms(terms) ? '' : terms,
+  DEFAULT_PI_TERMS
+);
 
 export const DEFAULT_PO_TERMS = [
   'Delivery 10 days from the date of Purchase Order.',
@@ -1391,18 +1411,29 @@ export const formatPrintTermsHtml = (terms, fallbackLines = DEFAULT_INVOICE_TERM
   )).join('');
 };
 
-export const buildFooterTerms = (companyName, termsHtml, declarationHtml) => {
+export const buildFooterTerms = (companyName, termsHtml, declarationHtml, notesHtml = '') => {
   const rawTerms = String(termsHtml || '');
   const termsBlock = /<[^>]+>/.test(rawTerms)
     ? rawTerms
     : formatPrintTermsHtml(rawTerms, DEFAULT_INVOICE_TERMS);
   const declarationRaw = String(declarationHtml || DEFAULT_INVOICE_DECLARATION).trim();
   const declaration = /</.test(declarationRaw) ? declarationRaw : escHtml(declarationRaw);
+  const notesRaw = String(notesHtml || '').trim();
+  const notesBlock = !notesRaw
+    ? ''
+    : (/</.test(notesRaw) ? notesRaw : escHtml(notesRaw));
+  const notesCell = notesBlock
+    ? `<td class="f3col">
+        <div class="box-head">${PRINT_ICON_DOC} NOTES</div>
+        <div class="f3-body">${notesBlock}</div>
+      </td>`
+    : '';
   return `
-  <table class="footer3">
+  <table class="footer3${notesCell ? ' has-notes' : ''}">
     <tr>
+      ${notesCell}
       <td class="f3col">
-        <div class="box-head"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg> TERMS &amp; CONDITIONS</div>
+        <div class="box-head">${PRINT_ICON_DOC} TERMS &amp; CONDITIONS</div>
         <div class="f3-body">${termsBlock}</div>
       </td>
       <td class="f3col">
@@ -1523,14 +1554,24 @@ export const bakePrintSvgPaints = (root) => {
         const cs = getComputedStyle(svg);
         if (cs.stroke && cs.stroke !== 'none') stroke = cs.stroke;
       } catch { /* ignore */ }
+      if (!svg.getAttribute('width')) svg.setAttribute('width', '16');
+      if (!svg.getAttribute('height')) svg.setAttribute('height', '16');
+      if (!svg.getAttribute('xmlns')) svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
       svg.setAttribute('fill', 'none');
       svg.setAttribute('stroke', stroke);
       if (!svg.getAttribute('stroke-width')) svg.setAttribute('stroke-width', '1.6');
       if (!svg.getAttribute('stroke-linecap')) svg.setAttribute('stroke-linecap', 'round');
       if (!svg.getAttribute('stroke-linejoin')) svg.setAttribute('stroke-linejoin', 'round');
+      const w = svg.getAttribute('width');
+      const h = svg.getAttribute('height');
+      if (w && !String(w).includes('%')) svg.style.width = `${w}px`;
+      if (h && !String(h).includes('%')) svg.style.height = `${h}px`;
       svg.querySelectorAll('path, circle, rect, line, polyline, polygon, ellipse').forEach((node) => {
-        if (!node.getAttribute('fill')) node.setAttribute('fill', 'none');
-        if (!node.getAttribute('stroke')) node.setAttribute('stroke', stroke);
+        node.setAttribute('fill', 'none');
+        node.setAttribute('stroke', stroke);
+        if (!node.getAttribute('stroke-width')) node.setAttribute('stroke-width', '1.6');
+        if (!node.getAttribute('stroke-linecap')) node.setAttribute('stroke-linecap', 'round');
+        if (!node.getAttribute('stroke-linejoin')) node.setAttribute('stroke-linejoin', 'round');
       });
     }
 
@@ -1549,6 +1590,28 @@ export const bakePrintSvgPaints = (root) => {
       const onPurpleBanner = svg.closest?.('.tbl-title, .pill-head, .page2-header, .bottom-banner, .dc-title-box, .title-box');
       if (onPurpleBanner && (!svg.getAttribute('fill') || svg.getAttribute('fill') === 'none')) {
         svg.setAttribute('fill', '#ffffff');
+      }
+      if (!svg.getAttribute('width') || !svg.getAttribute('height')) {
+        let w = 16;
+        let h = 16;
+        try {
+          const cs = getComputedStyle(svg);
+          const pw = parseFloat(cs.width);
+          const ph = parseFloat(cs.height);
+          if (pw > 0 && pw < 80) w = Math.round(pw);
+          if (ph > 0 && ph < 80) h = Math.round(ph);
+        } catch { /* ignore */ }
+        if (!svg.getAttribute('width')) svg.setAttribute('width', String(w));
+        if (!svg.getAttribute('height')) svg.setAttribute('height', String(h));
+      }
+      const painted = svg.getAttribute('fill');
+      if (painted && painted !== 'none') {
+        svg.querySelectorAll('path, circle, rect, polygon, ellipse').forEach((node) => {
+          const nodeFill = node.getAttribute('fill');
+          if (!nodeFill || nodeFill === 'inherit' || nodeFill.includes('var(')) {
+            node.setAttribute('fill', painted);
+          }
+        });
       }
     }
   });

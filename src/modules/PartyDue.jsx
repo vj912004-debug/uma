@@ -19,7 +19,8 @@ const PartyDue = () => {
   const [statusTab, setStatusTab] = useState('pending');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [columnFilters, setColumnFilters] = useState({});
-  const fyKeys = useMemo(() => getFYKeysThroughCurrent('21-22'), []);
+  const fyKeys = useMemo(() => ['26-27'], []);
+  const bucketKeys = useMemo(() => getFYKeysThroughCurrent('21-22'), []);
   const currentFY = useMemo(() => getCurrentFYKey(), []);
 
   // Payment Form State
@@ -76,14 +77,12 @@ const PartyDue = () => {
 
   // Outstanding = unpaid tax invoice totals (bill − received − TDS) per party
   const partyRows = collectPartyDueEntities(data).map((party) => {
-    const invoiceDuesByFY = getPartyOutstandingByFY(data, party, fyKeys, currentFY);
+    const invoiceDuesByFY = getPartyOutstandingByFY(data, party, bucketKeys, currentFY);
     const finals = {};
-    let totalDue = 0;
     fyKeys.forEach((fy) => {
-      const amount = invoiceDuesByFY[fy] || 0;
-      finals[fy] = amount;
-      totalDue += amount;
+      finals[fy] = invoiceDuesByFY[fy] || 0;
     });
+    const totalDue = bucketKeys.reduce((sum, fy) => sum + (invoiceDuesByFY[fy] || 0), 0);
 
     return {
       id: party.id,

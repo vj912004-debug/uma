@@ -3,13 +3,15 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber, nextAvailableDocNumber } from '../utils/numbering';
 import DateField from '../components/DateField';
+import DcPartyBoxes from '../components/DcPartyBoxes';
 import TimeField from '../components/TimeField';
 import { 
   FileText, Activity, UploadCloud, Package, Truck, 
-  FileSpreadsheet, FileCheck, CheckCircle, Clock, X, Plus, Edit2, Download, Trash2,
-  Search, ArrowRightToLine, Hand
+  FileSpreadsheet, FileCheck, CheckCircle, Clock, X, Plus, Edit2, Trash2,
+  Search, ArrowRightToLine, Hand, Ban
 } from 'lucide-react';
-import { exportToPDF, viewPDF, padBPRBatchRows } from '../utils/pdfExport';
+import { viewPDF, padBPRBatchRows } from '../utils/pdfExport';
+import DocDownloadButtons from '../components/DocDownloadButtons';
 import { enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, getLinkedPITermsForTI, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges, qtyInputValue, rateInputValue } from '../utils/documentCharges';
 import { DEFAULT_INVOICE_TERMS_TEXT, DEFAULT_PI_TERMS_TEXT } from '../utils/printTheme';
 import {
@@ -228,8 +230,8 @@ const isMovedToProcessingSheet = (mr, productName = '') => {
   return !!flag[upProductKey(productName)];
 };
 
-const getProcessManualDone = (mr, productName = '', type) => {
-  const map = mr?.processManualDone;
+const getProcessFlag = (mr, productName = '', type, field) => {
+  const map = mr?.[field];
   if (!map || typeof map !== 'object') return false;
   const key = upProductKey(productName);
   if (map[key]?.[type]) return true;
@@ -239,10 +241,19 @@ const getProcessManualDone = (mr, productName = '', type) => {
   return false;
 };
 
+const getProcessManualDone = (mr, productName = '', type) =>
+  getProcessFlag(mr, productName, type, 'processManualDone');
+
+const getProcessNotRequired = (mr, productName = '', type) =>
+  getProcessFlag(mr, productName, type, 'processNotRequired');
+
+const isProcessStepPassed = (mr, productName = '', type) =>
+  getProcessManualDone(mr, productName, type) || getProcessNotRequired(mr, productName, type);
+
 /** Unified E-Way Bill done = DC e-way + TI e-way (or single EWAY / legacy manual flags). */
 const isEwayBillDone = (data, mr, productName = '') => {
   const m = (type) => getProcessManualDone(mr, productName, type);
-  if (m('EWAY')) return true;
+  if (m('EWAY') || getProcessNotRequired(mr, productName, 'EWAY')) return true;
   const dc = findDC(data, mr.id, productName);
   const ti = findTI(data, mr.id, productName);
   const dcOk = (dc && dc.ewayBillNo) || m('EWDC');
@@ -257,14 +268,14 @@ const isUnderProcessRowComplete = (data, mr, productName = '') => {
   const pl = findPL(data, mr.id, productName);
   const dc = findDC(data, mr.id, productName);
   const ti = findTI(data, mr.id, productName);
-  const m = (type) => getProcessManualDone(mr, productName, type);
+  const passed = (type) => isProcessStepPassed(mr, productName, type);
   return Boolean(
-    (pi || m('PI')) &&
-    (bpr || m('BPR')) &&
-    (psd || m('PSD')) &&
-    (pl || m('PL')) &&
-    (dc || m('DC')) &&
-    (ti || m('TI')) &&
+    (pi || passed('PI')) &&
+    (bpr || passed('BPR')) &&
+    (psd || passed('PSD')) &&
+    (pl || passed('PL')) &&
+    (dc || passed('DC')) &&
+    (ti || passed('TI')) &&
     isEwayBillDone(data, mr, productName)
   );
 };
@@ -429,16 +440,16 @@ const UnderProcess = () => {
       const pl = getPL(mr.id, productName);
       const dc = getDC(mr.id, productName);
       const ti = getTI(mr.id, productName);
-      const m = (type) => getProcessManualDone(mr, productName, type);
+      const passed = (type) => isProcessStepPassed(mr, productName, type);
       const isComplete = isUnderProcessRowComplete(data, mr, productName);
       if (activeTab === 'Done') return isComplete;
       if (activeTab === 'Pending') return !isComplete;
-      if (activeTab === 'PI') return !(pi || m('PI'));
-      if (activeTab === 'BPR') return !(bpr || m('BPR'));
-      if (activeTab === 'PSD') return !(psd || m('PSD'));
-      if (activeTab === 'PL') return !(pl || m('PL'));
-      if (activeTab === 'DC') return !(dc || m('DC'));
-      if (activeTab === 'TI') return !(ti || m('TI'));
+      if (activeTab === 'PI') return !(pi || passed('PI'));
+      if (activeTab === 'BPR') return !(bpr || passed('BPR'));
+      if (activeTab === 'PSD') return !(psd || passed('PSD'));
+      if (activeTab === 'PL') return !(pl || passed('PL'));
+      if (activeTab === 'DC') return !(dc || passed('DC'));
+      if (activeTab === 'TI') return !(ti || passed('TI'));
       if (activeTab === 'EWAY' || activeTab === 'EWDC' || activeTab === 'EWTI') {
         return !isEwayBillDone(data, mr, productName);
       }
@@ -494,9 +505,9 @@ const UnderProcess = () => {
     setActiveModal(type);
   };
 
-  const setManualDoneFlag = (mr, productName, type, value) => {
+  const setProcessFlag = (mr, productName, type, field, value) => {
     const key = upProductKey(productName);
-    const currentMap = { ...(mr.processManualDone || {}) };
+    const currentMap = { ...(mr[field] || {}) };
     const bucket = { ...(currentMap[key] || {}) };
     if (value) bucket[type] = true;
     else delete bucket[type];
@@ -504,8 +515,16 @@ const UnderProcess = () => {
     else delete currentMap[key];
     updateItem('materialReceipts', mr.id, {
       ...mr,
-      processManualDone: currentMap
+      [field]: currentMap
     });
+  };
+
+  const setManualDoneFlag = (mr, productName, type, value) => {
+    setProcessFlag(mr, productName, type, 'processManualDone', value);
+  };
+
+  const setNotRequiredFlag = (mr, productName, type, value) => {
+    setProcessFlag(mr, productName, type, 'processNotRequired', value);
   };
 
   const handleMarkDoneManually = () => {
@@ -515,8 +534,19 @@ const UnderProcess = () => {
     setShowPendingPopover(null);
   };
 
+  const handleMarkNotRequired = () => {
+    if (!showPendingPopover) return;
+    const { mr, productName, cellType } = showPendingPopover;
+    setNotRequiredFlag(mr, productName, cellType, true);
+    setShowPendingPopover(null);
+  };
+
   const handleClearManualDone = (mr, productName, type) => {
     setManualDoneFlag(mr, productName, type, false);
+  };
+
+  const handleClearNotRequired = (mr, productName, type) => {
+    setNotRequiredFlag(mr, productName, type, false);
   };
 
   const handleGenerateFromPending = () => {
@@ -587,13 +617,6 @@ const UnderProcess = () => {
     }
   };
 
-  const handleDownloadPDF = () => {
-    const { cellType, doc } = showDocPopover;
-    const payload = cellType === 'PI' ? enrichPIForPrint(doc, data) : doc;
-    exportToPDF(cellType, payload);
-    setShowDocPopover(null);
-  };
-
   const handleViewPDF = () => {
     const { cellType, doc } = showDocPopover;
     const payload = cellType === 'PI' ? enrichPIForPrint(doc, data) : doc;
@@ -603,6 +626,7 @@ const UnderProcess = () => {
 
   const renderDocCell = (mr, productName, type, doc, { printDoc, disabled = false, eway = false } = {}) => {
     const manual = getProcessManualDone(mr, productName, type);
+    const notRequired = getProcessNotRequired(mr, productName, type);
     const generatedDone = eway ? !!(doc && doc.ewayBillNo) : !!doc;
 
     if (generatedDone) {
@@ -622,6 +646,21 @@ const UnderProcess = () => {
               <CheckCircle size={12} /> Done
             </button>
           )}
+        </td>
+      );
+    }
+
+    if (notRequired) {
+      return (
+        <td className="center">
+          <button
+            type="button"
+            onClick={() => handleClearNotRequired(mr, productName, type)}
+            className="doc-done doc-not-required"
+            title="Marked not required — click to undo"
+          >
+            <Ban size={12} /> Not Required
+          </button>
         </td>
       );
     }
@@ -672,9 +711,9 @@ const UnderProcess = () => {
           { id: 'BPR', label: 'BPR' },
           { id: 'PSD', label: 'PSD' },
           { id: 'PL', label: 'PL' },
+          { id: 'EWAY', label: 'E-Way Bill' },
           { id: 'DC', label: 'DC' },
           { id: 'TI', label: 'Tax Inv' },
-          { id: 'EWAY', label: 'E-Way Bill' },
           { id: 'Done', label: 'Done' }
         ].map(tab => (
           <button
@@ -739,9 +778,9 @@ const UnderProcess = () => {
               <th className="center">BPR</th>
               <th className="center">PSD</th>
               <th className="center">Packing List</th>
+              <th className="center">E-Way Bill</th>
               <th className="center">DC</th>
               <th className="center">Tax Inv</th>
-              <th className="center">E-Way Bill</th>
               <th className="center">Action</th>
             </tr>
           </thead>
@@ -801,23 +840,30 @@ const UnderProcess = () => {
                     })}
                     {renderDocCell(mr, productName, 'PL', pl, {
                       printDoc: () => viewPDF('PL', pl),
-                      disabled: !(bpr || getProcessManualDone(mr, productName, 'BPR'))
-                    })}
-                    {renderDocCell(mr, productName, 'DC', dc, {
-                      printDoc: () => viewPDF('DC', dc),
-                      disabled: !(pl || getProcessManualDone(mr, productName, 'PL'))
-                    })}
-                    {renderDocCell(mr, productName, 'TI', ti, {
-                      printDoc: () => viewPDF('TI', enrichTIForPrint(ti, data)),
-                      disabled: !(pl || getProcessManualDone(mr, productName, 'PL'))
+                      disabled: !(bpr || isProcessStepPassed(mr, productName, 'BPR'))
                     })}
                     {(() => {
+                      const ewayNotRequired = getProcessNotRequired(mr, productName, 'EWAY');
                       const ewayDone = isEwayBillDone(data, mr, productName);
                       const ewayManual = getProcessManualDone(mr, productName, 'EWAY')
                         || (getProcessManualDone(mr, productName, 'EWDC') && getProcessManualDone(mr, productName, 'EWTI'));
                       const ewayReady = !!(dc || ti
-                        || getProcessManualDone(mr, productName, 'DC')
-                        || getProcessManualDone(mr, productName, 'TI'));
+                        || isProcessStepPassed(mr, productName, 'DC')
+                        || isProcessStepPassed(mr, productName, 'TI'));
+                      if (ewayNotRequired) {
+                        return (
+                          <td className="center">
+                            <button
+                              type="button"
+                              onClick={() => handleClearNotRequired(mr, productName, 'EWAY')}
+                              className="doc-done doc-not-required"
+                              title="Marked not required — click to undo"
+                            >
+                              <Ban size={12} /> Not Required
+                            </button>
+                          </td>
+                        );
+                      }
                       if (ewayDone && !ewayManual) {
                         return (
                           <td className="center">
@@ -858,6 +904,14 @@ const UnderProcess = () => {
                         </td>
                       );
                     })()}
+                    {renderDocCell(mr, productName, 'DC', dc, {
+                      printDoc: () => viewPDF('DC', dc),
+                      disabled: !(pl || isProcessStepPassed(mr, productName, 'PL'))
+                    })}
+                    {renderDocCell(mr, productName, 'TI', ti, {
+                      printDoc: () => viewPDF('TI', enrichTIForPrint(ti, data)),
+                      disabled: !(pl || isProcessStepPassed(mr, productName, 'PL'))
+                    })}
 
                     <td className="center">
                       {rowComplete ? (
@@ -888,7 +942,7 @@ const UnderProcess = () => {
           </div>
           <div className="legend-item">
             <span className="legend-dot pending"></span>
-            <span>Pending — click for Generate or Done Manually</span>
+            <span>Pending — click for Generate, Done Manually, or Not Required</span>
           </div>
           <div className="legend-item">
             <span className="legend-dot done"></span>
@@ -913,6 +967,9 @@ const UnderProcess = () => {
             <button className="context-menu-item" onClick={handleMarkDoneManually}>
               <Hand size={14} /> Done Manually
             </button>
+            <button className="context-menu-item" onClick={handleMarkNotRequired}>
+              <Ban size={14} /> Not Required
+            </button>
           </div>
         </div>
       )}
@@ -928,7 +985,13 @@ const UnderProcess = () => {
             {showDocPopover.cellType !== 'EWAY' && (
               <>
                 <button className="context-menu-item" onClick={handleViewPDF}><FileText size={14} /> View / Print</button>
-                <button className="context-menu-item" onClick={handleDownloadPDF}><Download size={14} /> Download PDF</button>
+                <DocDownloadButtons
+                  variant="menu"
+                  docType={showDocPopover.cellType}
+                  title={showDocPopover.cellType}
+                  getData={() => (showDocPopover.cellType === 'PI' ? enrichPIForPrint(showDocPopover.doc, data) : showDocPopover.doc)}
+                  onDone={() => setShowDocPopover(null)}
+                />
               </>
             )}
             <button className="context-menu-item" onClick={handleEditDoc}><Edit2 size={14} /> Edit</button>
@@ -2595,6 +2658,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     partyDocNo: mr.partyDocNo || '',
     partyDocDate: mr.partyDocDate || '',
     partyName: mr.partyName || '',
+    shipName: mr.shipName || mr.partyName || '',
     billAddress: mr.billAddress || '',
     shipAddress: mr.shipAddress || '',
     gstinBill: mr.gstinBill || '',
@@ -2756,21 +2820,8 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           </div>
         )}
 
-        <div>
-          <label>Party Name</label>
-          <SearchableSelect
-            allowCustom
-            className="input-field"
-            placeholder="Select or type party name"
-            value={form.partyName}
-            onChange={(e) => setForm({ ...form, partyName: e.target.value })}
-          >
-            <option value="">Select or type party name</option>
-            {(data.parties || []).filter((p) => !p.isDeleted).map((p) => (
-              <option key={p.id} value={p.name}>{p.name}</option>
-            ))}
-          </SearchableSelect>
-        </div>
+        <DcPartyBoxes form={form} setForm={setForm} parties={data.parties} />
+
         <div>
           <label>Product Name</label>
           <SearchableSelect
