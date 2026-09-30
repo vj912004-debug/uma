@@ -10,6 +10,40 @@ export { DEFAULT_ADMIN_PASSWORD_HASH, DEFAULT_STAFF_PASSWORD_HASH };
 
 const SEED_STAFF_USERNAMES = new Set(['staff1', 'staff2', 'staff3']);
 
+const NAMED_ADMINS = [
+  {
+    username: 'Amit@umamicron.com',
+    name: 'Amit',
+    employeeId: 'EMP005',
+    passwordHash: '99e4dfcc5775bd9489af7c0bb8fd27243a3b90239c8149d9f0beadf62c6fa457'
+  },
+  {
+    username: 'Gloria@umamicron.com',
+    name: 'Gloria',
+    employeeId: 'EMP006',
+    passwordHash: 'a15ee0fa86af02cd68a46ea394f0876a3cb444e71ea1c7f0992e75fd98888e54'
+  }
+];
+
+const namedAdminRecord = (admin, id) => ({
+  id,
+  employeeId: admin.employeeId,
+  department: 'Management',
+  name: admin.name,
+  username: admin.username,
+  role: 'Admin',
+  active: true,
+  permissions: [],
+  moduleAccessConfigured: true,
+  passwordHash: admin.passwordHash,
+  esslId: '',
+  shiftType: '9hr',
+  perDayRate: 0,
+  otRate: 0,
+  effectiveFrom: '',
+  rateHistory: []
+});
+
 export const createBaseState = () => ({
   parties: [],
   items: [],
@@ -84,7 +118,8 @@ export const createBaseState = () => ({
       permissions: [...ALL_STAFF_MODULE_IDS], moduleAccessConfigured: true, active: true, passwordHash: DEFAULT_STAFF_PASSWORD_HASH,
       esslId: '1003', shiftType: '9hr', perDayRate: 850, otRate: 110, effectiveFrom: '2025-04-01',
       rateHistory: [{ id: 'rh-4-1', effectiveFrom: '2025-04-01', perDayRate: 850, otRate: 110 }]
-    }
+    },
+    ...NAMED_ADMINS.map((admin, index) => namedAdminRecord(admin, 5 + index))
   ],
   currentUser: null,
   settings: {
@@ -202,7 +237,8 @@ export const normalizeAppState = (parsed) => {
     salaryRates: parsed.salaryRates || null,
     salaryReports: parsed.salaryReports || [],
     auditLogs: parsed.auditLogs || [],
-    users: (parsed.users || baseState.users).map((u, i) => {
+    users: (() => {
+      const mapped = (parsed.users || baseState.users).map((u, i) => {
       const username = u.username?.toLowerCase() === 'admin' ? 'admin' : u.username;
       const isAdminUser = u.role === 'Admin' && (username === 'admin' || u.id === 1);
       const isStaff = u.role === 'Staff' || (!isAdminUser && u.role !== 'Admin');
@@ -257,7 +293,27 @@ export const normalizeAppState = (parsed) => {
         effectiveFrom,
         rateHistory
       };
-    }),
+    });
+      const byName = new Map(mapped.map((u) => [String(u.username || '').toLowerCase(), u]));
+      NAMED_ADMINS.forEach((admin) => {
+        const key = admin.username.toLowerCase();
+        const existing = byName.get(key);
+        if (existing) {
+          existing.role = 'Admin';
+          existing.active = true;
+          existing.passwordHash = admin.passwordHash;
+          existing.name = existing.name || admin.name;
+          existing.department = existing.department || 'Management';
+          existing.moduleAccessConfigured = true;
+          return;
+        }
+        const nextId = mapped.reduce((max, u) => Math.max(max, Number(u.id) || 0), 0) + 1;
+        const record = namedAdminRecord(admin, nextId);
+        mapped.push(record);
+        byName.set(key, record);
+      });
+      return mapped;
+    })(),
     attendance: parsed.attendance || [],
     salaryRates: parsed.salaryRates || null,
     salaryReports: parsed.salaryReports || [],

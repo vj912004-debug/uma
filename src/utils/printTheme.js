@@ -157,7 +157,12 @@ export const fillPrintPartyFields = (data, appData = {}) => {
   );
   const gstinBill = firstPrintText(data.gstinBill, data.gstin, mr?.gstinBill, party?.gstinBill, party?.gstin);
   const gstinShip = firstPrintText(data.gstinShip, mr?.gstinShip, party?.gstinShip, gstinBill);
-  const gstState = GST_STATE_NAMES[gstinBill.slice(0, 2)] || '';
+  const gstCode = /^\d{2}/.test(gstinBill) ? gstinBill.slice(0, 2) : '';
+  const gstState = GST_STATE_NAMES[gstCode] || '';
+  const billState = firstPrintText(data.billState, data.state, mr?.billState, party?.billState, party?.state, gstState);
+  const shipState = firstPrintText(data.shipState, mr?.shipState, party?.shipState, data.billState, data.state, party?.state, gstState);
+  const billStateCode = firstPrintText(data.billStateCode, data.stateCode, mr?.billStateCode, party?.billStateCode, party?.stateCode, gstCode);
+  const shipStateCode = firstPrintText(data.shipStateCode, mr?.shipStateCode, party?.shipStateCode, data.billStateCode, data.stateCode, party?.stateCode, gstCode);
 
   return {
     ...data,
@@ -168,8 +173,12 @@ export const fillPrintPartyFields = (data, appData = {}) => {
     gstinBill,
     gstinShip,
     gstin: firstPrintText(data.gstin, gstinBill),
-    billState: firstPrintText(data.billState, data.state, mr?.billState, party?.billState, party?.state, gstState),
-    shipState: firstPrintText(data.shipState, mr?.shipState, party?.shipState, data.billState, data.state, gstState)
+    state: firstPrintText(data.state, data.billState, party?.state, billState),
+    stateCode: firstPrintText(data.stateCode, data.billStateCode, party?.stateCode, billStateCode),
+    billState,
+    shipState,
+    billStateCode,
+    shipStateCode
   };
 };
 
@@ -315,9 +324,9 @@ export const layoutFillOtherPrintPages = (doc, pageHeight) => {
 
   doc.querySelectorAll('.sheet.pdf-page:not(.page2)').forEach((page) => {
     if (page.querySelector('.items-row') || page.classList.contains('pl-page')) return;
-    // Quotation page 1: never pad blank rows or force overflow clipping here.
-    // fitQuotationToTwoPages (prepareDoc) owns compaction + A4 fit.
-    if (page.querySelector('.features')) {
+    // Quotation pages: never pad blank rows. Blank lines were filling the
+    // commercial offer and pushing the notes off the page.
+    if (page.querySelector('.quote-main-table, .terms-wrap, .features')) {
       page.querySelectorAll('tr.filler-row').forEach((tr) => tr.remove());
       page.querySelectorAll('table.dt').forEach((el) => {
         el.style.setProperty('height', 'auto', 'important');
@@ -961,9 +970,13 @@ export const getSharedPrintStyles = () => `
     margin: 0 0 2px;
   }
   .party-body .addr {
-    margin: 0;
-    line-height: 1.4;
+    margin: 0 0 3px;
+    line-height: 1.45;
     white-space: normal;
+    text-align: left;
+  }
+  .party-body .addr:last-child {
+    margin-bottom: 0;
   }
   .party-foot, .card-footer-data {
     border-top: 1px solid var(--lav-border);
@@ -1126,8 +1139,6 @@ export const getSharedPrintStyles = () => `
   }
   .f3-body .term-line.term-highlight {
     font-weight: 800;
-    background: #fff3bf;
-    padding: 2px 4px;
   }
   .f3-body .term-note {
     margin: 0 0 8px;
@@ -1203,11 +1214,16 @@ export const getSharedPrintStyles = () => `
     color: #fff;
     margin: 8px -10px 0 -10px;
     padding: 7px 14px;
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    column-gap: 12px;
     font-size: 11.5px;
     border-radius: 0;
   }
+  .barfoot .foot-msg, .bottom-status-bar .foot-msg { text-align: center; justify-self: center; }
+  .barfoot .foot-page, .bottom-status-bar .foot-page { justify-self: end; text-align: right; white-space: nowrap; }
+  .barfoot .foot-side, .bottom-status-bar .foot-side { justify-self: start; text-align: left; }
 `;
 
 export const getPrintLogoSrc = (profile) => {
@@ -1479,9 +1495,9 @@ export const buildStatusBar = (
   { showThanks = false } = {}
 ) => `
   <div class="barfoot">
-    ${showThanks ? '<span>Thank you for your business!</span><span>E. &amp; O.E.</span>' : ''}
-    <span>${escHtml(customText)}</span>
-    <span>${escHtml(pageText)}</span>
+    <span class="foot-side">${showThanks ? 'Thank you for your business! &nbsp;&nbsp; E. &amp; O.E.' : ''}</span>
+    <span class="foot-msg">${escHtml(customText)}</span>
+    <span class="foot-page">${escHtml(pageText)}</span>
   </div>`;
 
 /**
@@ -1705,8 +1721,9 @@ export const renderHtmlToPdf = async (html, {
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     }
 
-    // If large font still overflows designed pages, escalate density before capture.
-    if (!skipPrintPrefs && resolvedPrefs) {
+    // Quotation pages already flow onto extra sheets. Do not shrink the type to force fewer pages.
+    const isQuoteDoc = Boolean(idoc.querySelector('.quote-main-table, .terms-wrap'));
+    if (!skipPrintPrefs && resolvedPrefs && !isQuoteDoc) {
       const escalate = ['md', 'lg', 'xl'];
       let tierIdx = Math.max(0, escalate.indexOf(density));
       for (let step = 0; step < 3; step++) {
@@ -1794,11 +1811,13 @@ export const renderHtmlToPdf = async (html, {
       layoutFitFooterPages(idoc, singlePageHeight);
       layoutPackingListPages(idoc, singlePageHeight);
       layoutFillOtherPrintPages(idoc, singlePageHeight);
-      // Quotation page 1: re-fit after layout helpers so tables are never clipped.
-      const isQuotationPage = Boolean(target.querySelector?.('.quote-main-table'));
-      if (isQuotationPage && typeof prepareDoc === 'function') {
-        prepareDoc(idoc, { width, singlePageHeight, printPrefs: resolvedPrefs, density });
-      }
+      // Pages were already split in prepareDoc. Do not run it again here:
+      // a second pass removes continuation sheets while they are still queued for capture.
+      const isQuotationPage = Boolean(
+        target.classList?.contains('page2')
+        || target.classList?.contains('quot-continue')
+        || target.querySelector?.('.quote-main-table')
+      );
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const naturalH = Math.max(target.scrollHeight, target.offsetHeight || 0);
@@ -1806,13 +1825,19 @@ export const renderHtmlToPdf = async (html, {
       // Lock designed pages to A4 unless this sheet still overflows and splitting is allowed
       const lockThisPage = (fitPage || pageNodes.length > 0) && !(splitOverflowPages && overflows);
 
-      if (isQuotationPage) {
-        // prepareDoc already locked/scaled the sheet — keep that result for capture.
+      if (isQuotationPage && !overflows) {
         fitScale = 1;
         target.style.height = `${singlePageHeight}px`;
         target.style.minHeight = `${singlePageHeight}px`;
         target.style.maxHeight = `${singlePageHeight}px`;
         target.style.overflow = 'hidden';
+      } else if (isQuotationPage && overflows) {
+        fitScale = 1;
+        const pages = Math.max(2, Math.ceil(naturalH / singlePageHeight));
+        target.style.height = 'auto';
+        target.style.maxHeight = 'none';
+        target.style.minHeight = `${pages * singlePageHeight}px`;
+        target.style.overflow = 'visible';
       } else if (lockThisPage) {
         // Auto-fit any locked page that overflows (font/size changes included).
         fitScale = overflows
@@ -1848,7 +1873,7 @@ export const renderHtmlToPdf = async (html, {
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-      const captureH = (lockThisPage || isQuotationPage || (!overflows && pageNodes.length > 0))
+      const captureH = ((lockThisPage || isQuotationPage) && !overflows) || (!overflows && pageNodes.length > 0)
         ? singlePageHeight
         : Math.max(naturalH, target.scrollHeight, singlePageHeight);
 
@@ -1865,8 +1890,23 @@ export const renderHtmlToPdf = async (html, {
         scrollX: 0,
         scrollY: 0,
         logging: false,
-        onclone: (clonedDoc) => {
+        onclone: (clonedDoc, clonedElement) => {
           bakePrintSvgPaints(clonedDoc.body || clonedDoc.documentElement);
+          // Keep the following sheet off this capture so its header is not sliced onto this page.
+          clonedDoc.querySelectorAll('.pdf-page').forEach((el) => {
+            if (!clonedElement || el === clonedElement || clonedElement.contains(el)) return;
+            el.style.setProperty('display', 'none', 'important');
+          });
+          if (clonedDoc.body) clonedDoc.body.style.background = '#ffffff';
+          const pinQuoteFooter = (el) => {
+            el.style.setProperty('margin', '0', 'important');
+            el.style.setProperty('margin-top', 'auto', 'important');
+            el.style.setProperty('flex-shrink', '0', 'important');
+          };
+          clonedDoc.querySelectorAll('.quot-continue .barfoot, .page2 .barfoot').forEach(pinQuoteFooter);
+          if (clonedElement?.querySelector?.('.quote-main-table, .terms-wrap')) {
+            clonedElement.querySelectorAll('.barfoot').forEach(pinQuoteFooter);
+          }
           if (!lockThisPage && !isQuotationPage && !(pageNodes.length > 0 && !overflows)) return;
           const htmlEl = clonedDoc.documentElement;
           const bodyEl = clonedDoc.body;
@@ -1883,7 +1923,14 @@ export const renderHtmlToPdf = async (html, {
             bodyEl.style.overflow = 'hidden';
           }
           clonedDoc.querySelectorAll('.pdf-page, .print-host, .page').forEach((el) => {
-            const isQuote = Boolean(el.querySelector?.('.quote-main-table'));
+            const isQuote = Boolean(el.querySelector?.('.quote-main-table, .terms-wrap, .features, .page2-notes'));
+            if (isQuotationPage && overflows && clonedElement && (el === clonedElement || clonedElement.contains(el))) {
+              el.style.height = 'auto';
+              el.style.maxHeight = 'none';
+              el.style.minHeight = '0';
+              el.style.overflow = 'visible';
+              return;
+            }
             const existingTransform = el.style.transform;
             const existingZoom = el.style.zoom;
             el.style.width = (!isQuote && fitScale < 1) ? `${Math.round(width / fitScale)}px` : (el.style.width || `${width}px`);
@@ -2032,12 +2079,22 @@ export const renderHtmlToPdf = async (html, {
             el.style.flexShrink = '0';
           });
           clonedDoc.querySelectorAll('.barfoot').forEach((el) => {
-            el.style.display = 'flex';
+            el.style.display = 'grid';
+            el.style.gridTemplateColumns = '1fr auto 1fr';
             el.style.alignItems = 'center';
+            el.style.columnGap = '12px';
             el.style.lineHeight = '1.35';
             el.style.minHeight = '32px';
             el.style.paddingTop = el.style.paddingTop || '8px';
             el.style.paddingBottom = '10px';
+            el.querySelectorAll('.foot-msg').forEach((msg) => {
+              msg.style.textAlign = 'center';
+              msg.style.justifySelf = 'center';
+            });
+            el.querySelectorAll('.foot-page').forEach((pageNo) => {
+              pageNo.style.justifySelf = 'end';
+              pageNo.style.textAlign = 'right';
+            });
           });
           layoutFitFooterPages(clonedDoc, singlePageHeight);
           layoutPackingListPages(clonedDoc, singlePageHeight);

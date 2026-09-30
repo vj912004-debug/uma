@@ -5,7 +5,8 @@ import {
   splitPartyAddressLines,
   formatPdfDateDmy,
   buildTiChargeAmounts,
-  getSplitGstRates
+  getSplitGstRates,
+  formatGstPercent
 } from './taxInvoiceLayout';
 import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPrintTermsHtml, DEFAULT_PO_TERMS, DEFAULT_INVOICE_DECLARATION, buildBankDetailsBox, buildStatusBar, PRINT_FOOTER_MESSAGES, PRINT_ICON_DOC, PRINT_ICON_CAL } from './printTheme';
 
@@ -72,17 +73,17 @@ export const buildPurchaseOrderHtml = (raw, profileInput) => {
         <td class="center">${fmtQty(qty)}</td>
         <td class="num">${rateEntered ? escHtml(parseFloat(rate).toFixed(2)) : ''}</td>
         <td class="num">${money(amt)}</td>
-        <td class="num">${blankNums ? '' : (sgstPercent || '')}</td>
+        <td class="num">${blankNums ? '' : formatGstPercent(sgstPercent)}</td>
         <td class="num">${money(sgstAmt)}</td>
-        <td class="num">${blankNums ? '' : (cgstPercent || '')}</td>
+        <td class="num">${blankNums ? '' : formatGstPercent(cgstPercent)}</td>
         <td class="num">${money(cgstAmt)}</td>
-        <td class="num">${blankNums ? '' : (igstPercent || '')}</td>
+        <td class="num">${blankNums ? '' : formatGstPercent(igstPercent)}</td>
         <td class="num">${money(igstAmt)}</td>
         <td class="num">${money(rowTotal)}</td>
       </tr>`);
   };
 
-  const { taxRate, sgst: sgstRate, cgst: cgstRate, igst: igstRate } = getSplitGstRates(data);
+  const { sgst: sgstRate, cgst: cgstRate, igst: igstRate } = getSplitGstRates(data);
 
   if (data.productName) {
     const qty = parseFloat(data.qty) || 0;
@@ -423,10 +424,12 @@ export const buildPurchaseOrderHtml = (raw, profileInput) => {
     margin:0 0 2px;
   }
   .party-body .addr{
-    margin:0;
-    line-height:1.4;
+    margin:0 0 3px;
+    line-height:1.45;
     white-space:normal;
+    text-align:left;
   }
+  .party-body .addr:last-child{margin-bottom:0;}
   .party-foot{
     border-top:1px solid var(--lav-border);
     padding:8px 12px;
@@ -585,15 +588,19 @@ export const buildPurchaseOrderHtml = (raw, profileInput) => {
     color:#fff;
     margin:8px -10px 0 -10px;
     padding:8px 14px 10px;
-    display:flex;
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
     align-items:center;
-    justify-content:space-between;
+    column-gap:12px;
     font-size:12px;
     line-height:1.35;
     min-height:32px;
     overflow:visible;
     flex-shrink:0;
   }
+  .barfoot .foot-msg{text-align:center;justify-self:center;}
+  .barfoot .foot-page{justify-self:end;text-align:right;white-space:nowrap;}
+  .barfoot .foot-side{justify-self:start;text-align:left;}
 
   @media print{
     body{background:#fff;}
@@ -736,9 +743,9 @@ export const buildPurchaseOrderHtml = (raw, profileInput) => {
     <div class="totals">
       <div class="totals-body">
         <div class="trow"><span class="tlabel">Total Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>
-        <div class="trow"><span class="tlabel">CGST @ ${cgstRate}%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
-        <div class="trow"><span class="tlabel">SGST @ ${sgstRate}%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
-        <div class="trow"><span class="tlabel">IGST @ ${igstRate || taxRate}%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
+        <div class="trow"><span class="tlabel">CGST @ ${formatGstPercent(cgstRate)}%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
+        <div class="trow"><span class="tlabel">SGST @ ${formatGstPercent(sgstRate)}%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
+        <div class="trow"><span class="tlabel">IGST @ ${formatGstPercent(igstRate)}%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
         <div class="trow rule"><span class="tlabel">Total Tax Amount</span><span class="tval">&#8377; ${fmtMoney(totalCgst + totalSgst + totalIgst)}</span></div>
         <div class="trow"><span class="tlabel">Round Off</span><span class="tval">&#8377; ${fmtMoney(roundOff)}</span></div>
       </div>

@@ -125,32 +125,103 @@ const catalogRowForPrint = (item, data) => {
 const firstProductName = (data) =>
   String(data?.productName || '').split(',')[0].trim();
 
+const rateNumber = (value) => {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const firstPositiveRate = (...values) => {
+  for (const value of values) {
+    if (rateNumber(value) > 0) return rateNumber(value);
+  }
+  return 0;
+};
+
 /** Merge product snapshot + top-level quote so print sees the ticked charges. */
 export const enrichQuotationForPrint = (data = {}) => {
   const productName = firstProductName(data);
   const saved = (productName && data.productSettings?.[productName]) || {};
-  const charges = { ...(saved.charges || {}), ...(data.charges || {}) };
-  const rates = { ...(saved.rates || {}), ...(data.rates || {}) };
-  const chargeNotes = { ...(saved.chargeNotes || {}), ...(data.chargeNotes || {}) };
-  const chargeSection = { ...(saved.chargeSection || {}), ...(data.chargeSection || {}) };
-  const rateUnits = mergeRateUnits({ ...(saved.rateUnits || {}), ...(data.rateUnits || {}) });
-  const mainCharges = (data.mainCharges && data.mainCharges.length)
+  const savedCharges = saved.charges || {};
+  const charges = { ...(data.charges || {}) };
+  Object.entries(savedCharges).forEach(([key, on]) => {
+    if (on) charges[key] = true;
+  });
+
+  const rates = { ...(saved.rates || {}) };
+  Object.entries(data.rates || {}).forEach(([key, value]) => {
+    if (rateNumber(value) > 0 || rates[key] == null) rates[key] = value;
+  });
+
+  let mainCharges = (data.mainCharges && data.mainCharges.length)
     ? data.mainCharges
     : (saved.mainCharges || []);
-  const optionalCharges = (data.optionalCharges && data.optionalCharges.length)
+  let optionalCharges = (data.optionalCharges && data.optionalCharges.length)
     ? data.optionalCharges
     : (saved.optionalCharges || []);
+
+  const header = data.defaultRates || {};
+  const lines = (Array.isArray(data.quoteLines) ? data.quoteLines : [])
+    .filter((line) => String(line?.name || '').trim());
+  const companyQuote = Boolean(data.companyQuoteMode) || lines.length > 0;
+
+  if (companyQuote) {
+    const cleaning = firstPositiveRate(header.cleaning, header.minimum, rates.cleaning);
+    const sieving = firstPositiveRate(header.sieving, rates.sieving);
+    const filterBag = firstPositiveRate(header.filterBag, rates.filterBag);
+    const headerProcessing = firstPositiveRate(header.processing, rates.processing);
+    rates.cleaning = cleaning || rates.cleaning || 0;
+    rates.sieving = sieving || rates.sieving || 0;
+    rates.filterBag = filterBag || rates.filterBag || 0;
+    rates.processing = firstPositiveRate(lines[0]?.rates?.processing, headerProcessing, rates.processing);
+    charges.cleaning = true;
+    charges.sieving = true;
+    charges.filterBag = true;
+    charges.processing = lines.length <= 1;
+
+    const rateUnits = mergeRateUnits({ ...(saved.rateUnits || {}), ...(data.rateUnits || {}) });
+    const productRows = lines.slice(lines.length > 1 ? 0 : 1).map((line) => {
+      const amount = firstPositiveRate(line?.rates?.processing, headerProcessing);
+      const printed = formatQuotedRate(amount, rateUnits.processing ?? defaultRateUnit('processing'));
+      const name = String(line?.name || '').trim();
+      return {
+        description: name ? `Processing Charges — ${name} (998842)` : 'Processing Charges (998842)',
+        psdRequirement: line?.psdReq || line?.psdRequirement || '',
+        rate: printed,
+        dryRate: printed,
+        sourceKey: ''
+      };
+    });
+    if (productRows.length) {
+      const kept = (mainCharges || []).filter((row) => row?.sourceKey !== 'processing' && !/^processing charges/i.test(String(row?.description || '')));
+      mainCharges = [...productRows, ...kept];
+    }
+    const other = firstPositiveRate(header.other);
+    if (other > 0) {
+      const printed = formatQuotedRate(other, '');
+      const hasOther = (optionalCharges || []).some((row) => /other charges/i.test(String(row?.description || '')));
+      if (!hasOther) {
+        optionalCharges = [...(optionalCharges || []), {
+          description: 'Other Charges',
+          rate: printed,
+          dryRate: printed,
+          sourceKey: ''
+        }];
+      }
+    }
+  }
+
+  const psdFromLine = lines[0]?.psdReq || lines[0]?.psdRequirement || '';
   return {
     ...data,
     charges,
     rates,
-    chargeNotes,
-    chargeSection,
-    rateUnits,
+    chargeNotes: { ...(saved.chargeNotes || {}), ...(data.chargeNotes || {}) },
+    chargeSection: { ...(saved.chargeSection || {}), ...(data.chargeSection || {}) },
+    rateUnits: mergeRateUnits({ ...(saved.rateUnits || {}), ...(data.rateUnits || {}) }),
     mainCharges,
     optionalCharges,
     qty: data.qty ?? saved.qty,
-    psdRequirement: data.psdRequirement || saved.psdRequirement || ''
+    psdRequirement: psdFromLine || data.psdRequirement || saved.psdRequirement || ''
   };
 };
 
@@ -200,7 +271,7 @@ export const buildQuotationHtml = (data, profileInput) => {
             </tr>`;
           })
           .join('')
-      : `<tr><td colspan="4" style="text-align:center;color:var(--muted)">No charges selected</td></tr>`;
+      : `<tr><td class="empty-offer" colspan="4">No&nbsp;charges&nbsp;selected</td></tr>`;
 
   const optionalRows =
     optionalCharges.length > 0
@@ -468,6 +539,16 @@ export const buildQuotationHtml = (data, profileInput) => {
     font-size:9.5px;font-weight:400;letter-spacing:normal;word-spacing:normal;
   }
   table.dt th:first-child, table.dt td:first-child{width:42px;}
+  table.dt td.empty-offer{
+    width:auto!important;
+    max-width:none!important;
+    white-space:normal!important;
+    word-spacing:0.2em!important;
+    letter-spacing:0.01em!important;
+    text-align:center;
+    color:var(--muted);
+    padding:8px 12px;
+  }
   /* HSN/SAC codes: same face as cell; stop digit+) collision in PDF capture */
   table.dt .hsn-code{
     font-family:inherit!important;
@@ -622,6 +703,39 @@ export const buildQuotationHtml = (data, profileInput) => {
     min-height:0;
     max-height:38%;
   }
+  .terms-wrap{
+    margin-top:8px;
+    flex:0 0 auto;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+  }
+  .terms-banner{
+    background:var(--purple);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:6px 10px;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.3px;
+    border-radius:6px 6px 0 0;
+  }
+  .terms-banner svg{width:14px;height:14px;fill:#fff;flex-shrink:0;}
+  .body-pad .terms-grid{
+    flex:0 0 auto;
+    max-height:none;
+    margin-top:0;
+    grid-auto-rows:auto;
+  }
+  .body-pad .term{height:auto;}
+  .page2 .features{
+    flex:0 0 auto;
+    margin:0 0 8px 0;
+    grid-template-rows:auto auto;
+  }
+  .page2 .feat{height:auto;min-height:78px;}
   .term{
     border:1px solid #e6e6e6;
     border-top:3px solid var(--purple);
@@ -742,7 +856,7 @@ export const buildQuotationHtml = (data, profileInput) => {
   .bottom-banner > span{min-width:0;}
   .barfoot{
     background:var(--purple);color:#fff;display:flex;align-items:center;justify-content:space-between;
-    padding:7px 14px;font-size:10.5px;width:100%;box-sizing:border-box;flex-shrink:0;margin-top:0;gap:8px;
+    padding:7px 14px;font-size:10.5px;width:100%;box-sizing:border-box;flex-shrink:0;margin-top:auto;gap:8px;
   }
   .barfoot span{min-width:0;}
 
@@ -848,31 +962,52 @@ export const buildQuotationHtml = (data, profileInput) => {
       </div>` : ''}
     </div>
 
-    <!-- FEATURES -->
-    <div class="features">
-      <div class="feat">
-        <div class="circ" style="background:#eee6f7;"><svg viewBox="0 0 24 24" fill="#5a2d81"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm-1 13l5.5-5.5-1.4-1.4L11 12.2 8.9 10 7.5 11.5 11 15z"/></svg></div>
-        <p>cGMP COMPLIANT FACILITY</p>
-      </div>
-      <div class="feat">
-        <div class="circ" style="background:#e2eefb;"><svg viewBox="0 0 24 24" fill="#2f6fbf"><path d="M19.4 13a7.6 7.6 0 000-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 00-1.7-1L14.9 3H9.1l-.4 2.4a7.4 7.4 0 00-1.7 1l-2.4-1-2 3.4L4.6 11a7.6 7.6 0 000 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.8 1.7 1l.4 2.4h5.8l.4-2.4c.6-.2 1.2-.6 1.7-1l2.4 1 2-3.4-2-1.6zM12 15.5A3.5 3.5 0 1112 8.5a3.5 3.5 0 010 7z"/></svg></div>
-        <p>CONTRACT MICRONIZATION EXPERTS</p>
-      </div>
-      <div class="feat">
-        <div class="circ" style="background:#e3f4e5;"><svg viewBox="0 0 24 24" fill="#2e8b3d"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 17a7 7 0 110-14 7 7 0 010 14zm0-11a4 4 0 100 8 4 4 0 000-8zm0 6a2 2 0 110-4 2 2 0 010 4z"/></svg></div>
-        <p>PARTICLE SIZE ANALYSIS &amp; DEVELOPMENT</p>
-      </div>
-      <div class="feat">
-        <div class="circ" style="background:#fdeadb;"><svg viewBox="0 0 24 24" fill="#f5811f"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8zM12 5.2L18 8l-6 3.3L6 8l6-2.8zM5 9.7l6 3.3v6.5l-6-3.3V9.7zm8 9.8v-6.5l6-3.3v6.5l-6 3.3z"/></svg></div>
-        <p>CLEAN ROOM PROCESSING AREA</p>
-      </div>
-      <div class="feat">
-        <div class="circ" style="background:#fbe3e6;"><svg viewBox="0 0 24 24" fill="#d94459"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 10.5V6h-2v7l5.2 3.1 1-1.6L13 12.5z"/></svg></div>
-        <p>ON TIME DELIVERY</p>
-      </div>
-      <div class="feat">
-        <div class="circ" style="background:#dfeaf5;"><svg viewBox="0 0 24 24" fill="#4a6fa5"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zm-7 8a7 7 0 0114 0H5zm14.5-9.5a3.5 3.5 0 10-3.4-4.3c.6.5 1 1.2 1.3 1.9a5 5 0 012.1 2.4zM19 13.3c1.8.7 3 2 3 3.7v1h-3.1a8.9 8.9 0 00-1-3.6c.4-.4.8-.7 1.1-1.1z"/></svg></div>
-        <p>DEDICATED TECHNICAL SUPPORT</p>
+    <!-- TERMS (kept on page 1) -->
+    <div class="terms-wrap">
+      <div class="terms-banner"><svg viewBox="0 0 24 24" fill="#ffffff"><path d="M4 4h16v16H4zM6 8h12M6 12h12M6 16h8"/></svg>TERMS &amp; CONDITIONS</div>
+      <div class="terms-grid">
+        <div class="term">
+          <div class="term-head">
+            <svg class="ticon" viewBox="0 0 24 24" fill="#5a2d81"><path d="M6 2h9l5 5v15H6zm8 1.5V8h4.5z"/></svg>
+            <h4>TAXES</h4>
+          </div>
+          <p>GST will be charged extra as applicable.</p>
+        </div>
+        <div class="term">
+          <div class="term-head">
+            <svg class="ticon" viewBox="0 0 24 24" fill="#2f9e8f"><path d="M17 4L4 17l1.4 1.4L18.4 5.4zM6.5 4a2.5 2.5 0 100 5 2.5 2.5 0 000-5zm11 10a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"/></svg>
+            <h4>PROCESS LOSS</h4>
+          </div>
+          <p>Loss occurs during processing is on your account.</p>
+        </div>
+        <div class="term">
+          <div class="term-head">
+            <svg class="ticon" viewBox="0 0 24 24" fill="#2e8b3d"><path d="M12 4V1L8 5l4 4V6a6 6 0 11-6 6H4a8 8 0 108-8z"/></svg>
+            <h4>BATCH / CHANGE OVER</h4>
+          </div>
+          <p>If same material is required to be micronized in separate batch<span class="sym">(es)</span> or different PSD specification, Change Over Charge <span class="sym">@ ₹&nbsp;500/-</span> per batch or per specification will be applicable.</p>
+        </div>
+        <div class="term">
+          <div class="term-head">
+            <svg class="ticon" viewBox="0 0 24 24" fill="#f5811f"><path d="M3 6h11v8H3zM14 9h4l3 3v2h-7zM6.5 19a2 2 0 100-4 2 2 0 000 4zm12 0a2 2 0 100-4 2 2 0 000 4z"/></svg>
+            <h4>OTHER CHARGES</h4>
+          </div>
+          <p>This is only processing charges. All other charges like Transportation, Insurance, Repacking material charges will be extra.</p>
+        </div>
+        <div class="term">
+          <div class="term-head">
+            <svg class="ticon" viewBox="0 0 24 24" fill="#2f9e8f"><path d="M2 5h20v14H2zm0 4h20v2H2zm3 5h6v2H5z"/></svg>
+            <h4>PAYMENT TERMS</h4>
+          </div>
+          <p>100% Advance against Performa Invoice.</p>
+        </div>
+        <div class="term">
+          <div class="term-head">
+            <svg class="ticon" viewBox="0 0 24 24" fill="#2f9e8f"><path d="M7 2v2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2h-2V2h-2v2H9V2zm-2 8h14v9H5z"/></svg>
+            <h4>VALIDITY</h4>
+          </div>
+          <p>This quotation is valid up to ${validityDate}.</p>
+        </div>
       </div>
     </div>
 
@@ -883,51 +1018,31 @@ export const buildQuotationHtml = (data, profileInput) => {
 
 <!-- ============================================================ PAGE 2 ============================================================ -->
 <div class="sheet pdf-page page2">
-  <div class="page2-header"><svg viewBox="0 0 24 24" fill="#ffffff"><path d="M4 4h16v16H4zM6 8h12M6 12h12M6 16h8"/></svg>TERMS &amp; CONDITIONS</div>
-
   <div class="page2-body">
-  <div class="terms-grid">
-    <div class="term">
-      <div class="term-head">
-        <svg class="ticon" viewBox="0 0 24 24" fill="#5a2d81"><path d="M6 2h9l5 5v15H6zm8 1.5V8h4.5z"/></svg>
-        <h4>TAXES</h4>
-      </div>
-      <p>GST will be charged extra as applicable.</p>
+  <div class="features">
+    <div class="feat">
+      <div class="circ" style="background:#eee6f7;"><svg viewBox="0 0 24 24" fill="#5a2d81"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm-1 13l5.5-5.5-1.4-1.4L11 12.2 8.9 10 7.5 11.5 11 15z"/></svg></div>
+      <p>cGMP COMPLIANT FACILITY</p>
     </div>
-    <div class="term">
-      <div class="term-head">
-        <svg class="ticon" viewBox="0 0 24 24" fill="#2f9e8f"><path d="M17 4L4 17l1.4 1.4L18.4 5.4zM6.5 4a2.5 2.5 0 100 5 2.5 2.5 0 000-5zm11 10a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"/></svg>
-        <h4>PROCESS LOSS</h4>
-      </div>
-      <p>Loss occurs during processing is on your account.</p>
+    <div class="feat">
+      <div class="circ" style="background:#e2eefb;"><svg viewBox="0 0 24 24" fill="#2f6fbf"><path d="M19.4 13a7.6 7.6 0 000-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 00-1.7-1L14.9 3H9.1l-.4 2.4a7.4 7.4 0 00-1.7 1l-2.4-1-2 3.4L4.6 11a7.6 7.6 0 000 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.8 1.7 1l.4 2.4h5.8l.4-2.4c.6-.2 1.2-.6 1.7-1l2.4 1 2-3.4-2-1.6zM12 15.5A3.5 3.5 0 1112 8.5a3.5 3.5 0 010 7z"/></svg></div>
+      <p>CONTRACT MICRONIZATION EXPERTS</p>
     </div>
-    <div class="term">
-      <div class="term-head">
-        <svg class="ticon" viewBox="0 0 24 24" fill="#2e8b3d"><path d="M12 4V1L8 5l4 4V6a6 6 0 11-6 6H4a8 8 0 108-8z"/></svg>
-        <h4>BATCH / CHANGE OVER</h4>
-      </div>
-      <p>If same material is required to be micronized in separate batch<span class="sym">(es)</span> or different PSD specification, Change Over Charge <span class="sym">@ ₹&nbsp;500/-</span> per batch or per specification will be applicable.</p>
+    <div class="feat">
+      <div class="circ" style="background:#e3f4e5;"><svg viewBox="0 0 24 24" fill="#2e8b3d"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 17a7 7 0 110-14 7 7 0 010 14zm0-11a4 4 0 100 8 4 4 0 000-8zm0 6a2 2 0 110-4 2 2 0 010 4z"/></svg></div>
+      <p>PARTICLE SIZE ANALYSIS &amp; DEVELOPMENT</p>
     </div>
-    <div class="term">
-      <div class="term-head">
-        <svg class="ticon" viewBox="0 0 24 24" fill="#f5811f"><path d="M3 6h11v8H3zM14 9h4l3 3v2h-7zM6.5 19a2 2 0 100-4 2 2 0 000 4zm12 0a2 2 0 100-4 2 2 0 000 4z"/></svg>
-        <h4>OTHER CHARGES</h4>
-      </div>
-      <p>This is only processing charges. All other charges like Transportation, Insurance, Repacking material charges will be extra.</p>
+    <div class="feat">
+      <div class="circ" style="background:#fdeadb;"><svg viewBox="0 0 24 24" fill="#f5811f"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8zM12 5.2L18 8l-6 3.3L6 8l6-2.8zM5 9.7l6 3.3v6.5l-6-3.3V9.7zm8 9.8v-6.5l6-3.3v6.5l-6 3.3z"/></svg></div>
+      <p>CLEAN ROOM PROCESSING AREA</p>
     </div>
-    <div class="term">
-      <div class="term-head">
-        <svg class="ticon" viewBox="0 0 24 24" fill="#2f9e8f"><path d="M2 5h20v14H2zm0 4h20v2H2zm3 5h6v2H5z"/></svg>
-        <h4>PAYMENT TERMS</h4>
-      </div>
-      <p>100% Advance against Performa Invoice.</p>
+    <div class="feat">
+      <div class="circ" style="background:#fbe3e6;"><svg viewBox="0 0 24 24" fill="#d94459"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 10.5V6h-2v7l5.2 3.1 1-1.6L13 12.5z"/></svg></div>
+      <p>ON TIME DELIVERY</p>
     </div>
-    <div class="term">
-      <div class="term-head">
-        <svg class="ticon" viewBox="0 0 24 24" fill="#2f9e8f"><path d="M7 2v2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2h-2V2h-2v2H9V2zm-2 8h14v9H5z"/></svg>
-        <h4>VALIDITY</h4>
-      </div>
-      <p>This quotation is valid up to ${validityDate}.</p>
+    <div class="feat">
+      <div class="circ" style="background:#dfeaf5;"><svg viewBox="0 0 24 24" fill="#4a6fa5"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zm-7 8a7 7 0 0114 0H5zm14.5-9.5a3.5 3.5 0 10-3.4-4.3c.6.5 1 1.2 1.3 1.9a5 5 0 012.1 2.4zM19 13.3c1.8.7 3 2 3 3.7v1h-3.1a8.9 8.9 0 00-1-3.6c.4-.4.8-.7 1.1-1.1z"/></svg></div>
+      <p>DEDICATED TECHNICAL SUPPORT</p>
     </div>
   </div>
 
@@ -990,16 +1105,236 @@ export const buildQuotationHtml = (data, profileInput) => {
 </html>`;
 };
 
+const quotePageHeight = (page) => {
+  page.style.height = 'auto';
+  page.style.maxHeight = 'none';
+  page.style.minHeight = '0';
+  page.style.overflow = 'visible';
+  page.style.transform = 'none';
+  page.style.zoom = '1';
+  void page.offsetHeight;
+  return Math.max(page.scrollHeight, page.offsetHeight || 0);
+};
+
+const lockQuotePage = (page, singlePageHeight) => {
+  page.style.width = '';
+  page.style.transform = 'none';
+  page.style.zoom = '1';
+  page.style.display = 'flex';
+  page.style.flexDirection = 'column';
+  page.style.height = `${singlePageHeight}px`;
+  page.style.minHeight = `${singlePageHeight}px`;
+  page.style.maxHeight = `${singlePageHeight}px`;
+  page.style.overflow = 'hidden';
+  const body = page.querySelector('.body-pad, .page2-body');
+  if (body) {
+    body.style.setProperty('flex', '1 1 auto', 'important');
+    body.style.setProperty('min-height', '0', 'important');
+  }
+  page.querySelectorAll('.barfoot').forEach((el) => {
+    el.style.setProperty('margin', '0', 'important');
+    el.style.setProperty('margin-top', 'auto', 'important');
+    el.style.setProperty('flex-shrink', '0', 'important');
+  });
+};
+
+const renumberQuotePages = (doc) => {
+  const pages = [...doc.querySelectorAll('.sheet.pdf-page')];
+  const total = pages.length || 1;
+  pages.forEach((page, index) => {
+    const span = [...page.querySelectorAll('.barfoot span')]
+      .find((el) => /page\s+\d+\s+of\s+\d+/i.test(el.textContent || ''));
+    if (span) span.textContent = `Page ${index + 1} of ${total}`;
+  });
+};
+
+const quoteTableKey = (block) => {
+  const table = block?.querySelector?.('table');
+  if (!table) return '';
+  if (table.classList.contains('quote-main-table')) return 'main';
+  if (table.classList.contains('quote-optional-table')) return 'optional';
+  return table.className || 'table';
+};
+
+const continuationAfter = (doc, page) => {
+  const next = page.nextElementSibling;
+  if (next?.classList.contains('quot-continue')) return next;
+  const fresh = doc.createElement('div');
+  fresh.className = 'sheet pdf-page quot-continue';
+  const proto = doc.querySelector('.sheet.pdf-page') || page;
+  const header = proto.querySelector('.header');
+  const contact = proto.querySelector('.contact-bar');
+  if (header) fresh.appendChild(header.cloneNode(true));
+  if (contact) fresh.appendChild(contact.cloneNode(true));
+  const body = doc.createElement('div');
+  body.className = 'body-pad';
+  fresh.appendChild(body);
+  const foot = proto.querySelector('.barfoot');
+  if (foot) fresh.appendChild(foot.cloneNode(true));
+  if (page.parentNode) page.parentNode.insertBefore(fresh, page.nextSibling);
+  return fresh;
+};
+
+const quoteBody = (page) => page?.querySelector?.('.body-pad, .page2-body');
+
+const meaningfulChildren = (el) => [...(el?.children || [])].filter((child) => {
+  if (child.classList?.contains('page2-spacer')) return false;
+  return true;
+});
+
+const placeAtStart = (parent, node) => {
+  parent.insertBefore(node, parent.firstChild);
+};
+
+const slotOnNext = (doc, page, node) => {
+  const next = continuationAfter(doc, page);
+  const dest = next.querySelector('.body-pad');
+  if (node.classList?.contains('term')) {
+    let grid = dest.querySelector(':scope > .terms-wrap .terms-grid, :scope > .terms-grid');
+    if (!grid) {
+      const wrap = doc.createElement('div');
+      wrap.className = 'terms-wrap';
+      const banner = page.querySelector('.terms-banner');
+      if (banner) wrap.appendChild(banner.cloneNode(true));
+      grid = doc.createElement('div');
+      grid.className = 'terms-grid';
+      wrap.appendChild(grid);
+      placeAtStart(dest, wrap);
+    }
+    placeAtStart(grid, node);
+    return;
+  }
+  if (node.classList?.contains('feat')) {
+    let grid = dest.querySelector(':scope > .features');
+    if (!grid) {
+      grid = doc.createElement('div');
+      grid.className = 'features';
+      placeAtStart(dest, grid);
+    }
+    placeAtStart(grid, node);
+    return;
+  }
+  if (node.tagName === 'LI') {
+    let list = dest.querySelector(':scope > .page2-notes ul, :scope > ul');
+    if (!list) {
+      const box = doc.createElement('div');
+      box.className = 'page2-notes';
+      list = doc.createElement('ul');
+      box.appendChild(list);
+      placeAtStart(dest, box);
+    }
+    placeAtStart(list, node);
+    return;
+  }
+  if (node.matches?.('tbody tr, tr')) {
+    return;
+  }
+  placeAtStart(dest, node);
+};
+
+const moveLastTableRow = (doc, page, tables) => {
+  const blocks = [...tables.children];
+  const last = blocks[blocks.length - 1];
+  if (!last) return false;
+  const rows = [...last.querySelectorAll('tbody tr')];
+  if (!rows.length) return false;
+  const body = quoteBody(page);
+  const other = meaningfulChildren(body).some((el) => el !== tables);
+  if (rows.length === 1 && blocks.length === 1 && !other) return false;
+  const next = continuationAfter(doc, page);
+  const tbody = destTableBlock(doc, next, last).querySelector('tbody');
+  if (!tbody) return false;
+  placeAtStart(tbody, rows[rows.length - 1]);
+  if (!last.querySelector('tbody tr')) last.remove();
+  if (!tables.children.length) tables.remove();
+  return true;
+};
+
+/** Move the bottom-most piece that does not fit onto the following page. */
+const shiftQuoteOverflow = (doc, page) => {
+  const body = quoteBody(page);
+  if (!body) return false;
+
+  const shiftFrom = (container) => {
+    const kids = meaningfulChildren(container);
+    if (!kids.length) return false;
+    const tail = kids[kids.length - 1];
+
+    if (tail.classList?.contains('tables')) {
+      if (moveLastTableRow(doc, page, tail)) return true;
+      if (kids.length > 1) {
+        slotOnNext(doc, page, tail);
+        return true;
+      }
+      return false;
+    }
+
+    if (kids.length > 1) {
+      slotOnNext(doc, page, tail);
+      return true;
+    }
+
+    if (tail.classList?.contains('terms-wrap') || tail.classList?.contains('terms-grid')) {
+      const grid = tail.querySelector?.('.terms-grid') || tail;
+      const cards = meaningfulChildren(grid);
+      if (cards.length > 1) {
+        slotOnNext(doc, page, cards[cards.length - 1]);
+        return true;
+      }
+    }
+    if (tail.classList?.contains('features')) {
+      const cards = meaningfulChildren(tail);
+      if (cards.length > 1) {
+        slotOnNext(doc, page, cards[cards.length - 1]);
+        return true;
+      }
+    }
+    if (tail.classList?.contains('page2-lower') || tail.classList?.contains('bottom-grid') || tail.classList?.contains('page2-notes')) {
+      return shiftFrom(tail);
+    }
+    const list = tail.querySelector?.('ul');
+    if (list && list.children.length > 1 && (tail.classList?.contains('fr-note') || tail.classList?.contains('page2-notes') || tail.closest?.('.page2-notes'))) {
+      slotOnNext(doc, page, list.lastElementChild);
+      return true;
+    }
+    return false;
+  };
+
+  return shiftFrom(body);
+};
+
+const spillQuoteUntilFit = (doc, singlePageHeight) => {
+  let guard = 0;
+  let page = doc.querySelector('.sheet.pdf-page');
+  while (page && guard < 400) {
+    guard += 1;
+    const height = quotePageHeight(page);
+    if (height <= singlePageHeight + 4) {
+      page = page.nextElementSibling;
+      continue;
+    }
+    const before = height;
+    const moved = shiftQuoteOverflow(doc, page);
+    const after = quotePageHeight(page);
+    if (!moved || after >= before - 1) {
+      page = page.nextElementSibling;
+    }
+  }
+  doc.querySelectorAll('.quot-continue').forEach((extra) => {
+    const body = extra.querySelector('.body-pad');
+    if (!body || !String(body.textContent || '').trim()) extra.remove();
+  });
+};
+
 /**
- * Fit quotation page 1 onto one A4 sheet without clipping charge rows.
- * Tables always win: hide/compact chrome first, then optionally restore features
- * only when leftover space is enough. Never let feature flex steal table height.
+ * Flow quotation content onto as many A4 pages as it needs.
+ * Rows, terms, notes, and feature cards move to the next page instead of being clipped.
  */
-export const fitQuotationToTwoPages = (doc, { singlePageHeight = 1123, density = 'base' } = {}) => {
+export const fitQuotationToTwoPages = (doc, { singlePageHeight = 1123 } = {}) => {
   if (!doc) return;
 
   doc.querySelectorAll('.quot-continue').forEach((el) => el.remove());
-  doc.querySelectorAll('.sheet.pdf-page:not(.page2) tr.filler-row').forEach((tr) => tr.remove());
+  doc.querySelectorAll('.sheet.pdf-page tr.filler-row').forEach((tr) => tr.remove());
 
   doc.querySelectorAll('table.dt').forEach((table) => {
     const headerRow = table.querySelector('thead tr');
@@ -1017,9 +1352,7 @@ export const fitQuotationToTwoPages = (doc, { singlePageHeight = 1123, density =
     });
   });
 
-  const pages = [...doc.querySelectorAll('.sheet.pdf-page')];
-  pages.forEach((page) => {
-    const isPage2 = page.classList.contains('page2');
+  doc.querySelectorAll('.sheet.pdf-page').forEach((page) => {
     page.style.zoom = '1';
     page.style.transform = 'none';
     page.style.width = '';
@@ -1030,149 +1363,56 @@ export const fitQuotationToTwoPages = (doc, { singlePageHeight = 1123, density =
       'quot-ultra',
       'quot-features-fill'
     );
-
-    if (isPage2) {
-      page.style.height = `${singlePageHeight}px`;
-      page.style.minHeight = `${singlePageHeight}px`;
-      page.style.maxHeight = `${singlePageHeight}px`;
-      page.style.overflow = 'hidden';
-      return;
-    }
-
-    const features = page.querySelector('.features');
-    const facImg = page.querySelector('.fac-img');
-    const tablesBox = page.querySelector('.tables');
-    const bodyPad = page.querySelector('.body-pad');
-
     page.style.height = 'auto';
     page.style.maxHeight = 'none';
     page.style.minHeight = '0';
     page.style.overflow = 'visible';
-    if (tablesBox) {
-      tablesBox.style.setProperty('flex', '0 0 auto', 'important');
-      tablesBox.style.setProperty('height', 'auto', 'important');
-      tablesBox.style.setProperty('max-height', 'none', 'important');
-      tablesBox.style.setProperty('overflow', 'visible', 'important');
+    const body = quoteBody(page);
+    if (body) {
+      body.style.setProperty('flex', '0 0 auto', 'important');
+      body.style.setProperty('height', 'auto', 'important');
+      body.style.setProperty('max-height', 'none', 'important');
+      body.style.setProperty('overflow', 'visible', 'important');
     }
-    page.querySelectorAll('.tables > div, table.dt').forEach((el) => {
+    page.querySelectorAll('.tables, .tables > div, table.dt, .terms-wrap, .features, .page2-lower').forEach((el) => {
       el.style.setProperty('flex', '0 0 auto', 'important');
       el.style.setProperty('height', 'auto', 'important');
       el.style.setProperty('max-height', 'none', 'important');
       el.style.setProperty('overflow', 'visible', 'important');
     });
-    if (features) {
-      features.style.display = '';
-      features.style.setProperty('flex', '0 0 auto', 'important');
-      features.style.setProperty('min-height', '0', 'important');
-    }
-    if (facImg) facImg.style.display = '';
-    if (bodyPad) {
-      bodyPad.style.setProperty('flex', '0 0 auto', 'important');
-      bodyPad.style.setProperty('overflow', 'visible', 'important');
-      bodyPad.style.setProperty('min-height', '0', 'important');
-    }
-
-    // Fit charge tables first — features stay hidden until we know there is room.
-    page.classList.add('quot-hide-features');
-    if (density === 'lg' || density === 'xl') page.classList.add('quot-compact');
-    if (density === 'xl') page.classList.add('quot-compact-more');
-    void page.offsetHeight;
-
-    const pageH = () => Math.max(page.scrollHeight, page.offsetHeight || 0);
-    const steps = [
-      () => page.classList.add('quot-compact'),
-      () => page.classList.add('quot-compact-more'),
-      () => { if (facImg) facImg.style.display = 'none'; },
-      () => page.classList.add('quot-ultra')
-    ];
-    for (let i = 0; i < steps.length && pageH() > singlePageHeight + 2; i += 1) {
-      steps[i]();
-      void page.offsetHeight;
-    }
-
-    // Restore feature cards and stretch them into leftover A4 space.
-    const coreH = pageH();
-    const leftover = singlePageHeight - coreH;
-    if (features && leftover >= 72) {
-      page.classList.remove('quot-hide-features');
-      page.classList.add('quot-features-fill');
-
-      page.style.height = `${singlePageHeight}px`;
-      page.style.minHeight = `${singlePageHeight}px`;
-      page.style.maxHeight = `${singlePageHeight}px`;
-      page.style.overflow = 'hidden';
-
-      if (bodyPad) {
-        bodyPad.style.setProperty('flex', '1 1 auto', 'important');
-        bodyPad.style.setProperty('min-height', '0', 'important');
-      }
-
-      // Measure how much of the page is used above the feature grid, then size cards to the rest.
-      features.style.setProperty('display', 'none', 'important');
-      void page.offsetHeight;
-      let usedAbove = 0;
-      const headerEl = page.querySelector('.header');
-      const contactEl = page.querySelector('.contact-bar');
-      if (headerEl) usedAbove += Math.ceil(headerEl.getBoundingClientRect().height);
-      if (contactEl) usedAbove += Math.ceil(contactEl.getBoundingClientRect().height);
-      if (bodyPad) {
-        const cs = getComputedStyle(bodyPad);
-        usedAbove += (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-        [...bodyPad.children].forEach((child) => {
-          if (child === features) return;
-          usedAbove += Math.ceil(child.getBoundingClientRect().height);
-          const m = getComputedStyle(child);
-          usedAbove += (parseFloat(m.marginTop) || 0) + (parseFloat(m.marginBottom) || 0);
-        });
-      }
-      const fillH = Math.max(72, Math.floor(singlePageHeight - usedAbove - 14));
-      features.style.setProperty('display', 'grid', 'important');
-      features.style.setProperty('flex', '1 1 auto', 'important');
-      features.style.setProperty('min-height', `${fillH}px`, 'important');
-      features.style.setProperty('height', `${fillH}px`, 'important');
-      features.style.setProperty('align-content', 'stretch', 'important');
-      features.style.setProperty('margin-top', '8px', 'important');
-      features.style.setProperty('margin-bottom', '2px', 'important');
-      features.style.setProperty('gap', '8px', 'important');
-      void page.offsetHeight;
-
-      // If showing features still overflows, drop them so charge tables stay complete.
-      if (pageH() > singlePageHeight + 4) {
-        page.classList.add('quot-hide-features');
-        page.classList.remove('quot-features-fill');
-        features.style.removeProperty('height');
-        features.style.removeProperty('min-height');
-        features.style.setProperty('flex', '0 0 auto', 'important');
-        if (bodyPad) bodyPad.style.setProperty('flex', '0 0 auto', 'important');
-        void page.offsetHeight;
-      }
-    } else {
-      page.style.height = `${singlePageHeight}px`;
-      page.style.minHeight = `${singlePageHeight}px`;
-      page.style.maxHeight = `${singlePageHeight}px`;
-      page.style.overflow = 'hidden';
-      void page.offsetHeight;
-    }
-
-    // Still overflowing: scale the sheet (transform is respected by html2canvas better than zoom).
-    const lockedH = pageH();
-    if (lockedH > singlePageHeight + 4) {
-      page.style.height = 'auto';
-      page.style.maxHeight = 'none';
-      page.style.minHeight = '0';
-      page.style.overflow = 'visible';
-      void page.offsetHeight;
-      const natural = pageH();
-      const scale = Math.max(0.72, Math.min(1, singlePageHeight / natural));
-      page.style.width = `${Math.round(794 / scale)}px`;
-      page.style.transform = `scale(${scale})`;
-      page.style.transformOrigin = 'top left';
-      page.style.height = `${singlePageHeight}px`;
-      page.style.minHeight = `${singlePageHeight}px`;
-      page.style.maxHeight = `${singlePageHeight}px`;
-      page.style.overflow = 'hidden';
-    }
   });
+
+  spillQuoteUntilFit(doc, singlePageHeight);
+
+  doc.querySelectorAll('.sheet.pdf-page').forEach((page) => {
+    const height = quotePageHeight(page);
+    if (height <= singlePageHeight + 8) lockQuotePage(page, singlePageHeight);
+  });
+
+  renumberQuotePages(doc);
+};
+
+const destTableBlock = (doc, nextPage, sourceBlock) => {
+  const body = nextPage.querySelector('.body-pad');
+  let tables = body.querySelector(':scope > .tables');
+  if (!tables) {
+    tables = doc.createElement('div');
+    tables.className = 'tables';
+    body.insertBefore(tables, body.firstChild);
+  }
+  const key = quoteTableKey(sourceBlock);
+  let block = [...tables.children].find((el) => quoteTableKey(el) === key);
+  if (!block) {
+    block = sourceBlock.cloneNode(true);
+    const tbody = block.querySelector('tbody');
+    if (tbody) tbody.replaceChildren();
+    const sourceOrder = [...(sourceBlock.parentElement?.children || [])].map(quoteTableKey);
+    const insertAt = sourceOrder.indexOf(key);
+    const before = [...tables.children].find((el) => sourceOrder.indexOf(quoteTableKey(el)) > insertAt);
+    if (before) tables.insertBefore(block, before);
+    else tables.appendChild(block);
+  }
+  return block;
 };
 
 export const renderQuotationPdf = async (data, { mode = 'save', printPrefs } = {}) => {
@@ -1188,6 +1428,6 @@ export const renderQuotationPdf = async (data, { mode = 'save', printPrefs } = {
     fitPage: true,
     printPrefs,
     prepareDoc: fitQuotationToTwoPages,
-    splitOverflowPages: false
+    splitOverflowPages: true
   });
 };

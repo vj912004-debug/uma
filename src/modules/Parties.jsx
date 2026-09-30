@@ -11,6 +11,51 @@ import ExportButton from '../components/ExportButton';
 const displayChargeRate = (v) => (v == null || v === '' || v === 0) ? '' : v;
 const parseChargeRateInput = (val) => (val === '' ? 0 : (parseFloat(val) || 0));
 
+const INDIAN_STATES = [
+  { code: '01', name: 'Jammu and Kashmir' },
+  { code: '02', name: 'Himachal Pradesh' },
+  { code: '03', name: 'Punjab' },
+  { code: '04', name: 'Chandigarh' },
+  { code: '05', name: 'Uttarakhand' },
+  { code: '06', name: 'Haryana' },
+  { code: '07', name: 'Delhi' },
+  { code: '08', name: 'Rajasthan' },
+  { code: '09', name: 'Uttar Pradesh' },
+  { code: '10', name: 'Bihar' },
+  { code: '11', name: 'Sikkim' },
+  { code: '12', name: 'Arunachal Pradesh' },
+  { code: '13', name: 'Nagaland' },
+  { code: '14', name: 'Manipur' },
+  { code: '15', name: 'Mizoram' },
+  { code: '16', name: 'Tripura' },
+  { code: '17', name: 'Meghalaya' },
+  { code: '18', name: 'Assam' },
+  { code: '19', name: 'West Bengal' },
+  { code: '20', name: 'Jharkhand' },
+  { code: '21', name: 'Odisha' },
+  { code: '22', name: 'Chhattisgarh' },
+  { code: '23', name: 'Madhya Pradesh' },
+  { code: '24', name: 'Gujarat' },
+  { code: '26', name: 'Dadra and Nagar Haveli and Daman and Diu' },
+  { code: '27', name: 'Maharashtra' },
+  { code: '29', name: 'Karnataka' },
+  { code: '30', name: 'Goa' },
+  { code: '31', name: 'Lakshadweep' },
+  { code: '32', name: 'Kerala' },
+  { code: '33', name: 'Tamil Nadu' },
+  { code: '34', name: 'Puducherry' },
+  { code: '35', name: 'Andaman and Nicobar Islands' },
+  { code: '36', name: 'Telangana' },
+  { code: '37', name: 'Andhra Pradesh' },
+  { code: '38', name: 'Ladakh' },
+  { code: '97', name: 'Other Territory' }
+];
+
+const stateCodeForName = (name) => {
+  const hit = INDIAN_STATES.find((s) => s.name.toLowerCase() === String(name || '').trim().toLowerCase());
+  return hit?.code || '';
+};
+
 const Parties = () => {
   const { data, updateData, updateItem, setData, incrementSerial } = useAppContext();
   const navigate = useNavigate();
@@ -27,6 +72,8 @@ const Parties = () => {
     gstinBill: '',
     shipAddress: '',
     gstinShip: '',
+    state: '',
+    stateCode: '',
     deliveryNote: '',
     phone1: '',
     phone2: '',
@@ -191,6 +238,8 @@ const Parties = () => {
       gstinBill: '',
       shipAddress: '',
       gstinShip: '',
+      state: '',
+      stateCode: '',
       deliveryNote: '',
       phone1: '',
       phone2: '',
@@ -225,6 +274,7 @@ const Parties = () => {
               name: p.name || '',
               type: p.type || '',
               gstin: [p.gstinBill, p.gstinShip].filter(Boolean).join(' / '),
+              state: p.state || '',
               products: (p.products || []).map((prod) => prod.productName || prod.name || '').filter(Boolean).join(', ')
             }))}
             columns={[
@@ -232,6 +282,7 @@ const Parties = () => {
               { label: 'Party Name', key: 'name' },
               { label: 'Type', key: 'type' },
               { label: 'GSTIN (Bill / Ship)', key: 'gstin' },
+              { label: 'State', key: 'state' },
               { label: 'Products', key: 'products' }
             ]}
             filename="Parties"
@@ -446,15 +497,38 @@ const Parties = () => {
                     onChange={e => setFormData({...formData, gstinShip: e.target.value})}
                   />
                 </div>
+                <div className="party-span-all">
+                  <label>State</label>
+                  <SearchableSelect
+                    className="input-field"
+                    value={formData.state || ''}
+                    placeholder="Select state"
+                    allowCustom
+                    memoryKey="party-state"
+                    onChange={(e) => {
+                      const state = e.target.value;
+                      setFormData({
+                        ...formData,
+                        state,
+                        stateCode: stateCodeForName(state)
+                      });
+                    }}
+                  >
+                    <option value="">Select state</option>
+                    {INDIAN_STATES.map((s) => (
+                      <option key={s.code} value={s.name}>{s.name}</option>
+                    ))}
+                  </SearchableSelect>
+                </div>
               </div>
             </section>
 
             <section className="premium-card party-section-card">
-              <h3 className="party-section-title">Delivery Note</h3>
+              <h3 className="party-section-title">DC Description Notes</h3>
               <textarea
                 className="input-field"
                 rows="3"
-                placeholder="Note printed on the Delivery Challan for this party"
+                placeholder="Prints in the Delivery Challan description for this party"
                 value={formData.deliveryNote || ''}
                 onChange={e => setFormData({ ...formData, deliveryNote: e.target.value })}
               />

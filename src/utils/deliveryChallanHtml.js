@@ -1,7 +1,7 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { buildDcPrintLines, getDcAppData, resolveLinkedMr } from './deliveryChallanLayout';
 import { formatPdfDateDmy, splitPartyAddressLines } from './taxInvoiceLayout';
-import { escHtml, fmtQty, buildPrintBrandHtml, renderHtmlToPdf, hasPrintVal, fillPrintPartyFields, buildStatusBar, PRINT_FOOTER_MESSAGES, PRINT_ICON_DOC, PRINT_ICON_CAL } from './printTheme';
+import { escHtml, fmtQty, buildPrintBrandHtml, renderHtmlToPdf, fillPrintPartyFields, buildStatusBar, buildPartyFootHtml, buildOptionalMetaRowHtml, PRINT_FOOTER_MESSAGES, PRINT_ICON_DOC, PRINT_ICON_CAL } from './printTheme';
 
 const DEFAULT_DC_DELIVERY_NOTE =
   'Material sent for Micronisation on Job Work basis. Goods to be returned after processing.';
@@ -26,31 +26,6 @@ const toTitleCase = (s) => String(s || '')
   .toLowerCase()
   .replace(/\b([a-z])/g, (ch) => ch.toUpperCase());
 
-/** Always return street + city lines for DC company strip (never one long line). */
-const buildDcCompanyAddressLines = (profile) => {
-  const p = mergeCompanyProfile(profile);
-  const city = String(p.city || 'Vadodara').trim();
-  const pin = String(p.pincode || '391350').trim();
-  const state = String(p.state || 'Gujarat').trim();
-  const country = String(p.country || 'India').trim();
-  let street = String(p.addressLine1 || '').trim();
-  const extra = String(p.addressLine2 || '').trim();
-
-  if (city && street) {
-    const lower = street.toLowerCase();
-    const cityAt = lower.indexOf(city.toLowerCase());
-    if (cityAt > 0) {
-      street = street.slice(0, cityAt).replace(/[,\s]+$/g, '').trim();
-    }
-  }
-  if (extra) street = street ? `${street.replace(/,\s*$/, '')}, ${extra}` : extra;
-  if (street && !/,\s*$/.test(street)) street = `${street},`;
-  if (!street) street = 'Plot No. 1116, G.I.D.C., Ranoli, N.H.No. 8,';
-
-  const line2 = `${city} - ${pin}, ${state}, ${country}`;
-  return [toTitleCase(street), toTitleCase(line2)];
-};
-
 export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   const appData = appDataInput || raw?.appData || getDcAppData();
   const data = fillPrintPartyFields(raw, appData);
@@ -61,23 +36,21 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
 
   const dcNo = escHtml(data.dcNo || 'N/A');
   const dcDate = escHtml(formatPdfDateDmy(data.date) || 'N/A');
-  const poNo = escHtml(data.partyDocNo || '');
-  const poDate = escHtml(formatPdfDateDmy(data.partyDocDate) || '');
   const companyState = escHtml(toTitleCase(profile.state || 'Gujarat'));
-  const [addrLine1, addrLine2] = buildDcCompanyAddressLines(profile);
-  const companyAddressOne = escHtml([addrLine1, addrLine2].filter(Boolean).join(' '));
   const companyWebsite = escHtml(String(profile.website || 'www.umamicron.com').replace(/^https?:\/\//i, ''));
   const companyPhone = escHtml(profile.phone || '+91 97120 00297');
   const companyEmail = escHtml(profile.email || 'info@umamicron.com');
   const companyGstin = escHtml(profile.gstNumber || '');
-  const shipState = escHtml(data.shipState || data.billState || data.state || companyState);
-  const stateCode = escHtml(data.shipStateCode || data.billStateCode || data.stateCode || '24');
   const billName = escHtml(data.partyName || '');
   const shipName = escHtml(data.shipName || data.partyName || '');
   const billLines = splitPartyAddressLines(data.billAddress || data.address || '', 42);
   const shipLines = splitPartyAddressLines(data.shipAddress || data.billAddress || data.address || '', 42);
-  const billGstin = escHtml(data.gstinBill || data.gstin || '');
-  const shipGstin = escHtml(data.gstinShip || data.gstinBill || data.gstin || '');
+  const companyStateCode = escHtml(String(profile.gstNumber || '24').replace(/\s/g, '').slice(0, 2) || '24');
+  const poMetaRows = [
+    buildOptionalMetaRowHtml('PO No.', data.partyDocNo || '', { iconHtml: PRINT_ICON_DOC }),
+    buildOptionalMetaRowHtml('PO Date', formatPdfDateDmy(data.partyDocDate) || '', { iconHtml: PRINT_ICON_CAL })
+  ].filter(Boolean).join('');
+  const poMetaBlock = poMetaRows ? `<div class="block">${poMetaRows}</div>` : '';
 
   let companyPan = escHtml(profile.panNumber || '');
   if (!companyPan && profile.gstNumber && profile.gstNumber.length >= 15) {
@@ -253,43 +226,33 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
     --grey-line:#d9d9d9;
   }
   *{box-sizing:border-box;font-family:Cambria,Georgia,serif;}
-  html,body{margin:0;padding:0;background:#fff;width:794px;overflow:hidden;font-family:Cambria,Georgia,serif;color:var(--text);}
-  
-  /* Outer border lives on .content-wrapper so right edge is never clipped */
+  html,body{margin:0;padding:0;background:#fff;font-family:Cambria,Georgia,serif;color:var(--text);}
+
   .page {
     width: 794px;
     height: 1123px;
-    padding: 4px;
+    max-height: 1123px;
+    min-height: 1123px;
+    padding: 0;
     margin: 0;
     background: #fff;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
   }
-
   .content-wrapper {
+    display: flex;
+    flex-direction: column;
     width: 100%;
     height: 100%;
-    flex: 1;
-    border-collapse: collapse;
+    min-height: 0;
     border: 2px solid var(--purple);
     box-sizing: border-box;
-    table-layout: fixed;
   }
-  .content-wrapper td { padding: 0; vertical-align: top; }
-  /* Header + footer content-sized; items band fills leftover page height */
-  .content-wrapper tr.dc-top,
-  .content-wrapper tr.dc-bot {
-    height: 1px;
-  }
-  .content-wrapper tr.items-row {
-    height: 100%;
-  }
-  .content-wrapper td.pad-bot { vertical-align: bottom; }
-  .content-wrapper td.pad-mid {
-    vertical-align: top;
-    padding-bottom: 8px;
-    height: 100%;
-  }
+  .inv-top { flex: 0 0 auto; padding: 4px 10px 0; }
+  .items-row { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 0 10px 4px; }
+  .inv-bot { flex: 0 0 auto; padding: 8px 10px 0; }
 
   /* ===== HEADER ===== */
   .header {
@@ -297,8 +260,9 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
     justify-content: space-between;
     align-items: center;
     gap: 12px;
-    margin: 0 0 10px;
-    padding: 0 0 10px;
+    margin: 0 0 8px;
+    padding: 0 0 8px;
+    border-bottom: 1px solid var(--purple);
   }
   .brand {
     display: flex;
@@ -367,96 +331,60 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
     white-space: nowrap;
   }
 
-  /* ===== COMPANY HEADER STRIP (address + contacts) ===== */
-  .company-strip {
-    display: flex;
-    flex-direction: column;
-    border-top: 1.5px solid var(--purple);
-    border-bottom: 1.5px solid var(--purple);
-    margin: 0 0 14px 0;
-    padding: 0;
-    font-size: 11.5px;
-    color: var(--purple);
-    width: 100%;
-    box-sizing: border-box;
+  /* ===== COMPANY INFO + CHALLAN META (same shell as PI) ===== */
+  .info-row { display: flex; gap: 14px; margin-bottom: 14px; }
+  .company-info { flex: 1.15; font-size: 12px; line-height: 1.55; }
+  .company-info .line { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 4px; }
+  .icon { color: var(--purple); flex-shrink: 0; width: 16px; height: 16px; margin-top: 1px; }
+  .icon svg, .m-icon svg, .party-head svg, .box-head svg {
+    width: 16px; height: 16px; display: block; fill: none; stroke: #3d2b7d; stroke-width: 1.6;
+    stroke-linecap: round; stroke-linejoin: round;
   }
-  .company-strip .dc-strip-addr {
-    display: flex;
+  .reg-details { margin-top: 0; font-size: 12px; line-height: 1.7; }
+  .reg-row {
+    display: grid;
+    grid-template-columns: 52px 12px minmax(0, 1fr);
+    column-gap: 4px;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 7px 10px;
-    border-bottom: 1.5px solid var(--purple);
-    text-align: center;
-    min-width: 0;
   }
-  .company-strip .dc-strip-addr .dc-addr-one {
-    color: var(--purple);
-    font-weight: 600;
-    line-height: 1.35;
-    white-space: normal;
+  .reg-row .label { font-weight: 700; color: var(--purple); white-space: nowrap; }
+  .invoice-meta {
+    flex: 1.15;
+    min-width: 300px;
+    border: 1px solid var(--purple);
+    border-radius: 6px;
+    overflow: hidden;
   }
-  .company-strip .dc-strip-contacts {
-    display: flex;
+  .invoice-meta .block { padding: 8px 10px; font-size: 12px; }
+  .invoice-meta .block + .block { border-top: 1px solid var(--purple); }
+  .meta-row {
+    display: grid;
+    grid-template-columns: 16px 158px 12px minmax(0, 1fr);
+    column-gap: 4px;
     align-items: center;
-    justify-content: space-between;
-    gap: 0;
-    padding: 7px 4px;
-    min-width: 0;
-  }
-  .company-strip .dc-ci {
-    flex: 1 1 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    min-width: 0;
-    padding: 0 6px;
+    margin-bottom: 4px;
+    font-size: 12px;
+    line-height: 1.3;
     white-space: nowrap;
-    color: var(--purple);
-    font-weight: 600;
   }
-  .company-strip .dc-ci strong { font-weight: 800; }
-  .company-strip .dc-sep {
-    flex: 0 0 1px;
-    align-self: stretch;
-    width: 1px;
-    background: var(--purple);
-    opacity: 0.55;
-  }
-  .company-strip .icon {
-    color: var(--purple);
-    flex-shrink: 0;
-    width: 15px;
-    height: 15px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .company-strip .icon svg {
-    width: 15px;
-    height: 15px;
-    display: block;
-    fill: none;
-    stroke: #3d2b7d;
-    stroke: var(--purple);
-    stroke-width: 1.7;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
+  .meta-row .m-label { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+  .meta-row .m-colon { font-weight: 700; }
+  .meta-row .m-value { min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
 
   /* ===== BILL TO / SHIP TO & META DETAILS ===== */
   .parties {
     display: flex;
-    gap: 14px;
-    margin-bottom: 14px;
+    gap: 10px;
+    margin-bottom: 8px;
     width: 100%;
     max-width: 100%;
   }
   .party {
     flex: 1;
     min-width: 0;
-    border: 1px solid var(--lav-border);
+    border: 1px solid var(--purple);
+    border-radius: 6px;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
@@ -489,10 +417,12 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
     margin: 0 0 2px;
   }
   .party-body .addr {
-    margin: 0;
-    line-height: 1.4;
+    margin: 0 0 3px;
+    line-height: 1.45;
     white-space: normal;
+    text-align: left;
   }
+  .party-body .addr:last-child { margin-bottom: 0; }
   .party-foot {
     border-top: 1px solid var(--lav-border);
     padding: 8px 12px;
@@ -502,25 +432,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   .party-foot .flabel { width: 50px; font-weight: 700; color: var(--text); }
   .party-foot .fcolon { width: 12px; }
 
-  /* Invoice Meta inside right party box */
-  .invoice-meta {
-    padding: 10px 12px;
-    font-size:12px;
-    flex: 1;
-  }
-  .meta-row {
-    display: grid;
-    grid-template-columns: 16px 110px 12px minmax(0, 1fr);
-    column-gap: 4px;
-    margin-bottom: 6px;
-    align-items: center;
-    white-space: nowrap;
-  }
   .meta-row .m-icon { color: var(--purple); width: 16px; display: flex; align-items: center; justify-content: center; }
-  .meta-row .m-icon svg { width: 16px; height: 16px; display: block; fill: none; stroke: #3d2b7d; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  .meta-row .m-label { color: #333; font-weight: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .meta-row .m-colon { font-weight: 600; white-space: nowrap; }
-  .meta-row .m-value { min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* ===== Items table fills middle; blank rows share leftover height evenly ===== */
   .pad-x { padding-left: 12px; padding-right: 12px; }
@@ -640,7 +552,9 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   .dc-footer-grid > div:nth-child(1) { flex: 1.15; min-width: 0; }
   .dc-footer-grid > div:nth-child(2) { flex: 0.85; min-width: 0; }
   .dc-meta-card {
-      border: 1px solid var(--lav-border);
+      border: 1px solid var(--purple);
+      border-radius: 6px;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
       box-sizing: border-box;
@@ -665,7 +579,9 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   .dc-sign-stack { display: flex; flex-direction: column; gap: 14px; width: 100%; box-sizing: border-box; }
   .dc-sign-card {
       flex: 1;
-      border: 1px solid var(--lav-border);
+      border: 1px solid var(--purple);
+      border-radius: 6px;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -681,24 +597,28 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   .barfoot {
     background: var(--purple);
     color: #fff;
-    margin: 12px 0 6px 0;
-    padding: 8px 14px;
-    display: flex;
-    justify-content: space-between;
-    font-size:12px;
+    margin: 8px -10px 0 -10px;
+    padding: 8px 14px 10px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    column-gap: 12px;
+    font-size: 12px;
     box-sizing: border-box;
-    border-radius: 6px;
+    border-radius: 0;
   }
+  .barfoot .foot-msg { text-align: center; justify-self: center; }
+  .barfoot .foot-page { justify-self: end; text-align: right; white-space: nowrap; }
+  .barfoot .foot-side { justify-self: start; text-align: left; }
   .dc-meta-card .dc-meta-row:first-of-type { margin-top: 8px; }
   .dc-meta-card .dc-meta-row:last-child { margin-bottom: 8px; }
 </style>
 </head>
 <body>
 
-  <div class="page pdf-page print-host">
-    <table class="content-wrapper">
-  <tr class="dc-top">
-    <td class="pad-x pad-top" valign="top">
+  <div class="page pdf-page print-host dc-page">
+<div class="content-wrapper">
+  <div class="inv-top">
       <div class="header">
         <div class="brand">
       ${buildPrintBrandHtml(profile, {
@@ -708,37 +628,29 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
     </div>
         <div class="tax-invoice-box">
           <div class="ti-title">DELIVERY CHALLAN</div>
-          <svg style="width:36px; height:36px; fill:#fff;" viewBox="0 0 24 24">
-            <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
-          </svg>
         </div>
       </div>
 
-      <div class="company-strip">
-        <div class="dc-strip-addr">
-          <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></span>
-          <span class="dc-addr-one">${companyAddressOne}</span>
+      <div class="info-row">
+        <div class="company-info" style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="address-col" style="flex:1; padding-right:14px;">
+            <div class="line"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></span><span>${escHtml(profile.addressLine1 || 'Plot No. 1116, G.I.D.C., Ranoli,')}<br>${escHtml(profile.city || 'Vadodara')} - ${escHtml(profile.pincode || '391350')},<br>${escHtml(profile.state || 'Gujarat')}, ${escHtml(profile.country || 'India')}</span></div>
+            <div class="line"><span class="icon"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 2.9c0-.5.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg></span><span>${companyPhone}</span></div>
+            <div class="line"><span class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 6.5l9 7 9-7"/></svg></span><span>${companyEmail}</span></div>
+            <div class="line"><span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.4 3.6 5.7 3.6 9s-1.2 6.6-3.6 9c-2.4-2.4-3.6-5.7-3.6-9S9.6 5.4 12 3z"/></svg></span><span>${companyWebsite}</span></div>
+          </div>
+          <div class="reg-details">
+            <div class="reg-row"><span class="label">GSTIN</span><span class="colon">:</span><span>${companyGstin}</span></div>
+            <div class="reg-row"><span class="label">PAN</span><span class="colon">:</span><span>${companyPan}</span></div>
+            <div class="reg-row"><span class="label">State</span><span class="colon">:</span><span>${companyState} (${companyStateCode})</span></div>
+          </div>
         </div>
-        <div class="dc-strip-contacts">
-          <div class="dc-ci">
-            <span class="icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-            <span><strong>GSTIN:</strong> ${companyGstin}</span>
+        <div class="invoice-meta">
+          <div class="block">
+            <div class="meta-row"><span class="m-icon">${PRINT_ICON_DOC}</span><span class="m-label">Challan No.</span><span class="m-colon">:</span><span class="m-value">${dcNo}</span></div>
+            <div class="meta-row"><span class="m-icon">${PRINT_ICON_CAL}</span><span class="m-label">Challan Date</span><span class="m-colon">:</span><span class="m-value">${dcDate}</span></div>
           </div>
-          <span class="dc-sep" aria-hidden="true"></span>
-          <div class="dc-ci">
-            <span class="icon"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 2.9c0-.5.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg></span>
-            <span>${companyPhone}</span>
-          </div>
-          <span class="dc-sep" aria-hidden="true"></span>
-          <div class="dc-ci">
-            <span class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 6.5l9 7 9-7"/></svg></span>
-            <span>${companyEmail}</span>
-          </div>
-          <span class="dc-sep" aria-hidden="true"></span>
-          <div class="dc-ci">
-            <span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.4 3.6 5.7 3.6 9s-1.2 6.6-3.6 9c-2.4-2.4-3.6-5.7-3.6-9S9.6 5.4 12 3z"/></svg></span>
-            <span>${companyWebsite}</span>
-          </div>
+          ${poMetaBlock}
         </div>
       </div>
 
@@ -746,46 +658,17 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
         <div class="party">
           <div class="party-head"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg> BILL TO</div>
           <div class="party-body"><div class="cname">${billName}</div>${billLines.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
-          <div class="party-foot">
-            <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>${billGstin}</span></div>
-          </div>
+          ${buildPartyFootHtml(data.gstinBill || data.gstin || '', data.billState || data.state || '', data.billStateCode || data.stateCode || '')}
         </div>
         <div class="party">
-          <div class="party-head"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> SHIP TO</div>
+          <div class="party-head"><svg viewBox="0 0 24 24"><path d="M3 16V7h9v9"/><path d="M12 10h5l3 3v3h-8z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg> SHIP TO</div>
           <div class="party-body"><div class="cname">${shipName}</div>${shipLines.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
-          <div class="party-foot">
-            <div class="frow"><span class="flabel">GSTIN</span><span class="fcolon">:</span><span>${shipGstin}</span></div>
-            <div class="frow"><span class="flabel">State</span><span class="fcolon">:</span><span>${shipState} (${stateCode})</span></div>
-          </div>
+          ${buildPartyFootHtml(data.gstinShip || data.gstinBill || data.gstin || '', data.shipState || data.billState || data.state || '', data.shipStateCode || data.billStateCode || data.stateCode || '')}
         </div>
       </div>
-      <div class="parties">
-        <div class="party" style="flex:0 1 460px;">
-          <div class="party-head"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> DELIVERY CHALLAN DETAILS</div>
-          <div class="invoice-meta">
-            <div class="meta-row">
-              <span class="m-icon">${PRINT_ICON_DOC}</span>
-              <span class="m-label">Challan No.</span><span class="m-colon">:</span><span class="m-value">&nbsp;${dcNo}</span>
-            </div>
-            <div class="meta-row">
-              <span class="m-icon">${PRINT_ICON_CAL}</span>
-              <span class="m-label">Challan Date</span><span class="m-colon">:</span><span class="m-value">&nbsp;${dcDate}</span>
-            </div>
-            ${hasPrintVal(poNo) ? `<div class="meta-row" style="margin-top:8px;">
-              <span class="m-icon">${PRINT_ICON_DOC}</span>
-              <span class="m-label">PO No.</span><span class="m-colon">:</span><span class="m-value">&nbsp;${poNo}</span>
-            </div>` : ''}
-            ${hasPrintVal(poDate) ? `<div class="meta-row">
-              <span class="m-icon">${PRINT_ICON_CAL}</span>
-              <span class="m-label">PO Date</span><span class="m-colon">:</span><span class="m-value">&nbsp;${poDate}</span>
-            </div>` : ''}
-          </div>
-        </div>
-      </div>
-    </td>
-  </tr>
-  <tr class="items-row">
-    <td class="pad-x pad-mid">
+  </div>
+  <div class="items-row">
+    <div class="table-container">
         <table class="items">
           <thead>
             <tr>
@@ -807,11 +690,10 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
             </tr>
           </tfoot>
         </table>
-    </td>
-  </tr>
-  <tr class="dc-bot">
-    <td class="pad-x pad-bot">
-      <div class="dc-footer-grid">
+    </div>
+  </div>
+  <div class="inv-bot">
+<div class="dc-footer-grid">
         <div class="dc-meta-card">
           <div class="box-head"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> TRANSPORT DETAILS</div>
           <div class="dc-meta-row"><div class="dc-meta-label">Vehicle No.</div><div class="data-value">: &nbsp;${escHtml(data.vehicleNo || '')}</div></div>
@@ -834,9 +716,8 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
       </div>
 
       ${buildStatusBar('Page 1 of 1', PRINT_FOOTER_MESSAGES.DC)}
-    </td>
-  </tr>
-</table>
+  </div>
+</div>
 </div>
 </body>
 </html>`;

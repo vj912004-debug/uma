@@ -211,6 +211,7 @@ const MaterialReceipt = () => {
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
   const [statusTab, setStatusTab] = useState('pending');
+  const [pendingProductName, setPendingProductName] = useState('');
   const [pendingMicronSize, setPendingMicronSize] = useState('');
 
   // Primary MR Form State
@@ -711,12 +712,13 @@ const MaterialReceipt = () => {
   // Get active products for selected party
   const selectedPartyObj = data.parties.find(p => p.id === formData.partyId);
   const partyProducts = selectedPartyObj?.products || [];
-  const partyMicronSizes = useMemo(() => {
-    const fromProducts = (partyProducts || []).map((p) => p.psdReq);
-    const fromBatches = (formData.batches || []).map((b) => b.psdReq);
-    const fromSettings = Object.values(formData.productSettings || {}).map((s) => s?.micronSize);
-    return uniqueSortedOptions([...fromProducts, ...fromBatches, ...fromSettings, pendingMicronSize]);
-  }, [partyProducts, formData.batches, formData.productSettings, pendingMicronSize]);
+  const micronsForProduct = (productName) => {
+    const prod = (partyProducts || []).find(
+      (p) => String(p.name || '').trim().toLowerCase() === String(productName || '').trim().toLowerCase()
+    );
+    const saved = String(prod?.psdReq || '').trim();
+    return saved ? [saved] : [];
+  };
   // Products on this receipt, including a name typed in Add Product that is not on the party master
   const receivedProducts = (() => {
     const names = [];
@@ -736,14 +738,27 @@ const MaterialReceipt = () => {
     !receivedProducts.some(r => r.name.trim().toLowerCase() === prod.name.trim().toLowerCase())
   );
 
-  const addReceivedProduct = (rawName) => {
+  const chooseProductToAdd = (rawName) => {
     const typed = String(rawName || '').trim();
-    if (!typed) return;
+    if (!typed) {
+      setPendingProductName('');
+      setPendingMicronSize('');
+      return;
+    }
     const partyProd = partyProducts.find((p) => p.name.trim().toLowerCase() === typed.toLowerCase());
     const name = partyProd?.name || typed;
     if (receivedProducts.some((p) => p.name.trim().toLowerCase() === name.toLowerCase())) return;
-    const micron = pendingMicronSize || partyProd?.psdReq || '';
-    handleAddBatchForProduct(name, micron);
+    setPendingProductName(name);
+    setPendingMicronSize(partyProd?.psdReq || '');
+  };
+
+  const confirmProductMicron = (micron) => {
+    const name = String(pendingProductName || '').trim();
+    const value = String(micron || '').trim();
+    if (!name || !value) return;
+    if (receivedProducts.some((p) => p.name.trim().toLowerCase() === name.toLowerCase())) return;
+    handleAddBatchForProduct(name, value);
+    setPendingProductName('');
     setPendingMicronSize('');
   };
 
@@ -813,15 +828,12 @@ const MaterialReceipt = () => {
           value={batch.psdReq || ''}
           onChange={e => handleBatchCellChange(idx, 'psdReq', e.target.value)}
           placeholder="Type micron size"
-          memoryKey="micron-size"
+          remember={false}
         >
           <option value="">Select…</option>
-          {partyMicronSizes.map((r) => (
+          {micronsForProduct(batch.productName).map((r) => (
             <option key={r} value={r}>{r}</option>
           ))}
-          {!partyMicronSizes.some((r) => String(r).trim().toUpperCase() === 'N/A') && (
-            <option value="N/A">N/A</option>
-          )}
         </SearchableSelect>
       </td>
       <td style={{ padding: '0.5rem' }}>
@@ -1237,15 +1249,9 @@ const MaterialReceipt = () => {
                   <div style={{ marginBottom: '1rem' }}>
                     <div style={{ fontWeight: 700, fontSize: '1rem' }}>Products ({receivedProducts.length})</div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                      Only materials you add below appear on this receipt. Type a micron size or a product name if it is not in the list.
+                      Choose a product first. The micron size list opens after that product is selected.
                     </div>
                   </div>
-
-                  {receivedProducts.length === 0 && (
-                    <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--input-bg)', borderRadius: '8px', border: '1px dashed var(--border-color)' }}>
-                      No material received yet. Use &quot;Add Product&quot; to enter only the materials that arrived.
-                    </div>
-                  )}
 
                   {receivedProducts.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1297,15 +1303,12 @@ const MaterialReceipt = () => {
                                   value={settings.micronSize || prod.psdReq || ''}
                                   onChange={(e) => handleProductMicronSizeChange(prod.name, e.target.value)}
                                   placeholder="Type or select micron size"
-                                  memoryKey="micron-size"
+                                  remember={false}
                                 >
                                   <option value="">Select micron size…</option>
-                                  {partyMicronSizes.map((r) => (
+                                  {micronsForProduct(prod.name).map((r) => (
                                     <option key={r} value={r}>{r}</option>
                                   ))}
-                                  {!partyMicronSizes.some((r) => String(r).trim().toUpperCase() === 'N/A') && (
-                                    <option value="N/A">N/A</option>
-                                  )}
                                 </SearchableSelect>
                               </div>
                               <div>
@@ -1454,30 +1457,14 @@ const MaterialReceipt = () => {
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1rem', justifyContent: 'flex-end' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.45rem' }}>
                     <SearchableSelect
                       allowCustom
                       className="input-field"
-                      style={{ minWidth: '180px' }}
-                      value={pendingMicronSize}
-                      onChange={(e) => setPendingMicronSize(e.target.value)}
-                      placeholder="Type or select micron size"
-                      memoryKey="micron-size"
-                    >
-                      <option value="">Type or select micron size</option>
-                      {partyMicronSizes.map((r) => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                      {!partyMicronSizes.some((r) => String(r).trim().toUpperCase() === 'N/A') && (
-                        <option value="N/A">N/A</option>
-                      )}
-                    </SearchableSelect>
-                    <SearchableSelect
-                      allowCustom
-                      className="input-field"
-                      style={{ minWidth: '220px' }}
-                      value=""
-                      onCommit={addReceivedProduct}
+                      style={{ width: '220px', maxWidth: '100%', padding: '0.35rem 0.6rem', fontSize: '0.82rem' }}
+                      value={pendingProductName}
+                      onCommit={chooseProductToAdd}
                       placeholder="Type or add product"
                       memoryKey="mr-add-product"
                     >
@@ -1486,10 +1473,27 @@ const MaterialReceipt = () => {
                         <option key={prod.name} value={prod.name}>{prod.name}</option>
                       ))}
                     </SearchableSelect>
+                    {pendingProductName ? (
+                      <SearchableSelect
+                        allowCustom
+                        className="input-field"
+                        style={{ width: '220px', maxWidth: '100%', padding: '0.35rem 0.6rem', fontSize: '0.82rem' }}
+                        value={pendingMicronSize}
+                        onCommit={confirmProductMicron}
+                        placeholder="Type or select micron size"
+                        remember={false}
+                      >
+                        <option value="">Type or select micron size</option>
+                        {micronsForProduct(pendingProductName).map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </SearchableSelect>
+                    ) : null}
+                    </div>
                     <button
                       type="button"
                       className="btn btn-primary"
-                      style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem' }}
+                      style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem', alignSelf: 'flex-end' }}
                       disabled={receivedProducts.length === 0}
                       onClick={handleRemoveAllReceivedProducts}
                     >

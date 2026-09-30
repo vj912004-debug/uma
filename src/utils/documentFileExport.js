@@ -9,7 +9,7 @@ import {
 } from './companyProfile';
 import { promptPrintPrefs } from './promptPrintPrefs';
 import { normalizePrintPrefs } from './printPrefs';
-import { downloadInvoiceExcel } from './invoiceExcel';
+import { downloadInvoiceExcel, downloadStyledTablesExcel } from './invoiceExcel';
 
 const SKIP_KEYS = new Set([
   'id',
@@ -153,11 +153,25 @@ const sheetsForDocument = (docType, data) => {
   ];
 };
 
-export const downloadDocumentExcel = (docType, data) => {
+const PRINT_EXCEL_TITLES = {
+  DC: 'Delivery Challan',
+  BPR: 'Batch Production Record',
+  PL: 'Packing List',
+  QUOTATION: 'Quotation',
+  PSD: 'PSD Report'
+};
+
+export const downloadDocumentExcel = (docType, data, title) => {
   if (!data) return;
   const type = String(docType || '').toUpperCase();
-  if (type === 'PI' || type === 'TI') return downloadInvoiceExcel(type, data);
-  downloadTablesExcel(documentFileName(docType, data), sheetsForDocument(docType, data));
+  if (type === 'PI' || type === 'TI' || type === 'PO' || type === 'DN' || type === 'CN') {
+    return downloadInvoiceExcel(type, data);
+  }
+  return downloadStyledTablesExcel(
+    documentFileName(docType, data),
+    title || PRINT_EXCEL_TITLES[type] || type || 'Document',
+    sheetsForDocument(docType, data)
+  );
 };
 
 export const downloadDocumentWord = (docType, data, title) => {

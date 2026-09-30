@@ -174,8 +174,22 @@ const Sidebar = () => {
   ];
 
   const location = useLocation();
-  const displayName = currentUser?.name || currentUser?.username || 'User';
-  const initials = displayName.slice(0, 2).toUpperCase();
+  const loginId = String(currentUser?.username || '').trim();
+  const storedName = String(currentUser?.name || '').trim();
+  const roleWord = /^(admin|administrator|staff|user)$/i.test(storedName);
+  const fromLogin = loginId.includes('@')
+    ? loginId.split('@')[0].replace(/[._-]+/g, ' ')
+    : '';
+  const displayName = (!storedName || roleWord) && fromLogin
+    ? fromLogin
+    : (storedName || fromLogin || loginId || 'User');
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase() || 'U';
 
   return (
     <aside className="sidebar">
@@ -300,9 +314,7 @@ const Sidebar = () => {
           <div className="sidebar-avatar">{initials}</div>
           <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
             <p className="sidebar-user-name">{displayName}</p>
-            <p className="sidebar-user-meta">
-              {userRole}{currentUser?.employeeId ? ` · ${currentUser.employeeId}` : ''}
-            </p>
+            <p className="sidebar-user-meta">{loginId || userRole}</p>
           </div>
         </div>
         <button onClick={logout} className="btn sidebar-logout">

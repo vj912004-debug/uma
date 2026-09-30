@@ -126,7 +126,7 @@ const PartyDue = () => {
   const renderAmount = (value, isTotal = false) => {
     const n = parseFloat(value || 0) || 0;
     return (
-      <span style={{ fontWeight: isTotal ? 700 : (n > 0 ? 600 : 400) }}>
+      <span style={{ fontWeight: isTotal ? 700 : (n > 0 ? 600 : 400), fontVariantNumeric: 'tabular-nums' }}>
         ₹{n.toFixed(2)}
       </span>
     );
@@ -180,13 +180,13 @@ const PartyDue = () => {
               {/* Filter Row */}
               <tr style={{ background: 'var(--glass-bg)' }}>
                 {tableCols.map(col => (
-                  <th key={`filter-${col.key}`} style={{ padding: '0.2rem' }}>
+                  <th key={`filter-${col.key}`} style={{ padding: '0.35rem 1rem', textAlign: col.key === 'name' ? 'left' : 'right' }}>
                     <input 
                       type="text" 
-                      placeholder={`Filter...`} 
+                      placeholder="Filter..." 
                       value={columnFilters[col.key] || ''} 
                       onChange={e => setColumnFilters({...columnFilters, [col.key]: e.target.value})} 
-                      style={{ width: '100%', fontSize: '0.75rem', padding: '0.2rem', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px' }} 
+                      style={{ width: col.key === 'name' ? '100%' : '140px', marginLeft: col.key === 'name' ? 0 : 'auto', display: 'block', fontSize: '0.75rem', padding: '0.2rem 0.4rem', textAlign: col.key === 'name' ? 'left' : 'right', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px' }} 
                     />
                   </th>
                 ))}
@@ -213,7 +213,9 @@ const PartyDue = () => {
                       <td
                         key={fy}
                         style={{
-                          padding: '0.5rem',
+                          padding: '1rem',
+                          textAlign: 'right',
+                          fontVariantNumeric: 'tabular-nums',
                           color: party[fy] > 0 ? '#ef4444' : 'var(--text-muted)',
                           fontWeight: party[fy] > 0 ? 600 : 400
                         }}

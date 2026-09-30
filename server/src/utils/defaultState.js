@@ -164,6 +164,28 @@ export function getDefaultUsers() {
       permissions: staffPerms,
       active: true,
       passwordHash: DEFAULT_STAFF_PASSWORD_HASH
+    },
+    {
+      id: 5,
+      employeeId: 'EMP005',
+      department: 'Management',
+      name: 'Amit',
+      username: 'Amit@umamicron.com',
+      role: 'Admin',
+      active: true,
+      permissions: [],
+      passwordHash: '99e4dfcc5775bd9489af7c0bb8fd27243a3b90239c8149d9f0beadf62c6fa457'
+    },
+    {
+      id: 6,
+      employeeId: 'EMP006',
+      department: 'Management',
+      name: 'Gloria',
+      username: 'Gloria@umamicron.com',
+      role: 'Admin',
+      active: true,
+      permissions: [],
+      passwordHash: 'a15ee0fa86af02cd68a46ea394f0876a3cb444e71ea1c7f0992e75fd98888e54'
     }
   ];
 }

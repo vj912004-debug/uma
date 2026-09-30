@@ -1,44 +1,45 @@
 /** Selectable app modules for Staff login access. Keys are stable path ids. */
 export const MODULE_OPTIONS = [
-  { id: '/material-receipt', label: 'Material Receipt', group: 'Material' },
-  { id: '/under-process', label: 'Under Process', group: 'Material' },
-  { id: '/production-planning', label: 'Production Planning', group: 'Material' },
-  { id: '/parties', label: 'Master Data', group: 'Material' },
+  { id: '/parties', label: 'Master Data', group: 'Master Data' },
+  { id: '/production-planning', label: 'Production Planning', group: 'Production Planning' },
 
-  { id: '/purchase-orders', label: 'Purchase Orders', group: 'Invoices' },
-  { id: '/invoices-pi', label: 'Proforma Invoice', group: 'Invoices' },
-  { id: '/tax-invoice', label: 'Tax Invoice', group: 'Invoices' },
-  { id: '/monthly-billing', label: 'Monthly Billing', group: 'Invoices' },
-  { id: '/debit-notes', label: 'Debit Note', group: 'Invoices' },
-  { id: '/credit-notes', label: 'Credit Note', group: 'Invoices' },
+  { id: '/material-receipt', label: 'Material Receipt', group: 'Material Received' },
+  { id: '/under-process', label: 'Under Process', group: 'Material Received' },
 
-  { id: '/bpr', label: 'BPR', group: 'Dispatch' },
-  { id: '/psd', label: 'PSD Upload', group: 'Dispatch' },
-  { id: '/packing-list', label: 'Packing List', group: 'Dispatch' },
-  { id: '/dc', label: 'Delivery Challan', group: 'Dispatch' },
-  { id: '/eway-dc', label: 'E-Way (DC)', group: 'Dispatch', highlight: true },
-  { id: '/eway-ti', label: 'E-Way (TI)', group: 'Dispatch', highlight: true },
+  { id: '/purchase-orders', label: 'Purchase Orders', group: 'Invoices & Billing' },
+  { id: '/invoices-pi', label: 'Proforma Invoice', group: 'Invoices & Billing' },
+  { id: '/tax-invoice', label: 'Tax Invoice', group: 'Invoices & Billing' },
+  { id: '/monthly-billing', label: 'Monthly Billing', group: 'Invoices & Billing' },
+  { id: '/debit-notes', label: 'Debit Note', group: 'Invoices & Billing' },
+  { id: '/credit-notes', label: 'Credit Note', group: 'Invoices & Billing' },
+
+  { id: '/bpr', label: 'BPR', group: 'Dispatch & Delivery' },
+  { id: '/psd', label: 'PSD Upload', group: 'Dispatch & Delivery' },
+  { id: '/packing-list', label: 'Packing List', group: 'Dispatch & Delivery' },
+  { id: '/dc', label: 'Delivery Challan', group: 'Dispatch & Delivery' },
+  { id: '/eway-dc', label: 'E-Way (DC)', group: 'Dispatch & Delivery', highlight: true },
+  { id: '/eway-ti', label: 'E-Way (TI)', group: 'Dispatch & Delivery', highlight: true },
 
   { id: '/payment-follow-up', label: 'Payment Follow-Up', group: 'Payments' },
   { id: '/party-due', label: 'Party Due', group: 'Payments' },
   { id: '/payments', label: 'Payments', group: 'Payments' },
 
-  { id: '/purchase-management', label: 'Purchase Management', group: 'Procurement' },
-  { id: '/utility-record', label: 'Utility Record', group: 'Procurement' },
-  { id: '/utility-record-list', label: 'Utility Record List', group: 'Procurement' },
-  { id: '/utility-temp-record', label: 'Utility Temp. Record', group: 'Procurement' },
-  { id: '/utility-temp-record-list', label: 'Temperature Record List', group: 'Procurement' },
-  { id: '/pm-air-compressor', label: 'PM Air Compressor', group: 'Procurement' },
+  { id: '/purchase-management', label: 'Purchase Dashboard', group: 'Procurement & Maintenance' },
+  { id: '/utility-record', label: 'Utility Record', group: 'Procurement & Maintenance' },
+  { id: '/utility-record-list', label: 'Utility Record List', group: 'Procurement & Maintenance' },
+  { id: '/utility-temp-record', label: 'Utility Temp. Record', group: 'Procurement & Maintenance' },
+  { id: '/utility-temp-record-list', label: 'Temperature Record List', group: 'Procurement & Maintenance' },
+  { id: '/pm-air-compressor', label: 'PM Air Compressor', group: 'Procurement & Maintenance' },
 
-  { id: '/marketing', label: 'Marketing / Lead Entry', group: 'Marketing' },
-  { id: '/marketing-follow-up', label: 'Marketing Follow Up', group: 'Marketing' },
+  { id: '/marketing', label: 'Lead Entry', group: 'Marketing' },
+  { id: '/marketing-follow-up', label: 'Follow Up', group: 'Marketing' },
 
-  { id: '/processing-sheet', label: 'Processing Sheet', group: 'Reports' },
-  { id: '/tasks', label: 'Tasks', group: 'Reports' },
-  { id: '/quotations', label: 'Quotations', group: 'Reports' },
-  { id: '/employee-salary', label: 'Employee Salary', group: 'Reports', highlight: true },
-  { id: '/attendance', label: 'Attendance', group: 'Reports' },
-  { id: '/salary-calculation', label: 'Salary Calculation', group: 'Reports' }
+  { id: '/processing-sheet', label: 'Processing Sheet', group: 'Reports & Logs' },
+  { id: '/tasks', label: 'Tasks', group: 'Reports & Logs' },
+  { id: '/quotations', label: 'Quotations', group: 'Reports & Logs' },
+  { id: '/employee-salary', label: 'Employee Salary', group: 'Reports & Logs', highlight: true },
+  { id: '/attendance', label: 'Attendance', group: 'Reports & Logs' },
+  { id: '/salary-calculation', label: 'Salary Calculation', group: 'Reports & Logs' }
 ];
 
 export const ALL_STAFF_MODULE_IDS = MODULE_OPTIONS.map((m) => m.id);

@@ -8,7 +8,19 @@ import { ALL_STAFF_MODULE_IDS, groupModuleOptions, parsePermissionsList } from '
 import { newestFirst } from '../utils/dateUtils';
 import ExportButton from '../components/ExportButton';
 
-const DEPARTMENTS = ['Management', 'Production', 'Packaging', 'Quality Control', 'Accounts', 'General'];
+const DEPARTMENTS = [
+  'Dashboard',
+  'Master Data',
+  'Production Planning',
+  'Material Received',
+  'Invoices & Billing',
+  'Dispatch & Delivery',
+  'Payments',
+  'Procurement & Maintenance',
+  'Marketing',
+  'Reports & Logs',
+  'Settings & System'
+];
 const MODULE_GROUPS = groupModuleOptions();
 
 const emptyForm = (employeeId = '') => ({

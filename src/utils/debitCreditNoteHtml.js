@@ -1,5 +1,5 @@
 import { mergeCompanyProfile } from './companyProfile';
-import { formatPdfDateDmy, splitPartyAddressLines, getSplitGstRates } from './taxInvoiceLayout';
+import { formatPdfDateDmy, splitPartyAddressLines, getSplitGstRates, formatGstPercent } from './taxInvoiceLayout';
 import {
   STANDARD_CHARGES_LIST,
   OTHER_CHARGE_ITEM
@@ -119,6 +119,9 @@ export const calcNoteLines = (data) => {
     totalQty,
     taxRate,
     displayRate,
+    sgstCalc,
+    cgstCalc,
+    igstCalc,
     roundedTotal,
     roundOff
   };
@@ -398,10 +401,12 @@ const getCommonStyle = () => `
     margin:0 0 2px;
   }
   .party-body .addr{
-    margin:0;
-    line-height:1.4;
+    margin:0 0 3px;
+    line-height:1.45;
     white-space:normal;
+    text-align:left;
   }
+  .party-body .addr:last-child{margin-bottom:0;}
   .party-foot{
     border-top:1px solid var(--lav-border);
     padding:8px 12px;
@@ -675,11 +680,15 @@ const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
     totalIgst,
     totalAll,
     totalQty,
-    taxRate,
-    displayRate,
+    sgstCalc,
+    cgstCalc,
+    igstCalc,
     roundedTotal,
     roundOff
   } = calcNoteLines(data);
+  const sgstPct = formatGstPercent(sgstCalc);
+  const cgstPct = formatGstPercent(cgstCalc);
+  const igstPct = formatGstPercent(igstCalc);
 
   // Bill To
   const billName = escHtml(data.partyName || '');
@@ -712,11 +721,11 @@ const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
         <td class="center">${fmtQty(r.qty)}</td>
         <td class="num">${fmtMoney(r.rate)}</td>
         <td class="num">${fmtMoney(r.amt)}</td>
-        <td class="num">${sgstRate ? sgstRate : ''}</td>
+        <td class="num">${formatGstPercent(sgstRate)}</td>
         <td class="num">${fmtMoney(r.sgstAmt)}</td>
-        <td class="num">${cgstRate ? cgstRate : ''}</td>
+        <td class="num">${formatGstPercent(cgstRate)}</td>
         <td class="num">${fmtMoney(r.cgstAmt)}</td>
-        <td class="num">${igstRate ? igstRate : ''}</td>
+        <td class="num">${formatGstPercent(igstRate)}</td>
         <td class="num">${fmtMoney(r.igstAmt)}</td>
         <td class="num">${fmtMoney(r.rowTotal)}</td>
       </tr>`;
@@ -900,9 +909,9 @@ const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
         <div class="trow"><span class="tlabel">Total Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(grossAmt)}</span></div>
         ${discount > 0 ? `<div class="trow"><span class="tlabel">Discount</span><span class="tval">&#8377; ${fmtMoney(discount)}</span></div>
         <div class="trow"><span class="tlabel">Taxable Amount</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>` : ''}
-        <div class="trow"><span class="tlabel">CGST @ ${displayRate}%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
-        <div class="trow"><span class="tlabel">SGST @ ${displayRate}%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
-        <div class="trow"><span class="tlabel">IGST @ ${taxRate}%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
+        <div class="trow"><span class="tlabel">CGST @ ${cgstPct}%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
+        <div class="trow"><span class="tlabel">SGST @ ${sgstPct}%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
+        <div class="trow"><span class="tlabel">IGST @ ${igstPct}%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
         <div class="trow rule"><span class="tlabel">Total Tax Amount</span><span class="tval">&#8377; ${fmtMoney(totalTaxAmount)}</span></div>
         <div class="trow"><span class="tlabel">Round Off</span><span class="tval">&#8377; ${fmtMoney(roundOff)}</span></div>
       </div>

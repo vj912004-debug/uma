@@ -373,11 +373,17 @@ const SearchableSelect = ({
     )
     : null;
 
+  const boxed = style?.width && style.width !== '100%';
+  const wrapStyle = boxed
+    ? { width: style.width, maxWidth: style.maxWidth || '100%', flex: '0 0 auto' }
+    : undefined;
+
   return (
     <div
       ref={wrapRef}
       className={`searchable-select${disabled ? ' is-disabled' : ''}${open ? ' is-open' : ''}${allowCustom ? ' is-combo' : ''}`}
       title={title}
+      style={wrapStyle}
     >
       <select
         id={id}

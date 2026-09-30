@@ -128,6 +128,28 @@ const DEFAULT_RATES = {
   liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
 };
 
+const masterCharge = (products, key) => {
+  const filled = (products || []).find((prod) => {
+    const amount = parseFloat(prod?.charges?.[key]);
+    return Number.isFinite(amount) && amount !== 0;
+  });
+  if (filled) return filled.charges[key];
+  const fallback = parseFloat(products?.[0]?.charges?.[key]);
+  return Number.isFinite(fallback) ? products[0].charges[key] : 0;
+};
+
+const ratesFromMaster = (products = []) => {
+  const cleaning = masterCharge(products, 'cleaning');
+  return {
+    minimum: cleaning,
+    filterBag: masterCharge(products, 'filterBag'),
+    sieving: masterCharge(products, 'sieving'),
+    processing: masterCharge(products, 'processing'),
+    cleaning,
+    other: masterCharge(products, 'other')
+  };
+};
+
 const getDefaultForm = () => ({
   quotationNo: '',
   date: new Date().toISOString().split('T')[0],
@@ -363,6 +385,7 @@ const Quotations = () => {
   
   const [formData, setFormData] = useState(getDefaultForm());
   const [dropTarget, setDropTarget] = useState(null);
+  const [quotePage, setQuotePage] = useState(0);
 
   const quotationsList = newestFirst(data.quotations?.filter(q => !q.isDeleted) || []);
 
@@ -387,18 +410,37 @@ const Quotations = () => {
       !p.isDeleted && (p.name || '').trim().toLowerCase() === name.trim().toLowerCase()
     );
     if (party) {
-      setFormData(prev => ({
-        ...prev,
-        partyId: party.id,
-        partyName: party.name,
-        partyAddress: party.billAddress || '',
-        gstNumber: party.gstinBill || '',
-        productName: '',
-        psdRequirement: '',
-        productSettings: {},
-        chargeNotes: emptyChargeNotes(),
-        chargeSection: {}
-      }));
+      setFormData(prev => {
+        const products = party.products || [];
+        const defaults = prev.companyQuoteMode
+          ? ratesFromMaster(products)
+          : (prev.defaultRates || ratesFromMaster(products));
+        const quoteLines = prev.companyQuoteMode
+          ? (prev.sameCompanyCopy
+            ? (products.length ? products : [{}]).map((prod, index) => ({
+              ...blankCompanyLine(prod, defaults),
+              id: `ql-${Date.now()}-${index}`
+            }))
+            : [])
+          : prev.quoteLines;
+        return {
+          ...prev,
+          partyId: party.id,
+          partyName: party.name,
+          partyAddress: party.billAddress || '',
+          gstNumber: party.gstinBill || '',
+          productName: prev.companyQuoteMode
+            ? (quoteLines || []).map((line) => line.name).filter(Boolean).join(', ')
+            : '',
+          psdRequirement: '',
+          productSettings: {},
+          chargeNotes: emptyChargeNotes(),
+          chargeSection: {},
+          defaultRates: prev.companyQuoteMode ? defaults : prev.defaultRates,
+          quoteLines
+        };
+      });
+      setQuotePage(0);
       return;
     }
     setFormData(prev => ({
@@ -486,8 +528,71 @@ const Quotations = () => {
 
   const selectedParty = data.parties.find(p => p.id === formData.partyId);
   const partyProducts = selectedParty?.products || [];
+  const quoteLines = formData.quoteLines || [];
+  const quotePageSize = 6;
+  const quotePageCount = Math.max(1, Math.ceil(quoteLines.length / quotePageSize));
+  const safeQuotePage = Math.min(quotePage, quotePageCount - 1);
+  const visibleQuoteLines = quoteLines.slice(safeQuotePage * quotePageSize, safeQuotePage * quotePageSize + quotePageSize);
 
-  const handleSubmit = (e) => {
+  const patchCompanyQuote = (updater) => {
+    setFormData((prev) => {
+      const next = updater(prev);
+      const lines = next.quoteLines || prev.quoteLines || [];
+      return {
+        ...prev,
+        ...next,
+        productName: lines.map((line) => line.name).filter(Boolean).join(', ')
+      };
+    });
+  };
+
+  const setDefaultCharge = (key, value) => {
+    patchCompanyQuote((prev) => {
+      const previous = prev.defaultRates?.[key];
+      const defaultRates = { ...(prev.defaultRates || {}), [key]: value };
+      const column = key === 'minimum' ? null : key;
+      if (!column || column === 'other') return { defaultRates };
+      const quoteLinesNext = (prev.quoteLines || []).map((line) => {
+        const current = line.rates?.[column];
+        if (current === '' || current == null || String(current) === String(previous ?? '')) {
+          return { ...line, rates: { ...(line.rates || {}), [column]: value } };
+        }
+        return line;
+      });
+      return { defaultRates, quoteLines: quoteLinesNext };
+    });
+  };
+
+  const setQuoteLineField = (id, field, value) => {
+    patchCompanyQuote((prev) => ({
+      quoteLines: (prev.quoteLines || []).map((line) => {
+        if (line.id !== id) return line;
+        if (field.startsWith('rate.')) {
+          const rateKey = field.slice(5);
+          return { ...line, rates: { ...(line.rates || {}), [rateKey]: value } };
+        }
+        return { ...line, [field]: value };
+      })
+    }));
+  };
+
+  const addCompanyProduct = () => {
+    patchCompanyQuote((prev) => {
+      const defaults = prev.defaultRates || {};
+      const line = blankCompanyLine({}, defaults);
+      const quoteLinesNext = [...(prev.quoteLines || []), line];
+      setQuotePage(Math.floor((quoteLinesNext.length - 1) / quotePageSize));
+      return { quoteLines: quoteLinesNext };
+    });
+  };
+
+  const removeCompanyProduct = (id) => {
+    patchCompanyQuote((prev) => ({
+      quoteLines: (prev.quoteLines || []).filter((line) => line.id !== id)
+    }));
+  };
+
+  const handleSubmit = (e, statusOverride) => {
     e.preventDefault();
     const currentProduct = String(formData.productName || '').trim();
     const synced = tablesFromForm(formData);
@@ -508,12 +613,40 @@ const Quotations = () => {
       ...(formData.productSettings || {}),
       ...(currentProduct ? { [currentProduct]: currentSettings } : {})
     };
-    const payload = {
+    let payload = {
       ...formData,
       ...synced,
       productSettings,
       productName: currentProduct
     };
+    if (formData.companyQuoteMode) {
+      const lines = (formData.quoteLines || []).filter((line) => String(line.name || '').trim());
+      const companySettings = {};
+      lines.forEach((line) => {
+        companySettings[line.name] = {
+          qty: '',
+          psdRequirement: line.psdReq || '',
+          charges: { ...DEFAULT_CHARGES, cleaning: true, filterBag: true, processing: true, sieving: true },
+          rates: { ...DEFAULT_RATES, ...(line.rates || {}) },
+          chargeNotes: emptyChargeNotes(),
+          chargeSection: {},
+          rateUnits: mergeRateUnits(formData.rateUnits),
+          mainCharges: [],
+          optionalCharges: []
+        };
+      });
+      const first = lines[0] || {};
+      payload = {
+        ...payload,
+        status: statusOverride || 'generated',
+        quoteLines: lines,
+        defaultRates: { ...(formData.defaultRates || {}) },
+        productSettings: companySettings,
+        productName: lines.map((line) => line.name).join(', '),
+        psdRequirement: first.psdReq || '',
+        rates: { ...DEFAULT_RATES, ...(first.rates || {}) }
+      };
+    }
 
     if (formData.id) {
       updateItem('quotations', formData.id, payload);
@@ -600,31 +733,65 @@ const Quotations = () => {
     setPendingEditData(null);
   };
 
-  const handleCopyAsNew = (q) => {
-    const party = data.parties.find(p => p.id === q.partyId);
-    const productName = primaryProductName(q);
-    const { id, createdAt, quotationNo, isDeleted, deletedAt, ...rest } = q;
-    const baseForm = {
-      ...getDefaultForm(),
-      ...rest,
-      charges: { ...DEFAULT_CHARGES, ...(q.charges || {}) },
-      rates: { ...DEFAULT_RATES, ...(q.rates || {}) },
-      chargeNotes: { ...emptyChargeNotes(), ...(q.chargeNotes || {}) },
-      chargeSection: inferChargeSection(q),
-      rateUnits: mergeRateUnits(q.rateUnits),
-      productSettings: q.productSettings?.[productName]
-        ? { [productName]: q.productSettings[productName] }
-        : { ...(q.productSettings || {}) }
-    };
-    const applied = applyProductToQuotation(baseForm, productName, party);
-    const { docNo } = nextQuoteNumber(applied.date);
-    openQuotationForm({ ...applied, quotationNo: docNo });
+  const blankCompanyLine = (prod, defaults = {}) => ({
+  id: `ql-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  name: prod?.name || '',
+  nickname: prod?.nickname || '',
+  psdReq: prod?.psdReq || prod?.psdRequirement || '',
+  rates: {
+    cleaning: prod?.charges?.cleaning ?? prod?.rates?.cleaning ?? defaults.cleaning ?? 0,
+    filterBag: prod?.charges?.filterBag ?? prod?.rates?.filterBag ?? defaults.filterBag ?? 0,
+    processing: prod?.charges?.processing ?? prod?.rates?.processing ?? defaults.processing ?? 0,
+    sieving: prod?.charges?.sieving ?? prod?.rates?.sieving ?? defaults.sieving ?? 0
+  }
+});
+
+const handleSameCompanyQuote = (q) => {
+  const party = data.parties.find((p) => p.id === q.partyId);
+  const savedLines = Array.isArray(q.quoteLines) ? q.quoteLines : [];
+  const partyProducts = party?.products || [];
+  const sourceProducts = savedLines.length ? savedLines : partyProducts;
+  const master = ratesFromMaster(partyProducts);
+  const defaults = {
+    minimum: master.minimum || q.defaultRates?.minimum || q.rates?.cleaning || 0,
+    filterBag: master.filterBag || q.defaultRates?.filterBag || q.rates?.filterBag || 0,
+    sieving: master.sieving || q.defaultRates?.sieving || q.rates?.sieving || 0,
+    processing: master.processing || q.defaultRates?.processing || q.rates?.processing || 0,
+    cleaning: master.cleaning || q.defaultRates?.cleaning || q.rates?.cleaning || 0,
+    other: master.other || q.defaultRates?.other || 0
   };
+  const quoteLines = (sourceProducts.length ? sourceProducts : [{ name: primaryProductName(q) }])
+    .map((prod, index) => ({ ...blankCompanyLine(prod, defaults), id: `ql-${Date.now()}-${index}` }));
+  const { id, createdAt, quotationNo, isDeleted, deletedAt, ...rest } = q;
+  const { docNo } = nextQuoteNumber(q.date);
+  setQuotePage(0);
+  openQuotationForm({
+    ...getDefaultForm(),
+    ...rest,
+    id: undefined,
+    quotationNo: docNo,
+    charges: { ...DEFAULT_CHARGES, ...(q.charges || {}) },
+    rates: { ...DEFAULT_RATES, ...(q.rates || {}) },
+    chargeNotes: { ...emptyChargeNotes(), ...(q.chargeNotes || {}) },
+    companyQuoteMode: true,
+    sameCompanyCopy: true,
+    defaultRates: defaults,
+    quoteLines,
+    productName: quoteLines.map((line) => line.name).filter(Boolean).join(', '),
+    productSettings: {}
+  });
+};
 
   const handleNewQuotation = () => {
     setProductPickerOpen(false);
     setPendingEditData(null);
-    setFormData(getDefaultForm());
+    setQuotePage(0);
+    setFormData({
+      ...getDefaultForm(),
+      companyQuoteMode: true,
+      defaultRates: { minimum: 0, filterBag: 0, sieving: 0, processing: 0, cleaning: 0, other: 0 },
+      quoteLines: []
+    });
     setIsModalOpen(true);
   };
 
@@ -766,7 +933,7 @@ const Quotations = () => {
     const status = String(q.status || '').trim();
     if (status) {
       const s = status.toLowerCase();
-      if (s === 'accepted' || s === 'closed') return false;
+      if (s === 'accepted' || s === 'closed' || s === 'generated') return false;
       return true;
     }
     if (q.accepted === true || q.converted) return false;
@@ -870,7 +1037,7 @@ const Quotations = () => {
                         <Eye size={14} /> Preview
                       </button>
                       <DocDownloadButtons docType="QUOTATION" title="Quotation" getData={() => quotationPrintData(q)} size={14} />
-                      <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(16, 185, 129, 0.12)', color: '#059669' }} onClick={() => handleCopyAsNew(q)} title="New quotation for the same company and product">
+                      <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(91, 28, 133, 0.1)', color: 'var(--accent-primary)' }} onClick={() => handleSameCompanyQuote(q)} title="Same quotation for same company">
                         <Copy size={14} />
                       </button>
                       <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'transparent', color: 'var(--text-muted)' }} onClick={() => handleEdit(q)} title="Edit this quotation">
@@ -894,7 +1061,7 @@ const Quotations = () => {
           <div className="premium-card" style={{ width: '560px', maxWidth: '95%', maxHeight: '85vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '0.35rem', fontSize: '1.25rem' }}>Select Product on this Quotation</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-              This quotation has more than one product saved. Choose which product to edit. To quote the same product again as a new entry, use New Quotation or the copy button in the list.
+              This quotation has more than one product saved. Choose which product to edit. To quote the company again, use Same quotation for same company.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
               {pendingEditData.partyProducts.map(prod => {
@@ -947,9 +1114,9 @@ const Quotations = () => {
 
       {isModalOpen && (
         <div className="page-form-overlay">
-          <div className="premium-card" style={{ width: '900px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h2 style={{ marginBottom: '1.5rem' }}>{formData.id ? 'Edit Quotation' : 'Create Quotation'}</h2>
-            <form onSubmit={handleSubmit}>
+          <div className="premium-card" style={{ width: formData.companyQuoteMode ? '1100px' : '900px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ marginBottom: '1.5rem' }}>{formData.sameCompanyCopy ? 'Same Quotation for Same Company' : (formData.id ? 'Edit Quotation' : 'Create Quotation')}</h2>
+            <form onSubmit={(e) => handleSubmit(e, formData.companyQuoteMode ? 'generated' : undefined)}>
               <ChargeNoteDatalist />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
@@ -1010,8 +1177,140 @@ const Quotations = () => {
                 </div>
               </div>
 
+              {formData.companyQuoteMode && (
+                <div style={{ border: '1px solid #ddd6fe', borderRadius: '12px', overflow: 'hidden', marginBottom: '1.25rem', background: '#fff' }}>
+                  <div style={{ background: '#5b1c85', color: '#fff', padding: '0.75rem 1rem', fontWeight: 700 }}>
+                    Products &amp; Default Charges
+                  </div>
+                  <p style={{ margin: 0, padding: '0.55rem 1rem', fontSize: '0.75rem', color: '#6d28d9', background: '#f5f3ff' }}>
+                    Minimum charge, filter charge, sieving, processing charge and other common charges are applied once for the entire quotation (all products).
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '0.5rem', padding: '0.85rem 1rem' }}>
+                    {[
+                      ['minimum', 'Minimum Charge'],
+                      ['filterBag', 'Filter Bag Charge'],
+                      ['sieving', 'Sieving Charge'],
+                      ['processing', 'Processing Charge'],
+                      ['cleaning', 'Cleaning Charge'],
+                      ['other', 'Other Charges (If Any)']
+                    ].map(([key, label]) => (
+                      <label key={key} style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                        {label}
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          className="input-field"
+                          style={{ marginTop: '0.3rem', padding: '0.35rem 0.45rem' }}
+                          value={formData.defaultRates?.[key] ?? ''}
+                          onChange={(e) => setDefaultCharge(key, e.target.value)}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{ overflowX: 'auto', padding: '0 1rem 0.75rem' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                      <thead>
+                        <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>
+                          <th style={{ padding: '0.45rem' }}>Sr.</th>
+                          <th style={{ padding: '0.45rem' }}>Product Name</th>
+                          <th style={{ padding: '0.45rem' }}>Nick Name</th>
+                          <th style={{ padding: '0.45rem' }}>PSD Range</th>
+                          <th style={{ padding: '0.45rem' }}>Processing Charges</th>
+                          <th style={{ padding: '0.45rem' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleQuoteLines.map((line, index) => (
+                          <tr key={line.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <td style={{ padding: '0.35rem' }}>{safeQuotePage * quotePageSize + index + 1}</td>
+                            <td style={{ padding: '0.35rem', minWidth: '160px' }}>
+                              <SearchableSelect
+                                allowCustom
+                                className="input-field"
+                                style={{ width: '180px', padding: '0.3rem 0.4rem', fontSize: '0.78rem' }}
+                                value={line.name}
+                                onChange={(e) => {
+                                  const name = e.target.value;
+                                  const match = partyProducts.find((prod) => prod.name === name);
+                                  setQuoteLineField(line.id, 'name', name);
+                                  if (match) {
+                                    setQuoteLineField(line.id, 'nickname', match.nickname || '');
+                                    setQuoteLineField(line.id, 'psdReq', match.psdReq || '');
+                                    setQuoteLineField(line.id, 'rate.processing', match.charges?.processing ?? '');
+                                  }
+                                }}
+                                placeholder="Product"
+                                memoryKey="quote-company-product"
+                              >
+                                <option value="">Product</option>
+                                {partyProducts.map((prod) => (
+                                  <option key={prod.name} value={prod.name}>{prod.name}</option>
+                                ))}
+                              </SearchableSelect>
+                            </td>
+                            <td style={{ padding: '0.35rem' }}>
+                              <input className="input-field" style={{ padding: '0.3rem 0.4rem', width: '110px' }} value={line.nickname || ''} onChange={(e) => setQuoteLineField(line.id, 'nickname', e.target.value)} />
+                            </td>
+                            <td style={{ padding: '0.35rem' }}>
+                              <SearchableSelect
+                                allowCustom
+                                className="input-field"
+                                style={{ width: '150px', padding: '0.3rem 0.4rem', fontSize: '0.78rem' }}
+                                value={line.psdReq || ''}
+                                onChange={(e) => setQuoteLineField(line.id, 'psdReq', e.target.value)}
+                                placeholder="Type or select PSD"
+                                memoryKey="quote-psd-range"
+                              >
+                                <option value="">Type or select PSD</option>
+                                {(data.psdRequirements || []).map((req) => (
+                                  <option key={req} value={req}>{req}</option>
+                                ))}
+                                {line.psdReq && !(data.psdRequirements || []).includes(line.psdReq) && (
+                                  <option value={line.psdReq}>{line.psdReq}</option>
+                                )}
+                              </SearchableSelect>
+                            </td>
+                            <td style={{ padding: '0.35rem' }}>
+                              <input
+                                className="input-field"
+                                type="number"
+                                min="0"
+                                step="any"
+                                style={{ padding: '0.3rem 0.4rem', width: '110px' }}
+                                value={line.rates?.processing ?? ''}
+                                onChange={(e) => setQuoteLineField(line.id, 'rate.processing', e.target.value)}
+                              />
+                            </td>
+                            <td style={{ padding: '0.35rem' }}>
+                              <button type="button" className="btn" title="Remove product" style={{ padding: '0.25rem', color: '#ef4444', background: 'transparent' }} onClick={() => removeCompanyProduct(line.id)}>
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 1rem 0.85rem' }}>
+                    <button type="button" className="btn btn-primary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={addCompanyProduct}>
+                      <Plus size={14} /> Add Product
+                    </button>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      Showing {quoteLines.length ? safeQuotePage * quotePageSize + 1 : 0} to {Math.min(quoteLines.length, safeQuotePage * quotePageSize + quotePageSize)} of {quoteLines.length}
+                      {quotePageCount > 1 && (
+                        <span style={{ marginLeft: '0.5rem' }}>
+                          <button type="button" className="btn" style={{ padding: '0.15rem 0.4rem' }} disabled={safeQuotePage === 0} onClick={() => setQuotePage(safeQuotePage - 1)}>Prev</button>
+                          <button type="button" className="btn" style={{ padding: '0.15rem 0.4rem', marginLeft: '0.25rem' }} disabled={safeQuotePage >= quotePageCount - 1} onClick={() => setQuotePage(safeQuotePage + 1)}>Next</button>
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Associated Products table — same as Party / Material Receipt */}
-              {formData.partyId && partyProducts.length > 0 && (
+              {!formData.companyQuoteMode && formData.partyId && partyProducts.length > 0 && (
                 <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Associated Products &amp; Default Charges</h3>
@@ -1084,7 +1383,7 @@ const Quotations = () => {
                 </div>
               )}
 
-              {formData.productName ? (
+              {!formData.companyQuoteMode && (formData.productName ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 {partyProducts.length > 1 && (
                   <div style={{ gridColumn: 'span 2', padding: '0.85rem 1rem', background: 'rgba(91, 28, 133, 0.06)', borderRadius: '8px', border: '1px solid rgba(91, 28, 133, 0.2)' }}>
@@ -1142,9 +1441,11 @@ const Quotations = () => {
                   <input type="text" className="input-field" value={formData.signatoryName} onChange={e => setFormData({...formData, signatoryName: e.target.value})} />
                 </div>
               </div>
-              )}
+              ))}
 
-              {formData.productName && (
+              {(formData.companyQuoteMode || formData.productName) && (
+              <>
+              {!formData.companyQuoteMode && (
               <>
               <div
                 style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}
@@ -1384,6 +1685,8 @@ const Quotations = () => {
                 )}
                 </div>
               </div>
+              </>
+              )}
 
               <div>
                 <label>Terms & Conditions</label>
@@ -1396,18 +1699,23 @@ const Quotations = () => {
               </>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
                 <button type="button" className="btn" onClick={closeQuotationModal}>Cancel</button>
+                {formData.companyQuoteMode && (
+                  <button type="button" className="btn" disabled={!quoteLines.some((line) => String(line.name || '').trim())} onClick={(e) => handleSubmit(e, 'draft')}>
+                    Save as Draft
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn"
-                  disabled={!formData.productName}
+                  disabled={formData.companyQuoteMode ? !quoteLines.some((line) => String(line.name || '').trim()) : !formData.productName}
                   onClick={() => previewQuotation(formData)}
                 >
                   <Eye size={16} /> Preview
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={!formData.productName}>
-                  {formData.id ? 'Update Quotation' : 'Save as New Quotation'}
+                <button type="submit" className="btn btn-primary" disabled={formData.companyQuoteMode ? !quoteLines.some((line) => String(line.name || '').trim()) : !formData.productName}>
+                  {formData.companyQuoteMode ? 'Generate Quotation' : (formData.id ? 'Update Quotation' : 'Save as New Quotation')}
                 </button>
               </div>
             </form>

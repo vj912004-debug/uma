@@ -58,6 +58,14 @@ export const getSplitGstRates = (data) => {
   };
 };
 
+/** Print a GST percent, including 0, without a trailing decimal on whole numbers. */
+export const formatGstPercent = (percent) => {
+  const n = Number(percent);
+  if (!Number.isFinite(n)) return '0';
+  const rounded = Math.round(n * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+};
+
 /** Split a taxable amount into CGST/SGST/IGST rupees for form summaries. */
 export const splitTaxableGstAmount = (taxable, taxRate, gstType) => {
   const base = Math.max(0, parseFloat(taxable) || 0);
@@ -70,14 +78,61 @@ export const splitTaxableGstAmount = (taxable, taxRate, gstType) => {
   return { taxAmount, cgst: half, sgst: half, igst: 0 };
 };
 
+const ADDRESS_WORDS = [
+  'industrial', 'technical', 'rajasthan', 'patanwala', 'ghatkopar', 'apartment',
+  'opposite', 'shreyas', 'society', 'mumbai', 'centre', 'center', 'cinema',
+  'estate', 'nagar', 'floor', 'north', 'south', 'marg', 'road', 'plot', 'near',
+  'west', 'east', 'lbs', 'opp', 'ind'
+].sort((a, b) => b.length - a.length);
+
+const ADDRESS_ABBR = { lbs: 'LBS', opp: 'Opp' };
+
+const titleAddressWord = (dict) => {
+  if (ADDRESS_ABBR[dict]) return ADDRESS_ABBR[dict];
+  return dict.charAt(0).toUpperCase() + dict.slice(1);
+};
+
+/** Split a glued token only when every letter belongs to a known address word. */
+const segmentGluedAddress = (word) => {
+  const lower = String(word || '').toLowerCase();
+  if (!lower || lower.length < 4) return null;
+  const parts = [];
+  let i = 0;
+  while (i < lower.length) {
+    const hit = ADDRESS_WORDS.find((token) => lower.startsWith(token, i));
+    if (!hit) return null;
+    parts.push(titleAddressWord(hit));
+    i += hit.length;
+  }
+  return parts.length > 1 ? parts.join(' ') : null;
+};
+
+const spaceAddressToken = (token) => {
+  const match = String(token || '').match(/^([^A-Za-z0-9]*)([A-Za-z0-9]+)([^A-Za-z0-9]*)$/);
+  if (!match) return token;
+  const spaced = segmentGluedAddress(match[2]);
+  return spaced ? `${match[1]}${spaced}${match[3]}` : token;
+};
+
+const tidyAddressLine = (s) => String(s || '')
+  .replace(/\u00a0/g, ' ')
+  .replace(/^(\d+)(?=[A-Za-z])/, '$1 ')
+  .replace(/([^\s(])\(/g, '$1 (')
+  .replace(/\)(?=[A-Za-z0-9])/g, ') ')
+  .replace(/([A-Za-z])(\d{6})\b/g, '$1 $2')
+  .replace(/\s+/g, ' ')
+  .trim()
+  .split(' ')
+  .map(spaceAddressToken)
+  .join(' ')
+  .replace(/\s*,\s*/g, ', ')
+  .replace(/[,\s]+$/g, '')
+  .replace(/\s+/g, ' ')
+  .trim();
+
 /** Split party address into compact display lines (newlines, commas, then word-wrap). */
 export const splitPartyAddressLines = (address, charsPerLine = 48) => {
-  const tidy = (s) => String(s || '')
-    .replace(/\u00a0/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/\s*,\s*/g, ', ')
-    .replace(/[,\s]+$/g, '')
-    .trim();
+  const tidy = tidyAddressLine;
 
   const wrapLine = (raw) => {
     const text = tidy(raw);

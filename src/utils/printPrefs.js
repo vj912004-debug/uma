@@ -640,9 +640,14 @@ export const buildPrintPrefsCss = (prefs) => {
   }
   .uma-print-root .party-body .addr,
   .uma-print-root .party-body > div:not(.cname) {
-    margin: 0 !important;
-    line-height: 1.4 !important;
+    margin: 0 0 3px !important;
+    line-height: 1.45 !important;
     white-space: normal !important;
+    text-align: left !important;
+  }
+  .uma-print-root .party-body .addr:last-child,
+  .uma-print-root .party-body > div:not(.cname):last-child {
+    margin-bottom: 0 !important;
   }
   .uma-print-root .footer3,
   .uma-print-root .barfoot,
@@ -698,8 +703,7 @@ export const buildPrintPrefsCss = (prefs) => {
   }
   .uma-print-root .f3-body .term-line.term-highlight {
     font-weight: 800 !important;
-    background: #fff3bf !important;
-    padding: 2px 4px !important;
+    background: transparent !important;
   }
   .uma-print-root .ti-page .content-wrapper,
   .uma-print-root .pi-page .content-wrapper,
@@ -824,17 +828,34 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .barfoot {
     margin: 8px -10px 0 -10px !important;
     padding: ${Math.max(8, Math.round(bodyFs * 0.55))}px 14px ${Math.max(10, Math.round(bodyFs * 0.7))}px 14px !important;
+    display: grid !important;
+    grid-template-columns: 1fr auto 1fr !important;
     align-items: center !important;
+    column-gap: 12px !important;
     line-height: 1.35 !important;
     min-height: ${bodyFs + 18}px !important;
     overflow: visible !important;
     flex-shrink: 0 !important;
   }
+  .uma-print-root .barfoot .foot-msg {
+    text-align: center !important;
+    justify-self: center !important;
+  }
+  .uma-print-root .barfoot .foot-page {
+    justify-self: end !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+  }
+  .uma-print-root .barfoot .foot-side {
+    justify-self: start !important;
+    text-align: left !important;
+  }
   .uma-print-root .pi-page .barfoot,
   .uma-print-root .ti-page .barfoot,
   .uma-print-root .cn-page .barfoot,
   .uma-print-root .dn-page .barfoot,
-  .uma-print-root .po-page .barfoot {
+  .uma-print-root .po-page .barfoot,
+  .uma-print-root .dc-page .barfoot {
     margin: 4px -10px 0 -10px !important;
   }
   .uma-print-root .sig-col .sig-line,

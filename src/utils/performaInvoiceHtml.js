@@ -3,7 +3,8 @@ import {
   splitPartyAddressLines,
   formatPdfDateDmy,
   buildTiPrintChargeRows,
-  getSplitGstRates
+  getSplitGstRates,
+  formatGstPercent
 } from './taxInvoiceLayout';
 import { renderHtmlToPdf, buildPrintBrandHtml, hasPrintVal, buildPartyFootHtml, buildOptionalMetaRowHtml, buildFillerRowsHtml, ITEMS_TABLE_FILL_CSS, FIT_FOOTER_CSS, fillPrintPartyFields, loadUmaAppData, buildFooterTerms, formatPiPrintTermsHtml, DEFAULT_INVOICE_DECLARATION, buildBankDetailsBox, buildStatusBar, PRINT_FOOTER_MESSAGES, PRINT_ICON_DOC, PRINT_ICON_CAL } from './printTheme';
 export const escHtml = (v) => String(v ?? '')
@@ -26,9 +27,10 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
   const profile = mergeCompanyProfile(profileInput);
 
   const chargeRows = buildTiPrintChargeRows(data);
-  const { taxRate, displayRate, sgst: sgstCalc, cgst: cgstCalc, igst: igstCalc } = getSplitGstRates(data);
-  // Print RATE + tax amounts both use full form GST (e.g. 18).
-  const printGstRate = displayRate;
+  const { sgst: sgstCalc, cgst: cgstCalc, igst: igstCalc } = getSplitGstRates(data);
+  const sgstPct = formatGstPercent(sgstCalc);
+  const cgstPct = formatGstPercent(cgstCalc);
+  const igstPct = formatGstPercent(igstCalc);
 
   let totalAmt = 0;
   let totalSgst = 0;
@@ -65,8 +67,9 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
       cleanDesc = match[1].trim();
     }
 
-    const rateCell = lineAmt > 0 ? printGstRate : '';
-    const igstRateCell = lineAmt > 0 && igstCalc ? printGstRate : '';
+    const sgstRateCell = lineAmt > 0 ? sgstPct : '';
+    const cgstRateCell = lineAmt > 0 ? cgstPct : '';
+    const igstRateCell = lineAmt > 0 ? igstPct : '';
     const qtyEntered = qty !== '' && qty != null && Number.isFinite(parseFloat(qty)) && parseFloat(qty) !== 0;
     const rateEntered = parseFloat(rate) > 0;
     const blankNums = !qtyEntered && !rateEntered && lineAmt <= 0;
@@ -79,9 +82,9 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
         <td class="center">${fmtQty(qty)}</td>
         <td class="num">${rateEntered ? escHtml(parseFloat(rate).toFixed(2)) : ''}</td>
         <td class="num">${money(lineAmt)}</td>
-        <td class="num">${rateCell}</td>
+        <td class="num">${sgstRateCell}</td>
         <td class="num">${money(sgstAmt)}</td>
-        <td class="num">${rateCell}</td>
+        <td class="num">${cgstRateCell}</td>
         <td class="num">${money(cgstAmt)}</td>
         <td class="num">${igstRateCell}</td>
         <td class="num">${money(igstAmt)}</td>
@@ -428,10 +431,12 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
     margin:0 0 2px;
   }
   .party-body .addr{
-    margin:0;
-    line-height:1.4;
+    margin:0 0 3px;
+    line-height:1.45;
     white-space:normal;
+    text-align:left;
   }
+  .party-body .addr:last-child{margin-bottom:0;}
   .party-foot{
     border-top:1px solid var(--lav-border);
     padding:8px 12px;
@@ -588,7 +593,7 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
   .f3-body ol{margin:0;padding-left:18px;list-style-position:outside;}
   .f3-body li{white-space:normal;margin:0 0 4px;padding-left:4px;}
   .f3-body .term-line{margin:0 0 4px;white-space:normal;}
-  .f3-body .term-line.term-highlight{font-weight:800;background:#fff3bf;padding:2px 4px;}
+  .f3-body .term-line.term-highlight{font-weight:800;}
   .sig-col .sig-body{
     display:block;
     padding-top:8px;
@@ -761,9 +766,9 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
         <div class="trow"><span class="tlabel">Total Amount Before Tax</span><span class="tval">&#8377; ${fmtMoney(totalAmt + discount)}</span></div>
         ${discount > 0 ? `<div class="trow"><span class="tlabel">Discount</span><span class="tval">&#8377; ${fmtMoney(discount)}</span></div>
         <div class="trow"><span class="tlabel">Taxable Amount</span><span class="tval">&#8377; ${fmtMoney(totalAmt)}</span></div>` : ''}
-        <div class="trow"><span class="tlabel">CGST @ ${displayRate}%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
-        <div class="trow"><span class="tlabel">SGST @ ${displayRate}%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
-        <div class="trow"><span class="tlabel">IGST @ ${taxRate}%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
+        <div class="trow"><span class="tlabel">CGST @ ${cgstPct}%</span><span class="tval">&#8377; ${fmtMoney(totalCgst)}</span></div>
+        <div class="trow"><span class="tlabel">SGST @ ${sgstPct}%</span><span class="tval">&#8377; ${fmtMoney(totalSgst)}</span></div>
+        <div class="trow"><span class="tlabel">IGST @ ${igstPct}%</span><span class="tval">&#8377; ${fmtMoney(totalIgst)}</span></div>
         <div class="trow rule"><span class="tlabel">Total Tax Amount</span><span class="tval">&#8377; ${fmtMoney(totalCgst + totalSgst + totalIgst)}</span></div>
         <div class="trow"><span class="tlabel">Round Off</span><span class="tval">&#8377; ${fmtMoney(roundOff)}</span></div>
       </div>

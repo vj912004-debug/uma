@@ -994,10 +994,11 @@ tbody tr:hover td {
   font-size: 0.78rem;
   font-weight: 650;
   color: #ffffff;
-  white-space: nowrap;
+  white-space: normal;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   margin: 0;
+  text-transform: capitalize;
 }
 
 .sidebar-user-meta {
