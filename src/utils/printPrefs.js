@@ -322,6 +322,10 @@ export const buildPrintPrefsCss = (prefs) => {
     color: #231f20 !important;
     line-height: ${lineH} !important;
   }
+  .uma-print-root .dn-page .meta-row,
+  .uma-print-root .cn-page .meta-row {
+    grid-template-columns: 16px 178px 12px minmax(0, 1fr) !important;
+  }
   .uma-print-root .meta-row .m-icon {
     grid-column: 1 !important;
     width: 16px !important;

@@ -1,6 +1,6 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { buildDcPrintLines, getDcAppData, resolveLinkedMr } from './deliveryChallanLayout';
-import { formatPdfDateDmy, splitPartyAddressLines } from './taxInvoiceLayout';
+import { formatPdfDateDmy, splitPartyAddressLines, partyAddressHtml } from './taxInvoiceLayout';
 import { escHtml, fmtQty, buildPrintBrandHtml, renderHtmlToPdf, fillPrintPartyFields, buildStatusBar, buildPartyFootHtml, buildOptionalMetaRowHtml, PRINT_FOOTER_MESSAGES, PRINT_ICON_DOC, PRINT_ICON_CAL } from './printTheme';
 
 const DEFAULT_DC_DELIVERY_NOTE =
@@ -657,12 +657,12 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
       <div class="parties">
         <div class="party">
           <div class="party-head"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg> BILL TO</div>
-          <div class="party-body"><div class="cname">${billName}</div>${billLines.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
+          <div class="party-body"><div class="cname">${billName}</div>${partyAddressHtml(billLines)}</div>
           ${buildPartyFootHtml(data.gstinBill || data.gstin || '', data.billState || data.state || '', data.billStateCode || data.stateCode || '')}
         </div>
         <div class="party">
           <div class="party-head"><svg viewBox="0 0 24 24"><path d="M3 16V7h9v9"/><path d="M12 10h5l3 3v3h-8z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg> SHIP TO</div>
-          <div class="party-body"><div class="cname">${shipName}</div>${shipLines.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
+          <div class="party-body"><div class="cname">${shipName}</div>${partyAddressHtml(shipLines)}</div>
           ${buildPartyFootHtml(data.gstinShip || data.gstinBill || data.gstin || '', data.shipState || data.billState || data.state || '', data.shipStateCode || data.billStateCode || data.stateCode || '')}
         </div>
       </div>

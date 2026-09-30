@@ -1,6 +1,7 @@
 /** Shared purple print theme for TI / PI / DC / DN / CN / BPR HTML PDFs. */
 
 import { applyPrintPrefsToHtml, getStoredPrintPrefs, PRINT_ROOT_CLASS, getPrintDensity, getPrintMinFitScale, normalizePrintPrefs } from './printPrefs';
+import { partyAddressHtml } from './taxInvoiceLayout';
 import { DEFAULT_PRINT_LOGO_SRC } from './defaultPrintLogo';
 import { getBankDetailRows } from './companyProfile';
 import { buildPdfDownloadFileName } from './pdfFileName';
@@ -1343,7 +1344,7 @@ export const buildPartyCard = (title, iconClass, name, addressLines, gstin, stat
   <div class="party">
     <div class="party-head">${iconHtml} ${escHtml(title)}</div>
     <div class="party-body">
-      ${hasPrintVal(name) ? `<div class="cname">${escHtml(name)}</div>` : ''}${lines.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}
+      ${hasPrintVal(name) ? `<div class="cname">${escHtml(name)}</div>` : ''}${partyAddressHtml(lines)}
     </div>
     ${buildPartyFootHtml(gstin, state, stateCode)}
   </div>`;

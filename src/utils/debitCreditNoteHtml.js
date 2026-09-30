@@ -1,5 +1,5 @@
 import { mergeCompanyProfile } from './companyProfile';
-import { formatPdfDateDmy, splitPartyAddressLines, getSplitGstRates, formatGstPercent } from './taxInvoiceLayout';
+import { formatPdfDateDmy, splitPartyAddressLines, partyAddressHtml, getSplitGstRates, formatGstPercent } from './taxInvoiceLayout';
 import {
   STANDARD_CHARGES_LIST,
   OTHER_CHARGE_ITEM
@@ -318,7 +318,7 @@ const getCommonStyle = () => `
   }
   .meta-row{
     display:grid;
-    grid-template-columns:16px 158px 12px minmax(0,1fr);
+    grid-template-columns:16px 178px 12px minmax(0,1fr);
     column-gap:4px;
     align-items:center;
     margin-bottom:4px;
@@ -660,15 +660,47 @@ const getCommonStyle = () => `
   }
 `;
 
+const firstNoteText = (...vals) => {
+  for (const v of vals) {
+    const s = String(v ?? '').trim();
+    if (s && s !== '-' && s !== '—' && s !== 'N/A') return s;
+  }
+  return '';
+};
+
+const noteMetaDate = (...vals) => {
+  const raw = firstNoteText(...vals);
+  return formatPdfDateDmy(raw) || raw;
+};
+
+const linkedInvoiceForNote = (data) => {
+  const invoices = data?.appData?.invoices || [];
+  const refKey = firstNoteText(data.refInvoice, data.invoiceNo, data.againstInvoice, data.originalInvoiceNo).toLowerCase();
+  if (refKey) {
+    const byNo = invoices.find((inv) => String(inv?.invoiceNo || '').trim().toLowerCase() === refKey);
+    if (byNo) return byNo;
+  }
+  if (data.invoiceId) {
+    return invoices.find((inv) => inv?.id === data.invoiceId) || null;
+  }
+  return null;
+};
+
+const buildNoteMetaRow = (label, value, iconHtml) =>
+  `<div class="meta-row"><span class="m-icon">${iconHtml || ''}</span><span class="m-label">${escHtml(label)}</span><span class="m-colon">:</span><span class="m-value">${escHtml(value || '')}</span></div>`;
+
 const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
-  const data = fillPrintPartyFields(raw, raw?.appData || loadUmaAppData());
+  const appData = raw?.appData || loadUmaAppData();
+  const data = { ...fillPrintPartyFields(raw, appData), appData };
   const profile = mergeCompanyProfile(profileInput);
   const docNo = escHtml(data.noteNo || 'N/A');
   const docDate = escHtml(formatPdfDateDmy(data.date) || 'N/A');
-  const refInvoiceRaw = data.refInvoice || '';
-  const refDateRaw = formatPdfDateDmy(data.refInvoiceDate) || '';
-  const poNoRaw = data.poNo || '';
-  const refRaw = data.reference || '';
+  const linked = linkedInvoiceForNote(data);
+  const refInvoiceRaw = firstNoteText(data.refInvoice, data.invoiceNo, data.againstInvoice, data.originalInvoiceNo, linked?.invoiceNo);
+  const refDateRaw = noteMetaDate(data.refInvoiceDate, data.invoiceDate, data.originalInvoiceDate, linked?.date);
+  const poNoRaw = firstNoteText(data.poNo, data.partyDocNo, data.customerPoNo, linked?.partyDocNo);
+  const poDateRaw = noteMetaDate(data.poDate, data.partyDocDate, linked?.partyDocDate);
+  const refRaw = firstNoteText(data.reference, data.refNo);
 
   const {
     rows,
@@ -801,9 +833,10 @@ const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
         <div class="meta-row"><span class="m-icon">${PRINT_ICON_CAL}</span><span class="m-label">${noteType} Date</span><span class="m-colon">:</span><span class="m-value">${docDate}</span></div>
       </div>
       <div class="block">
-        ${buildOptionalMetaRowHtml('Original Invoice No.', refInvoiceRaw, { iconHtml: PRINT_ICON_DOC })}
-        ${buildOptionalMetaRowHtml('Original Invoice Date', refDateRaw, { iconHtml: PRINT_ICON_CAL })}
-        ${buildOptionalMetaRowHtml('Customer PO No.', poNoRaw, { iconHtml: PRINT_ICON_DOC })}
+        ${buildNoteMetaRow('Original Invoice No.', refInvoiceRaw, PRINT_ICON_DOC)}
+        ${buildNoteMetaRow('Original Invoice Date', refDateRaw, PRINT_ICON_CAL)}
+        ${buildNoteMetaRow('Customer PO No.', poNoRaw, PRINT_ICON_DOC)}
+        ${buildNoteMetaRow('PO Date', poDateRaw, PRINT_ICON_CAL)}
         ${buildOptionalMetaRowHtml('Reference', refRaw, { iconHtml: PRINT_ICON_DOC })}
       </div>
     </div>
@@ -813,12 +846,12 @@ const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
   <div class="parties">
     <div class="party">
       <div class="party-head"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg> BILL TO</div>
-      <div class="party-body"><div class="cname">${billName}</div>${billAddr.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
+      <div class="party-body"><div class="cname">${billName}</div>${partyAddressHtml(billAddr)}</div>
       ${buildPartyFootHtml(data.gstinBill || data.gstin || '', data.billState || data.state || '', data.billStateCode || data.stateCode || '')}
     </div>
     <div class="party">
       <div class="party-head"><svg viewBox="0 0 24 24"><path d="M3 16V7h9v9"/><path d="M12 10h5l3 3v3h-8z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg> SHIP TO</div>
-      <div class="party-body"><div class="cname">${shipName}</div>${shipAddr.map((line) => `<div class="addr">${escHtml(line)}</div>`).join('')}</div>
+      <div class="party-body"><div class="cname">${shipName}</div>${partyAddressHtml(shipAddr)}</div>
       ${buildPartyFootHtml(data.gstinShip || data.gstin || '', data.shipState || data.state || '', data.shipStateCode || data.stateCode || '')}
     </div>
   </div>

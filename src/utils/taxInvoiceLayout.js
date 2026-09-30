@@ -87,21 +87,24 @@ const ADDRESS_WORDS = [
 
 const ADDRESS_ABBR = { lbs: 'LBS', opp: 'Opp' };
 
-const titleAddressWord = (dict) => {
+const titleAddressWord = (dict, source) => {
   if (ADDRESS_ABBR[dict]) return ADDRESS_ABBR[dict];
+  const sliced = String(source || '').slice(0, dict.length);
+  if (sliced && sliced === sliced.toUpperCase()) return dict.toUpperCase();
   return dict.charAt(0).toUpperCase() + dict.slice(1);
 };
 
 /** Split a glued token only when every letter belongs to a known address word. */
 const segmentGluedAddress = (word) => {
-  const lower = String(word || '').toLowerCase();
+  const raw = String(word || '');
+  const lower = raw.toLowerCase();
   if (!lower || lower.length < 4) return null;
   const parts = [];
   let i = 0;
   while (i < lower.length) {
     const hit = ADDRESS_WORDS.find((token) => lower.startsWith(token, i));
     if (!hit) return null;
-    parts.push(titleAddressWord(hit));
+    parts.push(titleAddressWord(hit, raw.slice(i)));
     i += hit.length;
   }
   return parts.length > 1 ? parts.join(' ') : null;
@@ -114,79 +117,95 @@ const spaceAddressToken = (token) => {
   return spaced ? `${match[1]}${spaced}${match[3]}` : token;
 };
 
-const tidyAddressLine = (s) => String(s || '')
+const tidyAddressText = (value) => String(value || '')
   .replace(/\u00a0/g, ' ')
+  .replace(/\r\n/g, '\n')
+  .replace(/\n+/g, ' ')
   .replace(/^(\d+)(?=[A-Za-z])/, '$1 ')
   .replace(/([^\s(])\(/g, '$1 (')
   .replace(/\)(?=[A-Za-z0-9])/g, ') ')
-  .replace(/([A-Za-z])(\d{6})\b/g, '$1 $2')
+  .replace(/([A-Za-z])(\d{6})\b/g, '$1-$2')
   .replace(/\s+/g, ' ')
   .trim()
   .split(' ')
   .map(spaceAddressToken)
   .join(' ')
   .replace(/\s*,\s*/g, ', ')
+  .replace(/\bCenter Patanwala\b/g, 'Center, Patanwala')
+  .replace(/\bMarg\s+(?=[A-Za-z])/g, 'Marg, ')
   .replace(/[,\s]+$/g, '')
   .replace(/\s+/g, ' ')
   .trim();
 
-/** Split party address into compact display lines (newlines, commas, then word-wrap). */
-export const splitPartyAddressLines = (address, charsPerLine = 48) => {
-  const tidy = tidyAddressLine;
+const ADDRESS_LINE_LIMIT = 60;
+const ROAD_MARK = String.raw`\b(\S+)\s+((?:LBS\s+)?(?:Marg|Road|Street|Lane|Avenue|Plot))\b`;
 
-  const wrapLine = (raw) => {
-    const text = tidy(raw);
-    if (!text) return [];
-    if (text.length <= charsPerLine) return [text];
-    const parts = text.split(/,\s*/).filter(Boolean);
-    const lines = [];
-    let cur = '';
-    const flush = () => {
-      if (!cur) return;
-      if (cur.length <= charsPerLine) {
-        lines.push(cur);
-      } else {
-        const words = cur.split(/\s+/);
-        let buf = '';
-        words.forEach((w) => {
-          const next = buf ? `${buf} ${w}` : w;
-          if (next.length > charsPerLine && buf) {
-            lines.push(buf);
-            buf = w;
-          } else {
-            buf = next;
-          }
-        });
-        if (buf) lines.push(buf);
-      }
-      cur = '';
-    };
-    parts.forEach((part) => {
-      const next = cur ? `${cur}, ${part}` : part;
-      if (next.length > charsPerLine && cur) {
-        flush();
-        cur = part;
-      } else {
-        cur = next;
-      }
-    });
-    flush();
-    return lines.length ? lines : [text];
-  };
-
-  const chunks = String(address || '')
-    .replace(/\r\n/g, '\n')
-    .split('\n')
-    .map(tidy)
-    .filter(Boolean);
-
-  const lines = chunks.flatMap(wrapLine);
-  if (lines.length) {
-    const last = lines.length - 1;
-    lines[last] = lines[last].replace(/\b([A-Za-z][A-Za-z .]{2,})\s+(\d{6})\b/, '$1 - $2');
+const packAddressLines = (text, limit = ADDRESS_LINE_LIMIT) => {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const lines = [];
+  let cur = '';
+  words.forEach((word) => {
+    const next = cur ? `${cur} ${word}` : word;
+    if (cur && next.length > limit) {
+      lines.push(cur);
+      cur = word;
+    } else {
+      cur = next;
+    }
+  });
+  if (cur) lines.push(cur);
+  const joined = [];
+  lines.forEach((line) => {
+    if (joined.length && line.split(/\s+/).length === 1) {
+      joined[joined.length - 1] = `${joined[joined.length - 1]} ${line}`;
+      return;
+    }
+    if (line.split(/\s+/).length === 1 && joined.length === 0) {
+      joined.push(line);
+      return;
+    }
+    joined.push(line);
+  });
+  for (let i = 0; i < joined.length - 1; i += 1) {
+    if (joined[i + 1].split(/\s+/).length === 1) {
+      joined[i + 1] = `${joined[i].split(/\s+/).pop()} ${joined[i + 1]}`;
+      joined[i] = joined[i].replace(/\s+\S+$/, '').trim();
+    }
   }
-  return lines;
+  return joined.map((line) => line.trim()).filter(Boolean);
 };
+
+/**
+ * Space a party address and place the road line on its own row
+ * so a word like Cinema stays with Marg / Road instead of sitting alone.
+ */
+const toTwoAddressLines = (text) => {
+  if (!text) return [];
+  const road = text.match(new RegExp(ROAD_MARK, 'i'));
+  if (road && road.index > 12) {
+    const left = text.slice(0, road.index).replace(/[,\s]+$/g, '').trim();
+    const right = text.slice(road.index).trim();
+    if (left && right && right.length <= 72) return [left, right];
+  }
+  return packAddressLines(text);
+};
+
+/** Party address as two spaced lines, whatever line breaks were typed in Master Data. */
+export const splitPartyAddressLines = (address) => toTwoAddressLines(tidyAddressText(address));
+
+const escAddress = (v) => String(v ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;');
+
+export const partyAddressHtml = (lines) => (
+  (lines || [])
+    .filter((line) => String(line || '').trim())
+    .map((line) => `<div class="addr">${escAddress(line)}</div>`)
+    .join('')
+);
 
 /** Aligned bill/ship address rows; extra rows only when address needs multiple lines. */
 export const getPartyAddressRows = (billAddress, shipAddress, charsPerLine = 48) => {

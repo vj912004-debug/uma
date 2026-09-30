@@ -463,7 +463,7 @@ const Parties = () => {
                     className="input-field"
                     rows="3"
                     required
-                    placeholder="Billing / Registered Office Address"
+                    placeholder="Type each print line, then press Enter"
                     value={formData.billAddress}
                     onChange={e => setFormData({...formData, billAddress: e.target.value})}
                   />
@@ -483,7 +483,7 @@ const Parties = () => {
                     className="input-field"
                     rows="3"
                     required
-                    placeholder="Delivery / Warehouse Address"
+                    placeholder="Type each print line, then press Enter"
                     value={formData.shipAddress}
                     onChange={e => setFormData({...formData, shipAddress: e.target.value})}
                   />
