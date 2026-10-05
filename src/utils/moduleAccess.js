@@ -26,9 +26,7 @@ export const MODULE_OPTIONS = [
 
   { id: '/purchase-management', label: 'Purchase Dashboard', group: 'Procurement & Maintenance' },
   { id: '/utility-record', label: 'Utility Record', group: 'Procurement & Maintenance' },
-  { id: '/utility-record-list', label: 'Utility Record List', group: 'Procurement & Maintenance' },
   { id: '/utility-temp-record', label: 'Utility Temp. Record', group: 'Procurement & Maintenance' },
-  { id: '/utility-temp-record-list', label: 'Temperature Record List', group: 'Procurement & Maintenance' },
   { id: '/pm-air-compressor', label: 'PM Air Compressor', group: 'Procurement & Maintenance' },
 
   { id: '/marketing', label: 'Lead Entry', group: 'Marketing' },
@@ -37,6 +35,7 @@ export const MODULE_OPTIONS = [
   { id: '/processing-sheet', label: 'Processing Sheet', group: 'Reports & Logs' },
   { id: '/tasks', label: 'Tasks', group: 'Reports & Logs' },
   { id: '/quotations', label: 'Quotations', group: 'Reports & Logs' },
+  { id: '/employee-master', label: 'Employee Master', group: 'Reports & Logs' },
   { id: '/employee-salary', label: 'Employee Salary', group: 'Reports & Logs', highlight: true },
   { id: '/attendance', label: 'Attendance', group: 'Reports & Logs' },
   { id: '/salary-calculation', label: 'Salary Calculation', group: 'Reports & Logs' }

@@ -31,9 +31,7 @@ import CreditNotes from './modules/CreditNotes';
 import MonthlyBilling from './modules/MonthlyBilling';
 import PurchaseManagement from './modules/PurchaseManagement';
 import UtilityRecord from './modules/UtilityRecord';
-import UtilityRecordList from './modules/UtilityRecordList';
 import UtilityTempRecord from './modules/UtilityTempRecord';
-import UtilityTempRecordList from './modules/UtilityTempRecordList';
 import PmAirCompressor from './modules/PmAirCompressor';
 import MarketingManagement from './modules/MarketingManagement';
 import MarketingFollowUp from './modules/MarketingFollowUp';
@@ -41,6 +39,7 @@ import RecycleBin from './modules/RecycleBin';
 import SystemLogs from './modules/SystemLogs';
 import SalaryCalculation from './modules/SalaryCalculation';
 import EmployeeSalaryManagement from './modules/EmployeeSalaryManagement';
+import EmployeeMaster from './modules/EmployeeMaster';
 import Attendance from './modules/Attendance';
 import CompanyProfileSettings from './modules/CompanyProfileSettings';
 import EmployeeManagement from './modules/EmployeeManagement';
@@ -95,14 +94,15 @@ const AppLayout = () => {
         <Route path="/monthly-billing" element={<MonthlyBilling />} />
         <Route path="/purchase-management" element={<PurchaseManagement />} />
         <Route path="/utility-record" element={<UtilityRecord />} />
-        <Route path="/utility-record-list" element={<UtilityRecordList />} />
+        <Route path="/utility-record-list" element={<Navigate to="/utility-record" replace />} />
         <Route path="/utility-temp-record" element={<UtilityTempRecord />} />
-        <Route path="/utility-temp-record-list" element={<UtilityTempRecordList />} />
+        <Route path="/utility-temp-record-list" element={<Navigate to="/utility-temp-record" replace />} />
         <Route path="/pm-air-compressor" element={<PmAirCompressor />} />
         <Route path="/marketing" element={<MarketingManagement />} />
         <Route path="/marketing-follow-up" element={<MarketingFollowUp />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/salary-calculation" element={<SalaryCalculation />} />
+        <Route path="/employee-master" element={<EmployeeMaster />} />
         <Route path="/employee-salary" element={<EmployeeSalaryManagement />} />
         <Route path="/settings/company-profile" element={<ProtectedRoute adminOnly><CompanyProfileSettings /></ProtectedRoute>} />
         <Route path="/employees" element={<ProtectedRoute adminOnly><EmployeeManagement /></ProtectedRoute>} />

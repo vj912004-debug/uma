@@ -130,9 +130,7 @@ const Sidebar = () => {
         { name: 'Quote Follow Up', icon: Phone, path: '/purchase-management#pm-follow', hash: '#pm-follow', roles: ['Admin', 'Staff'], permissionIds: ['/purchase-management'] },
         { name: 'Quote Comparison', icon: GitCompare, path: '/purchase-management#pm-compare', hash: '#pm-compare', roles: ['Admin', 'Staff'], permissionIds: ['/purchase-management'] },
         { name: 'Utility Record', icon: Gauge, path: '/utility-record', roles: ['Admin', 'Staff'] },
-        { name: 'Utility Record List', icon: FileText, path: '/utility-record-list', roles: ['Admin', 'Staff'] },
         { name: 'Utility Temp. Record', icon: Thermometer, path: '/utility-temp-record', roles: ['Admin', 'Staff'] },
-        { name: 'Temperature Record List', icon: FileText, path: '/utility-temp-record-list', roles: ['Admin', 'Staff'] },
         { name: 'PM Air Compressor', icon: Fan, path: '/pm-air-compressor', roles: ['Admin', 'Staff'] }
       ]
     },
@@ -155,6 +153,7 @@ const Sidebar = () => {
         { name: 'Processing Sheet', icon: Grid, path: '/processing-sheet', roles: ['Admin', 'Staff'] },
         { name: 'Tasks', icon: Bell, path: '/tasks', roles: ['Admin', 'Staff'] },
         { name: 'Quotations', icon: PlusSquare, path: '/quotations', roles: ['Admin', 'Staff'] },
+        { name: 'Employee Master', icon: Users, path: '/employee-master', roles: ['Admin', 'Staff'] },
         { name: 'Employee Salary', icon: DollarSign, path: '/employee-salary', roles: ['Admin', 'Staff'], highlight: true },
         { name: 'Attendance', icon: UserCheck, path: '/attendance', roles: ['Admin', 'Staff'] },
         { name: 'Salary Calculation', icon: Calculator, path: '/salary-calculation', roles: ['Admin', 'Staff'] }

@@ -26,6 +26,8 @@ import SearchableSelect from '../components/SearchableSelect';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import { formatDate, newestFirst } from '../utils/dateUtils';
+import { DEPARTMENTS } from './EmployeeManagement';
+import { generateEmployeeId } from '../utils/auth';
 import {
   SHIFTS,
   SHIFT_TYPES,
@@ -58,6 +60,11 @@ const statusBadge = (code) => {
 
 const emptyMasterForm = () => ({
   userId: '',
+  employeeId: '',
+  name: '',
+  department: '',
+  designation: '',
+  joiningDate: '',
   esslId: '',
   shiftType: '9hr',
   perDayRate: '',
@@ -88,6 +95,8 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
     [data.users]
   );
   const departments = [...new Set((data.users || []).map((u) => u.department).filter(Boolean))];
+  const departmentOptions = [...new Set([...DEPARTMENTS, ...departments])];
+  const designationOptions = [...new Set((data.users || []).map((u) => u.designation).filter(Boolean))];
   const attendance = useMemo(() => newestFirst((data.attendance || []).filter((r) => !r.isDeleted)), [data.attendance]);
   const essl = { ...defaultEsslSettings(), ...(data.esslSettings || {}) };
 
@@ -96,6 +105,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
   const [editingUserId, setEditingUserId] = useState(null);
   const [historyUserId, setHistoryUserId] = useState(null);
   const [masterSearch, setMasterSearch] = useState('');
+  const [masterModal, setMasterModal] = useState(false);
 
   /* ── Attendance state ── */
   const [filters, setFilters] = useState({
@@ -131,7 +141,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
   const filteredMaster = payrollUsers.filter((u) => {
     if (!masterSearch) return true;
     const q = masterSearch.toLowerCase();
-    return [u.name, u.username, u.employeeId, u.esslId, u.department]
+    return [u.name, u.username, u.employeeId, u.esslId, u.department, u.designation]
       .some((v) => String(v || '').toLowerCase().includes(q));
   });
 
@@ -141,6 +151,11 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
     setHistoryUserId(user.id);
     setMasterForm({
       userId: String(user.id),
+      employeeId: user.employeeId || generateEmployeeId(data.users || []),
+      name: user.name || user.username || '',
+      department: user.department || '',
+      designation: user.designation || '',
+      joiningDate: user.joiningDate || '',
       esslId: user.esslId || '',
       shiftType: user.shiftType === '12hr' ? '12hr' : '9hr',
       perDayRate: rate.perDayRate || '',
@@ -148,6 +163,20 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
       effectiveFrom: rate.effectiveFrom || new Date().toISOString().slice(0, 10),
       active: user.active !== false
     });
+    setMasterModal(true);
+  };
+
+  const openMasterNew = () => {
+    setEditingUserId(null);
+    setHistoryUserId(null);
+    setMasterForm(emptyMasterForm());
+    setMasterModal(true);
+  };
+
+  const closeMasterModal = () => {
+    setMasterModal(false);
+    setEditingUserId(null);
+    setMasterForm(emptyMasterForm());
   };
 
   const saveMaster = (e) => {
@@ -177,6 +206,11 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
 
     updateItem('users', user.id, {
       ...user,
+      employeeId: user.employeeId || generateEmployeeId(data.users || []),
+      name: String(masterForm.name || '').trim() || user.name,
+      department: String(masterForm.department || '').trim(),
+      designation: String(masterForm.designation || '').trim(),
+      joiningDate: masterForm.joiningDate || '',
       esslId: String(masterForm.esslId || '').trim(),
       shiftType: masterForm.shiftType,
       perDayRate,
@@ -188,6 +222,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
     setEditingUserId(null);
     setMasterForm(emptyMasterForm());
     setHistoryUserId(user.id);
+    setMasterModal(false);
   };
 
   const connectEssl = (connected) => {
@@ -474,14 +509,14 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
 
       {/* ─── 1. Employee Master ─── */}
       {tab === 'master' && (
-        <div className="esm-grid-2">
+        <>
           <section className="premium-card esm-card">
             <header className="esm-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <span className="esm-no">1</span>
                 <div>
                   <h2>Employee Master</h2>
-                  <p>Emp. ID, eSSL ID, shift type, per-day & OT rates with effective dates</p>
+                  <p>Employee code, name, department, designation, joining date, rates, shift and status</p>
                 </div>
               </div>
               <ExportButton
@@ -489,30 +524,37 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                   const rate = getEffectiveRate(u);
                   return {
                     employeeId: u.employeeId,
-                    esslId: u.esslId || '',
                     name: u.name || u.username,
                     department: u.department || '',
-                    shiftType: u.shiftType || '9hr',
+                    designation: u.designation || '',
+                    joiningDate: u.joiningDate ? formatDate(u.joiningDate) : '',
                     perDayRate: rate.perDayRate || '',
                     otRate: rate.otRate || '',
-                    effectiveFrom: rate.effectiveFrom ? formatDate(rate.effectiveFrom) : '',
-                    status: u.active !== false ? 'Active' : 'Inactive'
+                    shiftType: u.shiftType || '9hr',
+                    status: u.active !== false ? 'Active' : 'Inactive',
+                    esslId: u.esslId || '',
+                    effectiveFrom: rate.effectiveFrom ? formatDate(rate.effectiveFrom) : ''
                   };
                 })}
                 columns={[
-                  { label: 'Emp. ID', key: 'employeeId' },
-                  { label: 'eSSL ID', key: 'esslId' },
+                  { label: 'Employee Code', key: 'employeeId' },
                   { label: 'Employee Name', key: 'name' },
                   { label: 'Department', key: 'department' },
+                  { label: 'Designation', key: 'designation' },
+                  { label: 'Joining Date', key: 'joiningDate' },
+                  { label: 'Salary/Day Rate (₹)', key: 'perDayRate' },
+                  { label: 'OT Rate (₹)', key: 'otRate' },
                   { label: 'Shift', key: 'shiftType' },
-                  { label: 'Per Day (₹)', key: 'perDayRate' },
-                  { label: 'OT / hr (₹)', key: 'otRate' },
-                  { label: 'Effective From', key: 'effectiveFrom' },
-                  { label: 'Status', key: 'status' }
+                  { label: 'Status', key: 'status' },
+                  { label: 'eSSL ID', key: 'esslId' },
+                  { label: 'Effective From', key: 'effectiveFrom' }
                 ]}
                 filename="Employee_Master"
                 title="Employee Master"
               />
+              <button type="button" className="btn btn-primary" onClick={openMasterNew} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Plus size={16} /> Employee Details
+              </button>
             </header>
             <div className="esm-card-body">
               <div className="esm-toolbar">
@@ -530,14 +572,14 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                 <table className="att-table">
                   <thead>
                     <tr>
-                      <th>Emp. ID</th>
-                      <th>eSSL ID</th>
+                      <th>Employee Code</th>
                       <th>Employee Name</th>
                       <th>Department</th>
+                      <th>Designation</th>
+                      <th>Joining Date</th>
+                      <th>Salary/Day Rate (₹)</th>
+                      <th>OT Rate (₹)</th>
                       <th>Shift</th>
-                      <th>Per Day (₹)</th>
-                      <th>OT / hr (₹)</th>
-                      <th>Effective From</th>
                       <th>Status</th>
                       <th>Action</th>
                     </tr>
@@ -548,22 +590,28 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                     ) : filteredMaster.map((u) => {
                       const rate = getEffectiveRate(u);
                       return (
-                        <tr key={u.id} className={historyUserId === u.id ? 'is-highlight' : ''}>
+                        <tr
+                          key={u.id}
+                          className={historyUserId === u.id ? 'is-highlight' : ''}
+                          onClick={() => openMasterEdit(u)}
+                          style={{ cursor: 'pointer' }}
+                          title="Click to open employee details"
+                        >
                           <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{u.employeeId}</td>
-                          <td>{u.esslId || '—'}</td>
                           <td className="att-emp">{u.name || u.username}</td>
                           <td>{u.department || '—'}</td>
-                          <td><span className="esm-chip">{u.shiftType || '9hr'}</span></td>
+                          <td>{u.designation || '—'}</td>
+                          <td>{u.joiningDate ? formatDate(u.joiningDate) : '—'}</td>
                           <td>{rate.perDayRate ? money(rate.perDayRate) : '—'}</td>
                           <td>{rate.otRate ? money(rate.otRate) : '—'}</td>
-                          <td>{rate.effectiveFrom ? formatDate(rate.effectiveFrom) : '—'}</td>
+                          <td><span className="esm-chip">{u.shiftType || '9hr'}</span></td>
                           <td>
                             <span className={`att-badge ${u.active !== false ? 'is-present' : 'is-absent'}`}>
                               {u.active !== false ? 'Active' : 'Inactive'}
                             </span>
                           </td>
                           <td className="pm-actions">
-                            <button type="button" title="Edit rates" onClick={() => openMasterEdit(u)}><Edit2 size={14} /></button>
+                            <button type="button" title="Edit employee" onClick={(e) => { e.stopPropagation(); openMasterEdit(u); }}><Edit2 size={14} /></button>
                           </td>
                         </tr>
                       );
@@ -572,11 +620,20 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                 </table>
               </div>
 
+            </div>
+          </section>
+
+          {masterModal && (
+            <div className="page-form-overlay">
+              <div className="premium-card pm-card" style={{ maxWidth: 820, margin: '0 auto' }}>
+                <div className="pm-list-head">
+                  <h2 className="pm-card-title" style={{ margin: 0 }}>{editingUserId ? 'Edit Employee' : 'Employee Details'}</h2>
+                  <button type="button" className="btn" onClick={closeMasterModal}>Close</button>
+                </div>
               <form className="esm-rate-form" onSubmit={saveMaster}>
-                <h3 className="esm-subhead">{editingUserId ? 'Update Rate' : 'Set / Update Rate'}</h3>
                 <div className="pm-form-grid pm-form-grid-2">
                   <div className="form-group pm-field">
-                    <label>Employee *</label>
+                    <label>Select Employee *</label>
                     <SearchableSelect
                       className="input-field"
                       required
@@ -589,53 +646,86 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                       }}
                     >
                       <option value="">Select employee</option>
-                      {(data.users || []).filter((u) => u.active !== false).map((u) => (
-                        <option key={u.id} value={String(u.id)}>{u.name || u.username} ({u.employeeId})</option>
+                      {(data.users || []).map((u) => (
+                        <option key={u.id} value={String(u.id)}>{u.name || u.username} ({u.employeeId}){u.active === false ? ' - Inactive' : ''}</option>
                       ))}
                     </SearchableSelect>
                   </div>
                   <div className="form-group pm-field">
-                    <label>eSSL ID</label>
-                    <input className="input-field" value={masterForm.esslId} onChange={(e) => setMasterForm({ ...masterForm, esslId: e.target.value })} placeholder="Biometric user id" />
+                    <label>Employee Code (Auto)</label>
+                    <input
+                      className="input-field"
+                      value={masterForm.employeeId}
+                      readOnly
+                      placeholder="Generated automatically"
+                      title="Generated automatically"
+                      style={{ background: 'var(--glass-bg)', color: 'var(--accent-primary)', fontWeight: 600, cursor: 'not-allowed' }}
+                    />
                   </div>
                   <div className="form-group pm-field">
-                    <label>Shift Type</label>
-                    <SearchableSelect className="input-field" value={masterForm.shiftType} onChange={(e) => setMasterForm({ ...masterForm, shiftType: e.target.value })}>
-                      <option value="9hr">9hr</option>
-                      <option value="12hr">12hr</option>
+                    <label>Employee Name</label>
+                    <input className="input-field" value={masterForm.name} onChange={(e) => setMasterForm({ ...masterForm, name: e.target.value })} placeholder="Full name" />
+                  </div>
+                  <div className="form-group pm-field">
+                    <label>Department</label>
+                    <SearchableSelect className="input-field" memoryKey="employee-department" value={masterForm.department} onChange={(e) => setMasterForm({ ...masterForm, department: e.target.value })} placeholder="Select department">
+                      <option value="">Select department</option>
+                      {departmentOptions.map((d) => <option key={d} value={d}>{d}</option>)}
                     </SearchableSelect>
                   </div>
                   <div className="form-group pm-field">
-                    <label>Effective From *</label>
-                    <DateField className="input-field" required value={masterForm.effectiveFrom} onChange={(e) => setMasterForm({ ...masterForm, effectiveFrom: e.target.value })} />
+                    <label>Designation</label>
+                    <SearchableSelect className="input-field" memoryKey="employee-designation" value={masterForm.designation} onChange={(e) => setMasterForm({ ...masterForm, designation: e.target.value })} placeholder="e.g. Operator, Supervisor">
+                      <option value="">Select designation</option>
+                      {designationOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </SearchableSelect>
                   </div>
                   <div className="form-group pm-field">
-                    <label>Per Day Rate (₹)</label>
+                    <label>Joining Date</label>
+                    <DateField className="input-field" value={masterForm.joiningDate} onChange={(e) => setMasterForm({ ...masterForm, joiningDate: e.target.value })} />
+                  </div>
+                  <div className="form-group pm-field">
+                    <label>Salary/Day Rate (₹)</label>
                     <input type="number" className="input-field" value={masterForm.perDayRate} onChange={(e) => setMasterForm({ ...masterForm, perDayRate: e.target.value })} />
                   </div>
                   <div className="form-group pm-field">
                     <label>OT Rate / hr (₹)</label>
                     <input type="number" className="input-field" value={masterForm.otRate} onChange={(e) => setMasterForm({ ...masterForm, otRate: e.target.value })} />
                   </div>
+                  <div className="form-group pm-field">
+                    <label>Shift</label>
+                    <SearchableSelect className="input-field" value={masterForm.shiftType} onChange={(e) => setMasterForm({ ...masterForm, shiftType: e.target.value })}>
+                      <option value="9hr">9hr</option>
+                      <option value="12hr">12hr</option>
+                    </SearchableSelect>
+                  </div>
+                  <div className="form-group pm-field">
+                    <label>Status</label>
+                    <SearchableSelect className="input-field" allowCustom={false} value={masterForm.active ? 'Active' : 'Inactive'} onChange={(e) => setMasterForm({ ...masterForm, active: e.target.value !== 'Inactive' })}>
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </SearchableSelect>
+                  </div>
+                  <div className="form-group pm-field">
+                    <label>Rate Effective From *</label>
+                    <DateField className="input-field" required value={masterForm.effectiveFrom} onChange={(e) => setMasterForm({ ...masterForm, effectiveFrom: e.target.value })} />
+                  </div>
+                  <div className="form-group pm-field">
+                    <label>eSSL ID</label>
+                    <input className="input-field" value={masterForm.esslId} onChange={(e) => setMasterForm({ ...masterForm, esslId: e.target.value })} placeholder="Biometric user id" />
+                  </div>
                 </div>
-                <p className="esm-note">System picks the correct rate from history using Effective From. Old rates stay intact.</p>
+                <p className="esm-note">System picks the correct rate from history using Rate Effective From. Old rates stay intact.</p>
                 <div className="pm-form-actions">
-                  <button type="submit" className="btn btn-primary">Save Rate</button>
-                  <button type="button" className="btn" onClick={() => { setEditingUserId(null); setMasterForm(emptyMasterForm()); }}>Clear</button>
+                  <button type="submit" className="btn btn-primary">Save Employee</button>
+                  <button type="button" className="btn" onClick={closeMasterModal}>Cancel</button>
                 </div>
               </form>
-            </div>
-          </section>
-
-          <section className="premium-card esm-card">
-            <header className="esm-card-head">
-              <span className="esm-no">1b</span>
-              <div>
-                <h2>Salary Rate History</h2>
-                <p>{historyUser ? (historyUser.name || historyUser.username) : 'Select an employee'}</p>
-              </div>
-            </header>
-            <div className="esm-card-body">
+              {historyUser && (
+              <>
+              <h3 className="esm-subhead" style={{ marginTop: '1.25rem' }}>
+                Salary Rate History - {historyUser.name || historyUser.username}
+              </h3>
               <div className="pm-table-wrap">
                 <table className="att-table">
                   <thead>
@@ -660,9 +750,12 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                   </tbody>
                 </table>
               </div>
+              </>
+              )}
+              </div>
             </div>
-          </section>
-        </div>
+          )}
+        </>
       )}
 
       {/* ─── 2. eSSL ─── */}

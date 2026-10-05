@@ -192,7 +192,7 @@ export const buildOutstandingInvoices = (data, asOnDate = todayISO()) => {
     .forEach((mr) => {
       if (!hasSheetOverride(mr.sheetOverrides || {}, 'totalBill')
         && !hasSheetOverride(mr.sheetOverrides || {}, 'outstanding')
-        && !hasSheetOverride(mr.sheetOverrides || {}, 'manualPaid')) {
+        && !hasSheetOverride(mr.sheetOverrides || {}, 'paymentAmounts')) {
         return;
       }
       const outstanding = getReceiptOutstanding(mr, null, payments);

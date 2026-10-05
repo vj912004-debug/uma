@@ -9,6 +9,7 @@ export const getMergedSheetOverrides = (mr, invoiceId) => {
   const rest = { ...o };
   delete rest.byInvoice;
   delete rest.outstanding;
+  delete rest.outstandingManual;
   delete rest.manualPaid;
   delete rest.tdsDeduction;
   delete rest.totalBill;
@@ -66,20 +67,44 @@ export const getReceiptBillAmount = (mr, ti) => {
   return 0;
 };
 
+const toAmount = (raw) => {
+  const n = parseFloat(String(raw || '').replace(/[₹,\s]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+};
+
 /**
- * Cheque/cash received (excludes TDS).
- * Processing Sheet "Total Recd (Manual)" overrides payment cheque totals.
+ * Parse the Processing Sheet "Amounts Received" text, e.g.
+ * "₹50000.00 | ₹20,000 (TDS ₹400)". Entries split on | ; + or a new line.
+ */
+export const parseAmountsReceivedText = (text) => {
+  const parts = String(text || '').split(/[|;+\n]/).map((s) => s.trim()).filter(Boolean);
+  let cheque = 0;
+  let tds = 0;
+  parts.forEach((part) => {
+    const tdsMatch = part.match(/TDS\s*[:\-]?\s*₹?\s*([\d,]+(?:\.\d+)?)/i);
+    if (tdsMatch) tds += toAmount(tdsMatch[1]);
+    const rest = tdsMatch ? part.replace(tdsMatch[0], '') : part;
+    const amtMatch = rest.match(/([\d,]+(?:\.\d+)?)/);
+    if (amtMatch) cheque += toAmount(amtMatch[1]);
+  });
+  return { cheque, tds };
+};
+
+/**
+ * Cheque/cash received (excludes TDS), taken from "Amounts Received":
+ * the typed sheet value when present, otherwise the logged payments.
  */
 export const getReceiptEffectivePaid = (mr, payments, invoiceId) => {
   const o = getMergedSheetOverrides(mr, invoiceId);
-  if (hasSheetOverride(o, 'manualPaid')) return parseFloat(o.manualPaid) || 0;
+  if (hasSheetOverride(o, 'paymentAmounts')) return parseAmountsReceivedText(o.paymentAmounts).cheque;
   return getReceiptChequeTotal(payments, mr?.id, invoiceId);
 };
 
-/** TDS deducted: Processing Sheet override wins over payment TDS. */
+/** TDS deducted: TDS column override, then TDS typed in Amounts Received, then payment TDS. */
 export const getReceiptEffectiveTds = (mr, payments, invoiceId) => {
   const o = getMergedSheetOverrides(mr, invoiceId);
   if (hasSheetOverride(o, 'tdsDeduction')) return parseFloat(o.tdsDeduction) || 0;
+  if (hasSheetOverride(o, 'paymentAmounts')) return parseAmountsReceivedText(o.paymentAmounts).tds;
   return getReceiptTdsTotal(payments, mr?.id, invoiceId);
 };
 
@@ -100,7 +125,7 @@ export const getReceiptOutstanding = (mr, ti, payments) => {
     return outstanding;
   };
 
-  if (hasSheetOverride(o, 'outstanding')) {
+  if (o.outstandingManual === true && hasSheetOverride(o, 'outstanding')) {
     const v = parseFloat(o.outstanding);
     const calc = computed();
     if ((!Number.isFinite(v) || v <= 0) && calc > 0.01) return calc;

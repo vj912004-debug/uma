@@ -8,7 +8,7 @@ import { ALL_STAFF_MODULE_IDS, groupModuleOptions, parsePermissionsList } from '
 import { newestFirst } from '../utils/dateUtils';
 import ExportButton from '../components/ExportButton';
 
-const DEPARTMENTS = [
+export const DEPARTMENTS = [
   'Dashboard',
   'Master Data',
   'Production Planning',
@@ -135,7 +135,7 @@ const EmployeeManagement = () => {
     const userData = {
       name: form.name.trim(),
       username: form.username.trim(),
-      employeeId: form.employeeId || generateEmployeeId(data.users || []),
+      employeeId: editingUser?.employeeId || generateEmployeeId(data.users || []),
       department: form.department,
       role: form.role,
       active: form.active,
@@ -371,13 +371,13 @@ const EmployeeManagement = () => {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Employee ID</label>
+                      <label>Employee Code (Auto)</label>
                       <input
                         className="input-field"
-                        value={form.employeeId}
-                        onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
-                        placeholder="EMP001"
-                        required
+                        value={form.employeeId || generateEmployeeId(data.users || [])}
+                        readOnly
+                        title="Generated automatically"
+                        style={{ background: 'var(--glass-bg)', color: 'var(--accent-primary)', fontWeight: 600, cursor: 'not-allowed' }}
                       />
                     </div>
                   </div>

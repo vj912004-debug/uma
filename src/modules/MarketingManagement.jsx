@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Megaphone,
-  Target,
   Save,
   X,
   Edit2,
@@ -73,6 +72,27 @@ const emptyOrder = () => ({
   remarks: ''
 });
 
+const TABS = [
+  { id: 'leads', label: 'Leads', icon: Users },
+  { id: 'followups', label: 'Follow Ups', icon: Phone },
+  { id: 'enquiries', label: 'Enquiries', icon: FileText },
+  { id: 'orders', label: 'Orders', icon: BadgeCheck },
+  { id: 'reports', label: 'Reports', icon: Megaphone },
+  { id: 'calendar', label: 'Calendar', icon: CalendarDays }
+];
+
+const HASH_TARGETS = {
+  'mkt-add-lead': { tab: 'leads', modal: 'lead' },
+  'mkt-leads': { tab: 'leads' },
+  'mkt-schedule': { tab: 'followups', modal: 'follow' },
+  'mkt-follow-history': { tab: 'followups' },
+  'mkt-convert-enquiry': { tab: 'enquiries', modal: 'enquiry' },
+  'mkt-enquiries': { tab: 'enquiries' },
+  'mkt-order': { tab: 'orders', modal: 'order' },
+  'mkt-reports': { tab: 'reports' },
+  'mkt-calendar': { tab: 'calendar' }
+};
+
 const Panel = ({ no, title, children, right, id }) => (
   <section className="mkt-panel" id={id}>
     <header className="mkt-panel-head">
@@ -109,13 +129,16 @@ const MarketingManagement = () => {
   const { data, updateData, updateItem, deleteItemSoftly } = useAppContext();
   const location = useLocation();
 
+  const [activeTab, setActiveTab] = useState('leads');
+  const [modal, setModal] = useState(null);
+
   useEffect(() => {
-    if (!location.hash) return undefined;
-    const id = location.hash.replace('#', '');
-    const t = window.setTimeout(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 80);
-    return () => window.clearTimeout(t);
+    const id = (location.hash || '').replace('#', '');
+    if (!id) return;
+    const target = HASH_TARGETS[id];
+    if (!target) return;
+    if (target.tab) setActiveTab(target.tab);
+    if (target.modal) setModal(target.modal);
   }, [location.hash]);
 
   const [leadForm, setLeadForm] = useState(emptyLead);
@@ -258,12 +281,39 @@ const MarketingManagement = () => {
     }
     clearLead();
     setLeadPage(1);
+    setModal(null);
+    setActiveTab('leads');
   };
 
   const editLead = (row) => {
     setEditingLeadId(row.id);
     setLeadForm({ ...emptyLead(), ...row });
-    document.getElementById('mkt-add-lead')?.scrollIntoView({ behavior: 'smooth' });
+    setModal('lead');
+  };
+
+  const openNewLead = () => {
+    clearLead();
+    setModal('lead');
+  };
+
+  const openFollowUp = (leadId = '') => {
+    setFollowForm({ ...emptyFollowUp(), leadId });
+    setModal('follow');
+  };
+
+  const openEnquiry = (leadId = '') => {
+    setEnquiryForm({ ...emptyEnquiry(), leadId });
+    setModal('enquiry');
+  };
+
+  const openOrder = (leadId = '', enquiryId = '') => {
+    setOrderForm({ ...emptyOrder(), leadId, enquiryId });
+    setModal('order');
+  };
+
+  const closeModal = () => {
+    if (modal === 'lead') clearLead();
+    setModal(null);
   };
 
   const deleteLead = (id) => {
@@ -287,6 +337,8 @@ const MarketingManagement = () => {
     }
     setFollowForm(emptyFollowUp());
     setFollowPage(1);
+    setModal(null);
+    setActiveTab('followups');
   };
 
   const deleteFollowUp = (id) => {
@@ -309,6 +361,8 @@ const MarketingManagement = () => {
     const lead = leads.find((l) => l.id === enquiryForm.leadId);
     if (lead) updateItem('marketingLeads', lead.id, { ...lead, status: 'Qualified' });
     setEnquiryForm(emptyEnquiry());
+    setModal(null);
+    setActiveTab('enquiries');
   };
 
   const saveOrder = (e) => {
@@ -327,9 +381,14 @@ const MarketingManagement = () => {
     const lead = leads.find((l) => l.id === orderForm.leadId);
     if (lead) updateItem('marketingLeads', lead.id, { ...lead, status: 'Converted' });
     setOrderForm(emptyOrder());
+    setModal(null);
+    setActiveTab('orders');
   };
 
-  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  const enquiryLabel = (id) => {
+    const en = enquiries.find((e) => e.id === id);
+    return en ? en.enquiryNo : '—';
+  };
 
   const conversionChecks = [
     { label: 'Lead Captured', done: leads.length > 0 },
@@ -339,6 +398,196 @@ const MarketingManagement = () => {
   ];
 
   const sourceTotal = Math.max(1, stats.bySource.reduce((s, x) => s + x.count, 0));
+
+  const leadFormView = (
+    <form onSubmit={saveLead} className="mkt-form">
+      <div className="mkt-form-grid">
+        <Field label="Date" required>
+          <DateField className="input-field" required value={leadForm.date} onChange={(e) => setLeadField('date', e.target.value)} />
+        </Field>
+        <Field label="Company Name" required>
+          <input className="input-field" required value={leadForm.companyName} onChange={(e) => setLeadField('companyName', e.target.value)} />
+        </Field>
+        <Field label="Contact Person" required>
+          <input className="input-field" required value={leadForm.contactPerson} onChange={(e) => setLeadField('contactPerson', e.target.value)} />
+        </Field>
+        <Field label="Mobile" required>
+          <input type="tel" className="input-field" required value={leadForm.mobile} onChange={(e) => setLeadField('mobile', e.target.value)} />
+        </Field>
+        <Field label="Email">
+          <input type="email" className="input-field" value={leadForm.email} onChange={(e) => setLeadField('email', e.target.value)} />
+        </Field>
+        <Field label="Product Interest">
+          <input className="input-field" value={leadForm.productInterest} onChange={(e) => setLeadField('productInterest', e.target.value)} />
+        </Field>
+        <Field label="Status" required>
+          <SearchableSelect className="input-field" required value={leadForm.status} onChange={(e) => setLeadField('status', e.target.value)}>
+            {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </SearchableSelect>
+        </Field>
+        <Field label="Remarks">
+          <input className="input-field" value={leadForm.remarks} onChange={(e) => setLeadField('remarks', e.target.value)} />
+        </Field>
+      </div>
+      <div className="mkt-source-block">
+        <span className="mkt-source-label">Lead Source Options</span>
+        <div className="mkt-source-options">
+          {LEAD_SOURCES.map((src) => (
+            <label key={src} className={`mkt-chip${leadForm.source === src ? ' is-active' : ''}`}>
+              <input
+                type="radio"
+                name="leadSource"
+                checked={leadForm.source === src}
+                onChange={() => setLeadField('source', src)}
+              />
+              {src}
+            </label>
+          ))}
+        </div>
+      </div>
+      <div className="mkt-form-actions">
+        <button type="submit" className="btn btn-primary"><Save size={14} /> {editingLeadId ? 'Update Lead' : 'Save'}</button>
+        <button type="button" className="btn mkt-btn-outline" onClick={closeModal}><X size={14} /> Cancel</button>
+      </div>
+    </form>
+  );
+
+  const followFormView = (
+    <form onSubmit={saveFollowUp} className="mkt-form">
+      <div className="mkt-form-grid">
+        <Field label="Lead / Company" required>
+          <SearchableSelect className="input-field" required value={followForm.leadId} onChange={(e) => setFollowField('leadId', e.target.value)} placeholder="Select lead">
+            <option value="">Select lead</option>
+            {leads.map((l) => <option key={l.id} value={l.id}>{l.companyName} — {l.contactPerson}</option>)}
+          </SearchableSelect>
+        </Field>
+        <Field label="Date" required>
+          <DateField className="input-field" required value={followForm.date} onChange={(e) => setFollowField('date', e.target.value)} />
+        </Field>
+        <Field label="Time" required>
+          <TimeField className="input-field" required value={followForm.time} onChange={(e) => setFollowField('time', e.target.value)} />
+        </Field>
+        <Field label="Follow Up Type" required>
+          <SearchableSelect className="input-field" required value={followForm.type} onChange={(e) => setFollowField('type', e.target.value)}>
+            {FOLLOW_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </SearchableSelect>
+        </Field>
+        <Field label="Status" required>
+          <SearchableSelect className="input-field" required value={followForm.status} onChange={(e) => setFollowField('status', e.target.value)}>
+            {FOLLOW_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </SearchableSelect>
+        </Field>
+        <Field label="Notes">
+          <input className="input-field" value={followForm.notes} onChange={(e) => setFollowField('notes', e.target.value)} />
+        </Field>
+      </div>
+      <div className="mkt-form-actions">
+        <button type="submit" className="btn btn-primary"><Save size={14} /> Save</button>
+        <button type="button" className="btn mkt-btn-outline" onClick={closeModal}>Cancel</button>
+      </div>
+    </form>
+  );
+
+  const enquiryFormView = (
+    <div className="mkt-split">
+      <form onSubmit={saveEnquiry} className="mkt-form">
+        <div className="mkt-form-grid">
+          <Field label="Select Lead" required>
+            <SearchableSelect className="input-field" required value={enquiryForm.leadId} onChange={(e) => setEnquiryField('leadId', e.target.value)} placeholder="Select lead">
+              <option value="">Select lead</option>
+              {leads.map((l) => <option key={l.id} value={l.id}>{l.companyName} — {l.contactPerson}</option>)}
+            </SearchableSelect>
+          </Field>
+          <Field label="Enquiry No.">
+            <input className="input-field" placeholder="Auto if blank" value={enquiryForm.enquiryNo} onChange={(e) => setEnquiryField('enquiryNo', e.target.value)} />
+          </Field>
+          <Field label="Date" required>
+            <DateField className="input-field" required value={enquiryForm.date} onChange={(e) => setEnquiryField('date', e.target.value)} />
+          </Field>
+          <Field label="Product / Requirement" required>
+            <input className="input-field" required value={enquiryForm.product} onChange={(e) => setEnquiryField('product', e.target.value)} />
+          </Field>
+          <Field label="Approx Qty">
+            <input className="input-field" value={enquiryForm.qty} onChange={(e) => setEnquiryField('qty', e.target.value)} />
+          </Field>
+          <Field label="Remarks">
+            <input className="input-field" value={enquiryForm.remarks} onChange={(e) => setEnquiryField('remarks', e.target.value)} />
+          </Field>
+        </div>
+        <div className="mkt-form-actions">
+          <button type="submit" className="btn btn-primary"><Save size={14} /> Convert</button>
+          <button type="button" className="btn mkt-btn-outline" onClick={closeModal}>Cancel</button>
+        </div>
+      </form>
+      <aside className="mkt-flow-card">
+        <h3>Conversion Flow</h3>
+        <ol className="mkt-flow">
+          <li><Users size={15} /> Lead</li>
+          <li><Phone size={15} /> Follow Up</li>
+          <li><FileText size={15} /> Enquiry</li>
+          <li><BadgeCheck size={15} /> Quotation</li>
+        </ol>
+      </aside>
+    </div>
+  );
+
+  const orderFormView = (
+    <div className="mkt-split">
+      <form onSubmit={saveOrder} className="mkt-form">
+        <div className="mkt-form-grid">
+          <Field label="Lead / Company" required>
+            <SearchableSelect className="input-field" required value={orderForm.leadId} onChange={(e) => setOrderField('leadId', e.target.value)} placeholder="Select lead">
+              <option value="">Select lead</option>
+              {leads.map((l) => <option key={l.id} value={l.id}>{l.companyName}</option>)}
+            </SearchableSelect>
+          </Field>
+          <Field label="Linked Enquiry">
+            <SearchableSelect className="input-field" value={orderForm.enquiryId} onChange={(e) => setOrderField('enquiryId', e.target.value)} placeholder="Optional">
+              <option value="">Optional</option>
+              {enquiries.filter((en) => !orderForm.leadId || en.leadId === orderForm.leadId).map((en) => (
+                <option key={en.id} value={en.id}>{en.enquiryNo} — {en.product}</option>
+              ))}
+            </SearchableSelect>
+          </Field>
+          <Field label="Order No.">
+            <input className="input-field" placeholder="Auto if blank" value={orderForm.orderNo} onChange={(e) => setOrderField('orderNo', e.target.value)} />
+          </Field>
+          <Field label="Date" required>
+            <DateField className="input-field" required value={orderForm.date} onChange={(e) => setOrderField('date', e.target.value)} />
+          </Field>
+          <Field label="Order Amount (₹)">
+            <input type="number" step="any" className="input-field" value={orderForm.amount} onChange={(e) => setOrderField('amount', e.target.value)} />
+          </Field>
+          <Field label="Remarks">
+            <input className="input-field" value={orderForm.remarks} onChange={(e) => setOrderField('remarks', e.target.value)} />
+          </Field>
+        </div>
+        <div className="mkt-form-actions">
+          <button type="submit" className="btn btn-primary"><Save size={14} /> Confirm Order</button>
+          <button type="button" className="btn mkt-btn-outline" onClick={closeModal}>Cancel</button>
+        </div>
+      </form>
+      <aside className="mkt-check-card">
+        <h3>Conversion Status</h3>
+        <ul className="mkt-checklist">
+          {conversionChecks.map((c) => (
+            <li key={c.label} className={c.done ? 'is-done' : ''}>
+              {c.done ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+              <span>{c.label}</span>
+            </li>
+          ))}
+        </ul>
+      </aside>
+    </div>
+  );
+
+  const MODALS = {
+    lead: { title: editingLeadId ? 'Edit Lead' : 'Add New Lead', body: leadFormView },
+    follow: { title: 'Schedule Follow Up', body: followFormView },
+    enquiry: { title: 'Convert to Enquiry', body: enquiryFormView },
+    order: { title: 'Conversion to Order / Business', body: orderFormView }
+  };
+  const openModal = modal ? MODALS[modal] : null;
 
   return (
     <div className="mkt-page">
@@ -352,88 +601,54 @@ const MarketingManagement = () => {
             Track Leads <span>→</span> Follow Ups <span>→</span> Convert to Enquiries <span>→</span> Grow Your Business
           </p>
         </div>
-        <ExportButton
-          data={leads}
-          columns={[
-            { label: 'Date', key: 'date' },
-            { label: 'Company', key: 'companyName' },
-            { label: 'Contact', key: 'contactPerson' },
-            { label: 'Mobile', key: 'mobile' },
-            { label: 'Email', key: 'email' },
-            { label: 'Source', key: 'source' },
-            { label: 'Status', key: 'status' }
-          ]}
-          filename="Marketing_Leads"
-          title="Marketing Leads"
-        />
-        <div className="mkt-hero-cta">
-          <Target size={18} />
-          <div>
-            <strong>Never miss a follow-up</strong>
-            <span>Schedule calls & meetings on time</span>
-          </div>
+        <div className="mkt-hero-actions">
+          <button type="button" className="btn btn-primary" onClick={openNewLead}><Plus size={14} /> New Lead</button>
+          <button type="button" className="btn mkt-btn-outline" onClick={() => openFollowUp()}><Phone size={14} /> Schedule Follow Up</button>
+          <button type="button" className="btn mkt-btn-outline" onClick={() => openEnquiry()}><FileText size={14} /> Convert to Enquiry</button>
+          <button type="button" className="btn mkt-btn-outline" onClick={() => openOrder()}><BadgeCheck size={14} /> New Order</button>
+          <ExportButton
+            data={leads}
+            columns={[
+              { label: 'Date', key: 'date' },
+              { label: 'Company', key: 'companyName' },
+              { label: 'Contact', key: 'contactPerson' },
+              { label: 'Mobile', key: 'mobile' },
+              { label: 'Email', key: 'email' },
+              { label: 'Source', key: 'source' },
+              { label: 'Status', key: 'status' }
+            ]}
+            filename="Marketing_Leads"
+            title="Marketing Leads"
+          />
         </div>
       </header>
 
-      <div className="mkt-grid">
-        {/* 1. Add New Lead */}
-        <Panel no="1" title="Add New Lead" id="mkt-add-lead">
-          <form onSubmit={saveLead} className="mkt-form">
-            <div className="mkt-form-grid">
-              <Field label="Date" required>
-                <DateField className="input-field" required value={leadForm.date} onChange={(e) => setLeadField('date', e.target.value)} />
-              </Field>
-              <Field label="Company Name" required>
-                <input className="input-field" required value={leadForm.companyName} onChange={(e) => setLeadField('companyName', e.target.value)} />
-              </Field>
-              <Field label="Contact Person" required>
-                <input className="input-field" required value={leadForm.contactPerson} onChange={(e) => setLeadField('contactPerson', e.target.value)} />
-              </Field>
-              <Field label="Mobile" required>
-                <input type="tel" className="input-field" required value={leadForm.mobile} onChange={(e) => setLeadField('mobile', e.target.value)} />
-              </Field>
-              <Field label="Email">
-                <input type="email" className="input-field" value={leadForm.email} onChange={(e) => setLeadField('email', e.target.value)} />
-              </Field>
-              <Field label="Product Interest">
-                <input className="input-field" value={leadForm.productInterest} onChange={(e) => setLeadField('productInterest', e.target.value)} />
-              </Field>
-              <Field label="Status" required>
-                <SearchableSelect className="input-field" required value={leadForm.status} onChange={(e) => setLeadField('status', e.target.value)}>
-                  {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </SearchableSelect>
-              </Field>
-              <Field label="Remarks">
-                <input className="input-field" value={leadForm.remarks} onChange={(e) => setLeadField('remarks', e.target.value)} />
-              </Field>
-            </div>
-            <div className="mkt-source-block">
-              <span className="mkt-source-label">Lead Source Options</span>
-              <div className="mkt-source-options">
-                {LEAD_SOURCES.map((src) => (
-                  <label key={src} className={`mkt-chip${leadForm.source === src ? ' is-active' : ''}`}>
-                    <input
-                      type="radio"
-                      name="leadSource"
-                      checked={leadForm.source === src}
-                      onChange={() => setLeadField('source', src)}
-                    />
-                    {src}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="mkt-form-actions">
-              <button type="submit" className="btn btn-primary"><Save size={14} /> {editingLeadId ? 'Update Lead' : 'Save'}</button>
-              {editingLeadId ? (
-                <button type="button" className="btn mkt-btn-outline" onClick={clearLead}><X size={14} /> Cancel</button>
-              ) : null}
-            </div>
-          </form>
-        </Panel>
+      <div className="mkt-kpi-row">
+        <div className="mkt-kpi tone-a"><span>Total Leads</span><strong>{stats.total}</strong></div>
+        <div className="mkt-kpi tone-b"><span>Contacted</span><strong>{stats.contacted}</strong></div>
+        <div className="mkt-kpi tone-c"><span>Follow Up</span><strong>{stats.follow}</strong></div>
+        <div className="mkt-kpi tone-d"><span>Closed / Won</span><strong>{stats.won}</strong></div>
+      </div>
 
-        {/* 2. View / Manage Leads */}
-        <Panel no="2" title="View / Manage Leads" id="mkt-leads">
+      <div className="esm-tabs">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              className={`esm-tab ${activeTab === t.id ? 'is-active' : ''}`}
+              onClick={() => setActiveTab(t.id)}
+            >
+              <Icon size={15} />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeTab === 'leads' && (
+        <Panel no="1" title="View / Manage Leads" id="mkt-leads">
           <StatusTabBar
             value={statusTab}
             onChange={(v) => { setStatusTab(v); setLeadPage(1); }}
@@ -464,6 +679,7 @@ const MarketingManagement = () => {
                   <th>Company Name</th>
                   <th>Contact Person</th>
                   <th>Mobile</th>
+                  <th>Product Interest</th>
                   <th>Source</th>
                   <th>Status</th>
                   <th>Action</th>
@@ -471,17 +687,20 @@ const MarketingManagement = () => {
               </thead>
               <tbody>
                 {leadRows.length === 0 ? (
-                  <tr><td colSpan={8} className="pm-empty">No leads yet. Add a lead in panel 1.</td></tr>
+                  <tr><td colSpan={9} className="pm-empty">No leads yet. Click New Lead to add one.</td></tr>
                 ) : leadRows.map((r, idx) => (
-                  <tr key={r.id}>
+                  <tr key={r.id} onClick={() => editLead(r)} style={{ cursor: 'pointer' }} title="Click to open lead">
                     <td>{(leadPageSafe - 1) * PAGE_SIZE + idx + 1}</td>
                     <td>{formatDate(r.date)}</td>
                     <td>{r.companyName}</td>
                     <td>{r.contactPerson}</td>
                     <td>{r.mobile}</td>
+                    <td>{r.productInterest || '—'}</td>
                     <td>{r.source}</td>
                     <td><span className={`mkt-badge ${badgeClass(r.status)}`}>{r.status}</span></td>
-                    <td className="pm-actions">
+                    <td className="pm-actions" onClick={(e) => e.stopPropagation()}>
+                      <button type="button" title="Schedule follow up" onClick={() => openFollowUp(r.id)}><Phone size={14} /></button>
+                      <button type="button" title="Convert to enquiry" onClick={() => openEnquiry(r.id)}><FileText size={14} /></button>
                       <button type="button" title="Edit" onClick={() => editLead(r)}><Edit2 size={14} /></button>
                       <button type="button" title="Delete" className="danger" onClick={() => deleteLead(r.id)}><Trash2 size={14} /></button>
                     </td>
@@ -499,46 +718,19 @@ const MarketingManagement = () => {
             </div>
           </div>
         </Panel>
+      )}
 
-        {/* 3. Schedule Follow Up */}
-        <Panel no="3" title="Schedule Follow Up" id="mkt-schedule">
-          <form onSubmit={saveFollowUp} className="mkt-form">
-            <div className="mkt-form-grid">
-              <Field label="Lead / Company" required>
-                <SearchableSelect className="input-field" required value={followForm.leadId} onChange={(e) => setFollowField('leadId', e.target.value)} placeholder="Select lead">
-                  <option value="">Select lead</option>
-                  {leads.map((l) => <option key={l.id} value={l.id}>{l.companyName} — {l.contactPerson}</option>)}
-                </SearchableSelect>
-              </Field>
-              <Field label="Date" required>
-                <DateField className="input-field" required value={followForm.date} onChange={(e) => setFollowField('date', e.target.value)} />
-              </Field>
-              <Field label="Time" required>
-                <TimeField className="input-field" required value={followForm.time} onChange={(e) => setFollowField('time', e.target.value)} />
-              </Field>
-              <Field label="Follow Up Type" required>
-                <SearchableSelect className="input-field" required value={followForm.type} onChange={(e) => setFollowField('type', e.target.value)}>
-                  {FOLLOW_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </SearchableSelect>
-              </Field>
-              <Field label="Status" required>
-                <SearchableSelect className="input-field" required value={followForm.status} onChange={(e) => setFollowField('status', e.target.value)}>
-                  {FOLLOW_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </SearchableSelect>
-              </Field>
-              <Field label="Notes">
-                <input className="input-field" value={followForm.notes} onChange={(e) => setFollowField('notes', e.target.value)} />
-              </Field>
-            </div>
-            <div className="mkt-form-actions">
-              <button type="submit" className="btn btn-primary"><Save size={14} /> Save</button>
-              <button type="button" className="btn mkt-btn-outline" onClick={() => setFollowForm(emptyFollowUp())}>Cancel</button>
-            </div>
-          </form>
-        </Panel>
-
-        {/* 4. Follow Up History */}
-        <Panel no="4" title="Follow Up History" id="mkt-follow-history">
+      {activeTab === 'followups' && (
+        <Panel
+          no="2"
+          title="Follow Up History"
+          id="mkt-follow-history"
+          right={(
+            <button type="button" className="btn btn-primary mkt-panel-btn" onClick={() => openFollowUp()}>
+              <Plus size={14} /> Schedule Follow Up
+            </button>
+          )}
+        >
           <div className="mkt-toolbar">
             <div className="pm-search">
               <Search size={14} />
@@ -586,58 +778,16 @@ const MarketingManagement = () => {
             </div>
           </div>
         </Panel>
+      )}
 
-        {/* 5. Convert to Enquiry */}
-        <Panel no="5" title="Convert to Enquiry" id="mkt-convert-enquiry">
-          <div className="mkt-split">
-            <form onSubmit={saveEnquiry} className="mkt-form">
-              <div className="mkt-form-grid mkt-form-grid-1">
-                <Field label="Select Lead" required>
-                  <SearchableSelect className="input-field" required value={enquiryForm.leadId} onChange={(e) => setEnquiryField('leadId', e.target.value)} placeholder="Select lead">
-                    <option value="">Select lead</option>
-                    {leads.map((l) => <option key={l.id} value={l.id}>{l.companyName} — {l.contactPerson}</option>)}
-                  </SearchableSelect>
-                </Field>
-                <Field label="Enquiry No.">
-                  <input className="input-field" placeholder="Auto if blank" value={enquiryForm.enquiryNo} onChange={(e) => setEnquiryField('enquiryNo', e.target.value)} />
-                </Field>
-                <Field label="Date" required>
-                  <DateField className="input-field" required value={enquiryForm.date} onChange={(e) => setEnquiryField('date', e.target.value)} />
-                </Field>
-                <Field label="Product / Requirement" required>
-                  <input className="input-field" required value={enquiryForm.product} onChange={(e) => setEnquiryField('product', e.target.value)} />
-                </Field>
-                <Field label="Approx Qty">
-                  <input className="input-field" value={enquiryForm.qty} onChange={(e) => setEnquiryField('qty', e.target.value)} />
-                </Field>
-                <Field label="Remarks">
-                  <input className="input-field" value={enquiryForm.remarks} onChange={(e) => setEnquiryField('remarks', e.target.value)} />
-                </Field>
-              </div>
-              <div className="mkt-form-actions">
-                <button type="submit" className="btn btn-primary"><Save size={14} /> Convert</button>
-              </div>
-            </form>
-            <aside className="mkt-flow-card">
-              <h3>Conversion Flow</h3>
-              <ol className="mkt-flow">
-                <li><Users size={15} /> Lead</li>
-                <li><Phone size={15} /> Follow Up</li>
-                <li><FileText size={15} /> Enquiry</li>
-                <li><BadgeCheck size={15} /> Quotation</li>
-              </ol>
-            </aside>
-          </div>
-        </Panel>
-
-        {/* 6. Enquiries & Quotations */}
+      {activeTab === 'enquiries' && (
         <Panel
-          no="6"
+          no="3"
           title="Enquiries & Quotations"
           id="mkt-enquiries"
           right={(
-            <button type="button" className="btn btn-primary mkt-panel-btn" onClick={() => scrollTo('mkt-convert-enquiry')}>
-              <Plus size={14} /> Add Quotation
+            <button type="button" className="btn btn-primary mkt-panel-btn" onClick={() => openEnquiry()}>
+              <Plus size={14} /> Convert to Enquiry
             </button>
           )}
         >
@@ -652,12 +802,13 @@ const MarketingManagement = () => {
                   <th>Qty</th>
                   <th>Status</th>
                   <th>Quotation No.</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {enquiries.length === 0 ? (
-                  <tr><td colSpan={7} className="pm-empty">No enquiries converted yet.</td></tr>
-                ) : enquiries.slice(0, 8).map((r) => (
+                  <tr><td colSpan={8} className="pm-empty">No enquiries converted yet.</td></tr>
+                ) : enquiries.map((r) => (
                   <tr key={r.id}>
                     <td className="purch-inq-no">{r.enquiryNo}</td>
                     <td>{formatDate(r.date)}</td>
@@ -666,71 +817,63 @@ const MarketingManagement = () => {
                     <td>{r.qty || '—'}</td>
                     <td><span className={`mkt-badge ${badgeClass(r.status)}`}>{r.status}</span></td>
                     <td>{r.quotationNo || '—'}</td>
+                    <td className="pm-actions">
+                      <button type="button" title="Convert to order" onClick={() => openOrder(r.leadId, r.id)}><BadgeCheck size={14} /></button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </Panel>
+      )}
 
-        {/* 7. Conversion to Order */}
-        <Panel no="7" title="Conversion to Order / Business" id="mkt-order">
-          <div className="mkt-split">
-            <form onSubmit={saveOrder} className="mkt-form">
-              <div className="mkt-form-grid mkt-form-grid-1">
-                <Field label="Lead / Company" required>
-                  <SearchableSelect className="input-field" required value={orderForm.leadId} onChange={(e) => setOrderField('leadId', e.target.value)} placeholder="Select lead">
-                    <option value="">Select lead</option>
-                    {leads.map((l) => <option key={l.id} value={l.id}>{l.companyName}</option>)}
-                  </SearchableSelect>
-                </Field>
-                <Field label="Linked Enquiry">
-                  <SearchableSelect className="input-field" value={orderForm.enquiryId} onChange={(e) => setOrderField('enquiryId', e.target.value)} placeholder="Optional">
-                    <option value="">Optional</option>
-                    {enquiries.filter((en) => !orderForm.leadId || en.leadId === orderForm.leadId).map((en) => (
-                      <option key={en.id} value={en.id}>{en.enquiryNo} — {en.product}</option>
-                    ))}
-                  </SearchableSelect>
-                </Field>
-                <Field label="Order No.">
-                  <input className="input-field" placeholder="Auto if blank" value={orderForm.orderNo} onChange={(e) => setOrderField('orderNo', e.target.value)} />
-                </Field>
-                <Field label="Date" required>
-                  <DateField className="input-field" required value={orderForm.date} onChange={(e) => setOrderField('date', e.target.value)} />
-                </Field>
-                <Field label="Order Amount (₹)">
-                  <input type="number" step="any" className="input-field" value={orderForm.amount} onChange={(e) => setOrderField('amount', e.target.value)} />
-                </Field>
-                <Field label="Remarks">
-                  <input className="input-field" value={orderForm.remarks} onChange={(e) => setOrderField('remarks', e.target.value)} />
-                </Field>
-              </div>
-              <div className="mkt-form-actions">
-                <button type="submit" className="btn btn-primary"><Save size={14} /> Confirm Order</button>
-              </div>
-            </form>
-            <aside className="mkt-check-card">
-              <h3>Conversion Status</h3>
-              <ul className="mkt-checklist">
-                {conversionChecks.map((c) => (
-                  <li key={c.label} className={c.done ? 'is-done' : ''}>
-                    {c.done ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-                    <span>{c.label}</span>
-                  </li>
+      {activeTab === 'orders' && (
+        <Panel
+          no="4"
+          title="Orders / Business"
+          id="mkt-order"
+          right={(
+            <button type="button" className="btn btn-primary mkt-panel-btn" onClick={() => openOrder()}>
+              <Plus size={14} /> New Order
+            </button>
+          )}
+        >
+          <div className="pm-table-wrap">
+            <table className="pm-table mkt-table">
+              <thead>
+                <tr>
+                  <th>Order No.</th>
+                  <th>Date</th>
+                  <th>Company</th>
+                  <th>Enquiry</th>
+                  <th>Amount (₹)</th>
+                  <th>Status</th>
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.length === 0 ? (
+                  <tr><td colSpan={7} className="pm-empty">No orders yet.</td></tr>
+                ) : orders.map((r) => (
+                  <tr key={r.id}>
+                    <td className="purch-inq-no">{r.orderNo}</td>
+                    <td>{formatDate(r.date)}</td>
+                    <td>{leadLabel(r.leadId)}</td>
+                    <td>{r.enquiryId ? enquiryLabel(r.enquiryId) : '—'}</td>
+                    <td>{r.amount ? Number(r.amount).toFixed(2) : '—'}</td>
+                    <td><span className={`mkt-badge ${badgeClass(r.status)}`}>{r.status}</span></td>
+                    <td>{r.remarks || '—'}</td>
+                  </tr>
                 ))}
-              </ul>
-            </aside>
+              </tbody>
+            </table>
           </div>
         </Panel>
+      )}
 
-        {/* 8. Reports & Analytics */}
-        <Panel no="8" title="Reports & Analytics" id="mkt-reports">
-          <div className="mkt-kpi-row">
-            <div className="mkt-kpi tone-a"><span>Total Leads</span><strong>{stats.total}</strong></div>
-            <div className="mkt-kpi tone-b"><span>Contacted</span><strong>{stats.contacted}</strong></div>
-            <div className="mkt-kpi tone-c"><span>Follow Up</span><strong>{stats.follow}</strong></div>
-            <div className="mkt-kpi tone-d"><span>Closed / Won</span><strong>{stats.won}</strong></div>
-          </div>
+      {activeTab === 'reports' && (
+        <Panel no="5" title="Reports & Analytics" id="mkt-reports">
           <div className="mkt-charts">
             <div className="mkt-chart-box">
               <h4>Lead Source</h4>
@@ -772,11 +915,20 @@ const MarketingManagement = () => {
               </div>
             </div>
           </div>
+          <ul className="mkt-footer-checks" style={{ marginTop: '1rem' }}>
+            {conversionChecks.map((c) => (
+              <li key={c.label} className={c.done ? 'is-done' : ''}>
+                {c.done ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                {c.label}
+              </li>
+            ))}
+          </ul>
         </Panel>
+      )}
 
-        {/* 9. Calendar View */}
+      {activeTab === 'calendar' && (
         <Panel
-          no="9"
+          no="6"
           title="Calendar View"
           id="mkt-calendar"
           right={(
@@ -803,7 +955,7 @@ const MarketingManagement = () => {
                         type="button"
                         className="mkt-cal-event"
                         title={`${item.time || ''} ${leadLabel(item.leadId)} — ${item.type}`}
-                        onClick={() => scrollTo('mkt-follow-history')}
+                        onClick={() => setActiveTab('followups')}
                       >
                         {item.time || item.type}
                       </button>
@@ -815,36 +967,19 @@ const MarketingManagement = () => {
             ))}
           </div>
         </Panel>
-      </div>
+      )}
 
-      <footer className="mkt-footer">
-        <div className="mkt-footer-steps">
-          {[
-            { id: 'mkt-add-lead', label: 'Add Lead', icon: Users },
-            { id: 'mkt-schedule', label: 'Follow Up', icon: Phone },
-            { id: 'mkt-convert-enquiry', label: 'Convert to Enquiry', icon: FileText },
-            { id: 'mkt-order', label: 'Convert to Order', icon: BadgeCheck },
-            { id: 'mkt-reports', label: 'Reports', icon: Megaphone },
-            { id: 'mkt-calendar', label: 'Calendar', icon: CalendarDays }
-          ].map((s) => {
-            const Icon = s.icon;
-            return (
-              <button type="button" key={s.id} className="mkt-footer-step" onClick={() => scrollTo(s.id)}>
-                <Icon size={14} />
-                <span>{s.label}</span>
-              </button>
-            );
-          })}
+      {openModal && (
+        <div className="page-form-overlay">
+          <div className="premium-card pm-card mkt-modal-card">
+            <div className="pm-list-head">
+              <h2 className="pm-card-title" style={{ margin: 0 }}>{openModal.title}</h2>
+              <button type="button" className="btn" onClick={closeModal}><X size={14} /> Close</button>
+            </div>
+            {openModal.body}
+          </div>
         </div>
-        <ul className="mkt-footer-checks">
-          {conversionChecks.map((c) => (
-            <li key={c.label} className={c.done ? 'is-done' : ''}>
-              {c.done ? <CheckCircle2 size={14} /> : <Circle size={14} />}
-              {c.label}
-            </li>
-          ))}
-        </ul>
-      </footer>
+      )}
     </div>
   );
 };

@@ -1,37 +1,19 @@
 import { mergeCompanyProfile } from './companyProfile';
-import { formatPdfDateDmy, formatPdfDateSlash } from './taxInvoiceLayout';
+import { formatPdfDateDmy, formatPdfDateSlash, splitPartyAddressLines, partyAddressHtml } from './taxInvoiceLayout';
 import {
   escHtml,
   renderHtmlToPdf,
   buildPrintHeader,
   buildStatusBar,
+  fillPrintPartyFields,
+  loadUmaAppData,
+  buildPartyFootHtml,
+  buildOptionalMetaRowHtml,
+  PRINT_ICON_DOC,
+  PRINT_ICON_CAL,
   PRINT_FOOTER_MESSAGES
 } from './printTheme';
 import { formatPrintRateText, formatQuotedRate, mergeRateUnits, defaultRateUnit } from './quotationRates';
-
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const formatQuoteDateLong = (d) => {
-  if (!d) return '';
-  try {
-    const str = String(d);
-    const date = str.length === 10 && str[4] === '-'
-      ? new Date(`${str}T00:00:00`)
-      : new Date(d);
-    if (Number.isNaN(date.getTime())) return String(d);
-    return `${String(date.getDate()).padStart(2, '0')}-${MONTHS[date.getMonth()]}-${date.getFullYear()}`;
-  } catch {
-    return String(d);
-  }
-};
-
-const splitAddress = (address) => {
-  if (!address) return '';
-  return address
-    .split('\n')
-    .map((l) => escHtml(l.trim()))
-    .filter(Boolean)
-    .join('<br>');
-};
 
 /** Keep digits from colliding with ( ) in PDF capture (Cambria / html2canvas kerning). */
 const wrapHsnCodeHtml = (text) => {
@@ -248,8 +230,6 @@ export const buildQuotationHtml = (data, profileInput) => {
   const profile = mergeCompanyProfile(profileInput);
   const { mainCharges, optionalCharges } = resolveChargesForPrint(data);
   const companyName = escHtml(profile.companyName || 'UMA MICRON');
-  const qtnNo = escHtml(data.quotationNo || 'N/A');
-  const qtnDate = escHtml(formatQuoteDateLong(data.date) || formatPdfDateDmy(data.date) || 'N/A');
   const validityDate = escHtml(formatPdfDateSlash(data.validityDate) || formatPdfDateDmy(data.validityDate) || '');
 
   const descriptionHtml = data.description
@@ -292,12 +272,10 @@ export const buildQuotationHtml = (data, profileInput) => {
   const pincode = profile.pincode || '391350';
   const state = profile.state || 'Gujarat';
   const addrLine1 = escHtml(String(addr1).replace(/\s*,\s*,+/g, ',').trim());
-  const addrLine2 = escHtml(`${city} - ${pincode}, ${state}, India`);
   const phoneRaw = String(profile.phone || '+91 97120 00297').trim();
-  const phoneStr = escHtml(
-    phoneRaw.replace(/^\+91(\d{5})(\d{5})$/, '+91 $1 $2')
-      .replace(/^\+91(\d{10})$/, (_, d) => `+91 ${d.slice(0, 5)} ${d.slice(5)}`)
-  );
+  const phoneFmt = phoneRaw.replace(/^\+91(\d{5})(\d{5})$/, '+91 $1 $2')
+    .replace(/^\+91(\d{10})$/, (_, d) => `+91 ${d.slice(0, 5)} ${d.slice(5)}`);
+  const phoneStr = escHtml(phoneFmt);
   const emailStr = escHtml(profile.email || 'info@umamicron.com');
   const webStr = escHtml(String(profile.website || 'www.umamicron.com').replace(/^https?:\/\//i, ''));
   const gstStr = escHtml(profile.gstNumber || '24AAGBPR8564D1ZE');
@@ -314,30 +292,38 @@ export const buildQuotationHtml = (data, profileInput) => {
 
   const sigName = escHtml(data.signatoryName || 'Amit Patel');
 
-  const partyName = escHtml(data.partyName || '');
-  const partyAddr = splitAddress(data.partyAddress || data.address || '');
-  const partyGstinRaw = data.gstin || '';
-  const partyContactRaw = data.contactPerson || '';
-  const partyMobileRaw = data.partyMobile || data.mobile || '';
-  const partyEmailRaw = data.partyEmail || data.email || '';
-  const partyInfoRows = [
-    ['GSTIN', partyGstinRaw],
-    ['Contact Person', partyContactRaw],
-    ['Mobile', partyMobileRaw],
-    ['Email', partyEmailRaw]
+  const party = fillPrintPartyFields(data, data.appData || loadUmaAppData());
+  const partyName = escHtml(party.partyName || '');
+  const partyLines = splitPartyAddressLines(party.partyAddress || party.billAddress || party.address || '');
+  const titleCase = (s) => String(s || '').toLowerCase().replace(/\b([a-z])/g, (ch) => ch.toUpperCase());
+  const partyFootHtml = buildPartyFootHtml(
+    party.gstinBill || party.gstin || '',
+    titleCase(party.billState || party.state || ''),
+    party.billStateCode || party.stateCode || ''
+  );
+  const attentionRows = [
+    ['Contact Person', data.contactPerson],
+    ['Mobile', data.partyMobile || data.mobile],
+    ['Email', data.partyEmail || data.email]
   ].filter(([, v]) => String(v || '').trim())
-    .map(([label, v]) => `<tr><td class="label">${label}</td><td class="colon">:</td><td>${escHtml(v)}</td></tr>`)
+    .map(([label, v]) => `<div class="frow"><span class="flabel">${label}</span><span class="fcolon">:</span><span>${escHtml(v)}</span></div>`)
     .join('');
 
-  const quoteDetailRows = [
-    ['Quotation No.', qtnNo],
-    ['Quotation Date', qtnDate],
-    ...(String(data.validityDate || '').trim() ? [['Validity', validityDate]] : []),
-    ['Contact Person', sigName],
-    ['Mobile', phoneStr],
-    ['Email', emailStr]
-  ].map(([label, v]) => `<tr><td class="label">${label}</td><td class="colon">:</td><td>${v}</td></tr>`)
-    .join('');
+  const companyStateName = titleCase(profile.state || 'Gujarat');
+  const companyStateCode = String(profile.gstNumber || '24').replace(/\s/g, '').slice(0, 2) || '24';
+  const companyPan = profile.panNumber
+    || (String(profile.gstNumber || '').length >= 15 ? String(profile.gstNumber).substring(2, 12) : '');
+
+  const quoteMetaRows = [
+    buildOptionalMetaRowHtml('Quotation No.', data.quotationNo || 'N/A', { iconHtml: PRINT_ICON_DOC }),
+    buildOptionalMetaRowHtml('Quotation Date', formatPdfDateDmy(data.date) || 'N/A', { iconHtml: PRINT_ICON_CAL }),
+    buildOptionalMetaRowHtml('Valid Till', formatPdfDateDmy(data.validityDate) || '', { iconHtml: PRINT_ICON_CAL })
+  ].join('');
+  const contactMetaRows = [
+    buildOptionalMetaRowHtml('Contact Person', data.signatoryName || 'Amit Patel', { iconHtml: PRINT_ICON_DOC }),
+    buildOptionalMetaRowHtml('Mobile', phoneFmt, { iconHtml: PRINT_ICON_DOC }),
+    buildOptionalMetaRowHtml('Email', profile.email || 'info@umamicron.com', { iconHtml: PRINT_ICON_DOC })
+  ].join('');
 
   const subject = escHtml(data.subject || 'Quotation for Micronization Services');
 
@@ -476,6 +462,50 @@ export const buildQuotationHtml = (data, profileInput) => {
   .info-table td.colon{width:4%;}
 
   .qd-card{position:relative;}
+
+  /* ============ COMPANY INFO + QUOTATION META + PARTIES (same shell as DC / PI) ============ */
+  .info-row{display:flex;gap:12px;margin-top:10px;align-items:stretch;}
+  .company-info{flex:1.15;display:flex;justify-content:space-between;align-items:center;gap:12px;
+    font-size:10.5px;line-height:1.5;color:var(--text);min-width:0;}
+  .company-info .address-col{flex:1;min-width:0;}
+  .company-info .line{display:flex;gap:7px;align-items:flex-start;margin-bottom:3px;}
+  .company-info .icon{flex-shrink:0;width:14px;height:14px;margin-top:1px;}
+  .company-info .icon svg,.meta-row .m-icon svg,.party-head svg{
+    width:14px;height:14px;display:block;fill:none;stroke:#3d2b7d;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .reg-details{font-size:10.5px;line-height:1.7;flex-shrink:0;}
+  .reg-row{display:grid;grid-template-columns:44px 10px auto;column-gap:4px;align-items:center;white-space:nowrap;}
+  .reg-row .label{font-weight:700;color:var(--purple);}
+  .invoice-meta{flex:1;min-width:280px;border:1px solid var(--purple);border-radius:6px;overflow:hidden;
+    display:flex;flex-direction:column;justify-content:center;}
+  .invoice-meta .block{padding:7px 10px;}
+  .invoice-meta .block + .block{border-top:1px solid var(--purple);}
+  .meta-row{display:grid;grid-template-columns:14px 118px 10px minmax(0,1fr);column-gap:4px;align-items:center;
+    margin-bottom:3px;font-size:10.5px;line-height:1.3;white-space:nowrap;color:#231f20;}
+  .meta-row:last-child{margin-bottom:0;}
+  .meta-row .m-label,.meta-row .m-colon,.meta-row .m-value{font-weight:700;}
+  .meta-row .m-value{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+  .meta-row .m-icon{display:flex;align-items:center;justify-content:center;}
+  .parties{display:flex;gap:10px;margin-top:10px;width:100%;}
+  .party{flex:1;min-width:0;border:1px solid var(--purple);border-radius:6px;overflow:hidden;
+    display:flex;flex-direction:column;box-sizing:border-box;}
+  .party-head{background:var(--purple-light);color:var(--purple);font-weight:800;font-size:10.5px;letter-spacing:.5px;
+    padding:6px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--purple-border);}
+  .party-body{padding:7px 12px;font-size:10.5px;line-height:1.4;flex:1;color:var(--text);}
+  .party-body .cname{color:var(--purple);font-weight:800;margin:0 0 2px;}
+  .party-body .addr{margin:0 0 3px;line-height:1.45;}
+  .party-body .addr:last-child{margin-bottom:0;}
+  .party-foot{border-top:1px solid var(--purple-border);padding:6px 12px;font-size:10.5px;}
+  .party-foot .frow,.qt-attention .frow{display:grid;grid-template-columns:max-content 10px minmax(0,1fr);column-gap:6px;margin-bottom:2px;}
+  .party-foot .frow:last-child,.qt-attention .frow:last-child{margin-bottom:0;}
+  .party-foot .flabel,.qt-attention .flabel{font-weight:700;}
+  .qt-attention .frow{grid-template-columns:100px 10px minmax(0,1fr);margin-bottom:4px;}
+  .sheet.quot-compact .info-row,.sheet.quot-compact .parties{margin-top:6px;gap:8px;}
+  .sheet.quot-compact .company-info,.sheet.quot-compact .reg-details,.sheet.quot-compact .meta-row,
+  .sheet.quot-compact .party-head,.sheet.quot-compact .party-body,.sheet.quot-compact .party-foot{font-size:9.5px;}
+  .sheet.quot-compact .invoice-meta .block,.sheet.quot-compact .party-body,.sheet.quot-compact .party-foot{padding:5px 10px;}
+  .sheet.quot-ultra .company-info .line{margin-bottom:1px;}
+  .sheet.quot-ultra .company-info,.sheet.quot-ultra .reg-details,.sheet.quot-ultra .meta-row,
+  .sheet.quot-ultra .party-head,.sheet.quot-ultra .party-body,.sheet.quot-ultra .party-foot{font-size:8.5px;line-height:1.3;}
 
   /* ============ SUBJECT ============ */
   .subject{
@@ -777,8 +807,8 @@ export const buildQuotationHtml = (data, profileInput) => {
     display:grid;
     grid-template-columns:minmax(0,1fr) minmax(0,1fr);
     gap:10px;
-    flex:1 1 0;
-    min-height:0;
+    flex:1 0 auto;
+    min-height:auto;
     align-items:stretch;
   }
   .bbox{
@@ -788,7 +818,6 @@ export const buildQuotationHtml = (data, profileInput) => {
     padding:12px 14px;
     min-width:0;
     height:100%;
-    min-height:0;
     display:flex;
     flex-direction:column;
   }
@@ -875,52 +904,39 @@ export const buildQuotationHtml = (data, profileInput) => {
   <!-- HEADER (same layout as TI / PI / PO) -->
   ${buildPrintHeader(profile, 'QUOTATION', 'CONTRACT MICRONIZATION SERVICES')}
 
-  <!-- CONTACT BAR -->
-  <div class="contact-bar">
-    <div class="citem c-addr">
-      <svg class="ic" viewBox="0 0 24 24"><path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z"/></svg>
-      <span>${addrLine1}<br>${addrLine2}</span>
-    </div>
-    <div class="citem c-tight">
-      <svg class="ic" viewBox="0 0 24 24"><path d="M4 3h12a2 2 0 012 2v14l-8-3.5L2 19V5a2 2 0 012-2zm3 4h6v2H7V7zm0 4h6v2H7v-2z"/></svg>
-      <span>GSTIN: ${gstStr}</span>
-    </div>
-    <div class="citem c-tight">
-      <svg class="ic" viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.4 0 .8-.3 1L6.6 10.8z"/></svg>
-      <span>${phoneStr}</span>
-    </div>
-    <div class="citem c-tight">
-      <svg class="ic" viewBox="0 0 24 24"><path d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
-      <span>${emailStr}</span>
-    </div>
-    <div class="citem c-tight">
-      <svg class="ic" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm6.9 6h-3a15.6 15.6 0 00-1.4-3.9A8 8 0 0118.9 8zM12 4c.8 1.1 1.5 2.5 1.9 4h-3.8c.4-1.5 1.1-2.9 1.9-4zM4.3 14a8 8 0 010-4h3.4a17 17 0 000 4H4.3zm.8 2h3a15.6 15.6 0 001.4 3.9A8 8 0 015.1 16zm3-8H5.1a8 8 0 014.4-3.9A15.6 15.6 0 008.1 8zM12 20c-.8-1.1-1.5-2.5-1.9-4h3.8c-.4 1.5-1.1 2.9-1.9 4zm2.3-6H9.7a13 13 0 010-4h4.6a13 13 0 010 4zm.4 5.9c.6-1.2 1.1-2.5 1.4-3.9h3a8 8 0 01-4.4 3.9zm1.8-5.9a17 17 0 000-4h3.4a8 8 0 010 4h-3.4z"/></svg>
-      <span>${webStr}</span>
-    </div>
-  </div>
-
   <div class="body-pad">
-    <!-- TWO COL -->
-    <div class="two-col">
-      <div class="info-box">
-        <div class="pill-head"><svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4 0-8 2-8 5v2h16v-2c0-3-4-5-8-5z"/></svg>PREPARED FOR</div>
-        <div class="card">
-          <div class="co-name">${partyName}</div>
-          <div class="addr">${partyAddr}</div>
-          <table class="info-table">
-            ${partyInfoRows}
-          </table>
+    <!-- COMPANY + QUOTATION META (same layout as DC / PI) -->
+    <div class="info-row">
+      <div class="company-info">
+        <div class="address-col">
+          <div class="line"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></span><span>${addrLine1}<br>${escHtml(city)} - ${escHtml(pincode)},<br>${escHtml(state)}, India</span></div>
+          <div class="line"><span class="icon"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 2.9c0-.5.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg></span><span>${phoneStr}</span></div>
+          <div class="line"><span class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 6.5l9 7 9-7"/></svg></span><span>${emailStr}</span></div>
+          <div class="line"><span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.4 3.6 5.7 3.6 9s-1.2 6.6-3.6 9c-2.4-2.4-3.6-5.7-3.6-9S9.6 5.4 12 3z"/></svg></span><span>${webStr}</span></div>
+        </div>
+        <div class="reg-details">
+          <div class="reg-row"><span class="label">GSTIN</span><span class="colon">:</span><span>${gstStr}</span></div>
+          ${companyPan ? `<div class="reg-row"><span class="label">PAN</span><span class="colon">:</span><span>${escHtml(companyPan)}</span></div>` : ''}
+          <div class="reg-row"><span class="label">State</span><span class="colon">:</span><span>${escHtml(companyStateName)} (${escHtml(companyStateCode)})</span></div>
         </div>
       </div>
+      <div class="invoice-meta">
+        <div class="block">${quoteMetaRows}</div>
+        <div class="block">${contactMetaRows}</div>
+      </div>
+    </div>
 
-      <div class="info-box">
-        <div class="pill-head"><svg viewBox="0 0 24 24"><path d="M6 2h12a1 1 0 011 1v18l-7-3-7 3V3a1 1 0 011-1z"/></svg>QUOTATION DETAILS</div>
-        <div class="card qd-card">
-          <table class="info-table">
-            ${quoteDetailRows}
-          </table>
-        </div>
+    <!-- PREPARED FOR / KIND ATTENTION (same cards as DC Bill To / Ship To) -->
+    <div class="parties">
+      <div class="party">
+        <div class="party-head"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg> PREPARED FOR</div>
+        <div class="party-body"><div class="cname">${partyName}</div>${partyAddressHtml(partyLines)}</div>
+        ${partyFootHtml}
       </div>
+      ${attentionRows ? `<div class="party">
+        <div class="party-head"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 2.9c0-.5.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg> KIND ATTENTION</div>
+        <div class="party-body qt-attention">${attentionRows}</div>
+      </div>` : ''}
     </div>
 
     <!-- SUBJECT -->

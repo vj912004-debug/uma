@@ -19,6 +19,8 @@ import {
   getReceiptPayments,
   getReceiptBillAmount,
   getReceiptOutstanding,
+  getReceiptEffectivePaid,
+  getReceiptEffectiveTds,
   hasSheetOverride,
   getMergedSheetOverrides
 } from '../utils/paymentTotals';
@@ -104,7 +106,8 @@ const ProcessingSheet = () => {
     const numericFields = new Set([
       'receivedQty', 'bprNetQty', 'dcNetQty', 'totalBill', 'manualPaid', 'tdsDeduction', 'outstanding'
     ]);
-    const paymentFields = new Set(['totalBill', 'manualPaid', 'tdsDeduction', 'outstanding']);
+    const paymentFields = new Set(['totalBill', 'manualPaid', 'tdsDeduction', 'outstanding', 'paymentAmounts']);
+    const recalcFields = new Set(['totalBill', 'tdsDeduction', 'paymentAmounts']);
     // Empty numeric cells save as 0 so clearing does not snap back to auto-calculated values
     const nextVal = numericFields.has(field) && (value === '' || value === null || value === undefined)
       ? '0'
@@ -114,39 +117,31 @@ const ProcessingSheet = () => {
       ? (data.invoices || []).find((inv) => inv.id === invoiceId)
       : getTI(mrId);
 
-    const persistComputedOutstanding = (bucket, nextMr) => {
-      const outstanding = getReceiptOutstanding(nextMr, ti, data.payments);
-      bucket.outstanding = outstanding < 0.01 ? '0' : String(Math.round(outstanding * 100) / 100);
-      bucket.dueStatus = outstanding <= 0 ? '0' : 'Due';
+    const fieldValue = field === 'paymentAmounts' ? value : nextVal;
+
+    const applyChange = (bucket) => {
+      bucket[field] = fieldValue;
+      if (recalcFields.has(field)) {
+        delete bucket.outstanding;
+        delete bucket.outstandingManual;
+        delete bucket.dueStatus;
+      } else if (field === 'outstanding') {
+        bucket.outstandingManual = true;
+        bucket.dueStatus = (parseFloat(nextVal) || 0) <= 0 ? '0' : 'Due';
+      }
     };
 
     if (invoiceId && paymentFields.has(field)) {
       const byInvoice = { ...(currentOverrides.byInvoice || {}) };
       const invO = { ...(byInvoice[invoiceId] || {}) };
-      invO[field] = nextVal;
-      if (field === 'manualPaid' || field === 'totalBill' || field === 'tdsDeduction') {
-        delete invO.outstanding;
-        const nextMr = {
-          ...mr,
-          sheetOverrides: { ...currentOverrides, byInvoice: { ...byInvoice, [invoiceId]: invO } }
-        };
-        persistComputedOutstanding(invO, nextMr);
-      } else if (field === 'outstanding') {
-        invO.dueStatus = (parseFloat(nextVal) || 0) <= 0 ? '0' : 'Due';
-      }
+      applyChange(invO);
       byInvoice[invoiceId] = invO;
       currentOverrides.byInvoice = byInvoice;
       // Stale receipt-level outstanding must not leak onto other invoices / Party Due
       delete currentOverrides.outstanding;
+      delete currentOverrides.outstandingManual;
     } else {
-      currentOverrides[field] = nextVal;
-      if (field === 'manualPaid' || field === 'totalBill' || field === 'tdsDeduction') {
-        delete currentOverrides.outstanding;
-        const nextMr = { ...mr, sheetOverrides: currentOverrides };
-        persistComputedOutstanding(currentOverrides, nextMr);
-      } else if (field === 'outstanding') {
-        currentOverrides.dueStatus = (parseFloat(nextVal) || 0) <= 0 ? '0' : 'Due';
-      }
+      applyChange(currentOverrides);
     }
 
     updateItem('materialReceipts', mrId, {
@@ -208,6 +203,8 @@ const ProcessingSheet = () => {
       paid,
       manualPaid: hasSheetOverride(o, 'manualPaid') ? o.manualPaid : '',
       tdsDeduction: finalTds,
+      amountsReceivedTotal:
+        getReceiptEffectivePaid(mr, data.payments, ti?.id) + getReceiptEffectiveTds(mr, data.payments, ti?.id),
       outstanding: compOutstanding,
       dueStatus: compOutstanding <= 0
         ? '0'
@@ -299,12 +296,8 @@ const ProcessingSheet = () => {
 
   const summaryTotals = filteredRows.reduce(
     (acc, row) => {
-      const received =
-        row.manualPaid !== '' && row.manualPaid != null
-          ? (parseFloat(row.manualPaid) || 0) + (parseFloat(row.tdsDeduction) || 0)
-          : (parseFloat(row.paid) || 0);
       acc.totalBill += parseFloat(row.totalBill) || 0;
-      acc.totalReceived += received;
+      acc.totalReceived += parseFloat(row.amountsReceivedTotal) || 0;
       acc.outstanding += parseFloat(row.outstanding) || 0;
       acc.tds += parseFloat(row.tdsDeduction) || 0;
       return acc;
