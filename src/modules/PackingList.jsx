@@ -333,6 +333,7 @@ const PackingList = () => {
           <ExportButton
             data={filteredPLs.map((pl) => ({
               plNo: pl.plNo,
+              partyName: pl.partyName || '',
               productName: getPLDisplayProductLabel(pl, data),
               totalWeight: pl.totalWeight,
               totalDrums: pl.totalDrums
@@ -340,11 +341,12 @@ const PackingList = () => {
             columns={[
               { label: 'PL No', key: 'plNo' },
               { label: 'Product', key: 'productName' },
-              { label: 'Total Weight', key: 'totalWeight' },
-              { label: 'Total Drums', key: 'totalDrums' }
+              { label: 'Total Weight (Kg)', key: 'totalWeight', type: 'number', total: true },
+              { label: 'Total Drums', key: 'totalDrums', type: 'int', total: true }
             ]}
             filename="Packing_Lists"
             title="Packing Lists"
+            groupBy="partyName"
           />
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New PL

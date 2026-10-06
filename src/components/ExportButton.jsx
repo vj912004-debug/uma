@@ -10,6 +10,17 @@ import {
 } from '../utils/companyProfile';
 import { promptPrintPrefs } from '../utils/promptPrintPrefs';
 import { normalizePrintPrefs } from '../utils/printPrefs';
+import { cellValue, downloadCompanyWiseExcel } from '../utils/companyWiseExcel';
+
+const displayRows = (data, columns) => data.map((row) => {
+  const out = { ...row };
+  columns.forEach((col) => {
+    if (!col.type && !col.value) return;
+    const v = cellValue(row, col);
+    out[col.key] = typeof v === 'number' ? v.toFixed(2) : v;
+  });
+  return out;
+});
 
 /** Map CSS font stacks to jsPDF built-in faces. */
 const toJsPdfFont = (fontFamily = '') => {
@@ -19,10 +30,15 @@ const toJsPdfFont = (fontFamily = '') => {
   return 'helvetica';
 };
 
-const ExportButton = ({ data, columns, filename, title }) => {
+const ExportButton = ({ data, columns, filename, title, groupBy }) => {
   const profile = getStoredCompanyProfile();
 
   const exportToExcel = () => {
+    if (groupBy) {
+      downloadCompanyWiseExcel({ filename, title, columns, rows: data, groupBy })
+        .catch((err) => alert(`Excel export failed: ${err?.message || err}`));
+      return;
+    }
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
@@ -70,7 +86,7 @@ const ExportButton = ({ data, columns, filename, title }) => {
     doc.autoTable({
       startY: 65,
       columns: tableCols,
-      body: data,
+      body: displayRows(data, columns),
       theme: 'grid',
       styles: { font: pdfFont, fontSize: bodySize },
       headStyles: { fillColor: [16, 185, 129], font: pdfFont, fontStyle: 'bold' }
@@ -100,7 +116,7 @@ const ExportButton = ({ data, columns, filename, title }) => {
     });
     tableHtml += '</tr>';
 
-    data.forEach((row) => {
+    displayRows(data, columns).forEach((row) => {
       tableHtml += '<tr>';
       columns.forEach((col) => {
         tableHtml += `<td style="font-family:${fontFamily};font-size:${fontSize}px;">${row[col.key] || ''}</td>`;

@@ -297,11 +297,12 @@ const PurchaseOrders = () => {
   });
 
   const exportColumns = [
-    { label: 'Date', key: 'date' },
+    { label: 'PO Date', key: 'date', type: 'date' },
     { label: 'PO Number', key: 'poNo' },
     { label: 'Party Name', key: 'partyName' },
-    { label: 'Qty (Kg)', key: 'qty' },
-    { label: 'Total (₹)', key: 'total' }
+    { label: 'Product', key: 'productName' },
+    { label: 'Qty (Kg)', key: 'qty', type: 'number', total: true },
+    { label: 'Total (₹)', key: 'total', type: 'money', total: true }
   ];
 
   const chargesList = STANDARD_CHARGES_LIST;
@@ -472,7 +473,7 @@ const PurchaseOrders = () => {
           <p style={{ color: 'var(--text-muted)' }}>Generate and manage incoming POs seamlessly from workflows.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <ExportButton data={filtered} columns={exportColumns} filename="Purchase_Orders" title="Purchase Orders Log" />
+          <ExportButton data={filtered} columns={exportColumns} filename="Purchase_Orders" title="Purchase Orders Log" groupBy="partyName" />
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New PO
           </button>

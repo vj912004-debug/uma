@@ -62,11 +62,21 @@ const OPTIONAL_PRINT_CHARGES = [
 
 const ALL_PRINT_CHARGES = [...MAIN_PRINT_CHARGES, ...OPTIONAL_PRINT_CHARGES];
 
-const defaultPrintSection = (key) =>
-  MAIN_PRINT_CHARGES.some((item) => item.key === key) ? 'main' : 'optional';
+const customPrintDefs = (data) =>
+  (Array.isArray(data?.customChargeDefs) ? data.customChargeDefs : [])
+    .filter((def) => def?.key && String(def.label || '').trim())
+    .map((def) => ({ key: def.key, label: String(def.label).trim(), isQtyRate: false, section: def.section }));
+
+const printChargeDefs = (data) => [...ALL_PRINT_CHARGES, ...customPrintDefs(data)];
+
+const defaultPrintSection = (key, data) => {
+  if (MAIN_PRINT_CHARGES.some((item) => item.key === key)) return 'main';
+  const custom = customPrintDefs(data).find((def) => def.key === key);
+  return custom?.section === 'main' ? 'main' : 'optional';
+};
 
 const printSectionFor = (data, key) =>
-  data.chargeSection?.[key] || defaultPrintSection(key);
+  data.chargeSection?.[key] || defaultPrintSection(key, data);
 
 const customPrintRows = (rows = []) =>
   (rows || [])
@@ -174,20 +184,25 @@ export const enrichQuotationForPrint = (data = {}) => {
       };
     });
     if (productRows.length) {
-      const kept = (mainCharges || []).filter((row) => row?.sourceKey !== 'processing' && !/^processing charges/i.test(String(row?.description || '')));
-      mainCharges = [...productRows, ...kept];
+      const isProcessingRow = (row) => row?.sourceKey === 'processing' || /^processing charges/i.test(String(row?.description || ''));
+      const keptMain = (mainCharges || []).filter((row) => !isProcessingRow(row));
+      const keptOptional = (optionalCharges || []).filter((row) => !isProcessingRow(row));
+      if (printSectionFor(data, 'processing') === 'optional') {
+        mainCharges = keptMain;
+        optionalCharges = [...productRows, ...keptOptional];
+      } else {
+        mainCharges = [...productRows, ...keptMain];
+        optionalCharges = keptOptional;
+      }
     }
     const other = firstPositiveRate(header.other);
     if (other > 0) {
       const printed = formatQuotedRate(other, '');
-      const hasOther = (optionalCharges || []).some((row) => /other charges/i.test(String(row?.description || '')));
-      if (!hasOther) {
-        optionalCharges = [...(optionalCharges || []), {
-          description: 'Other Charges',
-          rate: printed,
-          dryRate: printed,
-          sourceKey: ''
-        }];
+      const isOther = (row) => /other charges/i.test(String(row?.description || ''));
+      if (![...(mainCharges || []), ...(optionalCharges || [])].some(isOther)) {
+        const row = { description: 'Other Charges', rate: printed, dryRate: printed, sourceKey: '' };
+        if ((data.chargeSection?.other || 'optional') === 'main') mainCharges = [...(mainCharges || []), row];
+        else optionalCharges = [...(optionalCharges || []), row];
       }
     }
   }
@@ -214,7 +229,7 @@ const isChargeSelected = (data, item) =>
 const resolveChargesForPrint = (data) => {
   const mainCharges = [];
   const optionalCharges = [];
-  ALL_PRINT_CHARGES.forEach((item) => {
+  printChargeDefs(data).forEach((item) => {
     if (!isChargeSelected(data, item)) return;
     const row = catalogRowForPrint(item, data);
     if (printSectionFor(data, item.key) === 'main') mainCharges.push(row);
@@ -811,10 +826,13 @@ export const buildQuotationHtml = (data, profileInput) => {
     display:grid;
     grid-template-columns:minmax(0,1fr) minmax(0,1fr);
     gap:10px;
-    flex:1 0 auto;
+    flex:0 0 auto;
     min-height:auto;
     align-items:stretch;
   }
+  .quot-continue .features{flex:0 0 auto;margin:0 0 8px 0;grid-template-rows:auto auto;}
+  .quot-continue .feat{height:auto;min-height:78px;}
+  .quot-continue .terms-wrap + .bottom-grid{margin-top:10px;}
   .bbox{
     background:#f7f9fb;
     border:1px solid #e3e8ee;
@@ -828,9 +846,10 @@ export const buildQuotationHtml = (data, profileInput) => {
   .bbox-head{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-shrink:0;}
   .bbox-head svg{width:14px;height:14px;fill:#2f2263;fill:var(--purple-dark);flex-shrink:0;}
   .bbox-head h4{color:var(--purple-dark);font-size:11px;font-weight:800;letter-spacing:.2px;margin:0;}
-  .bbox ol{padding-left:15px;font-size:10px;line-height:1.5;color:#231f20;margin:0;flex:1 1 auto;
+  .bbox ol{list-style:none;counter-reset:bbox;padding-left:0;font-size:10px;line-height:1.5;color:#231f20;margin:0;flex:1 1 auto;
     word-spacing:normal;letter-spacing:normal;white-space:normal;overflow:visible;}
-  .bbox ol li{color:#231f20;opacity:1;-webkit-text-fill-color:#231f20;margin:0;}
+  .bbox ol li{counter-increment:bbox;position:relative;padding-left:18px;color:#231f20;opacity:1;-webkit-text-fill-color:#231f20;margin:0;}
+  .bbox ol li::before{content:counter(bbox) ".";position:absolute;left:0;top:0;font-weight:700;color:#2f2263;-webkit-text-fill-color:#2f2263;}
   .bbox ol li + li{margin-top:6px;}
   .sign2{
     text-align:right;margin:6px 0 4px auto;padding:0;flex-shrink:0;
@@ -880,6 +899,10 @@ export const buildQuotationHtml = (data, profileInput) => {
   }
   .page2-notes .fr-qr .qrbox{width:74px;height:74px;margin:0 auto;}
   .page2-notes .fr-qr span{display:block;font-size:7.5px;font-weight:700;color:var(--purple-dark);margin-top:6px;line-height:1.2;}
+  .page2-notes .sign2{
+    flex:0 0 132px;margin:0;align-self:stretch;justify-content:center;
+    border-left:1px dashed #d8cfe6;padding-left:12px;width:auto;
+  }
   .page2-spacer{display:none;}
   .bottom-banner{
     background:var(--purple);color:#fff;display:flex;align-items:center;justify-content:space-between;
@@ -1039,6 +1062,33 @@ export const buildQuotationHtml = (data, profileInput) => {
 <!-- ============================================================ PAGE 2 ============================================================ -->
 <div class="sheet pdf-page page2">
   <div class="page2-body">
+  <div class="bottom-grid">
+    <div class="bbox">
+      <div class="bbox-head">
+        <svg viewBox="0 0 24 24"><path d="M4 3h16v18l-8-4-8 4zM7 8h10v2H7zM7 12h6v2H7z"/></svg>
+        <h4>IMPORTANT NOTES</h4>
+      </div>
+      <ol>
+        <li>Please send Purchase Order and specification letter regarding particle size requirement, material dispatch destination with preferred transporter / courier along with material.</li>
+        <li>Please send extra drums and other repacking materials considering increase of volume after micronization &amp; micronized materials to be repacked in fresh bags.</li>
+        <li>Material must be Non-Hazardous, uniform, dry and free flow powder form. Declaration form regarding material's non hazardous property is mandatory.</li>
+      </ol>
+    </div>
+
+    <div class="bbox">
+      <div class="bbox-head">
+        <svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zm-7 8a7 7 0 0114 0H5zm14.5-9.5a3.5 3.5 0 10-3.4-4.3c.6.5 1 1.2 1.3 1.9a5 5 0 012.1 2.4z"/></svg>
+        <h4>CUSTOMER RESPONSIBILITIES</h4>
+      </div>
+      <ol>
+        <li>Material must be non-hazardous and free from any contamination.</li>
+        <li>Material specification and desired PSD must be clearly mentioned.</li>
+        <li>All documents &amp; regulatory forms to be provided along with material.</li>
+        <li>Repacking material to be provided if customer does not opt for our material.</li>
+      </ol>
+    </div>
+  </div>
+
   <div class="features">
     <div class="feat">
       <div class="circ" style="background:#eee6f7;"><svg viewBox="0 0 24 24" fill="#5a2d81"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm-1 13l5.5-5.5-1.4-1.4L11 12.2 8.9 10 7.5 11.5 11 15z"/></svg></div>
@@ -1067,33 +1117,6 @@ export const buildQuotationHtml = (data, profileInput) => {
   </div>
 
   <div class="page2-lower">
-  <div class="bottom-grid">
-    <div class="bbox">
-      <div class="bbox-head">
-        <svg viewBox="0 0 24 24"><path d="M4 3h16v18l-8-4-8 4zM7 8h10v2H7zM7 12h6v2H7z"/></svg>
-        <h4>IMPORTANT NOTES</h4>
-      </div>
-      <ol>
-        <li>Please send Purchase Order and specification letter regarding particle size requirement, material dispatch destination with preferred transporter / courier along with material.</li>
-        <li>Please send extra drums and other repacking materials considering increase of volume after micronization &amp; micronized materials to be repacked in fresh bags.</li>
-        <li>Material must be Non-Hazardous, uniform, dry and free flow powder form. Declaration form regarding material's non hazardous property is mandatory.</li>
-      </ol>
-    </div>
-
-    <div class="bbox">
-      <div class="bbox-head">
-        <svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zm-7 8a7 7 0 0114 0H5zm14.5-9.5a3.5 3.5 0 10-3.4-4.3c.6.5 1 1.2 1.3 1.9a5 5 0 012.1 2.4z"/></svg>
-        <h4>CUSTOMER RESPONSIBILITIES</h4>
-      </div>
-      <ol>
-        <li>Material must be non-hazardous and free from any contamination.</li>
-        <li>Material specification and desired PSD must be clearly mentioned.</li>
-        <li>All documents &amp; regulatory forms to be provided along with material.</li>
-        <li>Repacking material to be provided if customer does not opt for our material.</li>
-      </ol>
-    </div>
-  </div>
-
   <div class="page2-notes">
     <div class="fr-note">
       <p class="note-title">Note:</p>
@@ -1107,15 +1130,14 @@ export const buildQuotationHtml = (data, profileInput) => {
       </div>
       <span>SCAN TO VISIT OUR WEBSITE</span>
     </div>
+    <div class="sign2">
+      <div class="seal-box">SEAL</div>
+      <p><b>For ${companyName}</b></p>
+      <p><b>${sigName}</b><br><small>Authorised Signatory</small></p>
+    </div>
   </div>
   </div>
   <div class="page2-spacer"></div>
-
-  <div class="sign2">
-    <div class="seal-box">SEAL</div>
-    <p><b>For ${companyName}</b></p>
-    <p><b>${sigName}</b><br><small>Authorised Signatory</small></p>
-  </div>
   </div>
 
   ${buildStatusBar('Page 2 of 2', PRINT_FOOTER_MESSAGES.QT)}
@@ -1239,8 +1261,14 @@ const slotOnNext = (doc, page, node) => {
     if (!list) {
       const box = doc.createElement('div');
       box.className = 'page2-notes';
+      const note = doc.createElement('div');
+      note.className = 'fr-note';
+      const title = doc.createElement('p');
+      title.className = 'note-title';
+      title.textContent = 'Note (continued):';
       list = doc.createElement('ul');
-      box.appendChild(list);
+      note.append(title, list);
+      box.appendChild(note);
       placeAtStart(dest, box);
     }
     placeAtStart(list, node);
@@ -1248,6 +1276,13 @@ const slotOnNext = (doc, page, node) => {
   }
   if (node.matches?.('tbody tr, tr')) {
     return;
+  }
+  const ownList = node.matches?.('.page2-notes') ? node.querySelector('ul') : node.querySelector?.('.page2-notes ul');
+  const carried = ownList && dest.querySelector(':scope > .page2-notes');
+  if (carried && !node.contains(carried)) {
+    const lines = carried.querySelector('ul');
+    if (lines) ownList.append(...lines.children);
+    carried.remove();
   }
   placeAtStart(dest, node);
 };
@@ -1289,6 +1324,20 @@ const shiftQuoteOverflow = (doc, page) => {
       return false;
     }
 
+    if (tail.classList?.contains('page2-lower') || tail.classList?.contains('page2-notes')) {
+      const list = tail.classList.contains('page2-notes') ? tail.querySelector('ul') : null;
+      if (list && list.children.length > 1) {
+        slotOnNext(doc, page, list.lastElementChild);
+        return true;
+      }
+      if (!list && shiftFrom(tail)) return true;
+      if (kids.length > 1) {
+        slotOnNext(doc, page, tail);
+        return true;
+      }
+      return false;
+    }
+
     if (kids.length > 1) {
       slotOnNext(doc, page, tail);
       return true;
@@ -1308,9 +1357,6 @@ const shiftQuoteOverflow = (doc, page) => {
         slotOnNext(doc, page, cards[cards.length - 1]);
         return true;
       }
-    }
-    if (tail.classList?.contains('page2-lower') || tail.classList?.contains('bottom-grid') || tail.classList?.contains('page2-notes')) {
-      return shiftFrom(tail);
     }
     const list = tail.querySelector?.('ul');
     if (list && list.children.length > 1 && (tail.classList?.contains('fr-note') || tail.classList?.contains('page2-notes') || tail.closest?.('.page2-notes'))) {
@@ -1333,17 +1379,44 @@ const spillQuoteUntilFit = (doc, singlePageHeight) => {
       page = page.nextElementSibling;
       continue;
     }
-    const before = height;
-    const moved = shiftQuoteOverflow(doc, page);
-    const after = quotePageHeight(page);
-    if (!moved || after >= before - 1) {
-      page = page.nextElementSibling;
-    }
+    if (!shiftQuoteOverflow(doc, page)) page = page.nextElementSibling;
   }
   doc.querySelectorAll('.quot-continue').forEach((extra) => {
     const body = extra.querySelector('.body-pad');
     if (!body || !String(body.textContent || '').trim()) extra.remove();
   });
+};
+
+/** When the T&C boxes spill onto a continuation page, continue page 2's content right after them on that page. */
+const flowPage2AfterTerms = (doc) => {
+  const page2 = doc.querySelector('.sheet.page2');
+  const terms = [...doc.querySelectorAll('.sheet.pdf-page .terms-wrap')].pop();
+  const termsPage = terms?.closest('.sheet.pdf-page');
+  if (!page2 || !termsPage?.classList.contains('quot-continue')) return false;
+  const dest = termsPage.querySelector('.body-pad');
+  if (!dest) return false;
+
+  const absorb = (child) => {
+    if (child.classList?.contains('page2-spacer')) return;
+    const extra = child.classList?.contains('page2-notes') ? child.querySelector('ul') : null;
+    const list = extra && dest.querySelector('.page2-notes ul');
+    if (list && list !== extra) {
+      list.append(...extra.children);
+      return;
+    }
+    dest.appendChild(child);
+  };
+
+  [...(quoteBody(page2)?.children || [])].forEach(absorb);
+  let next = page2.nextElementSibling;
+  page2.remove();
+  while (next?.classList.contains('quot-continue')) {
+    const after = next.nextElementSibling;
+    [...(next.querySelector('.body-pad')?.children || [])].forEach(absorb);
+    next.remove();
+    next = after;
+  }
+  return true;
 };
 
 /**
@@ -1403,6 +1476,7 @@ export const fitQuotationToTwoPages = (doc, { singlePageHeight = 1123 } = {}) =>
   });
 
   spillQuoteUntilFit(doc, singlePageHeight);
+  if (flowPage2AfterTerms(doc)) spillQuoteUntilFit(doc, singlePageHeight);
 
   doc.querySelectorAll('.sheet.pdf-page').forEach((page) => {
     const height = quotePageHeight(page);

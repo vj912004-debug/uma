@@ -115,7 +115,7 @@ const Sidebar = () => {
       title: 'Payments',
       icon: CreditCard,
       items: [
-        { name: 'Payment Follow-Up', icon: Phone, path: '/payment-follow-up', roles: ['Admin', 'Staff'], pill: true, highlight: true },
+        { name: 'Payment Follow-Up', icon: Phone, path: '/payment-follow-up', roles: ['Admin', 'Staff'], highlight: true },
         { name: 'Party Due', icon: DollarSign, path: '/party-due', roles: ['Admin', 'Staff'] },
         { name: 'Payments', icon: CreditCard, path: '/payments', roles: ['Admin', 'Staff'] }
       ]

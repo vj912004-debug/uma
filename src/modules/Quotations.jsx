@@ -66,6 +66,36 @@ const defaultChargeSection = (key) =>
 const getChargeSection = (chargeSection, key) =>
   chargeSection?.[key] || defaultChargeSection(key);
 
+const customDefsOf = (form) =>
+  (Array.isArray(form?.customChargeDefs) ? form.customChargeDefs : [])
+    .filter((def) => def?.key && String(def.label || '').trim())
+    .map((def) => ({ key: def.key, label: String(def.label).trim(), isQtyRate: false, section: def.section === 'main' ? 'main' : 'optional', custom: true }));
+
+const chargeDefsOf = (form) => [...ALL_CHARGE_DEFS, ...customDefsOf(form)];
+
+const sectionOfDef = (chargeSection, item) =>
+  chargeSection?.[item.key] || item.section || defaultChargeSection(item.key);
+
+const mergeChargeDefs = (catalog = [], own = []) => {
+  const byKey = new Map();
+  [...(own || []), ...(catalog || [])].forEach((def) => {
+    if (def?.key && !byKey.has(def.key)) byKey.set(def.key, def);
+  });
+  return [...byKey.values()];
+};
+
+/** Company quote header charges; `sectionKey` is the print row each one feeds. */
+const COMPANY_HEADER_CHARGES = [
+  { field: 'minimum', key: 'minimum', label: 'Minimum Charge', hint: 'Prints with Cleaning' },
+  { field: 'filterBag', key: 'filterBag', label: 'Filter Bag Charge' },
+  { field: 'sieving', key: 'sieving', label: 'Sieving Charge' },
+  { field: 'processing', key: 'processing', label: 'Processing Charge' },
+  { field: 'cleaning', key: 'cleaning', label: 'Cleaning Charge' },
+  { field: 'other', key: 'other', label: 'Other Charges (If Any)' }
+];
+
+const COMPANY_HEADER_KEYS = new Set(COMPANY_HEADER_CHARGES.map((item) => item.key));
+
 const CHARGE_NOTE_SUGGESTIONS = [
   'Nil if Qty is more than 500kg',
   'if applicable',
@@ -168,6 +198,7 @@ const getDefaultForm = () => ({
   chargeNotes: emptyChargeNotes(),
   chargeSection: {},
   rateUnits: emptyRateUnits(),
+  customChargeDefs: [],
   mainCharges: [],
   optionalCharges: [],
   productSettings: {},
@@ -185,10 +216,10 @@ const formatChargeRateLabel = (item, rate, unit) => {
 const customChargeRows = (rows = []) =>
   (rows || []).filter((row) => !row.sourceKey && String(row.description || '').trim());
 
-const buildAutoChargeRows = (section, charges, rates, qty, psdRequirement, chargeNotes = {}, chargeSection = {}, rateUnits = {}) => {
+const buildAutoChargeRows = (section, charges, rates, qty, psdRequirement, chargeNotes = {}, chargeSection = {}, rateUnits = {}, defs = ALL_CHARGE_DEFS) => {
   const rows = [];
-  ALL_CHARGE_DEFS.forEach((item) => {
-    if (getChargeSection(chargeSection, item.key) !== section) return;
+  defs.forEach((item) => {
+    if (sectionOfDef(chargeSection, item) !== section) return;
     if (!charges?.[item.key]) return;
     const rate = rates?.[item.key] || 0;
     const unit = rateUnits[item.key] ?? defaultRateUnit(item.key);
@@ -226,14 +257,15 @@ const rebuildChargeTables = (
   chargeNotes = {},
   chargeSection = {},
   existingMain = [],
-  rateUnits = {}
+  rateUnits = {},
+  defs = ALL_CHARGE_DEFS
 ) => ({
   mainCharges: [
-    ...buildAutoChargeRows('main', charges, rates, qty, psdRequirement, chargeNotes, chargeSection, rateUnits),
+    ...buildAutoChargeRows('main', charges, rates, qty, psdRequirement, chargeNotes, chargeSection, rateUnits, defs),
     ...customChargeRows(existingMain)
   ],
   optionalCharges: [
-    ...buildAutoChargeRows('optional', charges, rates, qty, psdRequirement, chargeNotes, chargeSection, rateUnits),
+    ...buildAutoChargeRows('optional', charges, rates, qty, psdRequirement, chargeNotes, chargeSection, rateUnits, defs),
     ...customChargeRows(existingOptional)
   ]
 });
@@ -249,7 +281,8 @@ const tablesFromForm = (form, patch = {}) => {
     next.chargeNotes,
     next.chargeSection,
     next.mainCharges,
-    next.rateUnits
+    next.rateUnits,
+    chargeDefsOf(next)
   );
 };
 
@@ -319,7 +352,8 @@ const applyProductToQuotation = (baseForm, productName, party) => {
       chargeNotes,
       chargeSection,
       saved.mainCharges,
-      rateUnits
+      rateUnits,
+      chargeDefsOf(baseForm)
     );
     return {
       ...baseForm,
@@ -340,7 +374,7 @@ const applyProductToQuotation = (baseForm, productName, party) => {
   const prodConfig = (party?.products || []).find(p => p.name === productName);
   const { charges, rates, psdRequirement } = buildChargesFromPartyProduct(prodConfig);
   const qty = baseForm.productName === productName ? (baseForm.qty ?? '') : '';
-  const tables = rebuildChargeTables(charges, rates, qty, psdRequirement, [], emptyChargeNotes(), {}, [], emptyRateUnits());
+  const tables = rebuildChargeTables(charges, rates, qty, psdRequirement, [], emptyChargeNotes(), {}, [], emptyRateUnits(), chargeDefsOf(baseForm));
   return {
     ...baseForm,
     productName,
@@ -374,7 +408,7 @@ const primaryProductName = (q) => {
 };
 
 const Quotations = () => {
-  const { data, updateData, updateItem, deleteItemSoftly, ensureSerialAtLeast } = useAppContext();
+  const { data, setData, updateData, updateItem, deleteItemSoftly, ensureSerialAtLeast } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
@@ -386,6 +420,27 @@ const Quotations = () => {
   const [formData, setFormData] = useState(getDefaultForm());
   const [dropTarget, setDropTarget] = useState(null);
   const [quotePage, setQuotePage] = useState(0);
+  const [newCharge, setNewCharge] = useState(null);
+
+  const chargeCatalog = data.settings?.quoteChargeCatalog;
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const catalog = Array.isArray(chargeCatalog) ? chargeCatalog : [];
+    setFormData((prev) => {
+      const own = prev.customChargeDefs || [];
+      const merged = mergeChargeDefs(catalog, own);
+      const added = merged.filter((def) => !own.some((item) => item.key === def.key));
+      if (!added.length) return prev;
+      const rates = { ...(prev.rates || {}) };
+      const rateUnits = { ...(prev.rateUnits || {}) };
+      added.forEach((def) => {
+        if (rates[def.key] == null && def.rate != null) rates[def.key] = def.rate;
+        if (rateUnits[def.key] == null && def.unit != null) rateUnits[def.key] = def.unit;
+      });
+      return { ...prev, customChargeDefs: merged, rates, rateUnits };
+    });
+  }, [isModalOpen, chargeCatalog]);
 
   const quotationsList = newestFirst(data.quotations?.filter(q => !q.isDeleted) || []);
 
@@ -644,7 +699,7 @@ const Quotations = () => {
         productSettings: companySettings,
         productName: lines.map((line) => line.name).join(', '),
         psdRequirement: first.psdReq || '',
-        rates: { ...DEFAULT_RATES, ...(first.rates || {}) }
+        rates: { ...DEFAULT_RATES, ...(formData.rates || {}), ...(first.rates || {}) }
       };
     }
 
@@ -664,6 +719,13 @@ const Quotations = () => {
       });
       ensureSerialAtLeast('QT', nextSerial);
     }
+    const usedCustom = customDefsOf(formData).filter((def) => formData.charges?.[def.key]);
+    if (usedCustom.length) {
+      saveChargeCatalog((list) => list.map((def) => {
+        if (!usedCustom.some((item) => item.key === def.key)) return def;
+        return { ...def, rate: formData.rates?.[def.key] ?? def.rate, unit: formData.rateUnits?.[def.key] ?? def.unit };
+      }));
+    }
     closeQuotationModal();
   };
 
@@ -676,6 +738,7 @@ const Quotations = () => {
     setIsModalOpen(false);
     setProductPickerOpen(false);
     setPendingEditData(null);
+    setNewCharge(null);
   };
 
   const handleEdit = (q) => {
@@ -903,7 +966,7 @@ const handleSameCompanyQuote = (q) => {
     setDropTarget(null);
     const payload = parseChargeDrag(e);
     if (!payload) return;
-    const section = zone === 'mainCatalog' || zone === 'mainTable' ? 'main' : 'optional';
+    const section = zone === 'mainCatalog' || zone === 'mainTable' || zone === 'companyMain' ? 'main' : 'optional';
     if (payload.kind === 'catalog') {
       moveCatalogCharge(payload.key, section);
       return;
@@ -915,7 +978,49 @@ const handleSameCompanyQuote = (q) => {
   };
 
   const catalogItemsFor = (section) =>
-    ALL_CHARGE_DEFS.filter((item) => getChargeSection(formData.chargeSection, item.key) === section);
+    chargeDefsOf(formData).filter((item) => sectionOfDef(formData.chargeSection, item) === section);
+
+  const saveChargeCatalog = (updater) => {
+    setData((prev) => ({
+      ...prev,
+      settings: {
+        ...(prev.settings || {}),
+        quoteChargeCatalog: updater(Array.isArray(prev.settings?.quoteChargeCatalog) ? prev.settings.quoteChargeCatalog : [])
+      }
+    }));
+  };
+
+  const addCustomCharge = (section, rawLabel) => {
+    const label = String(rawLabel || '').trim();
+    if (!label) return;
+    const existing = chargeDefsOf(formData).find((item) => item.label.toLowerCase() === label.toLowerCase());
+    const key = existing?.key || `custom_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    if (!existing) {
+      saveChargeCatalog((list) => [...list, { key, label, section }]);
+    }
+    setFormData((prev) => {
+      const customChargeDefs = existing
+        ? (prev.customChargeDefs || [])
+        : mergeChargeDefs([], [...(prev.customChargeDefs || []), { key, label, section }]);
+      const charges = { ...(prev.charges || {}), [key]: true };
+      const chargeSection = { ...(prev.chargeSection || {}), [key]: section };
+      const patch = { customChargeDefs, charges, chargeSection };
+      return { ...prev, ...patch, ...tablesFromForm(prev, patch) };
+    });
+    setNewCharge(null);
+  };
+
+  const removeCustomCharge = (key, label) => {
+    if (!window.confirm(`Remove "${label}" from the charge list? It will no longer show on new quotations.`)) return;
+    saveChargeCatalog((list) => list.filter((def) => def.key !== key));
+    setFormData((prev) => {
+      const customChargeDefs = (prev.customChargeDefs || []).filter((def) => def.key !== key);
+      const charges = { ...(prev.charges || {}) };
+      delete charges[key];
+      const patch = { customChargeDefs, charges };
+      return { ...prev, ...patch, ...tablesFromForm(prev, patch) };
+    });
+  };
 
   const dropZoneStyle = (zone) => ({
     borderRadius: '8px',
@@ -925,6 +1030,185 @@ const handleSameCompanyQuote = (q) => {
     minHeight: '48px',
     transition: 'border-color 0.15s ease, background 0.15s ease'
   });
+
+  const companyChargeCards = (section) => {
+    const header = COMPANY_HEADER_CHARGES
+      .filter((item) => getChargeSection(formData.chargeSection, item.key) === section)
+      .map((item) => ({ ...item, kind: 'header', id: `h-${item.field}`, sectionKey: item.key }));
+    const extra = chargeDefsOf(formData)
+      .filter((item) => !COMPANY_HEADER_KEYS.has(item.key) && sectionOfDef(formData.chargeSection, item) === section)
+      .map((item) => ({ ...item, kind: 'catalog', id: item.key, sectionKey: item.key }));
+    return [...header, ...extra];
+  };
+
+  const renderCompanyChargeCard = (card) => {
+    const isHeader = card.kind === 'header';
+    const section = getChargeSection(formData.chargeSection, card.key || card.sectionKey);
+    const isMain = section === 'main';
+    const on = isMain ? true : Boolean(formData.charges?.[card.key]);
+    return (
+      <div
+        key={card.id}
+        style={{
+          border: `1px solid ${on ? '#c4b5fd' : 'var(--border-color)'}`,
+          background: on ? '#f5f3ff' : '#fff',
+          borderRadius: '8px',
+          padding: '0.45rem 0.55rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.35rem',
+          boxShadow: dropTarget ? 'none' : '0 1px 2px rgba(0,0,0,0.04)'
+        }}
+      >
+        <div
+          draggable
+          title="Drag to move between Main Charges and Optional Charges"
+          onDragStart={(e) => startChargeDrag(e, { kind: 'catalog', key: card.sectionKey })}
+          onDragEnd={() => setDropTarget(null)}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'grab' }}
+        >
+          <GripVertical size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          {isMain && isHeader ? (
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#5b1c85', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {card.label}
+            </span>
+          ) : (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, margin: 0, flex: 1, minWidth: 0 }}>
+              <input type="checkbox" checked={on} onChange={() => toggleMaterialCharge(card.key)} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.label}</span>
+            </label>
+          )}
+          {card.custom && (
+            <button
+              type="button"
+              className="btn"
+              title="Remove this charge from the list"
+              style={{ padding: '0.1rem', color: '#ef4444', background: 'transparent', flexShrink: 0 }}
+              onClick={() => removeCustomCharge(card.key, card.label)}
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
+        </div>
+        {isHeader && isMain ? (
+          <>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              className="input-field"
+              style={{ padding: '0.3rem 0.45rem', fontSize: '0.8rem' }}
+              value={formData.defaultRates?.[card.field] ?? ''}
+              onChange={(e) => setDefaultCharge(card.field, e.target.value)}
+            />
+            {card.hint && <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{card.hint}</span>}
+          </>
+        ) : on && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>₹</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              className="input-field"
+              style={{ padding: '0.25rem 0.35rem', width: '80px', fontSize: '0.75rem' }}
+              value={isHeader ? (formData.defaultRates?.[card.field] ?? '') : rateInputValue(formData.rates?.[card.key])}
+              placeholder="0"
+              onChange={(e) => isHeader ? setDefaultCharge(card.field, e.target.value) : handleMaterialRateChange(card.key, e.target.value)}
+            />
+            {!isHeader && (
+              <RateUnitSelect
+                chargeKey={card.key}
+                value={formData.rateUnits?.[card.key]}
+                onChange={handleRateUnitChange}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderCompanyChargeZone = (section) => {
+    const zone = section === 'main' ? 'companyMain' : 'companyOptional';
+    const cards = companyChargeCards(section);
+    const adding = newCharge?.section === section;
+    const submitNewCharge = () => addCustomCharge(section, newCharge?.label);
+    return (
+      <div
+        style={{
+          padding: '0.65rem 1rem 0.85rem',
+          borderTop: section === 'optional' ? '1px solid #ede9fe' : 'none',
+          background: dropTarget === zone ? 'rgba(91, 28, 133, 0.04)' : 'transparent',
+          transition: 'background 0.2s ease'
+        }}
+        onDragOver={(e) => allowChargeDrop(e, zone)}
+        onDrop={(e) => handleChargeDrop(e, zone)}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', gap: '0.5rem' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#5b1c85', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span>{section === 'main' ? 'Main Charges' : 'Optional Charges'}</span>
+            <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+              {section === 'main'
+                ? '— applied once & printed in Main Charges'
+                : '— tick to print in Optional Services table'}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            style={{
+              padding: '0.25rem 0.6rem',
+              fontSize: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+              border: '1px solid #c4b5fd',
+              color: '#5b1c85',
+              background: '#fff',
+              fontWeight: 600
+            }}
+            onClick={() => setNewCharge({ section, label: '' })}
+          >
+            <Plus size={13} /> Add Charge
+          </button>
+        </div>
+        {adding && (
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.5rem', background: '#f5f3ff', padding: '0.4rem 0.6rem', borderRadius: '8px', border: '1px solid #c4b5fd' }}>
+            <input
+              autoFocus
+              type="text"
+              className="input-field"
+              style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem', flex: 1 }}
+              placeholder="Enter charge name (e.g. Loading Charge, Packaging, etc.)"
+              value={newCharge.label}
+              onChange={(e) => setNewCharge({ section, label: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); submitNewCharge(); }
+                if (e.key === 'Escape') { e.preventDefault(); setNewCharge(null); }
+              }}
+            />
+            <button type="button" className="btn btn-primary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }} disabled={!String(newCharge.label || '').trim()} onClick={submitNewCharge}>
+              Add &amp; Save
+            </button>
+            <button type="button" className="btn" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem', background: 'transparent', border: '1px solid var(--border-color)' }} onClick={() => setNewCharge(null)}>
+              Cancel
+            </button>
+          </div>
+        )}
+        <div style={dropZoneStyle(zone)}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.5rem' }}>
+            {cards.map(renderCompanyChargeCard)}
+          </div>
+          {!cards.length && (
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', padding: '0.8rem', textAlign: 'center', border: '1px dashed #c4b5fd', borderRadius: '8px', background: '#fff' }}>
+              Drag charges here to move them to {section === 'main' ? 'Main Charges' : 'Optional Charges'}.
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const partyOptions = useMemo(() => uniqueSortedOptions(quotationsList.map((q) => q.partyName)), [quotationsList]);
   const productOptions = useMemo(() => uniqueSortedOptions(quotationsList.map((q) => q.productName)), [quotationsList]);
@@ -1179,35 +1463,17 @@ const handleSameCompanyQuote = (q) => {
 
               {formData.companyQuoteMode && (
                 <div style={{ border: '1px solid #ddd6fe', borderRadius: '12px', overflow: 'hidden', marginBottom: '1.25rem', background: '#fff' }}>
-                  <div style={{ background: '#5b1c85', color: '#fff', padding: '0.75rem 1rem', fontWeight: 700 }}>
-                    Products &amp; Default Charges
+                  <div style={{ background: '#5b1c85', color: '#fff', padding: '0.75rem 1rem', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Products &amp; Default Charges</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 400, opacity: 0.9 }}>
+                      Drag &amp; drop charges between Main and Optional
+                    </span>
                   </div>
                   <p style={{ margin: 0, padding: '0.55rem 1rem', fontSize: '0.75rem', color: '#6d28d9', background: '#f5f3ff' }}>
-                    Minimum charge, filter charge, sieving, processing charge and other common charges are applied once for the entire quotation (all products).
+                    Minimum charge, filter charge, sieving, processing charge and other common charges are applied once for the entire quotation (all products). Drag charges between Main and Optional sections to shift them easily.
                   </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '0.5rem', padding: '0.85rem 1rem' }}>
-                    {[
-                      ['minimum', 'Minimum Charge'],
-                      ['filterBag', 'Filter Bag Charge'],
-                      ['sieving', 'Sieving Charge'],
-                      ['processing', 'Processing Charge'],
-                      ['cleaning', 'Cleaning Charge'],
-                      ['other', 'Other Charges (If Any)']
-                    ].map(([key, label]) => (
-                      <label key={key} style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                        {label}
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          className="input-field"
-                          style={{ marginTop: '0.3rem', padding: '0.35rem 0.45rem' }}
-                          value={formData.defaultRates?.[key] ?? ''}
-                          onChange={(e) => setDefaultCharge(key, e.target.value)}
-                        />
-                      </label>
-                    ))}
-                  </div>
+                  {renderCompanyChargeZone('main')}
+                  {renderCompanyChargeZone('optional')}
                   <div style={{ overflowX: 'auto', padding: '0 1rem 0.75rem' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                       <thead>

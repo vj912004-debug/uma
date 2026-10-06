@@ -231,12 +231,13 @@ const DeliveryChallan = () => {
               { label: 'DC No', key: 'dcNo' },
               { label: 'Customer', key: 'partyName' },
               { label: 'Product', key: 'productName' },
-              { label: 'Qty (Net)', key: 'qty' },
-              { label: 'Value (₹)', key: 'value' },
+              { label: 'Qty (Net Kg)', key: 'qty', type: 'number', total: true },
+              { label: 'Value (₹)', key: 'value', type: 'money', total: true },
               { label: 'Vehicle No', key: 'vehicleNo' }
             ]}
             filename="Delivery_Challans"
             title="Delivery Challans"
+            groupBy="partyName"
           />
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New DC

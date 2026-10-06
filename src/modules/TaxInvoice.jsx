@@ -549,8 +549,8 @@ const TaxInvoice = () => {
     { label: 'Invoice No', key: 'invoiceNo' },
     { label: 'Customer', key: 'partyName' },
     { label: 'Product', key: 'productName' },
-    { label: 'Qty', key: 'qty' },
-    { label: 'Total Amount', key: 'total' }
+    { label: 'Qty (Kg)', key: 'qty', type: 'number', total: true },
+    { label: 'Total Amount (₹)', key: 'total', type: 'money', total: true }
   ];
 
   return (
@@ -563,7 +563,7 @@ const TaxInvoice = () => {
           <p style={{ color: 'var(--text-muted)' }}>Generate and manage billing against finalized delivery challans.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <ExportButton data={exportRows} columns={exportColumns} filename="Tax_Invoices" title="Tax Invoices" />
+          <ExportButton data={exportRows} columns={exportColumns} filename="Tax_Invoices" title="Tax Invoices" groupBy="partyName" />
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New Tax Invoice
           </button>

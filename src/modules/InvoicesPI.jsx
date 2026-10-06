@@ -512,11 +512,12 @@ const InvoicesPI = () => {
   });
 
   const exportColumns = [
-    { label: 'Date', key: 'date' },
+    { label: 'PI Date', key: 'date', type: 'date' },
     { label: 'PI Number', key: 'invoiceNo' },
     { label: 'Party Name', key: 'partyName' },
-    { label: 'Qty (Kg)', key: 'qty' },
-    { label: 'Total (₹)', key: 'total' }
+    { label: 'Product', key: 'productName' },
+    { label: 'Qty (Kg)', key: 'qty', type: 'number', total: true },
+    { label: 'Total (₹)', key: 'total', type: 'money', total: true }
   ];
 
   const chargesList = STANDARD_CHARGES_LIST;
@@ -532,7 +533,7 @@ const InvoicesPI = () => {
           <p style={{ color: 'var(--text-muted)' }}>Generate advanced billing from Material Receipts.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <ExportButton data={filtered} columns={exportColumns} filename="Proforma_Invoices" title="Proforma Invoices Log" />
+          <ExportButton data={filtered} columns={exportColumns} filename="Proforma_Invoices" title="Proforma Invoices Log" groupBy="partyName" />
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New PI
           </button>
