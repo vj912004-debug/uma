@@ -38,7 +38,8 @@ export const MODULE_OPTIONS = [
   { id: '/employee-master', label: 'Employee Master', group: 'Reports & Logs' },
   { id: '/employee-salary', label: 'Employee Salary', group: 'Reports & Logs', highlight: true },
   { id: '/attendance', label: 'Attendance', group: 'Reports & Logs' },
-  { id: '/salary-calculation', label: 'Salary Calculation', group: 'Reports & Logs' }
+  { id: '/salary-calculation', label: 'Salary Calculation', group: 'Reports & Logs' },
+  { id: '/device-management', label: 'Device Management', group: 'Reports & Logs' }
 ];
 
 export const ALL_STAFF_MODULE_IDS = MODULE_OPTIONS.map((m) => m.id);

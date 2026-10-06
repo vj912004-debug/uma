@@ -1,19 +1,21 @@
 import React, { useMemo, useState } from 'react';
-import { Users, Plus, Save, Search, Edit2, Trash2, X } from 'lucide-react';
+import { Users, Plus, Save, Search, Edit2, Trash2, X, CheckCircle2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import DateField from '../components/DateField';
 import SearchableSelect from '../components/SearchableSelect';
 import ExportButton from '../components/ExportButton';
 import { formatDate, newestFirst } from '../utils/dateUtils';
 import { generateEmployeeId } from '../utils/auth';
-import { getEffectiveRate, money } from '../utils/payroll';
+import { getEffectiveRate, money, isPendingApproval, approvalPatch } from '../utils/payroll';
 import { DEPARTMENTS } from './EmployeeManagement';
 
 const SHIFT_OPTIONS = ['9hr', '12hr'];
 const STATUS_TABS = [
   { id: 'all', label: 'All' },
   { id: 'active', label: 'Active' },
-  { id: 'inactive', label: 'Inactive' }
+  { id: 'inactive', label: 'Inactive' },
+  { id: 'pending', label: 'Pending Approval' }
 ];
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -24,6 +26,7 @@ const emptyForm = () => ({
   department: '',
   designation: '',
   joiningDate: '',
+  esslId: '',
   perDayRate: '',
   otRate: '',
   shiftType: '9hr',
@@ -42,6 +45,7 @@ const Field = ({ label, required, children }) => (
 
 const EmployeeMaster = () => {
   const { data, updateData, updateItem, deleteItemSoftly } = useAppContext();
+  const { currentUser, isAdmin } = useAuth();
   const [search, setSearch] = useState('');
   const [statusTab, setStatusTab] = useState('all');
   const [deptFilter, setDeptFilter] = useState('');
@@ -55,6 +59,7 @@ const EmployeeMaster = () => {
     [users]
   );
 
+  const editingUser = editingId ? users.find((u) => u.id === editingId) : null;
   const departmentOptions = [...new Set([...DEPARTMENTS, ...users.map((u) => u.department).filter(Boolean)])];
   const designationOptions = [...new Set(users.map((u) => u.designation).filter(Boolean))];
 
@@ -62,17 +67,25 @@ const EmployeeMaster = () => {
     const active = u.active !== false;
     if (statusTab === 'active' && !active) return false;
     if (statusTab === 'inactive' && active) return false;
+    if (statusTab === 'pending' && !isPendingApproval(u)) return false;
     if (deptFilter && u.department !== deptFilter) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
-    return [u.employeeId, u.name, u.username, u.department, u.designation, u.shiftType]
+    return [u.employeeId, u.name, u.username, u.department, u.designation, u.shiftType, u.esslId]
       .some((v) => String(v || '').toLowerCase().includes(q));
   });
 
   const counts = {
     all: employees.length,
     active: employees.filter((u) => u.active !== false).length,
-    inactive: employees.filter((u) => u.active === false).length
+    inactive: employees.filter((u) => u.active === false).length,
+    pending: employees.filter(isPendingApproval).length
+  };
+
+  const approveEmployee = (u) => {
+    if (!isAdmin) return;
+    if (!window.confirm(`Approve ${u.name || u.employeeId}? Their attendance punches will then sync automatically.`)) return;
+    updateItem('users', u.id, { ...u, ...approvalPatch(currentUser) });
   };
 
   const exportRows = rows.map((u) => {
@@ -86,7 +99,9 @@ const EmployeeMaster = () => {
       perDayRate: rate.perDayRate || 0,
       otRate: rate.otRate || 0,
       shiftType: u.shiftType || '9hr',
-      status: u.active === false ? 'Inactive' : 'Active'
+      esslId: u.esslId || '',
+      status: u.active === false ? 'Inactive' : 'Active',
+      approval: isPendingApproval(u) ? 'Pending' : 'Approved'
     };
   });
 
@@ -106,6 +121,7 @@ const EmployeeMaster = () => {
       department: u.department || '',
       designation: u.designation || '',
       joiningDate: u.joiningDate || '',
+      esslId: u.esslId || '',
       perDayRate: rate.perDayRate || '',
       otRate: rate.otRate || '',
       shiftType: u.shiftType === '12hr' ? '12hr' : '9hr',
@@ -155,6 +171,7 @@ const EmployeeMaster = () => {
       department: form.department.trim(),
       designation: form.designation.trim(),
       joiningDate: form.joiningDate || '',
+      esslId: String(form.esslId || '').trim(),
       shiftType: form.shiftType,
       perDayRate,
       otRate,
@@ -182,6 +199,7 @@ const EmployeeMaster = () => {
         username: employeeId.toLowerCase(),
         role: 'Staff',
         permissions: [],
+        approvalStatus: 'Pending',
         rateHistory: history,
         effectiveFrom,
         createdAt: new Date().toISOString()
@@ -220,7 +238,9 @@ const EmployeeMaster = () => {
               { label: 'Salary/Day Rate', key: 'perDayRate' },
               { label: 'OT Rate', key: 'otRate' },
               { label: 'Shift', key: 'shiftType' },
-              { label: 'Status', key: 'status' }
+              { label: 'eSSL ID', key: 'esslId' },
+              { label: 'Status', key: 'status' },
+              { label: 'Approval', key: 'approval' }
             ]}
             filename="Employee_Master"
             title="Employee Master"
@@ -270,12 +290,13 @@ const EmployeeMaster = () => {
                 <th>OT Rate</th>
                 <th>Shift</th>
                 <th>Status</th>
+                <th>Approval</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={10} className="pm-empty">No employees found. Click Add Employee.</td></tr>
+                <tr><td colSpan={11} className="pm-empty">No employees found. Click Add Employee.</td></tr>
               ) : rows.map((u) => {
                 const rate = getEffectiveRate(u);
                 const active = u.active !== false;
@@ -290,6 +311,17 @@ const EmployeeMaster = () => {
                     <td>{rate.otRate ? money(rate.otRate) : '—'}</td>
                     <td><span className="esm-chip">{u.shiftType || '9hr'}</span></td>
                     <td><span className={`pm-pill ${active ? 'is-approved' : 'is-low'}`}>{active ? 'Active' : 'Inactive'}</span></td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      {isPendingApproval(u) ? (
+                        isAdmin ? (
+                          <button type="button" className="btn btn-primary esm-approve-btn" onClick={() => approveEmployee(u)}>
+                            <CheckCircle2 size={14} /> Approve
+                          </button>
+                        ) : <span className="pm-pill is-pending">Pending</span>
+                      ) : (
+                        <span className="pm-pill is-approved" title={u.approvedBy ? `Approved by ${u.approvedBy}` : ''}>Approved</span>
+                      )}
+                    </td>
                     <td className="pm-actions" onClick={(e) => e.stopPropagation()}>
                       <button type="button" title="Edit" onClick={() => openEdit(u)}><Edit2 size={14} /></button>
                       <button type="button" title="Delete" className="danger" onClick={() => handleDelete(u)}><Trash2 size={14} /></button>
@@ -333,6 +365,9 @@ const EmployeeMaster = () => {
               <Field label="Joining Date">
                 <DateField className="input-field" value={form.joiningDate} onChange={(e) => setField('joiningDate', e.target.value)} />
               </Field>
+              <Field label="eSSL ID (Attendance Machine)">
+                <input className="input-field" value={form.esslId} onChange={(e) => setField('esslId', e.target.value)} placeholder="Biometric user id" />
+              </Field>
               <Field label="Salary/Day Rate (₹)">
                 <input type="number" step="any" min="0" className="input-field" value={form.perDayRate} onChange={(e) => setField('perDayRate', e.target.value)} />
               </Field>
@@ -352,7 +387,13 @@ const EmployeeMaster = () => {
               </Field>
               <div className="pm-form-actions">
                 <button type="submit" className="btn btn-primary"><Save size={15} /> {editingId ? 'Update' : 'Save'}</button>
+                {isAdmin && editingUser && isPendingApproval(editingUser) ? (
+                  <button type="button" className="btn esm-approve-btn" onClick={() => { approveEmployee(editingUser); }}>
+                    <CheckCircle2 size={15} /> Approve Employee
+                  </button>
+                ) : null}
                 <button type="button" className="btn pm-btn-outline" onClick={closeForm}>Cancel</button>
+                {!editingId ? <span className="esm-approve-hint">New employees need admin approval before attendance punches sync.</span> : null}
               </div>
             </form>
           </section>

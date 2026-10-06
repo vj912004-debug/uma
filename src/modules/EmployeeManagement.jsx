@@ -156,6 +156,7 @@ const EmployeeManagement = () => {
       const newUser = {
         id: Date.now(),
         ...userData,
+        approvalStatus: form.role === 'Admin' ? 'Approved' : 'Pending',
         createdAt: new Date().toISOString()
       };
       updateData('users', newUser);

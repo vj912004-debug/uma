@@ -281,7 +281,9 @@ const PaymentFollowUp = () => {
   };
 
   const buildStatementInvoices = () =>
-    (selectedInvoices.length ? selectedInvoices : customerInvoices);
+    [...(selectedInvoices.length ? selectedInvoices : customerInvoices)].sort((a, b) =>
+      String(a.invoiceDate || '').localeCompare(String(b.invoiceDate || ''))
+      || String(a.invoiceNo || '').localeCompare(String(b.invoiceNo || ''), undefined, { numeric: true }));
 
   const openPdfPreview = async () => {
     if (!selectedCustomer) return;
@@ -309,7 +311,6 @@ const PaymentFollowUp = () => {
       'Invoice Date': formatDate(i.invoiceDate),
       'Invoice Amount': i.invoiceAmount ?? '',
       'Paid Amount': i.paidAmount ?? '',
-      'TDS Amount': i.tdsAmount ?? '',
       Outstanding: i.outstanding ?? '',
       'Days Overdue': i.daysOverdue ?? ''
     }))

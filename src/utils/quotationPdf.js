@@ -368,6 +368,10 @@ export const buildQuotationHtml = (data, profileInput) => {
     width:794px;min-height:1123px;height:1123px;max-height:1123px;
     display:flex;flex-direction:column;
   }
+  .sheet.pdf-page::after{
+    content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+    border:2px solid var(--purple);pointer-events:none;z-index:60;
+  }
   .sheet + .sheet{margin-top:30px;}
 
   /* ============ HEADER (same badge style as TI / PI / PO) ============ */

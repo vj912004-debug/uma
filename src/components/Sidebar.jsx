@@ -41,7 +41,8 @@ import {
   Megaphone,
   UserPlus,
   PhoneCall,
-  BarChart3
+  BarChart3,
+  Fingerprint
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { canAccessModule } from '../utils/moduleAccess';
@@ -156,7 +157,8 @@ const Sidebar = () => {
         { name: 'Employee Master', icon: Users, path: '/employee-master', roles: ['Admin', 'Staff'] },
         { name: 'Employee Salary', icon: DollarSign, path: '/employee-salary', roles: ['Admin', 'Staff'], highlight: true },
         { name: 'Attendance', icon: UserCheck, path: '/attendance', roles: ['Admin', 'Staff'] },
-        { name: 'Salary Calculation', icon: Calculator, path: '/salary-calculation', roles: ['Admin', 'Staff'] }
+        { name: 'Salary Calculation', icon: Calculator, path: '/salary-calculation', roles: ['Admin', 'Staff'] },
+        { name: 'Device Management', icon: Fingerprint, path: '/device-management', roles: ['Admin', 'Staff'] }
       ]
     },
     {

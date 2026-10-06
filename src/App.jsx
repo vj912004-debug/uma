@@ -4,6 +4,7 @@ import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar';
+import EsslAutoSync from './components/EsslAutoSync';
 import Login from './pages/Login';
 import Dashboard from './modules/Dashboard';
 import Parties from './modules/Parties';
@@ -40,6 +41,7 @@ import SystemLogs from './modules/SystemLogs';
 import SalaryCalculation from './modules/SalaryCalculation';
 import EmployeeSalaryManagement from './modules/EmployeeSalaryManagement';
 import EmployeeMaster from './modules/EmployeeMaster';
+import DeviceManagement from './modules/DeviceManagement';
 import Attendance from './modules/Attendance';
 import CompanyProfileSettings from './modules/CompanyProfileSettings';
 import EmployeeManagement from './modules/EmployeeManagement';
@@ -63,6 +65,7 @@ const AppLayout = () => {
 
   return (
   <div className="app-layout">
+    <EsslAutoSync />
     <Sidebar />
     <main className="app-main">
       <Routes>
@@ -103,6 +106,7 @@ const AppLayout = () => {
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/salary-calculation" element={<SalaryCalculation />} />
         <Route path="/employee-master" element={<EmployeeMaster />} />
+        <Route path="/device-management" element={<DeviceManagement />} />
         <Route path="/employee-salary" element={<EmployeeSalaryManagement />} />
         <Route path="/settings/company-profile" element={<ProtectedRoute adminOnly><CompanyProfileSettings /></ProtectedRoute>} />
         <Route path="/employees" element={<ProtectedRoute adminOnly><EmployeeManagement /></ProtectedRoute>} />

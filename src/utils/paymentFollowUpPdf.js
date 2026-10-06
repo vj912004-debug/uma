@@ -28,7 +28,6 @@ export const buildPaymentFollowUpStatementHtml = ({
       <td class="c">${escHtml(formatPdfDateDmy(inv.invoiceDate) || '')}</td>
       <td class="num">${money(inv.invoiceAmount)}</td>
       <td class="num">${money(inv.paidAmount)}</td>
-      <td class="num">${money(inv.tdsAmount)}</td>
       <td class="num"><strong>${money(inv.outstanding)}</strong></td>
       <td class="c">${inv.ageDays ?? ''}</td>
     </tr>`).join('');
@@ -197,21 +196,20 @@ export const buildPaymentFollowUpStatementHtml = ({
           <thead>
             <tr>
               <th style="width:7%">No.</th>
-              <th style="width:18%">Invoice No.</th>
-              <th style="width:12%">Date</th>
-              <th style="width:13%">Amount</th>
-              <th style="width:12%">Paid</th>
-              <th style="width:10%">TDS</th>
-              <th style="width:16%">Outstanding</th>
+              <th style="width:21%">Invoice No.</th>
+              <th style="width:13%">Date</th>
+              <th style="width:15%">Amount</th>
+              <th style="width:14%">Paid</th>
+              <th style="width:18%">Outstanding</th>
               <th style="width:12%">Days</th>
             </tr>
           </thead>
           <tbody>
-            ${rows || `<tr><td colspan="8" class="c">No outstanding invoices</td></tr>`}
+            ${rows || `<tr><td colspan="7" class="c">No outstanding invoices</td></tr>`}
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="6" class="num">GRAND TOTAL OUTSTANDING</td>
+              <td colspan="5" class="num">GRAND TOTAL OUTSTANDING</td>
               <td class="num">₹ ${money(totalOutstanding)}</td>
               <td></td>
             </tr>

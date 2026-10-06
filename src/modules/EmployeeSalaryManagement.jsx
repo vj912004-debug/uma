@@ -38,9 +38,14 @@ import {
   money,
   monthValue,
   calculateMonthSalary,
-  simulateEsslSync,
+  applyEsslSyncToState,
   summarizeAttendanceDay,
-  defaultEsslSettings
+  defaultEsslSettings,
+  isPendingApproval,
+  approvalPatch,
+  getBiometricDevices,
+  withDevices,
+  punchesForAttendanceRow
 } from '../utils/payroll';
 
 const TABS = [
@@ -128,6 +133,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
     isHalfDay: false
   });
   const [syncBusy, setSyncBusy] = useState(false);
+  const [punchRow, setPunchRow] = useState(null);
 
   /* ── Salary state ── */
   const [employeeId, setEmployeeId] = useState('');
@@ -226,15 +232,10 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
   };
 
   const connectEssl = (connected) => {
-    setData((prev) => ({
-      ...prev,
-      esslSettings: {
-        ...defaultEsslSettings(),
-        ...(prev.esslSettings || {}),
-        connected,
-        lastSync: connected ? (prev.esslSettings?.lastSync || null) : prev.esslSettings?.lastSync
-      }
-    }));
+    setData((prev) => withDevices(
+      prev,
+      getBiometricDevices(prev).map((d) => ({ ...d, status: connected ? 'Online' : 'Offline' }))
+    ));
   };
 
   const syncEssl = async () => {
@@ -244,34 +245,31 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
     }
     setSyncBusy(true);
     await new Promise((r) => setTimeout(r, 600));
-    const result = simulateEsslSync(data.users || [], attendance, 7);
-    if (result.records.length) {
-      setData((prev) => ({
-        ...prev,
-        attendance: [...result.records, ...(prev.attendance || [])],
-        esslSettings: {
-          ...defaultEsslSettings(),
-          ...(prev.esslSettings || {}),
-          connected: true,
-          lastSync: new Date().toISOString()
-        }
-      }));
-    } else {
-      setData((prev) => ({
-        ...prev,
-        esslSettings: {
-          ...defaultEsslSettings(),
-          ...(prev.esslSettings || {}),
-          connected: true,
-          lastSync: new Date().toISOString()
-        }
-      }));
-    }
+    const { result } = applyEsslSyncToState(data);
+    setData((prev) => applyEsslSyncToState(prev).next);
     setSyncBusy(false);
-    alert(result.added
-      ? `eSSL sync complete.\n${result.added} new punch record(s) imported.`
-      : 'eSSL sync complete.\nNo new punch records (already up to date).');
+    const pending = (data.users || []).filter((u) => u.active !== false && isPendingApproval(u)).length;
+    const lines = [
+      result.imported || result.added || result.updated
+        ? `${result.imported} raw punch(es) stored → ${result.added} attendance row(s) created, ${result.updated} updated.`
+        : 'No new punches (already up to date).'
+    ];
+    if (pending) lines.push(`${pending} employee(s) awaiting admin approval: raw punches are stored and will become attendance once approved.`);
+    alert(`eSSL sync complete.\n${lines.join('\n')}`);
     setTab('attendance');
+  };
+
+  const approveEmployee = (user) => {
+    if (!isAdmin) return;
+    if (!window.confirm(`Approve ${user.name || user.username} for eSSL attendance sync?`)) return;
+    updateItem('users', user.id, { ...user, ...approvalPatch(currentUser) });
+  };
+
+  const setAutoSync = (autoSync) => {
+    setData((prev) => ({
+      ...prev,
+      esslSettings: { ...defaultEsslSettings(), ...(prev.esslSettings || {}), autoSync }
+    }));
   };
 
   const filteredAtt = attendance.filter((r) => {
@@ -797,8 +795,14 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                 </button>
               </div>
             </div>
+            <label className="esm-auto-sync">
+              <input type="checkbox" checked={essl.autoSync !== false} onChange={(e) => setAutoSync(e.target.checked)} />
+              <span>
+                Auto sync every {essl.autoSyncMinutes || 5} minutes while connected
+              </span>
+            </label>
             <div className="esm-note">
-              Employees need an <strong>eSSL ID</strong> in Employee Master. Sync imports the last 7 working days of punches (skips duplicates). Demo mode works without a physical device.
+              New employees start as <strong>Pending Approval</strong>. After an admin approves them once, their punch-in and punch-out records sync automatically from the approval date onward — no further approval needed. Employees also need an <strong>eSSL ID</strong> in Employee Master. Demo mode works without a physical device.
             </div>
             <div className="pm-table-wrap" style={{ marginTop: '1rem' }}>
               <table className="att-table">
@@ -807,22 +811,41 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                     <th>Emp. ID</th>
                     <th>eSSL ID</th>
                     <th>Name</th>
-                    <th>Mapped</th>
+                    <th>Approval</th>
+                    <th>Sync Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(data.users || []).filter((u) => u.active !== false && u.role !== 'Admin').map((u) => (
-                    <tr key={u.id}>
-                      <td>{u.employeeId}</td>
-                      <td>{u.esslId || '—'}</td>
-                      <td>{u.name || u.username}</td>
-                      <td>
-                        {u.esslId
-                          ? <span className="att-badge is-present">Ready</span>
-                          : <span className="att-badge is-half">Set eSSL ID</span>}
-                      </td>
-                    </tr>
-                  ))}
+                  {newestFirst((data.users || []).filter((u) => !u.isDeleted && u.active !== false && u.role !== 'Admin')).map((u) => {
+                    const pending = isPendingApproval(u);
+                    return (
+                      <tr key={u.id}>
+                        <td>{u.employeeId}</td>
+                        <td>{u.esslId || '—'}</td>
+                        <td>{u.name || u.username}</td>
+                        <td>
+                          {pending ? (
+                            isAdmin ? (
+                              <button type="button" className="btn btn-primary esm-approve-btn" onClick={() => approveEmployee(u)}>
+                                <CheckCircle2 size={14} /> Approve
+                              </button>
+                            ) : <span className="att-badge is-half">Pending Approval</span>
+                          ) : (
+                            <span className="att-badge is-present" title={u.approvedAt ? `Approved ${new Date(u.approvedAt).toLocaleString('en-IN')}${u.approvedBy ? ` by ${u.approvedBy}` : ''}` : ''}>
+                              Approved{u.approvedAt ? ` · ${formatDate(u.approvedAt.slice(0, 10))}` : ''}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {pending
+                            ? <span className="att-badge is-absent">Waiting for admin</span>
+                            : u.esslId
+                              ? <span className="att-badge is-present">Auto sync</span>
+                              : <span className="att-badge is-half">Set eSSL ID</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -921,7 +944,8 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                             </span>
                           </td>
                           <td className="pm-actions">
-                            <button type="button" onClick={() => openAttEdit(r)}><Edit2 size={14} /></button>
+                            <button type="button" title="View raw punches" onClick={() => setPunchRow(r)}><Fingerprint size={14} /></button>
+                            <button type="button" title="Edit attendance" onClick={() => openAttEdit(r)}><Edit2 size={14} /></button>
                             {isAdmin && (
                               <button type="button" className="danger" onClick={() => window.confirm('Delete entry?') && deleteItemSoftly('attendance', r.id)}>
                                 <Trash2 size={14} />
@@ -1229,6 +1253,81 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
           </div>
         </div>
       )}
+
+      {punchRow && (() => {
+        const punches = punchesForAttendanceRow(data, punchRow);
+        const first = punches[0];
+        const last = punches.length > 1 ? punches[punches.length - 1] : null;
+        return (
+          <div className="page-form-overlay">
+            <div className="premium-card pm-card" style={{ maxWidth: 900, margin: '0 auto' }}>
+              <div className="pm-list-head">
+                <h2 className="pm-card-title" style={{ margin: 0 }}>
+                  <Fingerprint size={16} /> Raw Punches · {punchRow.username} · {formatDate(punchRow.date)}
+                </h2>
+                <button type="button" className="btn" onClick={() => setPunchRow(null)}>Close</button>
+              </div>
+              <div className="esm-punch-trace">
+                <span>Raw Punches <strong>{punches.length}</strong></span>
+                <ArrowRight size={14} />
+                <span>Attendance <strong>{punchRow.inTime || '—'} – {punchRow.outTime || '—'}</strong></span>
+                <ArrowRight size={14} />
+                <span>Total <strong>{punchRow.totalHours > 0 ? `${punchRow.totalHours} h` : '—'}</strong></span>
+                <ArrowRight size={14} />
+                <span>OT <strong>{punchRow.otHours > 0 ? `${punchRow.otHours} h` : '—'}</strong></span>
+              </div>
+              {punchRow.source !== 'essl' && (
+                <p className="esm-note">
+                  This attendance row was entered or edited by hand, so the times above come from that entry rather than from the machine.
+                  {punches.length ? ' The machine punches for this day are listed below for comparison.' : ''}
+                </p>
+              )}
+              {punchRow.source === 'essl' && first && (
+                <p className="esm-note">
+                  In time = first punch of the day ({first.punchTime}, Punch ID {first.punchId}).{' '}
+                  {last
+                    ? `Out time = last punch of the day (${last.punchTime}, Punch ID ${last.punchId}). Total hours are calculated from these two punches against the ${punchRow.shift || 'assigned'} shift.`
+                    : 'Only one punch so far, so the Out time fills in after the next punch is synced.'}
+                </p>
+              )}
+              <div className="pm-table-wrap">
+                <table className="pm-table">
+                  <thead>
+                    <tr>
+                      <th>Punch ID</th>
+                      <th>Device</th>
+                      <th>Device User ID</th>
+                      <th>Punch Date</th>
+                      <th>Punch Time</th>
+                      <th>Punch Type</th>
+                      <th>Verification</th>
+                      <th>Raw Data</th>
+                      <th>Used As</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {punches.length === 0 ? (
+                      <tr><td colSpan={9} className="pm-empty">No machine punches recorded for this employee on this day.</td></tr>
+                    ) : punches.map((p) => (
+                      <tr key={p.id}>
+                        <td><strong>{p.punchId}</strong></td>
+                        <td>{p.deviceName || '—'}</td>
+                        <td>{p.deviceUserId}</td>
+                        <td>{formatDate(p.punchDate)}</td>
+                        <td>{p.punchTime}</td>
+                        <td>{p.punchType}</td>
+                        <td>{p.verification}</td>
+                        <td><code className="dm-raw">{p.rawData}</code></td>
+                        <td>{p === first ? 'In time' : p === last ? 'Out time' : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
