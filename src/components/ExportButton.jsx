@@ -30,13 +30,13 @@ const toJsPdfFont = (fontFamily = '') => {
   return 'helvetica';
 };
 
-const ExportButton = ({ data, columns, filename, title, groupBy }) => {
+const ExportButton = ({ data, columns, filename, title, groupBy, docType }) => {
   const profile = getStoredCompanyProfile();
 
   const exportToExcel = () => {
     const flatData = flattenRowsForExcel(data);
-    if (groupBy) {
-      downloadCompanyWiseExcel({ filename, title, columns, rows: flatData, groupBy })
+    if (groupBy || docType || (Array.isArray(data) && data.some((r) => r?.invoiceNo || r?.poNo || r?.noteNo || r?.dcNo || r?.quotationNo))) {
+      downloadCompanyWiseExcel({ filename, title, columns, rows: data, groupBy: groupBy || 'partyName', docType })
         .catch((err) => alert(`Excel export failed: ${err?.message || err}`));
       return;
     }

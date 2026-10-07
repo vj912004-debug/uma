@@ -473,7 +473,7 @@ const PurchaseOrders = () => {
           <p style={{ color: 'var(--text-muted)' }}>Generate and manage incoming POs seamlessly from workflows.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <ExportButton data={filtered} columns={exportColumns} filename="Purchase_Orders" title="Purchase Orders Log" groupBy="partyName" />
+          <ExportButton data={filtered} columns={exportColumns} filename="Purchase_Orders" title="Purchase Orders Log" groupBy="partyName" docType="PO" />
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New PO
           </button>

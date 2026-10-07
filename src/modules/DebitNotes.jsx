@@ -261,6 +261,7 @@ const DebitNotes = () => {
             ]}
             filename="Debit_Notes"
             title="Debit Notes"
+            docType="DN"
           />
           <button className="btn btn-primary" onClick={handleOpenModal}>
             <Plus size={18} /> Add Debit Note

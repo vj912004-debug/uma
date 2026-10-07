@@ -268,6 +268,7 @@ const DeliveryChallan = () => {
             filename="Delivery_Challans"
             title="Delivery Challans"
             groupBy="partyName"
+            docType="DC"
           />
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New DC

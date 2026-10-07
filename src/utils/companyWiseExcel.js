@@ -141,9 +141,10 @@ export const flattenRowsForExcel = (rows) => {
   return flattened;
 };
 
-/** One worksheet tab per company, each listing that company's documents with the list columns and a total row. */
-export const downloadCompanyWiseExcel = async ({ filename, title, columns, rows, groupBy = 'partyName' }) => {
+/** One worksheet tab per company listing logs, plus individual formatted bill sheets for every document. */
+export const downloadCompanyWiseExcel = async ({ filename, title, columns, rows, groupBy = 'partyName', docType }) => {
   const { default: ExcelJS } = await import('exceljs');
+  const { appendInvoiceWorksheet } = await import('./invoiceExcel');
   const profile = getStoredCompanyProfile();
   const companyLines = [
     profile.companyName || 'UMA MICRON',
@@ -263,6 +264,28 @@ export const downloadCompanyWiseExcel = async ({ filename, title, columns, rows,
       }
       ws.pageSetup.printTitlesRow = '4:4';
     });
+
+  // Collect unique document objects for individual formatted bill sheets
+  const uniqueDocs = [];
+  const seenDocIds = new Set();
+  (rows || []).forEach((row) => {
+    const key = row?.invoiceNo || row?.poNo || row?.noteNo || row?.dcNo || row?.quotationNo || row?.id;
+    if (key && !seenDocIds.has(key)) {
+      seenDocIds.add(key);
+      uniqueDocs.push(row);
+    }
+  });
+
+  if (uniqueDocs.length > 0) {
+    uniqueDocs.forEach((docObj) => {
+      const type = docType || docObj.docType || (docObj.invoiceNo ? 'PI' : docObj.poNo ? 'PO' : docObj.noteNo ? 'DN' : docObj.dcNo ? 'DC' : 'PI');
+      try {
+        appendInvoiceWorksheet(wb, type, docObj, null, used);
+      } catch (err) {
+        console.warn('Could not append bill worksheet:', err);
+      }
+    });
+  }
 
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });

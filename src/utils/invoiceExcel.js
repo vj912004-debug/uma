@@ -261,11 +261,11 @@ const docMeta = (type, data) => {
   };
 };
 
-export const buildInvoiceWorkbook = async (docType, raw) => {
+export const appendInvoiceWorksheet = (wb, docType, raw, customSheetName, usedNames = new Set()) => {
   const data = raw || {};
-  const type = String(docType || '').toUpperCase();
+  const type = String(docType || data.docType || '').toUpperCase();
   const isPI = type === 'PI';
-  const title = DOC_TITLES[type] || 'Invoice';
+  const title = DOC_TITLES[type] || (type === 'DC' ? 'Delivery Challan' : type === 'QUOTATION' ? 'Quotation' : 'Invoice');
   const profile = mergeCompanyProfile(data.companyProfile || getStoredCompanyProfile());
   const totals = invoiceLines(data, type);
   const bill = partyBlock(data, 'bill');
@@ -279,9 +279,16 @@ export const buildInvoiceWorkbook = async (docType, raw) => {
     .filter((line) => !(packingNote && /packing materials and transportation/i.test(line)))
     .map((line, i) => `${i + 1}) ${line}`);
 
-  const wb = new ExcelJS.Workbook();
-  wb.creator = profile.companyName || 'UMA MICRON';
-  const ws = wb.addWorksheet(title.slice(0, 31), {
+  const rawName = customSheetName || meta.no || data.invoiceNo || data.poNo || data.noteNo || data.dcNo || data.quotationNo || title;
+  const baseName = String(rawName).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 31) || 'Bill';
+  let sheetTitle = baseName;
+  for (let i = 2; usedNames.has(sheetTitle.toLowerCase()); i += 1) {
+    const suffix = ` (${i})`;
+    sheetTitle = `${baseName.slice(0, 31 - suffix.length)}${suffix}`;
+  }
+  usedNames.add(sheetTitle.toLowerCase());
+
+  const ws = wb.addWorksheet(sheetTitle, {
     views: [{ showGridLines: false }],
     pageSetup: {
       paperSize: 9,
@@ -545,6 +552,14 @@ export const buildInvoiceWorkbook = async (docType, raw) => {
   });
 
   ws.pageSetup.printTitlesRow = `${headerRow}:${headerRow + 1}`;
+  return ws;
+};
+
+export const buildInvoiceWorkbook = async (docType, raw) => {
+  const profile = mergeCompanyProfile(raw?.companyProfile || getStoredCompanyProfile());
+  const wb = new ExcelJS.Workbook();
+  wb.creator = profile.companyName || 'UMA MICRON';
+  appendInvoiceWorksheet(wb, docType, raw);
   const buffer = await wb.xlsx.writeBuffer();
   return buffer;
 };

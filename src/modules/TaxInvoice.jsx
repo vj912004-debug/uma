@@ -563,7 +563,7 @@ const TaxInvoice = () => {
           <p style={{ color: 'var(--text-muted)' }}>Generate and manage billing against finalized delivery challans.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <ExportButton data={exportRows} columns={exportColumns} filename="Tax_Invoices" title="Tax Invoices" groupBy="partyName" />
+          <ExportButton data={filteredInvoices} columns={exportColumns} filename="Tax_Invoices" title="Tax Invoices" groupBy="partyName" docType="TI" />
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New Tax Invoice
           </button>

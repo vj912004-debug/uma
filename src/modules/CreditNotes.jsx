@@ -261,6 +261,7 @@ const CreditNotes = () => {
             ]}
             filename="Credit_Notes"
             title="Credit Notes"
+            docType="CN"
           />
           <button className="btn btn-primary" onClick={handleOpenModal}>
             <Plus size={18} /> Add Credit Note

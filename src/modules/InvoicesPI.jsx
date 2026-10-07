@@ -533,7 +533,7 @@ const InvoicesPI = () => {
           <p style={{ color: 'var(--text-muted)' }}>Generate advanced billing from Material Receipts.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <ExportButton data={filtered} columns={exportColumns} filename="Proforma_Invoices" title="Proforma Invoices Log" groupBy="partyName" />
+          <ExportButton data={filtered} columns={exportColumns} filename="Proforma_Invoices" title="Proforma Invoices Log" groupBy="partyName" docType="PI" />
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New PI
           </button>
