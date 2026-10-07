@@ -21,7 +21,8 @@ const fileName = (docType, data) => {
   return String(raw).replace(/[\\/:*?"<>|]+/g, '-');
 };
 
-const FILL = 'FFBDD7EE';
+const PURPLE = 'FF5B1C85';
+const FILL = 'FF5B1C85';
 const WHITE = 'FFFFFFFF';
 const TEXT = 'FF000000';
 const LINE = 'FF000000';
@@ -299,7 +300,8 @@ export const buildInvoiceWorkbook = async (docType, raw) => {
   ];
 
   const companyFont = { name: FONT, size: 18, bold: true, color: { argb: TEXT } };
-  const titleFont = { name: FONT, size: 14, bold: true, color: { argb: TEXT } };
+  const titleFont = { name: FONT, size: 14, bold: true, color: { argb: WHITE } };
+  const headLabelFont = { name: FONT, size: 10, bold: true, color: { argb: WHITE } };
   const labelFont = { name: FONT, size: 10, bold: true, color: { argb: TEXT } };
   const bodyFont = { name: FONT, size: 10, color: { argb: TEXT } };
   const smallFont = { name: FONT, size: 9, color: { argb: TEXT } };
@@ -307,7 +309,7 @@ export const buildInvoiceWorkbook = async (docType, raw) => {
   const left = { vertical: 'middle', horizontal: 'left', wrapText: true };
   const topLeft = { vertical: 'top', horizontal: 'left', wrapText: true };
   const right = { vertical: 'middle', horizontal: 'right' };
-  const fillHead = { font: labelFont, fill: solid(FILL), align: center, border };
+  const fillHead = { font: headLabelFont, fill: solid(FILL), align: center, border };
 
   const companyLines = [
     profile.companyName || 'UMA MICRON',
@@ -327,8 +329,8 @@ export const buildInvoiceWorkbook = async (docType, raw) => {
   ws.getRow(r).height = 78;
   r += 1;
 
-  merge(ws, r, 1, r, COLS, title, { font: titleFont, fill: solid(FILL), align: center, border });
-  ws.getRow(r).height = 22;
+  merge(ws, r, 1, r, COLS, title.toUpperCase(), { font: titleFont, fill: solid(FILL), align: center, border });
+  ws.getRow(r).height = 24;
   r += 1;
 
   merge(ws, r, 1, r, 2, meta.noLabel, { font: labelFont, align: left, border });
@@ -346,8 +348,8 @@ export const buildInvoiceWorkbook = async (docType, raw) => {
   merge(ws, r, 10, r, COLS, bill.code || String(profile.gstNumber || '').slice(0, 2), { font: bodyFont, align: center, border });
   r += 1;
 
-  merge(ws, r, 1, r, 6, 'Bill to Party', fillHead);
-  merge(ws, r, 7, r, COLS, 'Ship to Party', fillHead);
+  merge(ws, r, 1, r, 6, 'BILL TO', fillHead);
+  merge(ws, r, 7, r, COLS, 'SHIP TO', fillHead);
   r += 1;
 
   const addressRows = (party) => {
@@ -447,7 +449,7 @@ export const buildInvoiceWorkbook = async (docType, raw) => {
   const blanks = Math.max(0, 8 - body.length);
   for (let i = 0; i < blanks; i += 1) writeLine(null, '');
 
-  merge(ws, r, 1, r, 2, 'Total', { font: labelFont, fill: solid(FILL), align: center, border });
+  merge(ws, r, 1, r, 2, 'TOTAL', { font: headLabelFont, fill: solid(FILL), align: center, border });
   const totalCells = [
     qtyText(totals.totalQty) || '0',
     '',
@@ -463,7 +465,7 @@ export const buildInvoiceWorkbook = async (docType, raw) => {
   totalCells.forEach((value, i) => {
     paint(ws.getCell(r, i + 3), {
       value,
-      font: labelFont,
+      font: headLabelFont,
       fill: solid(FILL),
       align: center,
       border,
@@ -474,14 +476,14 @@ export const buildInvoiceWorkbook = async (docType, raw) => {
 
   const bankRows = getBankDetailRows(profile);
   const summary = [
-    ['Total Amount before Tax', money(totals.totalAmt + (totals.discount || 0))],
+    ['Total Amount Before Tax', money(totals.totalAmt + (totals.discount || 0))],
     ...(totals.discount > 0 ? [['Discount', money(totals.discount)]] : []),
-    ['CGST', money(totals.totalCgst)],
-    ['SGST', money(totals.totalSgst)],
-    ['IGST', money(totals.totalIgst)],
+    [`CGST @ ${totals.taxRate ? (totals.taxRate / 2) : 9}%`, money(totals.totalCgst)],
+    [`SGST @ ${totals.taxRate ? (totals.taxRate / 2) : 9}%`, money(totals.totalSgst)],
+    ['IGST @ 0%', money(totals.totalIgst)],
     ['Total Tax Amount', money(totals.totalSgst + totals.totalCgst + totals.totalIgst)],
     ...(Math.abs(totals.roundOff) > 0.001 ? [['Round Off', money(totals.roundOff)]] : []),
-    ['Total Amount after Tax', money(totals.rounded)]
+    ['GRAND TOTAL', money(totals.rounded)]
   ];
   const bankText = ['OUR BANK DETAILS', ...bankRows.map((pair) => `${pair[0]} : ${pair[1] || ''}`)].join('\n');
   merge(ws, r, 1, r + summary.length - 1, 6, bankText, { font: bodyFont, align: topLeft, border });
@@ -489,13 +491,13 @@ export const buildInvoiceWorkbook = async (docType, raw) => {
     const row = r + i;
     const last = i === summary.length - 1;
     merge(ws, row, 7, row, 10, pair[0], {
-      font: labelFont,
+      font: last ? headLabelFont : labelFont,
       fill: solid(last ? FILL : WHITE),
       align: left,
       border
     });
     merge(ws, row, 11, row, COLS, pair[1], {
-      font: labelFont,
+      font: last ? headLabelFont : labelFont,
       fill: solid(last ? FILL : WHITE),
       align: right,
       border,
@@ -507,7 +509,7 @@ export const buildInvoiceWorkbook = async (docType, raw) => {
   const noteLines = [];
   if (packingNote) noteLines.push({ text: 'NOTE:', bold: true });
   if (packingNote) noteLines.push({ text: packingNote, bold: true });
-  noteLines.push({ text: 'Terms & conditions', bold: true });
+  noteLines.push({ text: 'TERMS & CONDITIONS', bold: true });
   terms.forEach((line) => noteLines.push({ text: line, bold: /packing materials and transportation/i.test(line) }));
 
   const signRows = Math.max(noteLines.length + 1, 6);
@@ -522,17 +524,25 @@ export const buildInvoiceWorkbook = async (docType, raw) => {
   for (let i = noteLines.length; i < signRows - 1; i += 1) {
     merge(ws, r + i, 1, r + i, 5, '', { font: smallFont, align: left, border });
   }
-  merge(ws, r, 6, r, COLS, DEFAULT_INVOICE_DECLARATION, { font: smallFont, align: left, border });
-  merge(ws, r + 1, 6, r + 1, COLS, `For ${profile.companyName || 'UMA MICRON'}`, { font: labelFont, align: center, border });
-  const gapEnd = r + signRows - 2;
-  if (gapEnd >= r + 2) merge(ws, r + 2, 6, gapEnd, COLS, '', { font: bodyFont, align: center, border });
-  merge(ws, r + signRows - 1, 1, r + signRows - 1, 5, `this is system generated ${title} so no need to sign`, {
-    font: labelFont,
+  merge(ws, r, 6, r, 8, 'DECLARATION', fillHead);
+  merge(ws, r + 1, 6, r + signRows - 2, 8, DEFAULT_INVOICE_DECLARATION, { font: smallFont, align: topLeft, border });
+
+  merge(ws, r, 9, r, COLS, `For ${profile.companyName || 'UMA MICRON'}`, fillHead);
+  merge(ws, r + 1, 9, r + signRows - 2, COLS, '\n\nAuthorised Signatory', { font: labelFont, align: center, border });
+
+  const footerRow = r + signRows - 1;
+  merge(ws, footerRow, 1, footerRow, 9, `This is a computer-generated ${title.toLowerCase()}.`, {
+    font: headLabelFont,
+    fill: solid(FILL),
     align: left,
     border
   });
-  merge(ws, r + signRows - 1, 6, r + signRows - 1, 8, 'Seal', { font: labelFont, align: center, border });
-  merge(ws, r + signRows - 1, 9, r + signRows - 1, COLS, 'Authorised signatory', { font: labelFont, align: center, border });
+  merge(ws, footerRow, 10, footerRow, COLS, 'Page 1 of 1', {
+    font: headLabelFont,
+    fill: solid(FILL),
+    align: center,
+    border
+  });
 
   ws.pageSetup.printTitlesRow = `${headerRow}:${headerRow + 1}`;
   const buffer = await wb.xlsx.writeBuffer();

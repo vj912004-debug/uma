@@ -51,7 +51,10 @@ const DocDownloadButtons = ({
   }
 
   return (
-    <span style={{ display: 'inline-flex', gap: '0.15rem', alignItems: 'center' }}>
+    <span style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+      <button type="button" title="Download Excel Bill" onClick={excel} style={iconBtn}>
+        <FileSpreadsheet size={size} color="#5b1c85" />
+      </button>
       <button type="button" title="Download PDF" onClick={pdf} style={iconBtn}>
         <FileText size={size} color="#ef4444" />
       </button>
