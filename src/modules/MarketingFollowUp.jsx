@@ -442,7 +442,7 @@ const MarketingFollowUp = () => {
                 <Phone size={18} />
                 <span>Schedule</span>
               </button>
-              <Link to="/marketing#mkt-reports">
+              <Link to="/marketing">
                 <BarChart3 size={18} />
                 <span>Reports</span>
               </Link>

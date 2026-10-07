@@ -108,9 +108,7 @@ const Sidebar = () => {
       icon: Megaphone,
       items: [
         { name: 'Lead Entry', icon: UserPlus, path: '/marketing', roles: ['Admin', 'Staff'] },
-        { name: 'Follow Up List', icon: PhoneCall, path: '/marketing-follow-up', roles: ['Admin', 'Staff'], highlight: true },
-        { name: 'Enquiry Conversion', icon: FileText, path: '/marketing#mkt-convert-enquiry', roles: ['Admin', 'Staff'] },
-        { name: 'Reports & Analytics', icon: BarChart3, path: '/marketing#mkt-reports', roles: ['Admin', 'Staff'] }
+        { name: 'Follow Up List', icon: PhoneCall, path: '/marketing-follow-up', roles: ['Admin', 'Staff'], highlight: true }
       ]
     },
     {
@@ -118,11 +116,7 @@ const Sidebar = () => {
       title: 'Procurement & Utility',
       icon: Wrench,
       items: [
-        { name: 'Purchase Dashboard', icon: ShoppingCart, path: '/purchase-management', hash: '', roles: ['Admin', 'Staff'], permissionIds: ['/purchase-management'] },
-        { name: 'New Inquiry', icon: FileText, path: '/purchase-management#pm-inquiry', hash: '#pm-inquiry', roles: ['Admin', 'Staff'], permissionIds: ['/purchase-management'] },
-        { name: 'Inquiry List', icon: ClipboardList, path: '/purchase-management#pm-status', hash: '#pm-status', roles: ['Admin', 'Staff'], permissionIds: ['/purchase-management'] },
-        { name: 'Quote Follow Up', icon: Phone, path: '/purchase-management#pm-follow', hash: '#pm-follow', roles: ['Admin', 'Staff'], permissionIds: ['/purchase-management'] },
-        { name: 'Quote Comparison', icon: GitCompare, path: '/purchase-management#pm-compare', hash: '#pm-compare', roles: ['Admin', 'Staff'], permissionIds: ['/purchase-management'] },
+        { name: 'Purchase Dashboard', icon: ShoppingCart, path: '/purchase-management', roles: ['Admin', 'Staff'] },
         { name: 'Utility Record', icon: Gauge, path: '/utility-record', roles: ['Admin', 'Staff'] },
         { name: 'Utility Temp. Record', icon: Thermometer, path: '/utility-temp-record', roles: ['Admin', 'Staff'] },
         { name: 'PM Air Compressor', icon: Fan, path: '/pm-air-compressor', roles: ['Admin', 'Staff'] }
