@@ -89,7 +89,6 @@ const COMPANY_HEADER_CHARGES = [
   { field: 'minimum', key: 'minimum', label: 'Minimum Charge', hint: 'Prints with Cleaning' },
   { field: 'filterBag', key: 'filterBag', label: 'Filter Bag Charge' },
   { field: 'sieving', key: 'sieving', label: 'Sieving Charge' },
-  { field: 'processing', key: 'processing', label: 'Processing Charge' },
   { field: 'cleaning', key: 'cleaning', label: 'Cleaning Charge' },
   { field: 'other', key: 'other', label: 'Other Charges (If Any)' }
 ];
@@ -1036,7 +1035,7 @@ const handleSameCompanyQuote = (q) => {
       .filter((item) => getChargeSection(formData.chargeSection, item.key) === section)
       .map((item) => ({ ...item, kind: 'header', id: `h-${item.field}`, sectionKey: item.key }));
     const extra = chargeDefsOf(formData)
-      .filter((item) => !COMPANY_HEADER_KEYS.has(item.key) && sectionOfDef(formData.chargeSection, item) === section)
+      .filter((item) => !COMPANY_HEADER_KEYS.has(item.key) && item.key !== 'processing' && sectionOfDef(formData.chargeSection, item) === section)
       .map((item) => ({ ...item, kind: 'catalog', id: item.key, sectionKey: item.key }));
     return [...header, ...extra];
   };

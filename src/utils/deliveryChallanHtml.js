@@ -12,14 +12,70 @@ const isStockDeliveryNote = (s) => {
   return !t || t.toLowerCase() === DEFAULT_DC_DELIVERY_NOTE.toLowerCase();
 };
 
-const resolveDeliveryNote = (data, linkedMr) => {
-  const dcTerms = cleanNote(data.termsAndConditions);
-  const dcNotes = cleanNote(data.deliveryNotes);
+const resolveSingleDeliveryNote = (data, linkedMr) => {
+  const dcTerms = cleanNote(data?.termsAndConditions);
+  const dcNotes = cleanNote(data?.deliveryNotes);
   const mrNotes = cleanNote(linkedMr?.deliveryNotes);
   if (dcTerms && !isStockDeliveryNote(dcTerms)) return dcTerms;
   if (dcNotes && !isStockDeliveryNote(dcNotes)) return dcNotes;
   if (mrNotes) return mrNotes;
   return dcTerms || dcNotes || '';
+};
+
+const resolveDeliveryNoteHtml = (data, linkedMr) => {
+  const dcProdNotes = data?.productDeliveryNotes || {};
+  const mrProdNotes = linkedMr?.productDeliveryNotes || {};
+
+  const productNames = [];
+  const addProdName = (n) => {
+    const s = String(n || '').trim();
+    if (s && !productNames.some((existing) => existing.toLowerCase() === s.toLowerCase())) {
+      productNames.push(s);
+    }
+  };
+
+  if (Array.isArray(data?.selectedProducts)) {
+    data.selectedProducts.forEach(addProdName);
+  }
+  if (Array.isArray(data?.productSummaries)) {
+    data.productSummaries.forEach((p) => addProdName(p?.prodName || p?.name));
+  }
+  Object.keys(dcProdNotes).forEach(addProdName);
+  Object.keys(mrProdNotes).forEach(addProdName);
+
+  const singleFallback = resolveSingleDeliveryNote(data, linkedMr);
+
+  if (productNames.length <= 1) {
+    const pName = productNames[0];
+    const note = pName ? (dcProdNotes[pName] || mrProdNotes[pName] || singleFallback) : singleFallback;
+    return note ? escHtml(cleanNote(note)) : '';
+  }
+
+  const notesByProduct = {};
+  const distinctNotes = new Set();
+
+  productNames.forEach((pName) => {
+    const note = cleanNote(dcProdNotes[pName] || mrProdNotes[pName] || singleFallback);
+    if (note) {
+      notesByProduct[pName] = note;
+      distinctNotes.add(note.toLowerCase());
+    }
+  });
+
+  if (distinctNotes.size === 0) {
+    return singleFallback ? escHtml(singleFallback) : '';
+  }
+
+  if (distinctNotes.size === 1) {
+    const firstNote = Object.values(notesByProduct)[0];
+    return escHtml(firstNote);
+  }
+
+  const parts = Object.entries(notesByProduct).map(([pName, note]) => {
+    return `<strong>${escHtml(pName)}:</strong> ${escHtml(note)}`;
+  });
+
+  return parts.join('<br/>');
 };
 
 const toTitleCase = (s) => String(s || '')
@@ -32,7 +88,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   const profile = mergeCompanyProfile(profileInput);
   const { lines, totalDrums, totalQty, goodsValueText } = buildDcPrintLines(data, appData);
   const linkedMr = resolveLinkedMr(data, appData);
-  const deliveryNote = resolveDeliveryNote(data, linkedMr);
+  const deliveryNoteHtml = resolveDeliveryNoteHtml(data, linkedMr);
 
   const dcNo = escHtml(data.dcNo || 'N/A');
   const dcDate = escHtml(formatPdfDateDmy(data.date) || 'N/A');
@@ -194,7 +250,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   bodyRows.push(`
       <tr class="dc-delivery-note dc-pin-start">
         <td></td>
-        <td class="left" colspan="4">${deliveryNote ? `<strong>${escHtml(deliveryNote)}</strong>` : '&nbsp;'}</td>
+        <td class="left" colspan="4">${deliveryNoteHtml ? deliveryNoteHtml : '&nbsp;'}</td>
       </tr>`);
   bodyRows.push(pinBlankRow);
   bodyRows.push(pinBlankRow);

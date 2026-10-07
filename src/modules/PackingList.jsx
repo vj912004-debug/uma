@@ -42,6 +42,7 @@ const PackingList = () => {
     totalWeight: 0,
     totalDrums: 0,
     sievingLumps: '',
+    productSievingLumps: {},
     batches: []
   });
 
@@ -78,6 +79,28 @@ const PackingList = () => {
 
   const formInitKey = editingPL?.id || selectedBPR?.id || (isModalOpen && !editingPL && !selectedBPR ? 'manual' : '');
 
+  const getProductSievingLumps = (prodName) => {
+    if (form.productSievingLumps?.[prodName] !== undefined) {
+      return form.productSievingLumps[prodName];
+    }
+    if (displayProducts.length === 1) {
+      return form.sievingLumps ?? '';
+    }
+    return '';
+  };
+
+  const handleProductSievingLumpsChange = (prodName, val) => {
+    setForm(prev => {
+      const nextMap = { ...(prev.productSievingLumps || {}), [prodName]: val };
+      const totalLumps = Object.values(nextMap).reduce((sum, v) => sum + parseWt(v), 0);
+      return {
+        ...prev,
+        productSievingLumps: nextMap,
+        sievingLumps: totalLumps || ''
+      };
+    });
+  };
+
   useEffect(() => {
     if (!isModalOpen) return;
 
@@ -97,6 +120,7 @@ const PackingList = () => {
         productName: mr ? getReceiptProductLabel(mr, opts) : (editingPL.productName || ''),
         productSummaries: summaries.length ? summaries : (editingPL.productSummaries || []),
         sievingLumps: editingPL.sievingLumps ?? editingPL.sievingLumpsNet ?? '',
+        productSievingLumps: editingPL.productSievingLumps || {},
         batches: (mergedBatches || []).filter(isFilledPlRow)
       });
       return;
@@ -118,6 +142,7 @@ const PackingList = () => {
         totalWeight: 0,
         totalDrums: plRows.length,
         sievingLumps: selectedBPR.lumpsNetWeight || selectedBPR.lumpsNet || '',
+        productSievingLumps: selectedBPR.productSievingLumps || {},
         batches: plRows
       });
     }
@@ -133,9 +158,14 @@ const PackingList = () => {
         drums: acc.drums + 1
       };
     }, { gross: 0, tare: 0, net: 0, drums: 0 });
-    const lumps = parseWt(form.sievingLumps);
+    let lumps = 0;
+    if (form.productSievingLumps && Object.keys(form.productSievingLumps).length > 0) {
+      lumps = Object.values(form.productSievingLumps).reduce((acc, v) => acc + parseWt(v), 0);
+    } else {
+      lumps = parseWt(form.sievingLumps);
+    }
     return { ...fromBatches, lumps, net: fromBatches.net + lumps };
-  }, [form.batches, form.sievingLumps]);
+  }, [form.batches, form.sievingLumps, form.productSievingLumps]);
 
   useEffect(() => {
     setForm(prev => ({ ...prev, totalDrums: prev.batches.length, totalWeight: grandTotal.net }));
@@ -260,6 +290,10 @@ const PackingList = () => {
       ? getReceiptProductSummaries(mr, opts).filter(p => p.batchCount > 0 || p.qty > 0)
       : (form.productSummaries || []);
 
+    const totalLumps = form.productSievingLumps && Object.keys(form.productSievingLumps).length > 0
+      ? Object.values(form.productSievingLumps).reduce((sum, v) => sum + parseWt(v), 0)
+      : parseWt(form.sievingLumps);
+
     const finalDoc = {
       ...form,
       receiptId: editingPL ? editingPL.receiptId : (selectedBPR?.receiptId || ''),
@@ -269,7 +303,8 @@ const PackingList = () => {
       productSummaries: summaries.length ? summaries : (form.productSummaries || []),
       batches: (form.batches || []).filter(isFilledPlRow),
       totalDrums: (form.batches || []).filter(isFilledPlRow).length,
-      sievingLumps: form.sievingLumps === '' || form.sievingLumps == null ? '' : parseWt(form.sievingLumps),
+      sievingLumps: totalLumps || '',
+      productSievingLumps: form.productSievingLumps || {},
       totalWeight: grandTotal.net
     };
 
@@ -507,17 +542,41 @@ const PackingList = () => {
                     </div>
                   )}
                 </div>
-                <div>
-                  <label>Sieving Lumps (Kg)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="input-field"
-                    placeholder="0.00"
-                    value={numberInputValue(form.sievingLumps)}
-                    onChange={e => setForm({ ...form, sievingLumps: parseOptionalNumber(e.target.value) })}
-                  />
-                </div>
+                {displayProducts.length > 1 ? (
+                  displayProducts.map((pName, pIdx) => (
+                    <div key={`lump-top-${pName}-${pIdx}`}>
+                      <label>Product {pIdx + 1} ({pName}) Sieving Lumps (Kg)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="input-field"
+                        placeholder="0.00"
+                        value={numberInputValue(getProductSievingLumps(pName))}
+                        onChange={e => handleProductSievingLumpsChange(pName, parseOptionalNumber(e.target.value))}
+                      />
+                    </div>
+                  ))
+                ) : (
+                  <div>
+                    <label>Sieving Lumps (Kg)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input-field"
+                      placeholder="0.00"
+                      value={numberInputValue(form.sievingLumps)}
+                      onChange={e => {
+                        const val = parseOptionalNumber(e.target.value);
+                        const pName = displayProducts[0] || 'default';
+                        setForm({
+                          ...form,
+                          sievingLumps: val,
+                          productSievingLumps: { ...(form.productSievingLumps || {}), [pName]: val }
+                        });
+                      }}
+                    />
+                  </div>
+                )}
                 <div>
                   <label>Total Weight (Calculated)</label>
                   <input type="text" className="input-field" readOnly value={`${form.totalWeight.toFixed(2)} Kg`} style={{ fontWeight: 600 }} />
@@ -559,11 +618,23 @@ const PackingList = () => {
 
                   return (
                     <div key={`${sectionLabel}-${pIdx}`} style={{ marginBottom: '1.25rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                         <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
                           Product {pIdx + 1}: {sectionLabel}
                         </h4>
-                        <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow(prodName || form.productName)}>+ Add Row</button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>Sieving Lumps (Kg):</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="input-field"
+                            style={{ padding: '0.25rem 0.4rem', width: '100px', fontSize: '0.8rem' }}
+                            placeholder="0.00"
+                            value={numberInputValue(getProductSievingLumps(prodName))}
+                            onChange={e => handleProductSievingLumpsChange(prodName, parseOptionalNumber(e.target.value))}
+                          />
+                          <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow(prodName || form.productName)}>+ Add Row</button>
+                        </div>
                       </div>
                       <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>

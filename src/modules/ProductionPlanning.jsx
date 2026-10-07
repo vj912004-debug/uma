@@ -94,6 +94,81 @@ const resolvePlan = (plan, materialReceipts = [], parties = []) => {
 
 const normProduct = (s) => String(s || '').trim().toLowerCase();
 
+const parsePlanDateTime = (dateStr, timeStr) => {
+  if (!dateStr) return null;
+  const t = timeStr || '00:00';
+  const d = new Date(`${dateStr}T${t}`);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const formatPlanDate = (d) => d.toISOString().slice(0, 10);
+const formatPlanTime = (d) => d.toTimeString().slice(0, 5);
+
+export const performCarryForward = (anchorPlan, allPlans) => {
+  if (!anchorPlan?.endDate || !anchorPlan?.endTime) {
+    return { nextPlans: allPlans, shiftedCount: 0 };
+  }
+
+  const anchorEnd = parsePlanDateTime(anchorPlan.endDate, anchorPlan.endTime);
+  if (!anchorEnd) return { nextPlans: allPlans, shiftedCount: 0 };
+
+  const otherPlans = (allPlans || []).filter(p =>
+    !p.isDeleted &&
+    p.id !== anchorPlan.id &&
+    p.status !== 'Done' &&
+    p.status !== 'Cancel'
+  );
+
+  if (otherPlans.length === 0) return { nextPlans: allPlans, shiftedCount: 0 };
+
+  const sorted = [...otherPlans].sort((a, b) => {
+    const dtA = parsePlanDateTime(a.startDate, a.startTime) || new Date(a.createdAt || 0);
+    const dtB = parsePlanDateTime(b.startDate, b.startTime) || new Date(b.createdAt || 0);
+    return dtA - dtB;
+  });
+
+  let currentChainEnd = new Date(anchorEnd.getTime());
+  let shiftedCount = 0;
+  const updatedMap = new Map();
+
+  for (const plan of sorted) {
+    const startDt = parsePlanDateTime(plan.startDate, plan.startTime);
+    const endDt = parsePlanDateTime(plan.endDate, plan.endTime);
+
+    let durationMs = 8 * 3600 * 1000;
+    if (startDt && endDt && endDt > startDt) {
+      durationMs = endDt.getTime() - startDt.getTime();
+    } else if (parseFloat(plan.hours) > 0) {
+      durationMs = Math.round(parseFloat(plan.hours) * 3600 * 1000);
+    }
+
+    if (!startDt || startDt < currentChainEnd) {
+      const newStart = new Date(currentChainEnd.getTime());
+      const newEnd = new Date(newStart.getTime() + durationMs);
+      const hoursNum = (durationMs / (3600 * 1000)).toFixed(2);
+
+      updatedMap.set(plan.id, {
+        ...plan,
+        startDate: formatPlanDate(newStart),
+        startTime: formatPlanTime(newStart),
+        endDate: formatPlanDate(newEnd),
+        endTime: formatPlanTime(newEnd),
+        hours: hoursNum
+      });
+
+      shiftedCount++;
+      currentChainEnd = newEnd;
+    } else {
+      if (endDt && endDt > currentChainEnd) {
+        currentChainEnd = new Date(endDt.getTime());
+      }
+    }
+  }
+
+  const nextPlans = (allPlans || []).map(p => updatedMap.get(p.id) || p);
+  return { nextPlans, shiftedCount };
+};
+
 /** True when a Delivery Challan exists for this plan's receipt (and product when set). */
 const isPlanDispatched = (plan, deliveryChallans = []) => {
   if (!plan?.receiptId) return false;
@@ -124,6 +199,7 @@ const ProductionPlanning = () => {
   const [productFilter, setProductFilter] = useState('');
   const [statusTab, setStatusTab] = useState('pending');
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
+  const [autoCarryForward, setAutoCarryForward] = useState(true);
 
   const userRole = data.settings?.userRole || 'Admin';
   const staffVisibleColumns = data.settings?.productionPlanningVisibleColumnsForStaff;
@@ -264,21 +340,77 @@ const ProductionPlanning = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     try {
+      let savedPlan;
+      let allPlans = data.productionPlans || [];
       if (isEditing) {
-        updateItem('productionPlans', isEditing, { ...formData, id: isEditing });
+        savedPlan = { ...formData, id: isEditing };
+        allPlans = allPlans.map(p => p.id === isEditing ? savedPlan : p);
       } else {
-        const newPlan = {
+        savedPlan = {
           ...formData,
           id: Date.now().toString(),
           createdAt: new Date().toISOString()
         };
-        updateData('productionPlans', newPlan);
+        allPlans = [...allPlans, savedPlan];
+      }
+
+      const hasDelay = Boolean(formData.delayReason && formData.delayReason.trim());
+
+      if ((autoCarryForward || hasDelay) && savedPlan.endDate && savedPlan.endTime) {
+        const { nextPlans, shiftedCount } = performCarryForward(savedPlan, allPlans);
+        setData(prev => ({ ...prev, productionPlans: nextPlans }));
+        if (shiftedCount > 0) {
+          alert(`Plan saved. ${hasDelay ? 'Delay reason updated and ' : ''}${shiftedCount} subsequent pending plan(s) were carried forward automatically.`);
+        }
+      } else {
+        setData(prev => ({ ...prev, productionPlans: allPlans }));
       }
       setIsModalOpen(false);
       setIsEditing(null);
     } catch (error) {
       console.error(error);
       alert("Error saving production plan.");
+    }
+  };
+
+  const handleCarryForwardForPlan = (plan) => {
+    const resolved = resolvePlan(plan, data.materialReceipts, data.parties);
+    const { nextPlans, shiftedCount } = performCarryForward(resolved, data.productionPlans || []);
+    if (shiftedCount > 0) {
+      setData(prev => ({ ...prev, productionPlans: nextPlans }));
+      alert(`Carried forward ${shiftedCount} subsequent pending plan(s) starting after ${resolved.batchNo || resolved.productName || 'selected plan'} (${resolved.endDate} ${resolved.endTime}).`);
+    } else {
+      alert('All pending plans are already scheduled after this plan. No shifting needed.');
+    }
+  };
+
+  const handleCarryForwardAll = () => {
+    const plans = data.productionPlans || [];
+    if (!plans.length) {
+      alert("No production plans available.");
+      return;
+    }
+
+    const candidates = [...plans]
+      .filter(p => !p.isDeleted && p.endDate && p.endTime)
+      .sort((a, b) => {
+        const dtA = parsePlanDateTime(a.endDate, a.endTime) || new Date(0);
+        const dtB = parsePlanDateTime(b.endDate, b.endTime) || new Date(0);
+        return dtB - dtA;
+      });
+
+    const anchor = candidates[0];
+    if (!anchor) {
+      alert("No completed or scheduled plan with end date/time found to use as anchor.");
+      return;
+    }
+
+    const { nextPlans, shiftedCount } = performCarryForward(anchor, plans);
+    if (shiftedCount > 0) {
+      setData(prev => ({ ...prev, productionPlans: nextPlans }));
+      alert(`Queue updated! Shifted ${shiftedCount} pending plan(s) based on ${anchor.batchNo || anchor.productName || 'latest plan'} (${anchor.endDate} ${anchor.endTime}).`);
+    } else {
+      alert("All pending plans are already scheduled after the latest completion date.");
     }
   };
 
@@ -299,11 +431,17 @@ const ProductionPlanning = () => {
     ...resolvedPlans.map((p) => p.productName),
     ...(data.parties || []).flatMap((p) => (p.products || []).map((prod) => prod.name))
   ]), [resolvedPlans, data.parties]);
+
   const isPlanPending = (p) => p.status !== 'Done' && p.status !== 'Cancel';
+  const isPlanDelayed = (p) => Boolean(p.delayReason && String(p.delayReason).trim());
+
   const pendingCount = resolvedPlans.filter(isPlanPending).length;
+  const delayedCount = resolvedPlans.filter(isPlanDelayed).length;
   const completedCount = resolvedPlans.filter((p) => p.status === 'Done').length;
+
   const filteredPlans = resolvedPlans.filter((p) => {
     if (statusTab === 'pending' && !isPlanPending(p)) return false;
+    if (statusTab === 'delayed' && !isPlanDelayed(p)) return false;
     if (statusTab === 'completed' && p.status !== 'Done') return false;
     if (partyFilter && (p.customer || '') !== partyFilter) return false;
     if (productFilter && (p.productName || '') !== productFilter) return false;
@@ -313,7 +451,8 @@ const ProductionPlanning = () => {
       (p.productNickName || '').toLowerCase().includes(q) ||
       (p.customer || '').toLowerCase().includes(q) ||
       (p.productName || '').toLowerCase().includes(q) ||
-      (p.batchNo || '').toLowerCase().includes(q)
+      (p.batchNo || '').toLowerCase().includes(q) ||
+      (p.delayReason || '').toLowerCase().includes(q)
     );
   });
 
@@ -349,8 +488,13 @@ const ProductionPlanning = () => {
           <h1 className="page-title">Production Planning</h1>
           <p className="page-subtitle">Schedule milling batches and track processing. Dispatched jobs leave this list automatically.</p>
         </div>
-        <div className="page-toolbar" style={{ flex: '1 1 460px', justifyContent: 'flex-end', minWidth: 0 }}>
+        <div className="page-toolbar" style={{ flex: '1 1 520px', justifyContent: 'flex-end', minWidth: 0 }}>
           <ExportButton data={filteredPlans} columns={visibleExportColumns} filename="Production_Plan" title="Production Plan Report" />
+          {userRole === 'Admin' && (
+            <button className="btn" onClick={handleCarryForwardAll} title="Shift all pending plans forward chronologically">
+              <Clock size={16} /> Carry Forward Queue
+            </button>
+          )}
           {userRole === 'Admin' && (
             <button className="btn" onClick={() => setIsColumnModalOpen(true)}>
               Configure Staff View
@@ -364,13 +508,20 @@ const ProductionPlanning = () => {
         </div>
       </header>
 
-      <StatusTabBar
-        value={statusTab}
-        onChange={setStatusTab}
-        allCount={resolvedPlans.length}
-        pendingCount={pendingCount}
-        completedCount={completedCount}
-      />
+      <div className="tab-bar status-tab-bar" style={{ marginBottom: '1.5rem' }}>
+        <button type="button" className={`tab-btn${statusTab === 'pending' ? ' active' : ''}`} onClick={() => setStatusTab('pending')}>
+          Pending ({pendingCount})
+        </button>
+        <button type="button" className={`tab-btn${statusTab === 'delayed' ? ' active' : ''}`} onClick={() => setStatusTab('delayed')}>
+          ⚠️ Delayed ({delayedCount})
+        </button>
+        <button type="button" className={`tab-btn${statusTab === 'completed' ? ' active' : ''}`} onClick={() => setStatusTab('completed')}>
+          Completed ({completedCount})
+        </button>
+        <button type="button" className={`tab-btn${statusTab === 'all' ? ' active' : ''}`} onClick={() => setStatusTab('all')}>
+          All ({resolvedPlans.length})
+        </button>
+      </div>
 
       <ListFilterBar
         searchTerm={searchTerm}
@@ -425,7 +576,57 @@ const ProductionPlanning = () => {
                     {effectiveVisibleColumns.includes('startDate') && <td style={{ fontSize: '0.85rem' }}>{plan.startDate ? `${formatDate(plan.startDate)} ${plan.startTime || ''}`.trim() : '-'}</td>}
                     {effectiveVisibleColumns.includes('endDate') && <td style={{ fontSize: '0.85rem' }}>{plan.endDate ? `${formatDate(plan.endDate)} ${plan.endTime || ''}`.trim() : '-'}</td>}
                     {effectiveVisibleColumns.includes('hours') && <td>{plan.hours || '-'}</td>}
-                    {effectiveVisibleColumns.includes('delayReason') && <td><div style={{ fontSize: '0.75rem', maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: plan.delayReason ? 'rgba(239, 68, 68, 0.8)' : 'var(--text-muted)' }}>{plan.delayReason || '-'}</div></td>}
+                    {effectiveVisibleColumns.includes('delayReason') && (
+                      <td>
+                        {plan.delayReason && plan.delayReason.trim() ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: '130px' }}>
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '4px',
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              color: '#ef4444',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              width: 'fit-content'
+                            }}>
+                              ⚠️ Delay Updated
+                            </span>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-primary)', fontWeight: 500 }} title={plan.delayReason}>
+                              {plan.delayReason}
+                            </span>
+                            {userRole === 'Admin' && isPlanPending(plan) && (
+                              <button
+                                type="button"
+                                className="btn"
+                                style={{
+                                  padding: '0.2rem 0.45rem',
+                                  fontSize: '0.7rem',
+                                  marginTop: '0.2rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  background: 'var(--glass-bg)',
+                                  border: '1px solid var(--border-color)',
+                                  color: 'var(--accent-primary)',
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => handleCarryForwardForPlan(plan)}
+                                title="Carry forward start & complete dates for all subsequent pending plans"
+                              >
+                                <Clock size={12} /> Carry Forward Queue
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', opacity: 0.7 }}>
+                            No Delay
+                          </span>
+                        )}
+                      </td>
+                    )}
                     {effectiveVisibleColumns.includes('supervisor') && <td>{plan.supervisor || '-'}</td>}
                     {effectiveVisibleColumns.includes('priorityLevel') && (
                       <td>
@@ -589,7 +790,14 @@ const ProductionPlanning = () => {
                   </SearchableSelect>
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label>Delay Reason (If Any)</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                    <label style={{ margin: 0 }}>Delay Reason (If Any)</label>
+                    {formData.delayReason?.trim() && (
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#ef4444', background: 'rgba(239, 68, 68, 0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                        ⚠️ Delay Reason Updated
+                      </span>
+                    )}
+                  </div>
                   <input type="text" className="input-field" value={formData.delayReason} onChange={e => setFormData({...formData, delayReason: e.target.value})} placeholder="Machine breakdown, missing materials..." />
                 </div>
                 
@@ -623,6 +831,17 @@ const ProductionPlanning = () => {
                 <div>
                   <label>Total Processing Hours</label>
                   <input type="text" className="input-field" value={formData.hours || ''} readOnly placeholder="Auto-calculated" style={{ fontWeight: 600, color: 'var(--accent-primary)', background: 'var(--glass-bg)' }} />
+                </div>
+
+                <div style={{ gridColumn: 'span 3', background: 'rgba(91, 28, 133, 0.04)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0, fontWeight: 600, fontSize: '0.85rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={autoCarryForward}
+                      onChange={e => setAutoCarryForward(e.target.checked)}
+                    />
+                    <span>Carry forward subsequent pending plans automatically (Reschedules queue dates & times)</span>
+                  </label>
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>

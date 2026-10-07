@@ -212,7 +212,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
 
     updateItem('users', user.id, {
       ...user,
-      employeeId: user.employeeId || generateEmployeeId(data.users || []),
+      employeeId: String(masterForm.employeeId || '').trim() || user.employeeId || generateEmployeeId(data.users || []),
       name: String(masterForm.name || '').trim() || user.name,
       department: String(masterForm.department || '').trim(),
       designation: String(masterForm.designation || '').trim(),
@@ -650,15 +650,25 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                     </SearchableSelect>
                   </div>
                   <div className="form-group pm-field">
-                    <label>Employee Code (Auto)</label>
-                    <input
-                      className="input-field"
-                      value={masterForm.employeeId}
-                      readOnly
-                      placeholder="Generated automatically"
-                      title="Generated automatically"
-                      style={{ background: 'var(--glass-bg)', color: 'var(--accent-primary)', fontWeight: 600, cursor: 'not-allowed' }}
-                    />
+                    <label>Employee Code</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input
+                        className="input-field"
+                        value={masterForm.employeeId}
+                        onChange={(e) => setMasterForm({ ...masterForm, employeeId: e.target.value })}
+                        placeholder="e.g. EMP001"
+                        style={{ flex: 1, fontWeight: 600 }}
+                      />
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => setMasterForm({ ...masterForm, employeeId: generateEmployeeId(data.users || []) })}
+                        title="Generate next available Employee Code"
+                        style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                      >
+                        <RefreshCw size={14} /> Generate
+                      </button>
+                    </div>
                   </div>
                   <div className="form-group pm-field">
                     <label>Employee Name</label>

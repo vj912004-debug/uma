@@ -231,6 +231,7 @@ const MaterialReceipt = () => {
     nickName: '',
     value: '', // Editable value of the material
     deliveryNotes: '', // Shown on linked Delivery Challan print
+    productDeliveryNotes: {}, // Per-product delivery notes { [prodName]: noteText }
     batches: [], // Array of { batchNo, drums: 0, qty: 0, psdReq: '', psdReport: 'No', psdMethod: '', isEmptyDrums: false }
     totalDrums: 0,
     totalQty: 0,
@@ -501,6 +502,7 @@ const MaterialReceipt = () => {
     }
     setFormData({
       ...prepared.baseForm,
+      productDeliveryNotes: prepared.baseForm.productDeliveryNotes || {},
       productSettings: applyCommonChargesToProductSettings(productSettings, seededCharges, seededRates, seededQtys),
       productName: prepared.baseForm.productName || '',
       nickName: '',
@@ -546,6 +548,7 @@ const MaterialReceipt = () => {
       nickName: '',
       value: '',
       deliveryNotes: '',
+      productDeliveryNotes: {},
       batches: [],
     totalDrums: 0,
     totalQty: 0,
@@ -1195,34 +1198,116 @@ const MaterialReceipt = () => {
                   <input type="number" className="input-field" placeholder="Editable" value={formData.value} onChange={e => setFormData({...formData, value: parseFloat(e.target.value) || ''})} />
                 </div>
 
-                <div style={{ gridColumn: 'span 4' }}>
-                  <label>Delivery Notes</label>
-                  {(data.dcDeliveryNotes || []).length > 0 && (
-                    <SearchableSelect
+                {receivedProducts.length > 1 ? (
+                  <div style={{ gridColumn: 'span 4' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span>Delivery Notes</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)' }}>(Separate note for each product)</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+                      {receivedProducts.map((prod, pIdx) => {
+                        const prodNote = (formData.productDeliveryNotes && formData.productDeliveryNotes[prod.name] !== undefined)
+                          ? formData.productDeliveryNotes[prod.name]
+                          : (formData.deliveryNotes || '');
+                        return (
+                          <div key={prod.name || pIdx} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', background: 'var(--bg-card)' }}>
+                            <label style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--accent-primary)', marginBottom: '0.4rem', display: 'block' }}>
+                              Product {pIdx + 1}: {prod.name}
+                            </label>
+                            {(data.dcDeliveryNotes || []).length > 0 && (
+                              <SearchableSelect
+                                className="input-field"
+                                value=""
+                                onChange={(e) => {
+                                  const picked = e.target.value;
+                                  if (picked) {
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      productDeliveryNotes: {
+                                        ...(prev.productDeliveryNotes || {}),
+                                        [prod.name]: picked
+                                      },
+                                      deliveryNotes: prev.deliveryNotes || picked
+                                    }));
+                                  }
+                                }}
+                                placeholder="Pick from master…"
+                                style={{ marginBottom: '0.5rem' }}
+                              >
+                                <option value="">Pick from master…</option>
+                                {(data.dcDeliveryNotes || []).map((n, idx) => (
+                                  <option key={idx} value={n}>{n}</option>
+                                ))}
+                              </SearchableSelect>
+                            )}
+                            <textarea
+                              className="input-field"
+                              rows="2"
+                              list="dcDeliveryNoteOptions"
+                              placeholder={`Shown on Delivery Challan print for ${prod.name}`}
+                              value={prodNote}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setFormData(prev => ({
+                                  ...prev,
+                                  productDeliveryNotes: {
+                                    ...(prev.productDeliveryNotes || {}),
+                                    [prod.name]: val
+                                  },
+                                  deliveryNotes: val || prev.deliveryNotes
+                                }));
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ gridColumn: 'span 4' }}>
+                    <label>Delivery Notes</label>
+                    {(data.dcDeliveryNotes || []).length > 0 && (
+                      <SearchableSelect
+                        className="input-field"
+                        value=""
+                        onChange={(e) => {
+                          const picked = e.target.value;
+                          if (picked) {
+                            const singleProd = receivedProducts[0]?.name;
+                            setFormData(prev => ({
+                              ...prev,
+                              deliveryNotes: picked,
+                              productDeliveryNotes: singleProd ? { ...(prev.productDeliveryNotes || {}), [singleProd]: picked } : (prev.productDeliveryNotes || {})
+                            }));
+                          }
+                        }}
+                        placeholder="Pick from master…"
+                        style={{ marginBottom: '0.5rem' }}
+                      >
+                        <option value="">Pick from master…</option>
+                        {(data.dcDeliveryNotes || []).map((n, idx) => (
+                          <option key={idx} value={n}>{n}</option>
+                        ))}
+                      </SearchableSelect>
+                    )}
+                    <textarea
                       className="input-field"
-                      value=""
-                      onChange={(e) => {
-                        const picked = e.target.value;
-                        if (picked) setFormData({ ...formData, deliveryNotes: picked });
+                      rows="2"
+                      list="dcDeliveryNoteOptions"
+                      placeholder="Shown on Delivery Challan print (e.g. Material sent for Micronisation on Job Work basis.)"
+                      value={formData.deliveryNotes || ''}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const singleProd = receivedProducts[0]?.name;
+                        setFormData(prev => ({
+                          ...prev,
+                          deliveryNotes: val,
+                          productDeliveryNotes: singleProd ? { ...(prev.productDeliveryNotes || {}), [singleProd]: val } : (prev.productDeliveryNotes || {})
+                        }));
                       }}
-                      placeholder="Pick from master…"
-                      style={{ marginBottom: '0.5rem' }}
-                    >
-                      <option value="">Pick from master…</option>
-                      {(data.dcDeliveryNotes || []).map((n, idx) => (
-                        <option key={idx} value={n}>{n}</option>
-                      ))}
-                    </SearchableSelect>
-                  )}
-                  <textarea
-                    className="input-field"
-                    rows="2"
-                    list="dcDeliveryNoteOptions"
-                    placeholder="Shown on Delivery Challan print (e.g. Material sent for Micronisation on Job Work basis.)"
-                    value={formData.deliveryNotes || ''}
-                    onChange={e => setFormData({ ...formData, deliveryNotes: e.target.value })}
-                  />
-                </div>
+                    />
+                  </div>
+                )}
               </div>
 
               <datalist id="psdReqOptions">

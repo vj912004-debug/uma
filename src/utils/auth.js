@@ -30,10 +30,11 @@ export function generatePassword(length = 8) {
 export function generateEmployeeId(existingUsers = []) {
   const nums = existingUsers
     .map((u) => {
-      const match = u.employeeId?.match(/^EMP(\d+)$/i);
+      const code = String(u.employeeId || u.empCode || '').trim();
+      const match = code.match(/(\d+)/);
       return match ? parseInt(match[1], 10) : 0;
     })
-    .filter((n) => n > 0);
+    .filter((n) => n > 0 && !isNaN(n));
   const next = nums.length ? Math.max(...nums) + 1 : 1;
   return `EMP${String(next).padStart(3, '0')}`;
 }

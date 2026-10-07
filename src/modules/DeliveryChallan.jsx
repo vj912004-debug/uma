@@ -44,7 +44,8 @@ const emptyDCForm = (docNo = '') => ({
   driverName: '',
   driverContact: '',
   termsAndConditions: '',
-  deliveryNotes: ''
+  deliveryNotes: '',
+  productDeliveryNotes: {}
 });
 
 const DeliveryChallan = () => {
@@ -84,6 +85,7 @@ const DeliveryChallan = () => {
       setForm({
         ...editingDoc,
         selectedProducts: selected,
+        productDeliveryNotes: editingDoc.productDeliveryNotes || activeMR?.productDeliveryNotes || {},
         ...computed,
         qty: editingDoc.qty,
         totalDrums: editingDoc.totalDrums,
@@ -112,6 +114,7 @@ const DeliveryChallan = () => {
         gstinBill: activeMR.gstinBill,
         gstinShip: activeMR.gstinShip,
         selectedProducts: allNames,
+        productDeliveryNotes: activeMR.productDeliveryNotes || {},
         vehicleNo: activeMR.vehicleNo || '',
         termsAndConditions: (activeMR.deliveryNotes || '').trim(),
         deliveryNotes: (activeMR.deliveryNotes || '').trim(),
@@ -120,15 +123,42 @@ const DeliveryChallan = () => {
     }
   }, [formInitKey, isModalOpen]);
 
+  const selectAllProducts = () => {
+    if (!activeMR) return;
+    const allNames = availableProducts.map(p => p.prodName);
+    const computed = buildDCFieldsFromProducts(activeMR, activePL, prodOpts, allNames);
+    setForm(prev => ({
+      ...prev,
+      selectedProducts: allNames,
+      ...computed,
+      value: parseFloat(prev.value) > 0 ? prev.value : (computed.value || '')
+    }));
+  };
+
+  const selectSingleProduct = (prodName) => {
+    if (!activeMR) return;
+    const next = [prodName];
+    const computed = buildDCFieldsFromProducts(activeMR, activePL, prodOpts, next);
+    setForm(prev => ({
+      ...prev,
+      selectedProducts: next,
+      ...computed,
+      value: parseFloat(prev.value) > 0 ? prev.value : (computed.value || '')
+    }));
+  };
+
   const toggleProductSelection = (prodName) => {
     if (!activeMR) return;
     setForm(prev => {
       const current = prev.selectedProducts || [];
       const isSelected = current.some(p => p.trim().toLowerCase() === prodName.trim().toLowerCase());
-      const next = isSelected
-        ? current.filter(p => p.trim().toLowerCase() !== prodName.trim().toLowerCase())
-        : [...current, prodName];
-      if (next.length === 0) return prev;
+      let next;
+      if (isSelected) {
+        next = current.filter(p => p.trim().toLowerCase() !== prodName.trim().toLowerCase());
+        if (next.length === 0) next = [prodName];
+      } else {
+        next = [...current, prodName];
+      }
       const computed = buildDCFieldsFromProducts(activeMR, activePL, prodOpts, next);
       return {
         ...prev,
@@ -372,31 +402,88 @@ const DeliveryChallan = () => {
                 <div style={{ gridColumn: 'span 4', borderTop: '1px solid var(--border-color)', margin: '0.5rem 0' }}></div>
 
                 {availableProducts.length > 1 && (
-                  <div style={{ gridColumn: 'span 4', marginBottom: '0.5rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Select Product(s) for Dispatch</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ gridColumn: 'span 4', marginBottom: '0.75rem', background: 'rgba(91, 28, 133, 0.04)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(91, 28, 133, 0.15)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontWeight: 700, fontSize: '0.9rem', color: 'var(--accent-primary)', margin: 0 }}>
+                          Dispatch Selection ({form.selectedProducts?.length || 0} of {availableProducts.length} Product{(form.selectedProducts?.length || 0) !== 1 ? 's' : ''} Selected)
+                        </label>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {form.selectedProducts?.length === availableProducts.length
+                            ? `✓ ${availableProducts.length} Products Selected — Generating Combined Delivery Challan for all products`
+                            : `✓ 1 Product Selected — Generating Single Product Delivery Challan for ${form.selectedProducts?.[0] || '1 product'}`}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          className="btn"
+                          style={{
+                            padding: '0.3rem 0.65rem',
+                            fontSize: '0.78rem',
+                            background: (form.selectedProducts || []).length === availableProducts.length ? 'var(--accent-primary)' : '#fff',
+                            color: (form.selectedProducts || []).length === availableProducts.length ? '#fff' : 'var(--accent-primary)',
+                            border: '1px solid var(--accent-primary)',
+                            fontWeight: 600
+                          }}
+                          onClick={selectAllProducts}
+                        >
+                          Dispatch All ({availableProducts.length} Products)
+                        </button>
+                        {availableProducts.map((p, pIdx) => {
+                          const isOnlyThis = (form.selectedProducts || []).length === 1 && (form.selectedProducts || [])[0]?.trim().toLowerCase() === p.prodName.trim().toLowerCase();
+                          return (
+                            <button
+                              key={p.prodName}
+                              type="button"
+                              className="btn"
+                              style={{
+                                padding: '0.3rem 0.65rem',
+                                fontSize: '0.78rem',
+                                background: isOnlyThis ? 'var(--accent-primary)' : '#fff',
+                                color: isOnlyThis ? '#fff' : 'var(--text-main)',
+                                border: '1px solid var(--border-color)',
+                                fontWeight: 600
+                              }}
+                              onClick={() => selectSingleProduct(p.prodName)}
+                            >
+                              Product {pIdx + 1} Only
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.65rem' }}>
                       {availableProducts.map((p, idx) => {
                         const checked = (form.selectedProducts || []).some(n => n.trim().toLowerCase() === p.prodName.trim().toLowerCase());
                         return (
                           <label
                             key={p.prodName}
                             style={{
-                              display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.85rem',
-                              background: checked ? 'rgba(91, 28, 133, 0.08)' : 'var(--input-bg)',
-                              border: `1px solid ${checked ? 'var(--accent-primary)' : 'var(--border-color)'}`,
-                              borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem'
+                              display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 0.9rem',
+                              background: checked ? '#fff' : 'var(--input-bg)',
+                              border: `2px solid ${checked ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+                              borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem',
+                              boxShadow: checked ? '0 2px 6px rgba(91, 28, 133, 0.12)' : 'none',
+                              transition: 'all 0.15s ease'
                             }}
                           >
                             <input
                               type="checkbox"
                               checked={checked}
                               onChange={() => toggleProductSelection(p.prodName)}
+                              style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
                             />
-                            <span style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>Product {idx + 1}:</span>
-                            <span style={{ fontWeight: 600 }}>{p.prodName}</span>
-                            <span style={{ color: 'var(--text-muted)', marginLeft: 'auto' }}>
-                              {parseFloat(p.qty || 0).toFixed(2)} Kg · {p.drums || 0} drum{(p.drums || 0) !== 1 ? 's' : ''}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--accent-primary)' }}>Product {idx + 1}</span>
+                                <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.prodName}</span>
+                              </div>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                                {parseFloat(p.qty || 0).toFixed(2)} Kg · {p.drums || 0} drum{(p.drums || 0) !== 1 ? 's' : ''}
+                              </span>
+                            </div>
                           </label>
                         );
                       })}
@@ -445,43 +532,126 @@ const DeliveryChallan = () => {
                   <input type="text" className="input-field" placeholder="e.g. 98765 43210" value={form.driverContact || ''} onChange={e => setForm({...form, driverContact: e.target.value})} />
                 </div>
 
-                <div style={{ gridColumn: 'span 4' }}>
-                  <label>Delivery Notes</label>
-                  {(data.dcDeliveryNotes || []).length > 0 && (
-                    <SearchableSelect
-                      className="input-field"
-                      value=""
-                      onChange={(e) => {
-                        const picked = e.target.value;
-                        if (picked) {
-                          setForm({
-                            ...form,
-                            deliveryNotes: picked,
-                            termsAndConditions: picked
-                          });
-                        }
-                      }}
-                      placeholder="Pick from master…"
-                      style={{ marginBottom: '0.5rem' }}
-                    >
-                      <option value="">Pick from master…</option>
-                      {(data.dcDeliveryNotes || []).map((n, idx) => (
-                        <option key={idx} value={n}>{n}</option>
-                      ))}
-                    </SearchableSelect>
-                  )}
-                  <textarea
-                    className="input-field"
-                    rows="2"
-                    placeholder="This text prints on the Delivery Challan"
-                    value={form.deliveryNotes ?? form.termsAndConditions ?? ''}
-                    onChange={e => setForm({
-                      ...form,
-                      deliveryNotes: e.target.value,
-                      termsAndConditions: e.target.value
-                    })}
-                  />
-                </div>
+                {(() => {
+                  const productsForNotes = (form.selectedProducts || []).length > 0
+                    ? form.selectedProducts
+                    : availableProducts.map(p => p.prodName);
+                  if (productsForNotes.length > 1) {
+                    return (
+                      <div style={{ gridColumn: 'span 4' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span>Delivery Notes</span>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)' }}>(Separate note for each product)</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+                          {productsForNotes.map((pName, pIdx) => {
+                            const prodNote = (form.productDeliveryNotes && form.productDeliveryNotes[pName] !== undefined)
+                              ? form.productDeliveryNotes[pName]
+                              : (form.deliveryNotes ?? form.termsAndConditions ?? '');
+                            return (
+                              <div key={pName || pIdx} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', background: 'var(--bg-card)' }}>
+                                <label style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--accent-primary)', marginBottom: '0.4rem', display: 'block' }}>
+                                  Product {pIdx + 1}: {pName}
+                                </label>
+                                {(data.dcDeliveryNotes || []).length > 0 && (
+                                  <SearchableSelect
+                                    className="input-field"
+                                    value=""
+                                    onChange={(e) => {
+                                      const picked = e.target.value;
+                                      if (picked) {
+                                        setForm(prev => ({
+                                          ...prev,
+                                          productDeliveryNotes: {
+                                            ...(prev.productDeliveryNotes || {}),
+                                            [pName]: picked
+                                          },
+                                          deliveryNotes: prev.deliveryNotes || picked,
+                                          termsAndConditions: prev.termsAndConditions || picked
+                                        }));
+                                      }
+                                    }}
+                                    placeholder="Pick from master…"
+                                    style={{ marginBottom: '0.5rem' }}
+                                  >
+                                    <option value="">Pick from master…</option>
+                                    {(data.dcDeliveryNotes || []).map((n, idx) => (
+                                      <option key={idx} value={n}>{n}</option>
+                                    ))}
+                                  </SearchableSelect>
+                                )}
+                                <textarea
+                                  className="input-field"
+                                  rows="2"
+                                  placeholder={`This text prints on the Delivery Challan for ${pName}`}
+                                  value={prodNote}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setForm(prev => ({
+                                      ...prev,
+                                      productDeliveryNotes: {
+                                        ...(prev.productDeliveryNotes || {}),
+                                        [pName]: val
+                                      },
+                                      deliveryNotes: val || prev.deliveryNotes,
+                                      termsAndConditions: val || prev.termsAndConditions
+                                    }));
+                                  }}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ gridColumn: 'span 4' }}>
+                      <label>Delivery Notes</label>
+                      {(data.dcDeliveryNotes || []).length > 0 && (
+                        <SearchableSelect
+                          className="input-field"
+                          value=""
+                          onChange={(e) => {
+                            const picked = e.target.value;
+                            if (picked) {
+                              const singleProd = productsForNotes[0];
+                              setForm(prev => ({
+                                ...prev,
+                                deliveryNotes: picked,
+                                termsAndConditions: picked,
+                                productDeliveryNotes: singleProd ? { ...(prev.productDeliveryNotes || {}), [singleProd]: picked } : (prev.productDeliveryNotes || {})
+                              }));
+                            }
+                          }}
+                          placeholder="Pick from master…"
+                          style={{ marginBottom: '0.5rem' }}
+                        >
+                          <option value="">Pick from master…</option>
+                          {(data.dcDeliveryNotes || []).map((n, idx) => (
+                            <option key={idx} value={n}>{n}</option>
+                          ))}
+                        </SearchableSelect>
+                      )}
+                      <textarea
+                        className="input-field"
+                        rows="2"
+                        placeholder="This text prints on the Delivery Challan"
+                        value={form.deliveryNotes ?? form.termsAndConditions ?? ''}
+                        onChange={e => {
+                          const val = e.target.value;
+                          const singleProd = productsForNotes[0];
+                          setForm(prev => ({
+                            ...prev,
+                            deliveryNotes: val,
+                            termsAndConditions: val,
+                            productDeliveryNotes: singleProd ? { ...(prev.productDeliveryNotes || {}), [singleProd]: val } : (prev.productDeliveryNotes || {})
+                          }));
+                        }}
+                      />
+                    </div>
+                  );
+                })()}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>

@@ -137,6 +137,10 @@ export const buildPackingListHtml = (data, profileInput) => {
   let sievingLumps = parseWeight(
     data.sievingLumps ?? data.sievingLumpsNet ?? data.lumpsNet ?? data.lumpsNetWeight ?? ''
   );
+  if (data.productSievingLumps && typeof data.productSievingLumps === 'object') {
+    const sumLumps = Object.values(data.productSievingLumps).reduce((acc, v) => acc + parseWeight(v), 0);
+    if (sumLumps > 0) sievingLumps = sumLumps;
+  }
   const batches = [];
   rawBatches.forEach((batch) => {
     if (isSievingLumpBatch(batch)) {
@@ -228,16 +232,33 @@ export const buildPackingListHtml = (data, profileInput) => {
       </section>`;
   }).join('');
 
-  const sievingLumpsHtml = sievingLumps > 0 ? `
+  let lumpRowsHtml = '';
+  if (data.productSievingLumps && typeof data.productSievingLumps === 'object') {
+    const entries = Object.entries(data.productSievingLumps).filter(([, v]) => parseWeight(v) > 0);
+    if (entries.length > 1) {
+      lumpRowsHtml = entries.map(([pName, v]) => `
+        <tr class="special-row">
+          <td colspan="5" class="special-label">Sieving Lumps — ${escHtml(pName)}</td>
+          <td class="num">${fmtMoney(parseWeight(v))}</td>
+        </tr>
+      `).join('');
+    }
+  }
+  if (!lumpRowsHtml && sievingLumps > 0) {
+    lumpRowsHtml = `
+      <tr class="special-row">
+        <td colspan="5" class="special-label">Sieving Lumps</td>
+        <td class="num">${fmtMoney(sievingLumps)}</td>
+      </tr>`;
+  }
+
+  const sievingLumpsHtml = lumpRowsHtml ? `
       <section class="product-block lumps-block">
         <div class="table-wrap">
           <table class="items">
             ${colgroup}
             <tbody>
-              <tr class="special-row">
-                <td colspan="5" class="special-label">Sieving Lumps</td>
-                <td class="num">${fmtMoney(sievingLumps)}</td>
-              </tr>
+              ${lumpRowsHtml}
             </tbody>
           </table>
         </div>

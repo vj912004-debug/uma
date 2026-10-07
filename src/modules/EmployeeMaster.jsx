@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Users, Plus, Save, Search, Edit2, Trash2, X, CheckCircle2 } from 'lucide-react';
+import { Users, Plus, Save, Search, Edit2, Trash2, X, CheckCircle2, RefreshCw } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import DateField from '../components/DateField';
@@ -182,15 +182,16 @@ const EmployeeMaster = () => {
       const user = users.find((u) => u.id === editingId);
       if (!user) return;
       const { history, effectiveFrom } = withRateHistory(user, perDayRate, otRate);
+      const employeeId = form.employeeId.trim() || user.employeeId || generateEmployeeId(users);
       updateItem('users', user.id, {
         ...user,
         ...common,
-        employeeId: user.employeeId || form.employeeId,
+        employeeId,
         rateHistory: history,
         effectiveFrom
       });
     } else {
-      const employeeId = generateEmployeeId(users);
+      const employeeId = form.employeeId.trim() || generateEmployeeId(users);
       const { history, effectiveFrom } = withRateHistory(null, perDayRate, otRate);
       updateData('users', {
         ...common,
@@ -344,8 +345,25 @@ const EmployeeMaster = () => {
               <button type="button" className="btn" onClick={closeForm}><X size={14} /> Close</button>
             </div>
             <form onSubmit={handleSave} className="pm-modal-form">
-              <Field label="Employee Code (Auto)">
-                <input className="input-field" readOnly value={form.employeeId} style={{ background: 'var(--bg-secondary, #f4f1f8)', fontWeight: 700 }} />
+              <Field label="Employee Code">
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    className="input-field"
+                    value={form.employeeId}
+                    onChange={(e) => setField('employeeId', e.target.value)}
+                    placeholder="e.g. EMP001"
+                    style={{ flex: 1, fontWeight: 600 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setField('employeeId', generateEmployeeId(users))}
+                    title="Generate next available Employee Code"
+                    style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <RefreshCw size={14} /> Generate
+                  </button>
+                </div>
               </Field>
               <Field label="Employee Name" required>
                 <input className="input-field" required value={form.name} onChange={(e) => setField('name', e.target.value)} />

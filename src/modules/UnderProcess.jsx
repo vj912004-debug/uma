@@ -2335,6 +2335,7 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     totalWeight: 0,
     totalDrums: 0,
     sievingLumps: '',
+    productSievingLumps: {},
     batches: []
   });
 
@@ -2353,6 +2354,28 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     return fromRows.length ? fromRows : [mr.productName].filter(Boolean);
   }, [form.batches, productNames, mr.productName]);
 
+  const getProductSievingLumps = (prodName) => {
+    if (form.productSievingLumps?.[prodName] !== undefined) {
+      return form.productSievingLumps[prodName];
+    }
+    if (displayProducts.length === 1) {
+      return form.sievingLumps ?? '';
+    }
+    return '';
+  };
+
+  const handleProductSievingLumpsChange = (prodName, val) => {
+    setForm(prev => {
+      const nextMap = { ...(prev.productSievingLumps || {}), [prodName]: val };
+      const totalLumps = Object.values(nextMap).reduce((sum, v) => sum + parseWt(v), 0);
+      return {
+        ...prev,
+        productSievingLumps: nextMap,
+        sievingLumps: totalLumps || ''
+      };
+    });
+  };
+
   const grandTotal = useMemo(() => {
     const fromBatches = (form.batches || []).reduce((acc, b) => {
       const net = b.net !== '' && b.net !== undefined && b.net !== null
@@ -2364,9 +2387,14 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         net: acc.net + net
       };
     }, { gross: 0, tare: 0, net: 0 });
-    const lumps = parseWt(form.sievingLumps);
+    let lumps = 0;
+    if (form.productSievingLumps && Object.keys(form.productSievingLumps).length > 0) {
+      lumps = Object.values(form.productSievingLumps).reduce((acc, v) => acc + parseWt(v), 0);
+    } else {
+      lumps = parseWt(form.sievingLumps);
+    }
     return { ...fromBatches, lumps, net: fromBatches.net + lumps };
-  }, [form.batches, form.sievingLumps]);
+  }, [form.batches, form.sievingLumps, form.productSievingLumps]);
 
   useEffect(() => {
     if (editing) {
@@ -2381,6 +2409,7 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           : getReceiptProductLabel(mr, prodOpts),
         productSummaries: editing.productSummaries?.length ? editing.productSummaries : summaries,
         sievingLumps: editing.sievingLumps ?? editing.sievingLumpsNet ?? '',
+        productSievingLumps: editing.productSievingLumps || {},
         batches: mergedBatches
       });
     } else {
@@ -2400,6 +2429,7 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         totalWeight: 0,
         totalDrums: plRows.length,
         sievingLumps: linkedBpr?.lumpsNetWeight || linkedBpr?.lumpsNet || '',
+        productSievingLumps: linkedBpr?.productSievingLumps || {},
         batches: plRows
       });
     }
@@ -2410,13 +2440,18 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       const net = r.net !== '' && r.net !== undefined ? parseWt(r.net) : Math.max(0, parseWt(r.gross) - parseWt(r.tare));
       return s + net;
     }, 0);
-    const lumps = parseWt(form.sievingLumps);
+    let lumps = 0;
+    if (form.productSievingLumps && Object.keys(form.productSievingLumps).length > 0) {
+      lumps = Object.values(form.productSievingLumps).reduce((acc, v) => acc + parseWt(v), 0);
+    } else {
+      lumps = parseWt(form.sievingLumps);
+    }
     setForm(prev => ({
       ...prev,
       totalDrums: prev.batches.length,
       totalWeight: drumsNet + lumps
     }));
-  }, [form.batches, form.sievingLumps]);
+  }, [form.batches, form.sievingLumps, form.productSievingLumps]);
 
   const handleCellChange = (idx, field, val) => {
     setForm(prev => {
@@ -2472,6 +2507,9 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
+    const totalLumps = form.productSievingLumps && Object.keys(form.productSievingLumps).length > 0
+      ? Object.values(form.productSievingLumps).reduce((sum, v) => sum + parseWt(v), 0)
+      : parseWt(form.sievingLumps);
     const finalDoc = {
       ...form,
       receiptId: mr.id,
@@ -2479,7 +2517,8 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       receiptNo: form.receiptNo || mr.receiptNo || '',
       productName: getReceiptProductLabel(mr, prodOpts),
       productSummaries: summaries.length ? summaries : (form.productSummaries || []),
-      sievingLumps: form.sievingLumps === '' || form.sievingLumps == null ? '' : parseWt(form.sievingLumps)
+      sievingLumps: totalLumps || '',
+      productSievingLumps: form.productSievingLumps || {}
     };
 
     if (editing) {
@@ -2518,17 +2557,41 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           <label>Product(s)</label>
           <input type="text" className="input-field" readOnly value={form.productName} />
         </div>
-        <div>
-          <label>Sieving Lumps (Kg)</label>
-          <input
-            type="number"
-            step="0.01"
-            className="input-field"
-            placeholder="0.00"
-            value={form.sievingLumps === 0 || form.sievingLumps === '' || form.sievingLumps == null ? '' : form.sievingLumps}
-            onChange={e => setForm({ ...form, sievingLumps: e.target.value === '' ? '' : (parseFloat(e.target.value) || '') })}
-          />
-        </div>
+        {displayProducts.length > 1 ? (
+          displayProducts.map((pName, pIdx) => (
+            <div key={`lump-top-gen-${pName}-${pIdx}`}>
+              <label>Product {pIdx + 1} ({pName}) Sieving Lumps (Kg)</label>
+              <input
+                type="number"
+                step="0.01"
+                className="input-field"
+                placeholder="0.00"
+                value={getProductSievingLumps(pName) === 0 || getProductSievingLumps(pName) === '' || getProductSievingLumps(pName) == null ? '' : getProductSievingLumps(pName)}
+                onChange={e => handleProductSievingLumpsChange(pName, e.target.value === '' ? '' : (parseFloat(e.target.value) || ''))}
+              />
+            </div>
+          ))
+        ) : (
+          <div>
+            <label>Sieving Lumps (Kg)</label>
+            <input
+              type="number"
+              step="0.01"
+              className="input-field"
+              placeholder="0.00"
+              value={form.sievingLumps === 0 || form.sievingLumps === '' || form.sievingLumps == null ? '' : form.sievingLumps}
+              onChange={e => {
+                const val = e.target.value === '' ? '' : (parseFloat(e.target.value) || '');
+                const pName = displayProducts[0] || 'default';
+                setForm({
+                  ...form,
+                  sievingLumps: val,
+                  productSievingLumps: { ...(form.productSievingLumps || {}), [pName]: val }
+                });
+              }}
+            />
+          </div>
+        )}
         <div>
           <label>Total Quantity (Calculated)</label>
           <input type="text" className="input-field" readOnly value={`${form.totalWeight.toFixed(2)} Kg`} style={{ fontWeight: 600 }} />
@@ -2567,9 +2630,21 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           });
           return (
             <div key={`${sectionLabel}-${pIdx}`} style={{ marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)' }}>Product {pIdx + 1}: {sectionLabel}</h4>
-                <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow(prodName)}>+ Add Row</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>Sieving Lumps (Kg):</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input-field"
+                    style={{ padding: '0.25rem 0.4rem', width: '100px', fontSize: '0.8rem' }}
+                    placeholder="0.00"
+                    value={getProductSievingLumps(prodName) === 0 || getProductSievingLumps(prodName) === '' || getProductSievingLumps(prodName) == null ? '' : getProductSievingLumps(prodName)}
+                    onChange={e => handleProductSievingLumpsChange(prodName, e.target.value === '' ? '' : (parseFloat(e.target.value) || ''))}
+                  />
+                  <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow(prodName)}>+ Add Row</button>
+                </div>
               </div>
               <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
@@ -2723,7 +2798,8 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     driverName: '',
     driverContact: '',
     termsAndConditions: (mr.deliveryNotes || '').trim(),
-    deliveryNotes: (mr.deliveryNotes || '').trim()
+    deliveryNotes: (mr.deliveryNotes || '').trim(),
+    productDeliveryNotes: mr.productDeliveryNotes || {}
   });
 
   useEffect(() => {
@@ -2735,6 +2811,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       setForm({
         ...editing,
         selectedProducts: selected,
+        productDeliveryNotes: editing.productDeliveryNotes || mr.productDeliveryNotes || {},
         ...computed,
         qty: editing.qty,
         totalDrums: editing.totalDrums,
@@ -2757,6 +2834,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       partyDocDate: mr.partyDocDate || '',
       partyName: mr.partyName || '',
       selectedProducts: selected,
+      productDeliveryNotes: mr.productDeliveryNotes || prev.productDeliveryNotes || {},
       ...computed,
       value: computed.value === 0 || computed.value == null ? '' : computed.value,
       vehicleNo: mr.vehicleNo || prev.vehicleNo,
@@ -2765,14 +2843,39 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     }));
   }, [dcFormInitKey]);
 
+  const selectAllProducts = () => {
+    const allNames = availableProducts.map(p => p.prodName);
+    const computed = buildDCFieldsFromProducts(mr, pl, prodOpts, allNames);
+    setForm(prev => ({
+      ...prev,
+      selectedProducts: allNames,
+      ...computed,
+      value: parseFloat(prev.value) > 0 ? prev.value : (computed.value || '')
+    }));
+  };
+
+  const selectSingleProduct = (prodName) => {
+    const next = [prodName];
+    const computed = buildDCFieldsFromProducts(mr, pl, prodOpts, next);
+    setForm(prev => ({
+      ...prev,
+      selectedProducts: next,
+      ...computed,
+      value: parseFloat(prev.value) > 0 ? prev.value : (computed.value || '')
+    }));
+  };
+
   const toggleProductSelection = (prodName) => {
     setForm(prev => {
       const current = prev.selectedProducts || [];
       const isSelected = current.some(p => p.trim().toLowerCase() === prodName.trim().toLowerCase());
-      const next = isSelected
-        ? current.filter(p => p.trim().toLowerCase() !== prodName.trim().toLowerCase())
-        : [...current, prodName];
-      if (next.length === 0) return prev;
+      let next;
+      if (isSelected) {
+        next = current.filter(p => p.trim().toLowerCase() !== prodName.trim().toLowerCase());
+        if (next.length === 0) next = [prodName];
+      } else {
+        next = [...current, prodName];
+      }
       const computed = buildDCFieldsFromProducts(mr, pl, prodOpts, next);
       return {
         ...prev,
@@ -2833,37 +2936,91 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         <div style={{ gridColumn: 'span 4', borderTop: '1px solid var(--border-color)', margin: '0.5rem 0' }}></div>
 
         {availableProducts.length > 1 && (
-          <div style={{ gridColumn: 'span 4', marginBottom: '0.5rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Select Product(s) for Dispatch</label>
-            <SearchableSelect
-              className="input-field"
-              value=""
-              onChange={(e) => {
-                if (e.target.value) toggleProductSelection(e.target.value);
-              }}
-            >
-              <option value="">Search and add / remove a product…</option>
-              {availableProducts.map((p) => {
-                const checked = (form.selectedProducts || []).some((n) => n.trim().toLowerCase() === p.prodName.trim().toLowerCase());
-                return (
-                  <option key={p.prodName} value={p.prodName}>
-                    {checked ? '✓ ' : ''}{p.prodName} ({parseFloat(p.qty || 0).toFixed(2)} Kg)
-                  </option>
-                );
-              })}
-            </SearchableSelect>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.65rem' }}>
-              {(form.selectedProducts || []).map((name) => (
+          <div style={{ gridColumn: 'span 4', marginBottom: '0.75rem', background: 'rgba(91, 28, 133, 0.04)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(91, 28, 133, 0.15)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.9rem', color: 'var(--accent-primary)', margin: 0 }}>
+                  Dispatch Selection ({form.selectedProducts?.length || 0} of {availableProducts.length} Product{(form.selectedProducts?.length || 0) !== 1 ? 's' : ''} Selected)
+                </label>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {form.selectedProducts?.length === availableProducts.length
+                    ? `✓ ${availableProducts.length} Products Selected — Generating Combined Delivery Challan for all products`
+                    : `✓ 1 Product Selected — Generating Single Product Delivery Challan for ${form.selectedProducts?.[0] || '1 product'}`}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button
-                  key={name}
                   type="button"
                   className="btn"
-                  onClick={() => toggleProductSelection(name)}
-                  style={{ padding: '0.3rem 0.65rem', fontSize: '0.8rem' }}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.78rem',
+                    background: (form.selectedProducts || []).length === availableProducts.length ? 'var(--accent-primary)' : '#fff',
+                    color: (form.selectedProducts || []).length === availableProducts.length ? '#fff' : 'var(--accent-primary)',
+                    border: '1px solid var(--accent-primary)',
+                    fontWeight: 600
+                  }}
+                  onClick={selectAllProducts}
                 >
-                  {name} ×
+                  Dispatch All ({availableProducts.length} Products)
                 </button>
-              ))}
+                {availableProducts.map((p, pIdx) => {
+                  const isOnlyThis = (form.selectedProducts || []).length === 1 && (form.selectedProducts || [])[0]?.trim().toLowerCase() === p.prodName.trim().toLowerCase();
+                  return (
+                    <button
+                      key={p.prodName}
+                      type="button"
+                      className="btn"
+                      style={{
+                        padding: '0.3rem 0.65rem',
+                        fontSize: '0.78rem',
+                        background: isOnlyThis ? 'var(--accent-primary)' : '#fff',
+                        color: isOnlyThis ? '#fff' : 'var(--text-main)',
+                        border: '1px solid var(--border-color)',
+                        fontWeight: 600
+                      }}
+                      onClick={() => selectSingleProduct(p.prodName)}
+                    >
+                      Product {pIdx + 1} Only
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.65rem' }}>
+              {availableProducts.map((p, idx) => {
+                const checked = (form.selectedProducts || []).some(n => n.trim().toLowerCase() === p.prodName.trim().toLowerCase());
+                return (
+                  <label
+                    key={p.prodName}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 0.9rem',
+                      background: checked ? '#fff' : 'var(--input-bg)',
+                      border: `2px solid ${checked ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+                      borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem',
+                      boxShadow: checked ? '0 2px 6px rgba(91, 28, 133, 0.12)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleProductSelection(p.prodName)}
+                      style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--accent-primary)' }}>Product {idx + 1}</span>
+                        <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.prodName}</span>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                        {parseFloat(p.qty || 0).toFixed(2)} Kg · {p.drums || 0} drum{(p.drums || 0) !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </label>
+                );
+              })}
             </div>
           </div>
         )}
@@ -2920,43 +3077,126 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           <input type="text" className="input-field" placeholder="e.g. 98765 43210" value={form.driverContact || ''} onChange={e => setForm({...form, driverContact: e.target.value})} />
         </div>
 
-        <div style={{ gridColumn: 'span 4' }}>
-          <label>Delivery Notes</label>
-          {(data.dcDeliveryNotes || []).length > 0 && (
-            <SearchableSelect
-              className="input-field"
-              value=""
-              onChange={(e) => {
-                const picked = e.target.value;
-                if (picked) {
-                  setForm({
-                    ...form,
-                    deliveryNotes: picked,
-                    termsAndConditions: picked
-                  });
-                }
-              }}
-              placeholder="Pick from master…"
-              style={{ marginBottom: '0.5rem' }}
-            >
-              <option value="">Pick from master…</option>
-              {(data.dcDeliveryNotes || []).map((n, idx) => (
-                <option key={idx} value={n}>{n}</option>
-              ))}
-            </SearchableSelect>
-          )}
-          <textarea
-            className="input-field"
-            rows="2"
-            placeholder="This text prints on the Delivery Challan"
-            value={form.deliveryNotes ?? form.termsAndConditions ?? ''}
-            onChange={e => setForm({
-              ...form,
-              deliveryNotes: e.target.value,
-              termsAndConditions: e.target.value
-            })}
-          />
-        </div>
+        {(() => {
+          const productsForNotes = (form.selectedProducts || []).length > 0
+            ? form.selectedProducts
+            : availableProducts.map(p => p.prodName);
+          if (productsForNotes.length > 1) {
+            return (
+              <div style={{ gridColumn: 'span 4' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>Delivery Notes</span>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)' }}>(Separate note for each product)</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+                  {productsForNotes.map((pName, pIdx) => {
+                    const prodNote = (form.productDeliveryNotes && form.productDeliveryNotes[pName] !== undefined)
+                      ? form.productDeliveryNotes[pName]
+                      : (form.deliveryNotes ?? form.termsAndConditions ?? '');
+                    return (
+                      <div key={pName || pIdx} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', background: 'var(--bg-card)' }}>
+                        <label style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--accent-primary)', marginBottom: '0.4rem', display: 'block' }}>
+                          Product {pIdx + 1}: {pName}
+                        </label>
+                        {(data.dcDeliveryNotes || []).length > 0 && (
+                          <SearchableSelect
+                            className="input-field"
+                            value=""
+                            onChange={(e) => {
+                              const picked = e.target.value;
+                              if (picked) {
+                                setForm(prev => ({
+                                  ...prev,
+                                  productDeliveryNotes: {
+                                    ...(prev.productDeliveryNotes || {}),
+                                    [pName]: picked
+                                  },
+                                  deliveryNotes: prev.deliveryNotes || picked,
+                                  termsAndConditions: prev.termsAndConditions || picked
+                                }));
+                              }
+                            }}
+                            placeholder="Pick from master…"
+                            style={{ marginBottom: '0.5rem' }}
+                          >
+                            <option value="">Pick from master…</option>
+                            {(data.dcDeliveryNotes || []).map((n, idx) => (
+                              <option key={idx} value={n}>{n}</option>
+                            ))}
+                          </SearchableSelect>
+                        )}
+                        <textarea
+                          className="input-field"
+                          rows="2"
+                          placeholder={`This text prints on the Delivery Challan for ${pName}`}
+                          value={prodNote}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setForm(prev => ({
+                              ...prev,
+                              productDeliveryNotes: {
+                                ...(prev.productDeliveryNotes || {}),
+                                [pName]: val
+                              },
+                              deliveryNotes: val || prev.deliveryNotes,
+                              termsAndConditions: val || prev.termsAndConditions
+                            }));
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div style={{ gridColumn: 'span 4' }}>
+              <label>Delivery Notes</label>
+              {(data.dcDeliveryNotes || []).length > 0 && (
+                <SearchableSelect
+                  className="input-field"
+                  value=""
+                  onChange={(e) => {
+                    const picked = e.target.value;
+                    if (picked) {
+                      const singleProd = productsForNotes[0];
+                      setForm(prev => ({
+                        ...prev,
+                        deliveryNotes: picked,
+                        termsAndConditions: picked,
+                        productDeliveryNotes: singleProd ? { ...(prev.productDeliveryNotes || {}), [singleProd]: picked } : (prev.productDeliveryNotes || {})
+                      }));
+                    }
+                  }}
+                  placeholder="Pick from master…"
+                  style={{ marginBottom: '0.5rem' }}
+                >
+                  <option value="">Pick from master…</option>
+                  {(data.dcDeliveryNotes || []).map((n, idx) => (
+                    <option key={idx} value={n}>{n}</option>
+                  ))}
+                </SearchableSelect>
+              )}
+              <textarea
+                className="input-field"
+                rows="2"
+                placeholder="This text prints on the Delivery Challan"
+                value={form.deliveryNotes ?? form.termsAndConditions ?? ''}
+                onChange={e => {
+                  const val = e.target.value;
+                  const singleProd = productsForNotes[0];
+                  setForm(prev => ({
+                    ...prev,
+                    deliveryNotes: val,
+                    termsAndConditions: val,
+                    productDeliveryNotes: singleProd ? { ...(prev.productDeliveryNotes || {}), [singleProd]: val } : (prev.productDeliveryNotes || {})
+                  }));
+                }}
+              />
+            </div>
+          );
+        })()}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>

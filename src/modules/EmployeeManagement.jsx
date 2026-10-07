@@ -135,7 +135,7 @@ const EmployeeManagement = () => {
     const userData = {
       name: form.name.trim(),
       username: form.username.trim(),
-      employeeId: editingUser?.employeeId || generateEmployeeId(data.users || []),
+      employeeId: String(form.employeeId || '').trim() || editingUser?.employeeId || generateEmployeeId(data.users || []),
       department: form.department,
       role: form.role,
       active: form.active,
@@ -372,14 +372,25 @@ const EmployeeManagement = () => {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Employee Code (Auto)</label>
-                      <input
-                        className="input-field"
-                        value={form.employeeId || generateEmployeeId(data.users || [])}
-                        readOnly
-                        title="Generated automatically"
-                        style={{ background: 'var(--glass-bg)', color: 'var(--accent-primary)', fontWeight: 600, cursor: 'not-allowed' }}
-                      />
+                      <label>Employee Code</label>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <input
+                          className="input-field"
+                          value={form.employeeId || ''}
+                          onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
+                          placeholder="e.g. EMP001"
+                          style={{ flex: 1, fontWeight: 600 }}
+                        />
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => setForm({ ...form, employeeId: generateEmployeeId(data.users || []) })}
+                          title="Generate next available Employee Code"
+                          style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                        >
+                          <RefreshCw size={14} /> Generate
+                        </button>
+                      </div>
                     </div>
                   </div>
 

@@ -22,7 +22,8 @@
   --input-focus-bg: #ffffff;
   --input-disabled-bg: #f1f5f9;
   --table-container-bg: #ffffff;
-  --table-header-bg: #F8F5FC;
+  --table-header-bg: #5b1c85;
+  --table-header-color: #ffffff;
   --td-border: #ddccec;
   --btn-bg: #ffffff;
   --btn-hover-bg: #f8fafc;
@@ -153,6 +154,54 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 10px;
+}
+
+/* Purple Banner Header component (matching reference image) */
+.purple-banner-header,
+.page-header-banner,
+.page-header-card {
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%) !important;
+  color: #ffffff !important;
+  padding: 0.85rem 1.25rem !important;
+  border-radius: 10px !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 14px rgba(91, 28, 133, 0.2);
+}
+
+.purple-banner-header h1,
+.purple-banner-header h2,
+.purple-banner-header h3,
+.purple-banner-header p,
+.purple-banner-header span,
+.page-header-banner h1,
+.page-header-banner h2,
+.page-header-banner h3,
+.page-header-banner p,
+.page-header-banner span,
+.page-header-card h1,
+.page-header-card h2,
+.page-header-card h3,
+.page-header-card p,
+.page-header-card span {
+  color: #ffffff !important;
+}
+
+th svg,
+.purple-banner-header svg,
+.page-header-banner svg,
+.page-header-card svg,
+.pm-list-head svg,
+.pm-modal-head svg,
+.fu-section-head svg,
+.sal-card-head svg,
+.esm-card-head svg,
+.mkt-panel-head svg,
+.pm-panel-head svg,
+.party-section-title svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
 }
 
 .premium-card {
@@ -470,14 +519,14 @@ table {
 }
 
 th {
-  padding: 0.8rem 0.95rem;
+  padding: 0.85rem 0.95rem;
   font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: var(--text-label) !important;
-  background: var(--table-header-bg);
-  border-bottom: 1px solid var(--border-color);
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%) !important;
+  border-bottom: 1px solid #4a166c;
   text-align: left;
 }
 
@@ -649,9 +698,15 @@ tbody tr:hover td {
 
 .party-section-title {
   margin: 0 0 1.1rem;
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   font-weight: 700;
-  color: var(--text-main);
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%);
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .party-section-head {
@@ -710,7 +765,7 @@ tbody tr:hover td {
 }
 
 .party-products-table thead tr {
-  background: var(--lavender);
+  background: #5b1c85 !important;
 }
 
 .party-products-table th {
@@ -720,8 +775,9 @@ tbody tr:hover td {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--brand-purple);
-  border-bottom: 1px solid #e4d8f0;
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%) !important;
+  border-bottom: 1px solid #4a166c;
   white-space: nowrap;
 }
 
@@ -1223,13 +1279,14 @@ tbody tr:hover td {
 
 .workflow-table th {
   text-align: left;
-  color: #5b1c85;
-  background: #F3EEF9;
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%) !important;
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   padding: 0.85rem 0.75rem;
+  border-bottom: 1px solid #4a166c;
 }
 
 .workflow-table td {
@@ -1281,8 +1338,9 @@ tbody tr:hover td {
   position: sticky;
   top: 0;
   z-index: 4;
-  background: #F3EEF9;
-  box-shadow: 0 1px 0 var(--border-color);
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 0 #4a166c;
 }
 
 .under-process-table-card .legend {
@@ -1786,14 +1844,14 @@ tbody tr:hover td {
 
 .dash-table th {
   text-align: left;
-  color: var(--text-muted);
+  color: #ffffff !important;
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   padding: 0.65rem 0.55rem;
-  border-bottom: 1px solid var(--border-color);
-  background: transparent;
+  border-bottom: 1px solid #4a166c;
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%) !important;
 }
 
 .dash-table td {
@@ -2401,10 +2459,11 @@ tbody tr:hover td {
 }
 .mb-table th {
   text-align: left;
-  padding: 0.55rem 0.45rem;
-  color: var(--text-muted);
-  font-weight: 650;
-  border-bottom: 1px solid var(--border-color);
+  padding: 0.65rem 0.55rem;
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%) !important;
+  font-weight: 700;
+  border-bottom: 1px solid #4a166c;
   white-space: nowrap;
 }
 .mb-table td {
@@ -2831,6 +2890,15 @@ tbody tr:hover td {
   gap: 0.75rem;
   flex-wrap: wrap;
   margin-bottom: 0.85rem;
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%);
+  color: #ffffff !important;
+  padding: 0.75rem 1.15rem;
+  border-radius: 10px;
+}
+.pm-list-head h2,
+.pm-list-head h3,
+.pm-list-head label {
+  color: #ffffff !important;
 }
 .pm-list-tools {
   display: flex;
@@ -2865,13 +2933,13 @@ tbody tr:hover td {
   min-width: 980px;
 }
 .pm-table th {
-  background: #f3e8ff;
-  color: #5b1c85;
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%) !important;
+  color: #ffffff !important;
   font-weight: 700;
   text-align: left;
-  padding: 0.55rem 0.45rem;
+  padding: 0.65rem 0.55rem;
   white-space: nowrap;
-  border-bottom: 1px solid #e9d5ff;
+  border-bottom: 1px solid #4a166c;
 }
 .pm-table td {
   padding: 0.55rem 0.45rem;
@@ -3829,10 +3897,11 @@ tbody tr:hover td {
 }
 .fu-table th {
   text-align: left;
-  padding: 0.55rem 0.45rem;
-  color: #5b1c85;
+  padding: 0.65rem 0.55rem;
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%) !important;
   font-weight: 700;
-  border-bottom: 1px solid #f1f1f4;
+  border-bottom: 1px solid #4a166c;
   white-space: nowrap;
 }
 .fu-table td {
@@ -4110,10 +4179,10 @@ tbody tr:hover td {
 .att-table th {
   text-align: left;
   padding: 0.65rem 0.5rem;
-  background: #f3e8ff;
-  color: #5b1c85;
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%) !important;
+  color: #ffffff !important;
   font-weight: 750;
-  border-bottom: 1px solid #e9d5ff;
+  border-bottom: 1px solid #4a166c;
   white-space: nowrap;
 }
 .att-table td {
@@ -4398,21 +4467,22 @@ tbody tr:hover td {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  padding: 1rem 1.15rem;
+  padding: 0.85rem 1.15rem;
   border-bottom: 1px solid var(--border-color);
-  background: rgba(91, 28, 133, 0.04);
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%);
+  color: #ffffff !important;
   flex-wrap: wrap;
 }
 .esm-card-head h2 {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 800;
-  color: #5b1c85;
+  color: #ffffff !important;
 }
 .esm-card-head p {
   margin: 0.2rem 0 0;
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.88);
 }
 .esm-card-body { padding: 1rem 1.15rem 1.25rem; }
 .esm-no {
@@ -4851,8 +4921,8 @@ tbody tr:hover td {
 .pm-mini th {
   position: sticky;
   top: 0;
-  background: #f6f1fb;
-  color: #5b1c85;
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%) !important;
+  color: #ffffff !important;
   font-size: 0.68rem;
   z-index: 1;
 }
@@ -4998,6 +5068,16 @@ tbody tr:hover td {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  background: linear-gradient(135deg, #5b1c85 0%, #4a166c 100%);
+  color: #ffffff !important;
+  padding: 0.75rem 1.15rem;
+  border-radius: 10px 10px 0 0;
+}
+.pm-modal-head .pm-card-title,
+.pm-modal-head h2,
+.pm-modal-head h3 {
+  margin: 0;
+  color: #ffffff !important;
 }
 .pm-modal-head .pm-card-title { margin: 0; }
 .pm-modal-form {
