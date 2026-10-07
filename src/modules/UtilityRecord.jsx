@@ -30,20 +30,15 @@ const emptyForm = () => ({
   time: new Date().toTimeString().slice(0, 5),
   make: '',
   voltage1: '',
-  voltage2: '',
   voltage3: '',
   ampere1: '',
   ampere2: '',
   ampere3: '',
-  oldDryerStart: 'Yes',
-  newDryerStart: 'Yes',
-  oldMoistureSeparator: 'Yes',
-  newMoistureSeparator: 'Yes',
-  smallTank1Pressure: '',
-  bigNewTank2Pressure: '',
+  dryerStart: 'Yes',
+  moistureSeparator: 'Yes',
+  tankPressure: '',
   loadingUnloadingTime: '',
-  tempCompressorOld: '',
-  tempCompressorNew: '',
+  tempCompressor: '',
   doneBy: '',
   remarks: ''
 });
@@ -74,20 +69,15 @@ const EXPORT_COLUMNS = [
   { label: 'Time', key: 'time' },
   { label: 'Make', key: 'make' },
   { label: 'Voltage - 1 (V)', key: 'voltage1' },
-  { label: 'Voltage - 2 (V)', key: 'voltage2' },
   { label: 'Voltage - 3 (V)', key: 'voltage3' },
   { label: 'Ampere - 1 (A)', key: 'ampere1' },
   { label: 'Ampere - 2 (A)', key: 'ampere2' },
   { label: 'Ampere - 3 (A)', key: 'ampere3' },
-  { label: 'Dryer Start - 1', key: 'dryer1' },
-  { label: 'Dryer Start - 2', key: 'dryer2' },
-  { label: 'Moisture Separator Working - 1', key: 'moisture1' },
-  { label: 'Moisture Separator Working - 2', key: 'moisture2' },
-  { label: 'Tank - 1 Pressure (Kg)', key: 'tank1' },
-  { label: 'Tank - 2 Pressure (Kg)', key: 'tank2' },
+  { label: 'Dryer Start', key: 'dryerStart' },
+  { label: 'Moisture Separator Working', key: 'moistureSeparator' },
+  { label: 'Tank Pressure (Kg)', key: 'tankPressure' },
   { label: 'Loading/Unloading Time', key: 'loadingTime' },
-  { label: 'Temp. of Compressor - 1 (°C)', key: 'temp1' },
-  { label: 'Temp. of Compressor - 2 (°C)', key: 'temp2' },
+  { label: 'Temp. of Compressor (°C)', key: 'tempCompressor' },
   { label: 'Done By', key: 'doneBy' },
   { label: 'Remarks', key: 'remarks' }
 ];
@@ -148,20 +138,15 @@ const UtilityRecord = () => {
     time: r.time || '',
     make: r.make || '',
     voltage1: r.voltage1,
-    voltage2: r.voltage2,
     voltage3: r.voltage3,
     ampere1: r.ampere1,
     ampere2: r.ampere2,
     ampere3: r.ampere3,
-    dryer1: r.oldDryerStart,
-    dryer2: r.newDryerStart,
-    moisture1: r.oldMoistureSeparator,
-    moisture2: r.newMoistureSeparator,
-    tank1: r.smallTank1Pressure,
-    tank2: r.bigNewTank2Pressure,
-    loadingTime: r.loadingUnloadingTime,
-    temp1: r.tempCompressorOld,
-    temp2: r.tempCompressorNew,
+    dryerStart: r.dryerStart || r.oldDryerStart || '',
+    moistureSeparator: r.moistureSeparator || r.oldMoistureSeparator || '',
+    tankPressure: r.tankPressure || r.smallTank1Pressure || '',
+    loadingTime: r.loadingUnloadingTime || '',
+    tempCompressor: r.tempCompressor || r.tempCompressorOld || '',
     doneBy: r.doneBy,
     remarks: r.remarks
   }));
@@ -169,7 +154,14 @@ const UtilityRecord = () => {
   const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const openEdit = (row) => {
-    setForm({ ...emptyForm(), ...row });
+    setForm({
+      ...emptyForm(),
+      ...row,
+      dryerStart: row.dryerStart || row.oldDryerStart || 'Yes',
+      moistureSeparator: row.moistureSeparator || row.oldMoistureSeparator || 'Yes',
+      tankPressure: row.tankPressure || row.smallTank1Pressure || '',
+      tempCompressor: row.tempCompressor || row.tempCompressorOld || ''
+    });
     setEditingId(row.id);
     setShowList(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -245,9 +237,6 @@ const UtilityRecord = () => {
             <Field label="Voltage - 1 (V)" required>
               <input type="number" step="any" className="input-field" required value={form.voltage1} onChange={(e) => setField('voltage1', e.target.value)} />
             </Field>
-            <Field label="Voltage - 2 (V)" required>
-              <input type="number" step="any" className="input-field" required value={form.voltage2} onChange={(e) => setField('voltage2', e.target.value)} />
-            </Field>
             <Field label="Voltage - 3 (V)" required>
               <input type="number" step="any" className="input-field" required value={form.voltage3} onChange={(e) => setField('voltage3', e.target.value)} />
             </Field>
@@ -261,42 +250,25 @@ const UtilityRecord = () => {
             <Field label="Ampere - 3 (A)" required>
               <input type="number" step="any" className="input-field" required value={form.ampere3} onChange={(e) => setField('ampere3', e.target.value)} />
             </Field>
-            <Field label="Dryer Start - 1" required>
-              <SearchableSelect className="input-field" required value={form.oldDryerStart} onChange={(e) => setField('oldDryerStart', e.target.value)}>
+            <Field label="Dryer Start" required>
+              <SearchableSelect className="input-field" required value={form.dryerStart} onChange={(e) => setField('dryerStart', e.target.value)}>
                 {YES_NO.map((o) => <option key={o} value={o}>{o}</option>)}
               </SearchableSelect>
             </Field>
-            <Field label="Dryer Start - 2" required>
-              <SearchableSelect className="input-field" required value={form.newDryerStart} onChange={(e) => setField('newDryerStart', e.target.value)}>
+            <Field label="Moisture Separator Working" required>
+              <SearchableSelect className="input-field" required value={form.moistureSeparator} onChange={(e) => setField('moistureSeparator', e.target.value)}>
                 {YES_NO.map((o) => <option key={o} value={o}>{o}</option>)}
               </SearchableSelect>
             </Field>
 
-            <Field label="Moisture Separator Working - 1" required>
-              <SearchableSelect className="input-field" required value={form.oldMoistureSeparator} onChange={(e) => setField('oldMoistureSeparator', e.target.value)}>
-                {YES_NO.map((o) => <option key={o} value={o}>{o}</option>)}
-              </SearchableSelect>
-            </Field>
-            <Field label="Moisture Separator Working - 2" required>
-              <SearchableSelect className="input-field" required value={form.newMoistureSeparator} onChange={(e) => setField('newMoistureSeparator', e.target.value)}>
-                {YES_NO.map((o) => <option key={o} value={o}>{o}</option>)}
-              </SearchableSelect>
-            </Field>
-            <Field label="Tank - 1 Pressure (Kg)" required>
-              <input type="number" step="any" className="input-field" required value={form.smallTank1Pressure} onChange={(e) => setField('smallTank1Pressure', e.target.value)} />
-            </Field>
-            <Field label="Tank - 2 Pressure (Kg)" required>
-              <input type="number" step="any" className="input-field" required value={form.bigNewTank2Pressure} onChange={(e) => setField('bigNewTank2Pressure', e.target.value)} />
+            <Field label="Tank Pressure (Kg)" required>
+              <input type="number" step="any" className="input-field" required value={form.tankPressure} onChange={(e) => setField('tankPressure', e.target.value)} />
             </Field>
             <Field label="Loading/Unloading Time" required>
               <input type="text" className="input-field" required placeholder="48/62" value={form.loadingUnloadingTime} onChange={(e) => setField('loadingUnloadingTime', e.target.value)} />
             </Field>
-
-            <Field label="Temp. of Compressor - 1 (°C)" required>
-              <input type="number" step="any" className="input-field" required value={form.tempCompressorOld} onChange={(e) => setField('tempCompressorOld', e.target.value)} />
-            </Field>
-            <Field label="Temp. of Compressor - 2 (°C)" required>
-              <input type="number" step="any" className="input-field" required value={form.tempCompressorNew} onChange={(e) => setField('tempCompressorNew', e.target.value)} />
+            <Field label="Temp. of Compressor (°C)" required>
+              <input type="number" step="any" className="input-field" required value={form.tempCompressor} onChange={(e) => setField('tempCompressor', e.target.value)} />
             </Field>
             <Field label="Done By" required>
               <SearchableSelect className="input-field" required value={form.doneBy} onChange={(e) => setField('doneBy', e.target.value)} placeholder="Select" allowCustom>
@@ -364,20 +336,15 @@ const UtilityRecord = () => {
                   <th>Time</th>
                   <th>Make</th>
                   <th>Voltage - 1 (V)</th>
-                  <th>Voltage - 2 (V)</th>
                   <th>Voltage - 3 (V)</th>
                   <th>Ampere - 1 (A)</th>
                   <th>Ampere - 2 (A)</th>
                   <th>Ampere - 3 (A)</th>
-                  <th>Dryer Start - 1</th>
-                  <th>Dryer Start - 2</th>
-                  <th>Moisture Separator Working - 1</th>
-                  <th>Moisture Separator Working - 2</th>
-                  <th>Tank - 1 Pressure (Kg)</th>
-                  <th>Tank - 2 Pressure (Kg)</th>
+                  <th>Dryer Start</th>
+                  <th>Moisture Separator Working</th>
+                  <th>Tank Pressure (Kg)</th>
                   <th>Loading/Unloading Time</th>
-                  <th>Temp. Comp. - 1 (°C)</th>
-                  <th>Temp. Comp. - 2 (°C)</th>
+                  <th>Temp. of Compressor (°C)</th>
                   <th>Done By</th>
                   <th>Remarks</th>
                   <th>Action</th>
@@ -386,7 +353,7 @@ const UtilityRecord = () => {
               <tbody>
                 {pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={22} className="pm-empty">
+                    <td colSpan={17} className="pm-empty">
                       {rows.length && !filtered.length
                         ? 'No records in the selected date range. Widen the date filter above to see saved entries.'
                         : 'No utility records yet. Add one using the form.'}
@@ -399,20 +366,15 @@ const UtilityRecord = () => {
                     <td>{r.time || '—'}</td>
                     <td>{r.make || '—'}</td>
                     <td>{r.voltage1}</td>
-                    <td>{r.voltage2}</td>
                     <td>{r.voltage3}</td>
                     <td>{r.ampere1}</td>
                     <td>{r.ampere2}</td>
                     <td>{r.ampere3}</td>
-                    <td>{r.oldDryerStart}</td>
-                    <td>{r.newDryerStart}</td>
-                    <td>{r.oldMoistureSeparator}</td>
-                    <td>{r.newMoistureSeparator}</td>
-                    <td>{r.smallTank1Pressure}</td>
-                    <td>{r.bigNewTank2Pressure}</td>
+                    <td>{r.dryerStart || r.oldDryerStart}</td>
+                    <td>{r.moistureSeparator || r.oldMoistureSeparator}</td>
+                    <td>{r.tankPressure || r.smallTank1Pressure}</td>
                     <td>{r.loadingUnloadingTime}</td>
-                    <td>{r.tempCompressorOld}</td>
-                    <td>{r.tempCompressorNew}</td>
+                    <td>{r.tempCompressor || r.tempCompressorOld}</td>
                     <td>{r.doneBy}</td>
                     <td>{r.remarks || '—'}</td>
                     <td className="pm-actions" onClick={(e) => e.stopPropagation()}>
