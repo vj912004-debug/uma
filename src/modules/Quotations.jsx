@@ -1266,6 +1266,8 @@ const handleSameCompanyQuote = (q) => {
             ]}
             filename="Quotations"
             title="Quotations"
+            groupBy="partyName"
+            docType="QUOTATION"
           />
           <button className="btn btn-primary" onClick={handleNewQuotation}>
             <Plus size={18} /> New Quotation

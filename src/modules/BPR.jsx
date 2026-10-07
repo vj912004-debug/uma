@@ -608,7 +608,7 @@ const BPR = () => {
             >
               <Plus size={18} /> Create New BPR
             </button>
-            <ExportButton data={filteredBPRs} columns={tableCols} filename="BPR_Records" title="Batch Processing Records" />
+            <ExportButton data={filteredBPRs} columns={tableCols} filename="BPR_Records" title="Batch Processing Records" groupBy="partyName" docType="BPR" />
           </div>
         </div>
       </header>

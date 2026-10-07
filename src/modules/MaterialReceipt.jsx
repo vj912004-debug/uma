@@ -971,7 +971,7 @@ const MaterialReceipt = () => {
           <p style={{ color: 'var(--text-muted)' }}>Log incoming supplier raw materials, batches, and PSD method specifications.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <ExportButton data={filteredReceipts} columns={tableCols} filename="Material_Receipts" title="Material Receipts Log" />
+          <ExportButton data={filteredReceipts} columns={tableCols} filename="Material_Receipts" title="Material Receipts Log" groupBy="partyName" docType="MR" />
           <button className="btn btn-primary" onClick={handleOpenModal}>
             <Plus size={18} /> Add Material Receipt
           </button>

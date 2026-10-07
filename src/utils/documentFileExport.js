@@ -164,7 +164,7 @@ const PRINT_EXCEL_TITLES = {
 export const downloadDocumentExcel = (docType, data, title) => {
   if (!data) return;
   const type = String(docType || '').toUpperCase();
-  if (type === 'PI' || type === 'TI' || type === 'PO' || type === 'DN' || type === 'CN') {
+  if (type === 'PI' || type === 'TI' || type === 'PO' || type === 'DN' || type === 'CN' || type === 'DC' || type === 'PL' || type === 'QUOTATION' || type === 'BPR' || type === 'PSD' || data.invoiceNo || data.poNo || data.noteNo || data.dcNo) {
     return downloadInvoiceExcel(type, data);
   }
   return downloadStyledTablesExcel(

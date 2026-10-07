@@ -366,13 +366,7 @@ const PackingList = () => {
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <ExportButton
-            data={filteredPLs.map((pl) => ({
-              plNo: pl.plNo,
-              partyName: pl.partyName || '',
-              productName: getPLDisplayProductLabel(pl, data),
-              totalWeight: pl.totalWeight,
-              totalDrums: pl.totalDrums
-            }))}
+            data={filteredPLs}
             columns={[
               { label: 'PL No', key: 'plNo' },
               { label: 'Product', key: 'productName' },
@@ -382,6 +376,7 @@ const PackingList = () => {
             filename="Packing_Lists"
             title="Packing Lists"
             groupBy="partyName"
+            docType="PL"
           />
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New PL

@@ -167,7 +167,7 @@ const PSD = () => {
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>PSD Lab Reports</h1>
           <p style={{ color: 'var(--text-muted)' }}>Upload and log Particle Size Distribution (PSD) analysis reports.</p>
         </div>
-        <ExportButton data={exportRows} columns={exportColumns} filename="PSD_Reports" title="PSD Lab Reports" />
+        <ExportButton data={filteredPSDs} columns={exportColumns} filename="PSD_Reports" title="PSD Lab Reports" groupBy="partyName" docType="PSD" />
       </header>
 
       <ListFilterBar

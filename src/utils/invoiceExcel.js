@@ -137,22 +137,47 @@ const invoiceLines = (data, docType) => {
   if (type === 'PO' && String(data.productName || '').trim()) {
     const qty = parseFloat(data.qty) || 0;
     const rate = parseFloat(data.rate) || 0;
-    const amt = qty * rate > 0 ? qty * rate : (parseFloat(data.amount) || 0);
+    const amt = qty * rate > 0 ? qty * rate : (parseFloat(data.amount || data.total) || 0);
     const specs = String(data.productDescription || '').trim();
     push(specs ? `${data.productName} - ${specs}` : data.productName, qty, rate, amt);
   }
 
   buildTiPrintChargeRows(data).forEach((row) => push(row.label, row.qty, row.rate, row.amt));
   (data.customCharges || []).forEach((cc) => {
-    if (!cc.checked) return;
+    if (cc.checked === false) return;
     const rawQty = cc.qty;
     const ccQty = parseFloat(rawQty);
     const qty = (rawQty === '' || rawQty == null || !Number.isFinite(ccQty) || ccQty === 0) ? 0 : ccQty;
     const rate = parseFloat(cc.rate) || 0;
-    const name = String(cc.name || '').trim();
+    const name = String(cc.name || cc.description || '').trim();
     if (!name) return;
     push(name, qty, rate, qty * rate);
   });
+
+  if (!lines.length && Array.isArray(data.productSummaries) && data.productSummaries.length) {
+    data.productSummaries.forEach((p) => {
+      const q = parseFloat(p.qty) || 0;
+      const r = parseFloat(p.rate) || 0;
+      const a = q * r > 0 ? q * r : (parseFloat(p.amount || p.total) || 0);
+      push(p.prodName || p.productName || 'Product', q, r, a);
+    });
+  }
+
+  if (!lines.length && Array.isArray(data.items) && data.items.length) {
+    data.items.forEach((item) => {
+      const q = parseFloat(item.qty) || 0;
+      const r = parseFloat(item.rate) || 0;
+      const a = parseFloat(item.amt || item.amount || item.total) || (q * r);
+      push(item.desc || item.description || item.name || item.productName || 'Item', q, r, a);
+    });
+  }
+
+  if (!lines.length && String(data.productName || '').trim()) {
+    const q = parseFloat(data.qty) || 0;
+    const r = parseFloat(data.rate) || 0;
+    const a = parseFloat(data.total || data.amount) || (q * r);
+    push(data.productName, q, r, a);
+  }
 
   let totalAmt = lines.reduce((sum, row) => sum + row.amt, 0);
   const discount = parseFloat(data.discount) || 0;
