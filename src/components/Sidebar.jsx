@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -50,29 +50,11 @@ import { canAccessModule } from '../utils/moduleAccess';
 const Sidebar = () => {
   const { currentUser, logout } = useAuth();
   const userRole = currentUser?.role || 'Staff';
+  const location = useLocation();
 
-  // Always use the logged-in user record (with permissions). Never invent Admin access.
   const canSee = (path) => {
     if (!currentUser) return false;
     return canAccessModule(currentUser, path);
-  };
-
-  const [expandedGroups, setExpandedGroups] = useState({
-    material: true,
-    invoices: false,
-    dispatch: false,
-    payments: true,
-    procurement: false,
-    marketing: true,
-    reports: true,
-    system: false
-  });
-
-  const toggleGroup = (groupKey) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [groupKey]: !prev[groupKey]
-    }));
   };
 
   const groups = [
@@ -86,43 +68,54 @@ const Sidebar = () => {
       ]
     },
     {
+      key: 'dispatch',
+      title: 'Dispatch & Delivery',
+      icon: Truck,
+      items: [
+        { name: 'Packing List', icon: Package, path: '/packing-list', roles: ['Admin', 'Staff'] },
+        { name: 'Delivery Challan', icon: Truck, path: '/dc', roles: ['Admin', 'Staff'] },
+        { name: 'E-Way Bill', icon: FileSpreadsheet, path: '/eway', roles: ['Admin', 'Staff'], permissionIds: ['/eway', '/eway-dc', '/eway-ti'] },
+        { name: 'BPR Record', icon: Activity, path: '/bpr', roles: ['Admin', 'Staff'] },
+        { name: 'PSD Upload', icon: UploadCloud, path: '/psd', roles: ['Admin', 'Staff'] }
+      ]
+    },
+    {
       key: 'invoices',
       title: 'Invoices & Billing',
       icon: FileText,
       items: [
-        { name: 'Purchase Orders', icon: ShoppingCart, path: '/purchase-orders', roles: ['Admin', 'Staff'] },
-        { name: 'Proforma Invoice', icon: FileText, path: '/invoices-pi', roles: ['Admin', 'Staff'] },
         { name: 'Tax Invoice', icon: FileCheck, path: '/tax-invoice', roles: ['Admin', 'Staff'] },
+        { name: 'Proforma Invoice', icon: FileText, path: '/invoices-pi', roles: ['Admin', 'Staff'] },
         { name: 'Monthly Billing', icon: CalendarDays, path: '/monthly-billing', roles: ['Admin', 'Staff'], highlight: true },
+        { name: 'Purchase Orders', icon: ShoppingCart, path: '/purchase-orders', roles: ['Admin', 'Staff'] },
         { name: 'Debit Note', icon: FileMinus, path: '/debit-notes', roles: ['Admin', 'Staff'] },
         { name: 'Credit Note', icon: FilePlus, path: '/credit-notes', roles: ['Admin', 'Staff'] }
       ]
     },
     {
-      key: 'dispatch',
-      title: 'Dispatch & Delivery',
-      icon: Truck,
-      items: [
-        { name: 'BPR', icon: Activity, path: '/bpr', roles: ['Admin', 'Staff'] },
-        { name: 'PSD Upload', icon: UploadCloud, path: '/psd', roles: ['Admin', 'Staff'] },
-        { name: 'Packing List', icon: Package, path: '/packing-list', roles: ['Admin', 'Staff'] },
-        { name: 'Delivery Challan', icon: Truck, path: '/dc', roles: ['Admin', 'Staff'] },
-        { name: 'E-Way', icon: FileSpreadsheet, path: '/eway', roles: ['Admin', 'Staff'], permissionIds: ['/eway', '/eway-dc', '/eway-ti'] },
-      ]
-    },
-    {
       key: 'payments',
-      title: 'Payments',
+      title: 'Payments & Due',
       icon: CreditCard,
       items: [
         { name: 'Payment Follow-Up', icon: Phone, path: '/payment-follow-up', roles: ['Admin', 'Staff'], highlight: true },
-        { name: 'Party Due', icon: DollarSign, path: '/party-due', roles: ['Admin', 'Staff'] },
-        { name: 'Payments', icon: CreditCard, path: '/payments', roles: ['Admin', 'Staff'] }
+        { name: 'Party Due Status', icon: DollarSign, path: '/party-due', roles: ['Admin', 'Staff'] },
+        { name: 'Payments Register', icon: CreditCard, path: '/payments', roles: ['Admin', 'Staff'] }
+      ]
+    },
+    {
+      key: 'marketing',
+      title: 'Marketing & Leads',
+      icon: Megaphone,
+      items: [
+        { name: 'Lead Entry', icon: UserPlus, path: '/marketing', roles: ['Admin', 'Staff'] },
+        { name: 'Follow Up List', icon: PhoneCall, path: '/marketing-follow-up', roles: ['Admin', 'Staff'], highlight: true },
+        { name: 'Enquiry Conversion', icon: FileText, path: '/marketing#mkt-convert-enquiry', roles: ['Admin', 'Staff'] },
+        { name: 'Reports & Analytics', icon: BarChart3, path: '/marketing#mkt-reports', roles: ['Admin', 'Staff'] }
       ]
     },
     {
       key: 'procurement',
-      title: 'Procurement & Maintenance',
+      title: 'Procurement & Utility',
       icon: Wrench,
       items: [
         { name: 'Purchase Dashboard', icon: ShoppingCart, path: '/purchase-management', hash: '', roles: ['Admin', 'Staff'], permissionIds: ['/purchase-management'] },
@@ -136,29 +129,25 @@ const Sidebar = () => {
       ]
     },
     {
-      key: 'marketing',
-      title: 'Marketing',
-      icon: Megaphone,
+      key: 'hr',
+      title: 'HR & Attendance',
+      icon: Users,
       items: [
-        { name: 'Lead Entry', icon: UserPlus, path: '/marketing', roles: ['Admin', 'Staff'] },
-        { name: 'Follow Up', icon: PhoneCall, path: '/marketing-follow-up', roles: ['Admin', 'Staff'], highlight: true },
-        { name: 'Enquiry Conversion', icon: FileText, path: '/marketing#mkt-convert-enquiry', roles: ['Admin', 'Staff'] },
-        { name: 'Reports & Analytics', icon: BarChart3, path: '/marketing#mkt-reports', roles: ['Admin', 'Staff'] }
+        { name: 'Employee Master', icon: Users, path: '/employee-master', roles: ['Admin', 'Staff'] },
+        { name: 'Employee Salary', icon: DollarSign, path: '/employee-salary', roles: ['Admin', 'Staff'], highlight: true },
+        { name: 'Daily Attendance', icon: UserCheck, path: '/attendance', roles: ['Admin', 'Staff'] },
+        { name: 'Salary Calculation', icon: Calculator, path: '/salary-calculation', roles: ['Admin', 'Staff'] },
+        { name: 'Device Management', icon: Fingerprint, path: '/device-management', roles: ['Admin', 'Staff'] }
       ]
     },
     {
       key: 'reports',
-      title: 'Reports & Logs',
+      title: 'Reports & Sheets',
       icon: Grid,
       items: [
         { name: 'Processing Sheet', icon: Grid, path: '/processing-sheet', roles: ['Admin', 'Staff'] },
-        { name: 'Tasks', icon: Bell, path: '/tasks', roles: ['Admin', 'Staff'] },
         { name: 'Quotations', icon: PlusSquare, path: '/quotations', roles: ['Admin', 'Staff'] },
-        { name: 'Employee Master', icon: Users, path: '/employee-master', roles: ['Admin', 'Staff'] },
-        { name: 'Employee Salary', icon: DollarSign, path: '/employee-salary', roles: ['Admin', 'Staff'], highlight: true },
-        { name: 'Attendance', icon: UserCheck, path: '/attendance', roles: ['Admin', 'Staff'] },
-        { name: 'Salary Calculation', icon: Calculator, path: '/salary-calculation', roles: ['Admin', 'Staff'] },
-        { name: 'Device Management', icon: Fingerprint, path: '/device-management', roles: ['Admin', 'Staff'] }
+        { name: 'Tasks & Alerts', icon: Bell, path: '/tasks', roles: ['Admin', 'Staff'] }
       ]
     },
     {
@@ -167,14 +156,51 @@ const Sidebar = () => {
       icon: Building2,
       items: [
         { name: 'Company Profile', icon: Building2, path: '/settings/company-profile', roles: ['Admin'] },
-        { name: 'Employees', icon: Shield, path: '/employees', roles: ['Admin'] },
+        { name: 'User Management', icon: Shield, path: '/employees', roles: ['Admin'] },
         { name: 'Recycle Bin', icon: Archive, path: '/recycle-bin', roles: ['Admin'] },
         { name: 'Backups & Logs', icon: DatabaseBackup, path: '/system-logs', roles: ['Admin'] }
       ]
     }
   ];
 
-  const location = useLocation();
+  const [expandedGroups, setExpandedGroups] = useState({
+    material: true,
+    dispatch: false,
+    invoices: false,
+    payments: false,
+    procurement: false,
+    marketing: false,
+    hr: false,
+    reports: false,
+    system: false
+  });
+
+  // Automatically expand group containing active route
+  useEffect(() => {
+    const currentPath = location.pathname;
+    const currentHash = location.hash || '';
+
+    groups.forEach((group) => {
+      const isCurrentGroupActive = group.items.some((item) => {
+        if (item.hash) {
+          return currentPath === '/purchase-management' && currentHash === item.hash;
+        }
+        return currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path));
+      });
+
+      if (isCurrentGroupActive) {
+        setExpandedGroups((prev) => ({ ...prev, [group.key]: true }));
+      }
+    });
+  }, [location.pathname, location.hash]);
+
+  const toggleGroup = (groupKey) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupKey]: !prev[groupKey]
+    }));
+  };
+
   const loginId = String(currentUser?.username || '').trim();
   const storedName = String(currentUser?.name || '').trim();
   const roleWord = /^(admin|administrator|staff|user)$/i.test(storedName);
@@ -195,7 +221,7 @@ const Sidebar = () => {
   return (
     <aside className="sidebar">
       {/* Brand Header */}
-      <div className="sidebar-brand" style={{ marginBottom: '1.35rem', padding: '0 0.35rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="sidebar-brand" style={{ marginBottom: '1.25rem', padding: '0 0.35rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <div className="sidebar-brand-logo">M</div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -210,6 +236,9 @@ const Sidebar = () => {
 
       {/* Nav Section */}
       <nav className="sidebar-nav">
+        {/* Main Section Header */}
+        <div className="sidebar-nav-section-label">MAIN MENU</div>
+
         {/* Dashboard Direct Link */}
         {userRole && canSee('/') && (
           <NavLink
@@ -250,6 +279,9 @@ const Sidebar = () => {
           </NavLink>
         )}
 
+        {/* Section Divider Label */}
+        <div className="sidebar-nav-section-label" style={{ marginTop: '0.75rem' }}>MODULES & WORKFLOW</div>
+
         {/* Collapsible Accordion Groups */}
         {groups.map((group) => {
           const visibleItems = group.items.filter((item) => {
@@ -263,10 +295,17 @@ const Sidebar = () => {
 
           const isExpanded = expandedGroups[group.key];
 
+          const isChildActive = visibleItems.some((item) => {
+            if (item.hash) {
+              return location.pathname === '/purchase-management' && location.hash === item.hash;
+            }
+            return location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
+          });
+
           return (
             <div key={group.key} className="sidebar-group">
               <button
-                className="sidebar-group-header"
+                className={`sidebar-group-header ${isChildActive ? 'has-active-child' : ''}`}
                 onClick={() => toggleGroup(group.key)}
                 aria-expanded={isExpanded}
               >

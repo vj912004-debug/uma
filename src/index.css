@@ -920,6 +920,15 @@ tbody tr:hover td {
   background: rgba(255, 255, 255, 0.3);
 }
 
+.sidebar-nav-section-label {
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 0.45rem 0.65rem 0.2rem;
+  text-transform: uppercase;
+}
+
 .sidebar-group {
   display: flex;
   flex-direction: column;
@@ -947,6 +956,14 @@ tbody tr:hover td {
 .sidebar-group-header:hover {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-group-header.has-active-child {
+  color: #ffffff;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.12);
+  border-left: 3px solid #86efac;
+  border-radius: 4px 10px 10px 4px;
 }
 
 .sidebar-group-header-content {
