@@ -35,6 +35,112 @@ export const cellValue = (row, col) => {
   return raw ?? '';
 };
 
+const normProdKey = (s) => (s || '').trim().toLowerCase();
+
+export const flattenRowsForExcel = (rows) => {
+  const flattened = [];
+  (rows || []).forEach((row) => {
+    // 1. Check if productSummaries has multiple items with prodName
+    const summaries = Array.isArray(row.productSummaries)
+      ? row.productSummaries.filter(p => p && (p.prodName || p.productName))
+      : [];
+
+    if (summaries.length > 1) {
+      const docTotalQty = summaries.reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0) || parseFloat(row.qty) || 1;
+      const docTotalAmount = typeof row.total === 'number' ? row.total : (parseFloat(row.total) || 0);
+
+      // Check if per-product charge blocks exist
+      const pcKeys = Object.keys(row.productCharges || {});
+      if (pcKeys.length > 1) {
+        let sumSub = 0;
+        const prodSubs = {};
+        pcKeys.forEach(pName => {
+          const pc = row.productCharges[pName];
+          const summary = summaries.find(s => normProdKey(s.prodName || s.productName) === normProdKey(pName));
+          const pQty = summary ? (parseFloat(summary.qty) || 0) : 0;
+          let sub = 0;
+          if (pc && pc.charges) {
+            Object.keys(pc.charges).forEach(k => {
+              if (pc.charges[k]) {
+                const r = parseFloat(pc.rates?.[k]) || 0;
+                const q = k === 'processing' ? pQty : (parseFloat(pc.qtys?.[k]) || 0);
+                sub += q * r;
+              }
+            });
+          }
+          prodSubs[pName] = { qty: pQty, sub };
+          sumSub += sub;
+        });
+
+        const taxRate = parseFloat(row.taxRate) || 18;
+        const discount = parseFloat(row.discount) || 0;
+
+        summaries.forEach((p) => {
+          const pName = p.prodName || p.productName;
+          const matched = prodSubs[pName] || prodSubs[Object.keys(prodSubs).find(k => normProdKey(k) === normProdKey(pName))];
+          let itemTotal = 0;
+          if (matched && sumSub > 0) {
+            const ratio = matched.sub / sumSub;
+            const taxable = Math.max(0, matched.sub - (discount * ratio));
+            itemTotal = +(taxable * (1 + taxRate / 100)).toFixed(2);
+          } else {
+            const itemQty = parseFloat(p.qty) || 0;
+            const ratio = docTotalQty > 0 ? (itemQty / docTotalQty) : (1 / summaries.length);
+            itemTotal = +(docTotalAmount * ratio).toFixed(2);
+          }
+
+          flattened.push({
+            ...row,
+            productName: pName,
+            qty: parseFloat(p.qty) || +(row.qty / summaries.length).toFixed(2),
+            total: itemTotal
+          });
+        });
+        return;
+      }
+
+      summaries.forEach((p) => {
+        const itemQty = parseFloat(p.qty) || 0;
+        const ratio = docTotalQty > 0 ? (itemQty / docTotalQty) : (1 / summaries.length);
+        const itemTotal = +(docTotalAmount * ratio).toFixed(2);
+        flattened.push({
+          ...row,
+          productName: p.prodName || p.productName,
+          qty: itemQty || +(row.qty / summaries.length).toFixed(2),
+          total: itemTotal
+        });
+      });
+      return;
+    }
+
+    // 2. Check if productName contains commas (e.g. "Rivaroxaban, Bosentan")
+    const rawName = String(row.productName || '').trim();
+    if (rawName.includes(',')) {
+      const names = rawName.split(',').map(s => s.trim()).filter(Boolean);
+      if (names.length > 1) {
+        const docTotalQty = parseFloat(row.qty) || 0;
+        const docTotalAmount = typeof row.total === 'number' ? row.total : (parseFloat(row.total) || 0);
+        const itemQty = +(docTotalQty / names.length).toFixed(2);
+        const itemTotal = +(docTotalAmount / names.length).toFixed(2);
+
+        names.forEach((name) => {
+          flattened.push({
+            ...row,
+            productName: name,
+            qty: itemQty,
+            total: itemTotal
+          });
+        });
+        return;
+      }
+    }
+
+    // Single product or no split needed
+    flattened.push(row);
+  });
+  return flattened;
+};
+
 /** One worksheet tab per company, each listing that company's documents with the list columns and a total row. */
 export const downloadCompanyWiseExcel = async ({ filename, title, columns, rows, groupBy = 'partyName' }) => {
   const { default: ExcelJS } = await import('exceljs');
@@ -46,8 +152,10 @@ export const downloadCompanyWiseExcel = async ({ filename, title, columns, rows,
     profile.gstNumber ? `GSTIN: ${profile.gstNumber}` : ''
   ].filter(Boolean);
 
+  const flatRows = flattenRowsForExcel(rows);
+
   const groups = new Map();
-  (rows || []).forEach((row) => {
+  (flatRows || []).forEach((row) => {
     const name = groupName(row, groupBy);
     if (!groups.has(name)) groups.set(name, []);
     groups.get(name).push(row);

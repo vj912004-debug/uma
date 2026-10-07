@@ -10,7 +10,7 @@ import {
 } from '../utils/companyProfile';
 import { promptPrintPrefs } from '../utils/promptPrintPrefs';
 import { normalizePrintPrefs } from '../utils/printPrefs';
-import { cellValue, downloadCompanyWiseExcel } from '../utils/companyWiseExcel';
+import { cellValue, downloadCompanyWiseExcel, flattenRowsForExcel } from '../utils/companyWiseExcel';
 
 const displayRows = (data, columns) => data.map((row) => {
   const out = { ...row };
@@ -34,12 +34,13 @@ const ExportButton = ({ data, columns, filename, title, groupBy }) => {
   const profile = getStoredCompanyProfile();
 
   const exportToExcel = () => {
+    const flatData = flattenRowsForExcel(data);
     if (groupBy) {
-      downloadCompanyWiseExcel({ filename, title, columns, rows: data, groupBy })
+      downloadCompanyWiseExcel({ filename, title, columns, rows: flatData, groupBy })
         .catch((err) => alert(`Excel export failed: ${err?.message || err}`));
       return;
     }
-    const worksheet = XLSX.utils.json_to_sheet(data);
+    const worksheet = XLSX.utils.json_to_sheet(flatData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
     XLSX.writeFile(workbook, `${filename}.xlsx`);
@@ -83,10 +84,12 @@ const ExportButton = ({ data, columns, filename, title, groupBy }) => {
 
     const tableCols = columns.map((col) => ({ header: col.label, dataKey: col.key }));
 
+    const flatData = flattenRowsForExcel(data);
+
     doc.autoTable({
       startY: 65,
       columns: tableCols,
-      body: displayRows(data, columns),
+      body: displayRows(flatData, columns),
       theme: 'grid',
       styles: { font: pdfFont, fontSize: bodySize },
       headStyles: { fillColor: [16, 185, 129], font: pdfFont, fontStyle: 'bold' }
@@ -99,6 +102,7 @@ const ExportButton = ({ data, columns, filename, title, groupBy }) => {
     const prefs = await promptPrintPrefs({ mode: 'save', docType: title || filename || 'Export' });
     if (!prefs) return;
     const { fontFamily, fontSize } = normalizePrintPrefs(prefs);
+    const flatData = flattenRowsForExcel(data);
 
     const header =
       "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><body>";
@@ -116,7 +120,7 @@ const ExportButton = ({ data, columns, filename, title, groupBy }) => {
     });
     tableHtml += '</tr>';
 
-    displayRows(data, columns).forEach((row) => {
+    displayRows(flatData, columns).forEach((row) => {
       tableHtml += '<tr>';
       columns.forEach((col) => {
         tableHtml += `<td style="font-family:${fontFamily};font-size:${fontSize}px;">${row[col.key] || ''}</td>`;
