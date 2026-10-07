@@ -815,7 +815,7 @@ export const buildTaxInvoiceHtml = (raw, profileInput) => {
   </div>
 
   <!-- TERMS / DECLARATION / SIGNATORY -->
-  ${buildFooterTerms(profile.companyName || 'UMA MICRON', formatPrintTermsHtml(isPlaceholderInvoiceTerms(data.terms) ? '' : data.terms, DEFAULT_INVOICE_TERMS), DEFAULT_INVOICE_DECLARATION)}
+  ${buildFooterTerms(profile.companyName || 'UMA MICRON', formatPrintTermsHtml(isPlaceholderInvoiceTerms(data.terms) ? '' : data.terms, DEFAULT_INVOICE_TERMS), DEFAULT_INVOICE_DECLARATION, '', profile.stamp)}
 
   <!-- BAR FOOTER -->
   ${buildStatusBar('Page 1 of 1', PRINT_FOOTER_MESSAGES.TI, { showThanks: true })}

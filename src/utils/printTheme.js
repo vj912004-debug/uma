@@ -1435,7 +1435,7 @@ export const formatPrintTermsHtml = (terms, fallbackLines = DEFAULT_INVOICE_TERM
   }).join('');
 };
 
-export const buildFooterTerms = (companyName, termsHtml, declarationHtml, notesHtml = '') => {
+export const buildFooterTerms = (companyName, termsHtml, declarationHtml, notesHtml = '', stampUrl = '') => {
   const rawTerms = String(termsHtml || '');
   const termsBlock = /<[^>]+>/.test(rawTerms)
     ? rawTerms
@@ -1452,6 +1452,9 @@ export const buildFooterTerms = (companyName, termsHtml, declarationHtml, notesH
         <div class="f3-body">${notesBlock}</div>
       </td>`
     : '';
+  const stampImg = stampUrl
+    ? `<img src="${stampUrl}" alt="Stamp" style="max-height:50px;max-width:110px;object-fit:contain;display:block;margin:0 auto;" />`
+    : '';
   return `
   <table class="footer3${notesCell ? ' has-notes' : ''}">
     <tr>
@@ -1467,7 +1470,7 @@ export const buildFooterTerms = (companyName, termsHtml, declarationHtml, notesH
       <td class="f3col sig-col">
         <div class="box-head" style="justify-content:center;">For ${escHtml(companyName || 'UMA MICRON')}</div>
         <div class="f3-body sig-body">
-          <div class="sig-space"></div>
+          <div class="sig-space" style="display:flex;align-items:center;justify-content:center;">${stampImg}</div>
           <div class="sig-line">Authorised Signatory</div>
         </div>
       </td>

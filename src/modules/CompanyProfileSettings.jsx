@@ -58,6 +58,22 @@ const CompanyProfileSettings = () => {
     reader.readAsDataURL(file);
   };
 
+  const handleStampChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file (PNG, JPG, etc.).');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Stamp image must be under 2 MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setField('stamp', reader.result);
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const validationErrors = validateCompanyProfile(form);
@@ -194,7 +210,7 @@ const CompanyProfileSettings = () => {
               <label>Established Year</label>
               <input type="number" className="input-field" value={form.establishedYear} onChange={e => setField('establishedYear', e.target.value)} placeholder="e.g. 2010" />
             </div>
-            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <div className="form-group">
               <label>Company Logo</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 {form.logo ? (
@@ -210,6 +226,25 @@ const CompanyProfileSettings = () => {
                 <label className="btn" style={{ cursor: 'pointer' }}>
                   <Upload size={16} /> Upload Logo
                   <input type="file" accept="image/*" hidden onChange={handleLogoChange} />
+                </label>
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Company Stamp / Seal</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                {form.stamp ? (
+                  <div style={{ position: 'relative' }}>
+                    <img src={form.stamp} alt="Stamp preview" style={{ width: '80px', height: '80px', objectFit: 'contain', borderRadius: '8px', border: '1px solid var(--border-color)', background: '#fff' }} />
+                    <button type="button" onClick={() => setField('stamp', '')} style={{ position: 'absolute', top: -6, right: -6, background: '#ef4444', border: 'none', borderRadius: '50%', color: '#fff', cursor: 'pointer', padding: '2px' }}>
+                      <X size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ width: '80px', height: '80px', borderRadius: '8px', border: '1px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.7rem' }}>No stamp</div>
+                )}
+                <label className="btn" style={{ cursor: 'pointer' }}>
+                  <Upload size={16} /> Upload Stamp
+                  <input type="file" accept="image/*" hidden onChange={handleStampChange} />
                 </label>
               </div>
             </div>
@@ -316,21 +351,31 @@ const CompanyProfileSettings = () => {
         <div className="premium-card" style={{ marginBottom: '1.5rem' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem' }}>Document Preview</h3>
           <div style={{ padding: '1rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-              {form.logo && <img src={form.logo} alt="" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
-                <p style={{ fontWeight: 800, fontSize: '1.1rem', margin: 0 }}>{form.companyName || 'Company Name'}</p>
-                {form.tagline && <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>{form.tagline}</p>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+                  {form.logo && <img src={form.logo} alt="" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />}
+                  <div>
+                    <p style={{ fontWeight: 800, fontSize: '1.1rem', margin: 0 }}>{form.companyName || 'Company Name'}</p>
+                    {form.tagline && <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>{form.tagline}</p>}
+                  </div>
+                </div>
+                <p style={{ fontSize: '0.85rem', margin: '0.25rem 0' }}>{formatCompanyAddressSingle(form)}</p>
+                <p style={{ fontSize: '0.85rem', margin: '0.25rem 0' }}>{form.phone}{form.email ? ` | ${form.email}` : ''}</p>
+                {form.gstNumber && <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0.25rem 0' }}>GSTIN: {form.gstNumber}</p>}
+                {(form.bankName || form.accountNumber) && (
+                  <p style={{ fontSize: '0.85rem', margin: '0.5rem 0 0', color: 'var(--text-muted)' }}>
+                    Bank: {[form.bankName, form.accountName, form.accountNumber, form.ifscCode].filter(Boolean).join(' · ')}
+                  </p>
+                )}
               </div>
+              {form.stamp && (
+                <div style={{ textAlign: 'center', padding: '0.5rem 0.75rem', border: '1px dashed var(--border-color)', borderRadius: '6px', background: '#fff' }}>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '0 0 0.25rem 0', fontWeight: 600 }}>Company Stamp</p>
+                  <img src={form.stamp} alt="Stamp Preview" style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
+                </div>
+              )}
             </div>
-            <p style={{ fontSize: '0.85rem', margin: '0.25rem 0' }}>{formatCompanyAddressSingle(form)}</p>
-            <p style={{ fontSize: '0.85rem', margin: '0.25rem 0' }}>{form.phone}{form.email ? ` | ${form.email}` : ''}</p>
-            {form.gstNumber && <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0.25rem 0' }}>GSTIN: {form.gstNumber}</p>}
-            {(form.bankName || form.accountNumber) && (
-              <p style={{ fontSize: '0.85rem', margin: '0.5rem 0 0', color: 'var(--text-muted)' }}>
-                Bank: {[form.bankName, form.accountName, form.accountNumber, form.ifscCode].filter(Boolean).join(' · ')}
-              </p>
-            )}
           </div>
         </div>
 

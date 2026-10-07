@@ -1131,7 +1131,7 @@ export const buildQuotationHtml = (data, profileInput) => {
       <span>SCAN TO VISIT OUR WEBSITE</span>
     </div>
     <div class="sign2">
-      <div class="seal-box">SEAL</div>
+      ${profile.stamp ? `<img src="${profile.stamp}" alt="Stamp" style="max-height:54px;max-width:100px;object-fit:contain;display:block;margin:0 auto 4px auto;" />` : '<div class="seal-box">SEAL</div>'}
       <p><b>For ${companyName}</b></p>
       <p><b>${sigName}</b><br><small>Authorised Signatory</small></p>
     </div>

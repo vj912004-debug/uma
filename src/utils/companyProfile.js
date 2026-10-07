@@ -3,6 +3,7 @@ import { DEFAULT_PRINT_LOGO_SRC } from './defaultPrintLogo';
 export const DEFAULT_COMPANY_PROFILE = {
   companyName: 'UMA MICRON',
   logo: '',
+  stamp: '',
   tagline: 'ERP & Process Tracking',
   industryType: 'Micronization / Manufacturing',
   phone: '+91 97120 00297',

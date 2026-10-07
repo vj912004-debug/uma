@@ -760,7 +760,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
         <div class="dc-sign-stack">
           <div class="dc-sign-card">
             <div class="dc-sign-title">For ${escHtml(profile.companyName || 'UMA MICRON')}</div>
-            <div class="dc-sign-space"></div>
+            <div class="dc-sign-space" style="display:flex;align-items:center;justify-content:center;position:relative;">${profile.stamp ? `<img src="${profile.stamp}" alt="Stamp" style="max-height:40px;max-width:90px;object-fit:contain;display:block;" />` : ''}</div>
             <span style="font-size:12px; color: #333;">Authorised Signatory</span>
           </div>
           <div class="dc-sign-card">
