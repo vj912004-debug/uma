@@ -23,6 +23,8 @@ import ExportButton from '../components/ExportButton';
 import { formatDate } from '../utils/dateUtils';
 import { getEffectiveRate, money } from '../utils/payroll';
 import { getPrintStampSrc } from '../utils/companyProfile';
+import { SinglePayslipCard, DualPayslipPrintView } from '../components/PayslipDocument';
+import { DEPARTMENTS } from './EmployeeManagement';
 
 const currentMonthStr = () => {
   const d = new Date();
@@ -370,98 +372,10 @@ const PayslipView = () => {
           </div>
         </div>
 
-        {/* PANEL B: CENTER MAIN PAYSLIP CARD */}
+        {/* PANEL B: CENTER MAIN PAYSLIP CARD (DUAL A4 PAGE PREVIEW) */}
         {activeEmp && (
-          <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-            
-            {/* Payslip Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #5b1c85', paddingBottom: '0.85rem', marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div style={{ background: '#5b1c85', color: '#fff', width: 36, height: 36, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
-                  M
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#5b1c85' }}>
-                    {companyProfile.companyName || 'UMA MICRON'}
-                  </h3>
-                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>
-                    {companyProfile.tagline || 'Micronization for a Better Tomorrow'}
-                  </p>
-                </div>
-              </div>
-
-              <div style={{ textAlign: 'right' }}>
-                <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#5b1c85' }}>Salary Payslip</h2>
-                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                  Pay Period: <strong>{formatMonthLabel(selectedMonth)}</strong> | Payslip No: <strong>PS-{selectedMonth.replace('-', '')}-001</strong>
-                </span>
-              </div>
-            </div>
-
-            {/* Employee Info Bar */}
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <strong style={{ fontSize: '1.05rem', color: '#1e293b', display: 'block' }}>{activeEmp.name}</strong>
-                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  {activeEmp.empId} | {activeEmp.designation} | {activeEmp.department}
-                </span>
-              </div>
-              <div style={{ textAlign: 'right', fontSize: '0.78rem', color: '#64748b' }}>
-                Joining Date: <strong>{formatDate(activeEmp.joiningDate)}</strong>
-              </div>
-            </div>
-
-            {/* Earnings & Deductions Split Table */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden', marginBottom: '1.25rem' }}>
-              
-              {/* Earnings Table */}
-              <div style={{ borderRight: '1px solid #cbd5e1' }}>
-                <div style={{ background: '#ecfdf5', padding: '6px 12px', fontWeight: 800, color: '#047857', borderBottom: '1px solid #cbd5e1', fontSize: '0.82rem' }}>
-                  Earnings
-                </div>
-                <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Basic Salary</span><span>{money(activeEmp.basicSalary)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>DA (Dearness Allowance)</span><span>{money(activeEmp.da)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>HRA (House Rent Allowance)</span><span>{money(activeEmp.hra)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Special Allowance</span><span>{money(activeEmp.specialAllowance)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>OT Pay</span><span>{money(activeEmp.otPay)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Other Allowances</span><span>{money(activeEmp.otherAllowances)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1.5px solid #cbd5e1', paddingTop: '6px', fontWeight: 800, color: '#047857', fontSize: '0.85rem' }}>
-                    <span>Total Earnings</span><span>{money(activeEmp.grossSalary)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Deductions Table */}
-              <div>
-                <div style={{ background: '#fef2f2', padding: '6px 12px', fontWeight: 800, color: '#dc2626', borderBottom: '1px solid #cbd5e1', fontSize: '0.82rem' }}>
-                  Deductions
-                </div>
-                <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>PF (Employee)</span><span>{money(activeEmp.pf)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ESI (Employee)</span><span>{money(activeEmp.esi)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Professional Tax</span><span>{money(activeEmp.pt)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Other Deductions</span><span>{money(activeEmp.otherDeductions)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1.5px solid #cbd5e1', paddingTop: '1.5rem', fontWeight: 800, color: '#dc2626', fontSize: '0.85rem' }}>
-                    <span>Total Deductions</span><span>{money(activeEmp.totalDeductions)}</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Net Salary Highlight Banner */}
-            <div style={{ background: '#ecfdf5', border: '1.5px solid #a7f3d0', borderRadius: '8px', padding: '0.75rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <span style={{ fontWeight: 800, color: '#047857', fontSize: '0.95rem' }}>Net Salary</span>
-              <strong style={{ fontSize: '1.35rem', fontWeight: 800, color: '#047857' }}>{money(activeEmp.netSalary)}</strong>
-            </div>
-
-            {/* Footer Notice */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: '0.75rem' }}>
-              <span>🤖 This is a computer generated payslip. No signature required.</span>
-              <span>Generated On: {formatDate(new Date().toISOString().slice(0, 10))} 10:15 AM</span>
-            </div>
-
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <DualPayslipPrintView emp={activeEmp} selectedMonth={selectedMonth} companyProfile={companyProfile} />
           </div>
         )}
 
@@ -544,6 +458,12 @@ const PayslipView = () => {
 
       </div>
 
+      {/* Printable Container for Dual Payslips on A4 */}
+      {activeEmp && (
+        <div className="payslip-print-container" style={{ display: 'none' }}>
+          <DualPayslipPrintView emp={activeEmp} selectedMonth={selectedMonth} companyProfile={companyProfile} />
+        </div>
+      )}
     </div>
   );
 };

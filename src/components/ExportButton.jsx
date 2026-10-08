@@ -30,7 +30,7 @@ const toJsPdfFont = (fontFamily = '') => {
   return 'helvetica';
 };
 
-const ExportButton = ({ data, columns, filename, title, groupBy, docType }) => {
+const ExportButton = ({ data, columns, filename, title, groupBy, docType, className = '', style = {} }) => {
   const profile = getStoredCompanyProfile();
 
   const exportToExcel = () => {
@@ -140,66 +140,94 @@ const ExportButton = ({ data, columns, filename, title, groupBy, docType }) => {
   };
 
   return (
-    <div className="export-buttons" style={{ display: 'flex', gap: '1rem' }}>
+    <div
+      className={`export-buttons ${className}`}
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '0.5rem',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        ...style
+      }}
+    >
       <button
         type="button"
         onClick={exportToExcel}
         style={{
-          display: 'flex',
+          display: 'inline-flex',
           alignItems: 'center',
-          gap: '0.5rem',
+          justifyContent: 'center',
+          gap: '0.4rem',
           background: '#fff',
           border: '1px solid var(--border-color)',
-          padding: '0.5rem 1rem',
+          padding: '0.45rem 0.75rem',
           borderRadius: '6px',
           cursor: 'pointer',
-          fontSize: '0.85rem',
+          fontSize: '0.82rem',
           fontWeight: 500,
-          color: '#334155'
+          color: '#334155',
+          flex: '1 1 auto',
+          minWidth: '0',
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+          whiteSpace: 'nowrap'
         }}
         title="Export Excel"
       >
-        <FileSpreadsheet size={18} color="#5b1c85" /> Export Excel
+        <FileSpreadsheet size={16} color="#5b1c85" /> Export Excel
       </button>
       <button
         type="button"
         onClick={exportToPDF}
         style={{
-          display: 'flex',
+          display: 'inline-flex',
           alignItems: 'center',
-          gap: '0.5rem',
+          justifyContent: 'center',
+          gap: '0.4rem',
           background: '#fff',
           border: '1px solid var(--border-color)',
-          padding: '0.5rem 1rem',
+          padding: '0.45rem 0.75rem',
           borderRadius: '6px',
           cursor: 'pointer',
-          fontSize: '0.85rem',
+          fontSize: '0.82rem',
           fontWeight: 500,
-          color: '#334155'
+          color: '#334155',
+          flex: '1 1 auto',
+          minWidth: '0',
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+          whiteSpace: 'nowrap'
         }}
         title="Export PDF"
       >
-        <FileText size={18} color="#ef4444" /> Export PDF
+        <FileText size={16} color="#ef4444" /> Export PDF
       </button>
       <button
         type="button"
         onClick={exportToWord}
         style={{
-          display: 'flex',
+          display: 'inline-flex',
           alignItems: 'center',
-          gap: '0.5rem',
+          justifyContent: 'center',
+          gap: '0.4rem',
           background: '#fff',
           border: '1px solid var(--border-color)',
-          padding: '0.5rem 1rem',
+          padding: '0.45rem 0.75rem',
           borderRadius: '6px',
           cursor: 'pointer',
-          fontSize: '0.85rem',
+          fontSize: '0.82rem',
           fontWeight: 500,
-          color: '#334155'
+          color: '#334155',
+          flex: '1 1 auto',
+          minWidth: '0',
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+          whiteSpace: 'nowrap'
         }}
         title="Export Word"
       >
-        <FileDown size={18} color="#3b82f6" /> Export Word
+        <FileDown size={16} color="#3b82f6" /> Export Word
       </button>
     </div>
   );

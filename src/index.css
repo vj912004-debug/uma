@@ -2780,6 +2780,81 @@ tbody tr:hover td {
   }
 }
 
+/* Payslip Print Rules - Single A4 Page Guarantee */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 2mm 3mm;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .payslip-print-container,
+  .payslip-print-container *,
+  .printable-payslip-page,
+  .printable-payslip-page * {
+    visibility: visible !important;
+  }
+
+  .payslip-print-container,
+  .printable-payslip-page {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-before: avoid !important;
+    page-break-after: avoid !important;
+    overflow: hidden !important;
+  }
+
+  .payslip-container-single {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
+
+/* Software-Wide Export & Quick Actions Card Overflow Fix */
+.export-buttons {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.5rem !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.export-buttons button {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  white-space: nowrap !important;
+}
+
+.premium-card,
+.pm-card,
+.pm-quick,
+.pm-top-grid aside,
+.pm-top-grid section {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
 .list-filter-bar .list-filter-select {
   min-width: 180px;
   max-width: 280px;

@@ -29,6 +29,7 @@ import { formatDate } from '../utils/dateUtils';
 import { getEffectiveRate, money, calculateMonthSalary } from '../utils/payroll';
 import { DEPARTMENTS } from './EmployeeManagement';
 import { getPrintStampSrc } from '../utils/companyProfile';
+import { SinglePayslipCard, DualPayslipPrintView } from '../components/PayslipDocument';
 
 const currentMonthStr = () => {
   const d = new Date();
@@ -894,109 +895,9 @@ const SalaryCalculation = () => {
               </button>
             </div>
 
-            {/* Printable Payslip Container */}
-            <div id="printable-payslip" style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '1.5rem', fontSize: '0.85rem', color: '#1e293b' }}>
-              
-              {/* Header with Company Logo & Seal */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #5b1c85', paddingBottom: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#5b1c85' }}>
-                    {companyProfile.companyName || 'UMA MICRON'}
-                  </h3>
-                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                    {companyProfile.address || 'GIDC Ranoli, Vadodara, Gujarat 391350'}
-                  </p>
-                  <p style={{ margin: '0.1rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                    GSTIN: {companyProfile.gstin || '24AAACU1234F1Z5'}
-                  </p>
-                </div>
-
-                {stampSrc && (
-                  <img
-                    src={stampSrc}
-                    alt="Company Seal"
-                    style={{ height: '70px', objectFit: 'contain', mixBlendMode: 'multiply' }}
-                  />
-                )}
-              </div>
-
-              {/* Payslip Subheader */}
-              <div style={{ textAlign: 'center', background: '#f8fafc', padding: '0.4rem', fontWeight: 800, fontSize: '0.9rem', marginBottom: '1rem', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
-                PAYSLIP FOR THE MONTH OF {formatMonthLabel(selectedMonth).toUpperCase()}
-              </div>
-
-              {/* Employee Information Table */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem 1.5rem', marginBottom: '1.25rem', fontSize: '0.8rem' }}>
-                <div><strong>Employee ID:</strong> {payslipModalUser.empId}</div>
-                <div><strong>Employee Name:</strong> {payslipModalUser.name}</div>
-                <div><strong>Department:</strong> {payslipModalUser.department}</div>
-                <div><strong>Shift:</strong> {payslipModalUser.shift}</div>
-                <div><strong>Present Days:</strong> {payslipModalUser.presentDays} / {payslipModalUser.workingDays}</div>
-                <div><strong>OT Hours:</strong> {payslipModalUser.otHours} hrs</div>
-              </div>
-
-              {/* Earnings & Deductions Split Table */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', border: '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden', marginBottom: '1.25rem' }}>
-                
-                {/* Earnings */}
-                <div style={{ borderRight: '1px solid #cbd5e1' }}>
-                  <div style={{ background: '#ecfdf5', padding: '6px 10px', fontWeight: 800, color: '#047857', borderBottom: '1px solid #cbd5e1' }}>
-                    EARNINGS
-                  </div>
-                  <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Basic Salary</span><span>{money(payslipModalUser.basicSalary)}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Dearness Allowance (DA)</span><span>{money(payslipModalUser.da)}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>House Rent Allowance (HRA)</span><span>{money(payslipModalUser.hra)}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Special Allowance</span><span>{money(payslipModalUser.specialAllowance)}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Overtime (OT) Pay</span><span>{money(payslipModalUser.otPay)}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #cbd5e1', paddingTop: '6px', fontWeight: 800, color: '#047857' }}>
-                      <span>Gross Earnings</span><span>{money(payslipModalUser.grossSalary)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Deductions */}
-                <div>
-                  <div style={{ background: '#fef2f2', padding: '6px 10px', fontWeight: 800, color: '#dc2626', borderBottom: '1px solid #cbd5e1' }}>
-                    DEDUCTIONS
-                  </div>
-                  <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Provident Fund (PF)</span><span>{money(payslipModalUser.pf)}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ESI (Employee)</span><span>{money(payslipModalUser.esi)}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Professional Tax (PT)</span><span>{money(payslipModalUser.pt)}</span></div>
-                    {payslipModalUser.otherDeductions > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Other Deductions</span><span>{money(payslipModalUser.otherDeductions)}</span></div>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #cbd5e1', paddingTop: '6px', fontWeight: 800, color: '#dc2626' }}>
-                      <span>Total Deductions</span><span>{money(payslipModalUser.totalDeductions)}</span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Net Payable Banner */}
-              <div style={{ background: '#f5f3ff', border: '1.5px solid #c084fc', borderRadius: '6px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <span style={{ fontWeight: 800, color: '#5b1c85', fontSize: '0.95rem' }}>NET SALARY PAYABLE</span>
-                <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#5b1c85' }}>{money(payslipModalUser.netSalary)}</strong>
-              </div>
-
-              <div style={{ fontSize: '0.78rem', fontStyle: 'italic', color: '#64748b', marginBottom: '1.5rem' }}>
-                Amount in words: {numberToWords(payslipModalUser.netSalary)}
-              </div>
-
-              {/* Signatures */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ borderTop: '1px solid #94a3b8', width: '140px', marginBottom: '4px' }}></div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Employee Signature</span>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ borderTop: '1px solid #94a3b8', width: '140px', marginBottom: '4px' }}></div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Authorized Signatory</span>
-                </div>
-              </div>
-
+            {/* Dual A4 Payslip Container */}
+            <div id="printable-payslip" style={{ background: '#fff', borderRadius: '8px', overflowY: 'auto', maxHeight: '78vh' }}>
+              <DualPayslipPrintView emp={payslipModalUser} selectedMonth={selectedMonth} companyProfile={companyProfile} />
             </div>
 
             {/* Modal Actions */}
