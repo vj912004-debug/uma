@@ -39,6 +39,7 @@ export const MODULE_OPTIONS = [
   { id: '/employee-salary', label: 'Employee Salary', group: 'Reports & Logs', highlight: true },
   { id: '/attendance', label: 'Attendance', group: 'Reports & Logs' },
   { id: '/salary-calculation', label: 'Salary Calculation', group: 'Reports & Logs' },
+  { id: '/payslip', label: 'Payslip', group: 'Reports & Logs' },
   { id: '/device-management', label: 'Device Management', group: 'Reports & Logs' }
 ];
 

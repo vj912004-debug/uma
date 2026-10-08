@@ -40,6 +40,8 @@ import RecycleBin from './modules/RecycleBin';
 import SystemLogs from './modules/SystemLogs';
 import SalaryCalculation from './modules/SalaryCalculation';
 import EmployeeSalaryManagement from './modules/EmployeeSalaryManagement';
+import SalaryRegister from './modules/SalaryRegister';
+import PayslipView from './modules/PayslipView';
 import EmployeeMaster from './modules/EmployeeMaster';
 import DeviceManagement from './modules/DeviceManagement';
 import Attendance from './modules/Attendance';
@@ -107,7 +109,8 @@ const AppLayout = () => {
         <Route path="/salary-calculation" element={<SalaryCalculation />} />
         <Route path="/employee-master" element={<EmployeeMaster />} />
         <Route path="/device-management" element={<DeviceManagement />} />
-        <Route path="/employee-salary" element={<EmployeeSalaryManagement />} />
+        <Route path="/employee-salary" element={<SalaryRegister />} />
+        <Route path="/payslip" element={<PayslipView />} />
         <Route path="/settings/company-profile" element={<ProtectedRoute adminOnly><CompanyProfileSettings /></ProtectedRoute>} />
         <Route path="/employees" element={<ProtectedRoute adminOnly><EmployeeManagement /></ProtectedRoute>} />
         <Route path="/recycle-bin" element={<ProtectedRoute adminOnly><RecycleBin /></ProtectedRoute>} />

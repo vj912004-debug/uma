@@ -1,9 +1,10 @@
 import { DEFAULT_PRINT_LOGO_SRC } from './defaultPrintLogo';
+import { DEFAULT_PRINT_STAMP_SRC } from './defaultPrintStamp';
 
 export const DEFAULT_COMPANY_PROFILE = {
   companyName: 'UMA MICRON',
   logo: '',
-  stamp: '',
+  stamp: DEFAULT_PRINT_STAMP_SRC,
   tagline: 'ERP & Process Tracking',
   industryType: 'Micronization / Manufacturing',
   phone: '+91 97120 00297',
@@ -42,10 +43,21 @@ export const getBankDetailRows = (profile) => {
 export const formatBankDetailsText = (profile) =>
   getBankDetailRows(profile).map(([label, value]) => `${label} : ${value}`).join('\n');
 
-export const mergeCompanyProfile = (profile) => ({
-  ...DEFAULT_COMPANY_PROFILE,
-  ...(profile || {})
-});
+export const mergeCompanyProfile = (profile) => {
+  const merged = {
+    ...DEFAULT_COMPANY_PROFILE,
+    ...(profile || {})
+  };
+  if (!merged.stamp) {
+    merged.stamp = DEFAULT_PRINT_STAMP_SRC;
+  }
+  return merged;
+};
+
+export const getPrintStampSrc = (profile) => {
+  const p = mergeCompanyProfile(profile);
+  return p.stamp || DEFAULT_PRINT_STAMP_SRC;
+};
 
 export const getStoredCompanyProfile = () => {
   try {

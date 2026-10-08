@@ -1,4 +1,5 @@
 import { mergeCompanyProfile } from './companyProfile';
+import { DEFAULT_PRINT_STAMP_SRC } from './defaultPrintStamp';
 import { formatPdfDateDmy, formatPdfDateSlash, splitPartyAddressLines, partyAddressHtml } from './taxInvoiceLayout';
 import {
   escHtml,
@@ -1131,7 +1132,7 @@ export const buildQuotationHtml = (data, profileInput) => {
       <span>SCAN TO VISIT OUR WEBSITE</span>
     </div>
     <div class="sign2">
-      ${profile.stamp ? `<img src="${profile.stamp}" alt="Stamp" style="max-height:54px;max-width:100px;object-fit:contain;display:block;margin:0 auto 4px auto;" />` : '<div class="seal-box">SEAL</div>'}
+      ${(profile.stamp || DEFAULT_PRINT_STAMP_SRC) ? `<img src="${profile.stamp || DEFAULT_PRINT_STAMP_SRC}" alt="Stamp" style="max-height:54px;max-width:100px;object-fit:contain;display:block;margin:0 auto 4px auto;mix-blend-mode:multiply;" />` : '<div class="seal-box">SEAL</div>'}
       <p><b>For ${companyName}</b></p>
       <p><b>${sigName}</b><br><small>Authorised Signatory</small></p>
     </div>

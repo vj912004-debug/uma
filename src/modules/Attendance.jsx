@@ -1,6 +1,5 @@
 /**
- * Attendance module — re-exports payroll helpers and opens the
- * Employee Salary Management hub on the Attendance tab.
+ * Daily Attendance Approval module
  */
 export {
   SHIFTS,
@@ -8,8 +7,6 @@ export {
   calculateTimes
 } from '../utils/payroll';
 
-import EmployeeSalaryManagement from './EmployeeSalaryManagement';
+import DailyAttendance from './DailyAttendance';
 
-const Attendance = () => <EmployeeSalaryManagement defaultTab="attendance" />;
-
-export default Attendance;
+export default DailyAttendance;

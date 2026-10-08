@@ -42,7 +42,9 @@ import {
   UserPlus,
   PhoneCall,
   BarChart3,
-  Fingerprint
+  Fingerprint,
+  RefreshCw,
+  CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { canAccessModule } from '../utils/moduleAccess';
@@ -123,15 +125,33 @@ const Sidebar = () => {
       ]
     },
     {
-      key: 'hr',
-      title: 'HR & Attendance',
+      key: 'employee',
+      title: 'EMPLOYEE',
       icon: Users,
       items: [
-        { name: 'Employee Master', icon: Users, path: '/employee-master', roles: ['Admin', 'Staff'] },
-        { name: 'Employee Salary', icon: DollarSign, path: '/employee-salary', roles: ['Admin', 'Staff'], highlight: true },
+        { name: 'Employee Master', icon: Users, path: '/employee-master', roles: ['Admin', 'Staff'] }
+      ]
+    },
+    {
+      key: 'attendance',
+      title: 'ATTENDANCE',
+      icon: Calendar,
+      items: [
+        { name: 'Biometric Sync', icon: RefreshCw, path: '/device-management', roles: ['Admin', 'Staff'] },
+        { name: 'Biometric Mapping', icon: Fingerprint, path: '/device-management#map', roles: ['Admin', 'Staff'] },
         { name: 'Daily Attendance', icon: UserCheck, path: '/attendance', roles: ['Admin', 'Staff'] },
+        { name: 'Daily Approval', icon: CheckCircle2, path: '/attendance#approval', roles: ['Admin', 'Staff'] },
+        { name: 'Attendance Reports', icon: FileText, path: '/reports#attendance', roles: ['Admin', 'Staff'] }
+      ]
+    },
+    {
+      key: 'salary',
+      title: 'SALARY',
+      icon: DollarSign,
+      items: [
         { name: 'Salary Calculation', icon: Calculator, path: '/salary-calculation', roles: ['Admin', 'Staff'] },
-        { name: 'Device Management', icon: Fingerprint, path: '/device-management', roles: ['Admin', 'Staff'] }
+        { name: 'Salary Register', icon: CreditCard, path: '/employee-salary', roles: ['Admin', 'Staff'] },
+        { name: 'Payslip', icon: FileText, path: '/payslip', roles: ['Admin', 'Staff'] }
       ]
     },
     {
@@ -164,7 +184,9 @@ const Sidebar = () => {
     payments: false,
     procurement: false,
     marketing: false,
-    hr: false,
+    employee: true,
+    attendance: true,
+    salary: true,
     reports: false,
     system: false
   });
@@ -314,13 +336,15 @@ const Sidebar = () => {
                 <div className="sidebar-group-items">
                   {visibleItems.map((item) => (
                     <NavLink
-                      key={item.path}
+                      key={item.name + item.path}
                       to={item.path}
                       className={({ isActive }) => {
-                        const onHash = Object.prototype.hasOwnProperty.call(item, 'hash')
-                          && location.pathname === '/purchase-management'
-                          && (location.hash || '') === item.hash;
-                        const on = Object.prototype.hasOwnProperty.call(item, 'hash') ? onHash : isActive;
+                        const pathOnly = item.path.split('#')[0];
+                        const hashOnly = item.path.includes('#') ? `#${item.path.split('#')[1]}` : '';
+                        const onHash = hashOnly
+                          ? location.pathname === pathOnly && (location.hash || '') === hashOnly
+                          : isActive;
+                        const on = hashOnly ? onHash : isActive;
                         return [
                           'nav-link',
                           item.highlight ? 'highlight' : '',

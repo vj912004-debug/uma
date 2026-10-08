@@ -234,8 +234,8 @@ const CompanyProfileSettings = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 {form.stamp ? (
                   <div style={{ position: 'relative' }}>
-                    <img src={form.stamp} alt="Stamp preview" style={{ width: '80px', height: '80px', objectFit: 'contain', borderRadius: '8px', border: '1px solid var(--border-color)', background: '#fff' }} />
-                    <button type="button" onClick={() => setField('stamp', '')} style={{ position: 'absolute', top: -6, right: -6, background: '#ef4444', border: 'none', borderRadius: '50%', color: '#fff', cursor: 'pointer', padding: '2px' }}>
+                    <img src={form.stamp} alt="Stamp preview" style={{ width: '80px', height: '80px', objectFit: 'contain', borderRadius: '8px', border: '1px solid var(--border-color)', background: '#fff', mixBlendMode: 'multiply' }} />
+                    <button type="button" onClick={() => setField('stamp', '')} style={{ position: 'absolute', top: -6, right: -6, background: '#ef4444', border: 'none', borderRadius: '50%', color: '#fff', cursor: 'pointer', padding: '2px' }} title="Remove / Reset to Default Stamp">
                       <X size={12} />
                     </button>
                   </div>
@@ -243,7 +243,7 @@ const CompanyProfileSettings = () => {
                   <div style={{ width: '80px', height: '80px', borderRadius: '8px', border: '1px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.7rem' }}>No stamp</div>
                 )}
                 <label className="btn" style={{ cursor: 'pointer' }}>
-                  <Upload size={16} /> Upload Stamp
+                  <Upload size={16} /> Upload Custom Stamp
                   <input type="file" accept="image/*" hidden onChange={handleStampChange} />
                 </label>
               </div>
@@ -372,7 +372,7 @@ const CompanyProfileSettings = () => {
               {form.stamp && (
                 <div style={{ textAlign: 'center', padding: '0.5rem 0.75rem', border: '1px dashed var(--border-color)', borderRadius: '6px', background: '#fff' }}>
                   <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '0 0 0.25rem 0', fontWeight: 600 }}>Company Stamp</p>
-                  <img src={form.stamp} alt="Stamp Preview" style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
+                  <img src={form.stamp} alt="Stamp Preview" style={{ width: '60px', height: '60px', objectFit: 'contain', mixBlendMode: 'multiply' }} />
                 </div>
               )}
             </div>
