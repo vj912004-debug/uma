@@ -273,7 +273,7 @@ const SalaryCalculation = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
           <div style={{
-            background: 'rgba(91, 28, 133, 0.1)',
+            background: 'rgba(155, 98, 196, 0.1)',
             color: 'var(--accent-primary)',
             width: 44,
             height: 44,
@@ -297,7 +297,7 @@ const SalaryCalculation = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           {/* Month Selector Dropdown */}
           <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem' }}>
-            <Clock size={16} color="#5b1c85" />
+            <Clock size={16} color="#9b62c4" />
             <input
               type="month"
               className="input-field"
@@ -311,7 +311,7 @@ const SalaryCalculation = () => {
             type="button"
             className="btn btn-primary"
             onClick={handleRecalculateAll}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.65rem 1.25rem', background: '#5b1c85' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.65rem 1.25rem', background: '#9b62c4' }}
           >
             <Calculator size={16} /> Calculate Salary
           </button>
@@ -347,7 +347,7 @@ const SalaryCalculation = () => {
       }}>
         {/* Department */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem' }}>
-          <Briefcase size={16} color="#5b1c85" />
+          <Briefcase size={16} color="#9b62c4" />
           <SearchableSelect
             className="input-field"
             value={deptFilter}
@@ -362,7 +362,7 @@ const SalaryCalculation = () => {
 
         {/* Employee Type */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem' }}>
-          <Users size={16} color="#5b1c85" />
+          <Users size={16} color="#9b62c4" />
           <SearchableSelect
             className="input-field"
             allowCustom={false}
@@ -379,7 +379,7 @@ const SalaryCalculation = () => {
 
         {/* Shift */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem' }}>
-          <Clock size={16} color="#5b1c85" />
+          <Clock size={16} color="#9b62c4" />
           <SearchableSelect
             className="input-field"
             allowCustom={false}
@@ -429,7 +429,7 @@ const SalaryCalculation = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
         {/* Total Employees */}
         <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '12px', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ background: 'rgba(91, 28, 133, 0.15)', color: '#5b1c85', width: 42, height: 42, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'rgba(155, 98, 196, 0.15)', color: '#9b62c4', width: 42, height: 42, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Users size={20} />
           </div>
           <div>
@@ -529,7 +529,7 @@ const SalaryCalculation = () => {
                         style={{
                           borderBottom: '1px solid var(--border-color)',
                           cursor: 'pointer',
-                          background: isSelectedRow ? 'rgba(91, 28, 133, 0.06)' : isChecked ? 'rgba(91, 28, 133, 0.03)' : 'transparent'
+                          background: isSelectedRow ? 'rgba(155, 98, 196, 0.06)' : isChecked ? 'rgba(155, 98, 196, 0.03)' : 'transparent'
                         }}
                       >
                         <td style={{ padding: '10px 8px' }} onClick={(e) => e.stopPropagation()}>
@@ -610,7 +610,7 @@ const SalaryCalculation = () => {
                       fontSize: '0.78rem',
                       fontWeight: 700,
                       cursor: 'pointer',
-                      background: page === p ? '#5b1c85' : '#fff',
+                      background: page === p ? '#9b62c4' : '#fff',
                       color: page === p ? '#fff' : 'var(--text-main)'
                     }}
                   >
@@ -627,7 +627,7 @@ const SalaryCalculation = () => {
           {/* INFORMATIONAL FOOTER NOTE BOX */}
           <div style={{ marginTop: '1.25rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1.15rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
             <div style={{ display: 'flex', items: 'center', gap: '6px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.35rem' }}>
-              <Info size={14} color="#5b1c85" /> Note:
+              <Info size={14} color="#9b62c4" /> Note:
             </div>
             <ul style={{ margin: 0, paddingLeft: '1.2rem', lineHeight: 1.5 }}>
               <li>Salary is calculated based on approved daily attendance and biometric punches.</li>
@@ -649,7 +649,7 @@ const SalaryCalculation = () => {
                 width: 44,
                 height: 44,
                 borderRadius: '50%',
-                background: 'rgba(91, 28, 133, 0.12)',
+                background: 'rgba(155, 98, 196, 0.12)',
                 color: 'var(--accent-primary)',
                 display: 'flex',
                 alignItems: 'center',
@@ -697,9 +697,9 @@ const SalaryCalculation = () => {
                     padding: '0.45rem 0.65rem',
                     background: 'transparent',
                     border: 'none',
-                    borderBottom: rightSubTab === t.id ? '2px solid #5b1c85' : '2px solid transparent',
+                    borderBottom: rightSubTab === t.id ? '2px solid #9b62c4' : '2px solid transparent',
                     marginBottom: '-2px',
-                    color: rightSubTab === t.id ? '#5b1c85' : 'var(--text-muted)',
+                    color: rightSubTab === t.id ? '#9b62c4' : 'var(--text-muted)',
                     fontWeight: rightSubTab === t.id ? 700 : 600,
                     fontSize: '0.78rem',
                     cursor: 'pointer'
@@ -808,8 +808,8 @@ const SalaryCalculation = () => {
 
                 {/* NET SALARY HIGHLIGHT BOX */}
                 <div style={{ background: '#f5f3ff', border: '1.5px solid #ddd6fe', borderRadius: '10px', padding: '0.85rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#5b1c85' }}>Net Salary</span>
-                  <strong style={{ fontSize: '1.25rem', fontWeight: 800, color: '#5b1c85' }}>{money(activeSelectedUser.netSalary)}</strong>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#9b62c4' }}>Net Salary</span>
+                  <strong style={{ fontSize: '1.25rem', fontWeight: 800, color: '#9b62c4' }}>{money(activeSelectedUser.netSalary)}</strong>
                 </div>
 
                 {/* ACTION BUTTONS */}
@@ -826,7 +826,7 @@ const SalaryCalculation = () => {
                     type="button"
                     className="btn btn-primary"
                     onClick={() => alert(`Salary recalculated for ${activeSelectedUser.name}.`)}
-                    style={{ flex: 1, padding: '0.65rem', fontSize: '0.82rem', background: '#5b1c85', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                    style={{ flex: 1, padding: '0.65rem', fontSize: '0.82rem', background: '#9b62c4', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
                   >
                     <RefreshCw size={15} /> Recalculate
                   </button>
@@ -888,7 +888,7 @@ const SalaryCalculation = () => {
           <div className="modal-content" style={{ width: '680px', maxWidth: '95vw', padding: '1.75rem' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
               <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FileText size={20} color="#5b1c85" /> Salary Slip - {formatMonthLabel(selectedMonth)}
+                <FileText size={20} color="#9b62c4" /> Salary Slip - {formatMonthLabel(selectedMonth)}
               </h2>
               <button type="button" className="btn" onClick={() => setPayslipModalUser(null)} style={{ padding: '4px 8px' }}>
                 <X size={16} />
@@ -906,7 +906,7 @@ const SalaryCalculation = () => {
                 type="button"
                 className="btn btn-primary"
                 onClick={() => window.print()}
-                style={{ background: '#5b1c85', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                style={{ background: '#9b62c4', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
               >
                 <Printer size={16} /> Print Payslip
               </button>

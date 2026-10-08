@@ -1024,7 +1024,7 @@ const handleSameCompanyQuote = (q) => {
   const dropZoneStyle = (zone) => ({
     borderRadius: '8px',
     border: dropTarget === zone ? '2px dashed var(--accent-primary)' : '2px dashed transparent',
-    background: dropTarget === zone ? 'rgba(91, 28, 133, 0.06)' : 'transparent',
+    background: dropTarget === zone ? 'rgba(155, 98, 196, 0.06)' : 'transparent',
     padding: dropTarget === zone ? '0.5rem' : '0',
     minHeight: '48px',
     transition: 'border-color 0.15s ease, background 0.15s ease'
@@ -1068,7 +1068,7 @@ const handleSameCompanyQuote = (q) => {
         >
           <GripVertical size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           {isMain && isHeader ? (
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#5b1c85', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#9b62c4', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {card.label}
             </span>
           ) : (
@@ -1138,14 +1138,14 @@ const handleSameCompanyQuote = (q) => {
         style={{
           padding: '0.65rem 1rem 0.85rem',
           borderTop: section === 'optional' ? '1px solid #ede9fe' : 'none',
-          background: dropTarget === zone ? 'rgba(91, 28, 133, 0.04)' : 'transparent',
+          background: dropTarget === zone ? 'rgba(155, 98, 196, 0.04)' : 'transparent',
           transition: 'background 0.2s ease'
         }}
         onDragOver={(e) => allowChargeDrop(e, zone)}
         onDrop={(e) => handleChargeDrop(e, zone)}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', gap: '0.5rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#5b1c85', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#9b62c4', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <span>{section === 'main' ? 'Main Charges' : 'Optional Charges'}</span>
             <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.72rem' }}>
               {section === 'main'
@@ -1163,7 +1163,7 @@ const handleSameCompanyQuote = (q) => {
               alignItems: 'center',
               gap: '0.25rem',
               border: '1px solid #c4b5fd',
-              color: '#5b1c85',
+              color: '#9b62c4',
               background: '#fff',
               fontWeight: 600
             }}
@@ -1322,7 +1322,7 @@ const handleSameCompanyQuote = (q) => {
                         <Eye size={14} /> Preview
                       </button>
                       <DocDownloadButtons docType="QUOTATION" title="Quotation" getData={() => quotationPrintData(q)} size={14} />
-                      <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(91, 28, 133, 0.1)', color: 'var(--accent-primary)' }} onClick={() => handleSameCompanyQuote(q)} title="Same quotation for same company">
+                      <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', background: 'rgba(155, 98, 196, 0.1)', color: 'var(--accent-primary)' }} onClick={() => handleSameCompanyQuote(q)} title="Same quotation for same company">
                         <Copy size={14} />
                       </button>
                       <button className="btn" style={{ padding: '0.25rem 0.5rem', background: 'transparent', color: 'var(--text-muted)' }} onClick={() => handleEdit(q)} title="Edit this quotation">
@@ -1363,7 +1363,7 @@ const handleSameCompanyQuote = (q) => {
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       padding: '0.85rem 1rem',
-                      background: isCurrent ? 'rgba(91, 28, 133, 0.06)' : 'var(--input-bg)',
+                      background: isCurrent ? 'rgba(155, 98, 196, 0.06)' : 'var(--input-bg)',
                       border: isCurrent ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
                       borderRadius: '8px',
                       textAlign: 'left',
@@ -1464,7 +1464,7 @@ const handleSameCompanyQuote = (q) => {
 
               {formData.companyQuoteMode && (
                 <div style={{ border: '1px solid #ddd6fe', borderRadius: '12px', overflow: 'hidden', marginBottom: '1.25rem', background: '#fff' }}>
-                  <div style={{ background: '#5b1c85', color: '#fff', padding: '0.75rem 1rem', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ background: '#9b62c4', color: '#fff', padding: '0.75rem 1rem', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>Products &amp; Default Charges</span>
                     <span style={{ fontSize: '0.75rem', fontWeight: 400, opacity: 0.9 }}>
                       Drag &amp; drop charges between Main and Optional
@@ -1612,7 +1612,7 @@ const handleSameCompanyQuote = (q) => {
                               key={idx}
                               style={{
                                 borderBottom: '1px solid var(--border-color)',
-                                background: isSelected ? 'rgba(91, 28, 133, 0.06)' : isConfigured ? 'rgba(91, 28, 133, 0.03)' : 'transparent'
+                                background: isSelected ? 'rgba(155, 98, 196, 0.06)' : isConfigured ? 'rgba(155, 98, 196, 0.03)' : 'transparent'
                               }}
                             >
                               <td style={{ padding: '0.5rem', fontWeight: 600 }}>{prod.name}</td>
@@ -1653,7 +1653,7 @@ const handleSameCompanyQuote = (q) => {
               {!formData.companyQuoteMode && (formData.productName ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 {partyProducts.length > 1 && (
-                  <div style={{ gridColumn: 'span 2', padding: '0.85rem 1rem', background: 'rgba(91, 28, 133, 0.06)', borderRadius: '8px', border: '1px solid rgba(91, 28, 133, 0.2)' }}>
+                  <div style={{ gridColumn: 'span 2', padding: '0.85rem 1rem', background: 'rgba(155, 98, 196, 0.06)', borderRadius: '8px', border: '1px solid rgba(155, 98, 196, 0.2)' }}>
                     <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem' }}>
                       Which product do you want to edit?
                     </label>

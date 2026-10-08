@@ -97,7 +97,7 @@ const SimpleCrudModule = ({
         <div className="premium-card" style={{ maxWidth: 920, margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 750, color: 'var(--brand-purple, #5b1c85)' }}>
+              <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 750, color: 'var(--brand-purple, #9b62c4)' }}>
                 {editing ? `Edit ${title}` : `Add ${title}`}
               </h2>
               <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>

@@ -811,7 +811,7 @@ const UnderProcess = () => {
 
       <div className="premium-card data-table-container under-process-table-card" style={{ padding: '1.5rem', background: '#ffffff' }}>
         <div style={{ marginBottom: '1.25rem', flexShrink: 0 }}>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#5b1c85', margin: 0 }}>Material Processing Status</h2>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#9b62c4', margin: 0 }}>Material Processing Status</h2>
           <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: '0.25rem 0 0' }}>View and manage document generation for each material</p>
         </div>
         <div className="under-process-table-scroll">
@@ -1657,7 +1657,7 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           <td style={{ padding: '0.25rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{netVal > 0 ? netVal.toFixed(2) : formatWeightNet(r.net)}</td>
         </tr>
       ))}
-      <tr style={{ background: 'rgba(91, 28, 133, 0.1)', borderBottom: '2px solid var(--accent-primary)' }}>
+      <tr style={{ background: 'rgba(155, 98, 196, 0.1)', borderBottom: '2px solid var(--accent-primary)' }}>
         <td colSpan={2} style={{ padding: '0.45rem 0.35rem', textAlign: 'right', fontWeight: 800, color: 'var(--accent-primary)', fontSize: '0.8rem' }}>
           TOTAL — Batch {group.batchNo}
         </td>
@@ -2698,7 +2698,7 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                             </td>
                           </tr>
                         ))}
-                        <tr style={{ background: 'rgba(91, 28, 133, 0.1)', borderBottom: '2px solid var(--accent-primary)' }}>
+                        <tr style={{ background: 'rgba(155, 98, 196, 0.1)', borderBottom: '2px solid var(--accent-primary)' }}>
                           <td colSpan={3} style={{ padding: '0.45rem 0.35rem', textAlign: 'right', fontWeight: 800, color: 'var(--accent-primary)', fontSize: '0.8rem' }}>
                             TOTAL — Batch {group.batchNo}
                           </td>
@@ -2733,7 +2733,7 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                   <td style={{ padding: '0.5rem', fontWeight: 700, textAlign: 'center' }}>{grandTotal.lumps.toFixed(2)}</td>
                 </tr>
               )}
-              <tr style={{ background: 'rgba(91, 28, 133, 0.1)', borderTop: '2px solid var(--accent-primary)' }}>
+              <tr style={{ background: 'rgba(155, 98, 196, 0.1)', borderTop: '2px solid var(--accent-primary)' }}>
                 <td colSpan={3} style={{ padding: '0.65rem 0.5rem', textAlign: 'right', fontWeight: 800, color: 'var(--accent-primary)', fontSize: '0.85rem' }}>
                   GRAND TOTAL
                 </td>
@@ -2936,7 +2936,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         <div style={{ gridColumn: 'span 4', borderTop: '1px solid var(--border-color)', margin: '0.5rem 0' }}></div>
 
         {availableProducts.length > 1 && (
-          <div style={{ gridColumn: 'span 4', marginBottom: '0.75rem', background: 'rgba(91, 28, 133, 0.04)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(91, 28, 133, 0.15)' }}>
+          <div style={{ gridColumn: 'span 4', marginBottom: '0.75rem', background: 'rgba(155, 98, 196, 0.04)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(155, 98, 196, 0.15)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
                 <label style={{ display: 'block', fontWeight: 700, fontSize: '0.9rem', color: 'var(--accent-primary)', margin: 0 }}>
@@ -2999,7 +2999,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                       background: checked ? '#fff' : 'var(--input-bg)',
                       border: `2px solid ${checked ? 'var(--accent-primary)' : 'var(--border-color)'}`,
                       borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem',
-                      boxShadow: checked ? '0 2px 6px rgba(91, 28, 133, 0.12)' : 'none',
+                      boxShadow: checked ? '0 2px 6px rgba(155, 98, 196, 0.12)' : 'none',
                       transition: 'all 0.15s ease'
                     }}
                   >
@@ -3259,7 +3259,7 @@ const EWayBillGenerator = ({ mr, activeProductName = '', editing, onClose }) => 
     <form onSubmit={handleSubmit}>
       {dc ? (
         <div style={{ marginBottom: '1.25rem' }}>
-          <h4 style={{ margin: '0 0 0.75rem', color: '#5b1c85', fontSize: '0.95rem' }}>Delivery Challan E-Way</h4>
+          <h4 style={{ margin: '0 0 0.75rem', color: '#9b62c4', fontSize: '0.95rem' }}>Delivery Challan E-Way</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div style={{ gridColumn: 'span 2' }}>
               <label>Delivery Challan</label>
@@ -3307,7 +3307,7 @@ const EWayBillGenerator = ({ mr, activeProductName = '', editing, onClose }) => 
 
       {ti ? (
         <div style={{ marginBottom: '1.25rem' }}>
-          <h4 style={{ margin: '0 0 0.75rem', color: '#5b1c85', fontSize: '0.95rem' }}>Tax Invoice E-Way</h4>
+          <h4 style={{ margin: '0 0 0.75rem', color: '#9b62c4', fontSize: '0.95rem' }}>Tax Invoice E-Way</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
               <label>Tax Invoice</label>

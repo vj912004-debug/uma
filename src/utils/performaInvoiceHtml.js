@@ -161,10 +161,10 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
 <title>UMA MICRON - Performa Invoice</title>
 <style>
   :root{
-    --purple:#3d2b7d;
-    --purple-dark:#2f2263;
-    --lav-bg:#efeaf7;
-    --lav-border:#c9bce8;
+    --purple:#9b62c4;
+    --purple-dark:#73399e;
+    --lav-bg:#F6F0FA;
+    --lav-border:#d6c2e8;
     --orange:#f47920;
     --green:#2fa84f;
     --text:#231f20;
@@ -317,9 +317,9 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
     text-align:center;
     margin-top:1px;
   }
-  .icon svg{width:16px;height:16px;display:block;fill:none;stroke:#3d2b7d;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
-  .m-icon svg{width:15px;height:15px;display:block;fill:none;stroke:#3d2b7d;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
-  .party-head svg, .box-head svg{width:16px;height:16px;display:block;fill:none;stroke:#3d2b7d;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .icon svg{width:16px;height:16px;display:block;fill:none;stroke:#9b62c4;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .m-icon svg{width:15px;height:15px;display:block;fill:none;stroke:#9b62c4;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .party-head svg, .box-head svg{width:16px;height:16px;display:block;fill:none;stroke:#9b62c4;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
   .reg-details{
     margin-top:10px;
     font-size:12px;

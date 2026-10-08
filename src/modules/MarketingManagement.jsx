@@ -237,7 +237,7 @@ const MarketingManagement = () => {
     { label: 'Leads', value: leads.length, color: '#7c3aed' },
     { label: 'Follow Ups', value: followUps.length, color: '#a855f7' },
     { label: 'Enquiries', value: enquiries.length, color: '#c084fc' },
-    { label: 'Orders', value: orders.length, color: '#5b1c85' }
+    { label: 'Orders', value: orders.length, color: '#9b62c4' }
   ]), [leads, followUps, enquiries, orders]);
 
   const maxFunnel = Math.max(1, ...funnel.map((f) => f.value));
@@ -885,7 +885,7 @@ const MarketingManagement = () => {
                     className="mkt-donut"
                     style={{
                       background: `conic-gradient(${stats.bySource.map((s, i) => {
-                        const colors = ['#5b1c85', '#7c3aed', '#a855f7', '#c084fc', '#ddd6fe', '#f5d0fe', '#f9a8d4'];
+                        const colors = ['#9b62c4', '#7c3aed', '#a855f7', '#c084fc', '#ddd6fe', '#f5d0fe', '#f9a8d4'];
                         const start = stats.bySource.slice(0, i).reduce((a, x) => a + (x.count / sourceTotal) * 100, 0);
                         const end = start + (s.count / sourceTotal) * 100;
                         return `${colors[i % colors.length]} ${start}% ${end}%`;

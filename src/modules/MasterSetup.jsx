@@ -88,7 +88,7 @@ const MasterSetup = () => {
       onClick={() => { setActiveTab(tabId); setSearchTerm(''); setProductFilter(''); }}
       className="btn"
       style={{
-        background: activeTab === tabId ? 'rgba(91, 28, 133, 0.1)' : 'transparent',
+        background: activeTab === tabId ? 'rgba(155, 98, 196, 0.1)' : 'transparent',
         color: activeTab === tabId ? 'var(--accent-primary)' : 'var(--text-muted)',
         border: activeTab === tabId ? '1px solid var(--accent-primary)' : '1px solid transparent',
         flex: 1

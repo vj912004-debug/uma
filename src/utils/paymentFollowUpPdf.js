@@ -41,10 +41,10 @@ export const buildPaymentFollowUpStatementHtml = ({
 <title>UMA MICRON - Payment Follow-Up Statement</title>
 <style>
   :root{
-    --purple:#3d2b7d;
-    --purple-dark:#2f2263;
-    --lav-bg:#efeaf7;
-    --lav-border:#c9bce8;
+    --purple:#9b62c4;
+    --purple-dark:#73399e;
+    --lav-bg:#F6F0FA;
+    --lav-border:#d6c2e8;
     --green:#2fa84f;
     --text:#231f20;
   }

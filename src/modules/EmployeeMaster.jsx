@@ -424,7 +424,7 @@ const EmployeeMaster = () => {
       {/* Header Bar */}
       <header style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '1.25rem 1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ background: 'rgba(91, 28, 133, 0.1)', color: 'var(--accent-primary)', width: 42, height: 42, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'rgba(155, 98, 196, 0.1)', color: 'var(--accent-primary)', width: 42, height: 42, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Users size={22} />
           </div>
           <div>
@@ -529,7 +529,7 @@ const EmployeeMaster = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 1rem', minWidth: '200px' }}>
-          <Briefcase size={18} color="#5b1c85" />
+          <Briefcase size={18} color="#9b62c4" />
           <SearchableSelect className="input-field" value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} placeholder="All Departments" style={{ border: 'none', background: 'transparent', padding: '0.85rem', width: '100%', outline: 'none', fontSize: '0.9rem' }}>
             <option value="">All Departments</option>
             {departmentOptions.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -538,7 +538,7 @@ const EmployeeMaster = () => {
 
         {/* Mapping Status Filter Dropdown Box */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 1rem', minWidth: '200px' }}>
-          <CheckSquare size={18} color={mappingFilter === 'mapped' ? '#047857' : mappingFilter === 'unmapped' ? '#dc2626' : '#5b1c85'} />
+          <CheckSquare size={18} color={mappingFilter === 'mapped' ? '#047857' : mappingFilter === 'unmapped' ? '#dc2626' : '#9b62c4'} />
           <SearchableSelect
             className="input-field"
             allowCustom={false}
@@ -611,7 +611,7 @@ const EmployeeMaster = () => {
                 width: '72px',
                 height: '72px',
                 borderRadius: '50%',
-                background: 'rgba(91, 28, 133, 0.12)',
+                background: 'rgba(155, 98, 196, 0.12)',
                 color: 'var(--accent-primary)',
                 display: 'flex',
                 alignItems: 'center',
@@ -1064,7 +1064,7 @@ const EmployeeMaster = () => {
                       {ALL_MODULES.map((m) => {
                         const isChecked = (form.permissions || []).includes(m.id);
                         return (
-                          <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', padding: '0.5rem', borderRadius: '6px', background: isChecked ? 'rgba(91, 28, 133, 0.05)' : 'transparent', border: '1px solid var(--border-color)' }}>
+                          <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', padding: '0.5rem', borderRadius: '6px', background: isChecked ? 'rgba(155, 98, 196, 0.05)' : 'transparent', border: '1px solid var(--border-color)' }}>
                             <input
                               type="checkbox"
                               checked={isChecked}
@@ -1165,7 +1165,7 @@ const EmployeeMaster = () => {
                       <td><strong>{u.employeeId || '—'}</strong></td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(91, 28, 133, 0.1)', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.75rem' }}>
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(155, 98, 196, 0.1)', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.75rem' }}>
                             {u.name ? u.name.charAt(0).toUpperCase() : 'E'}
                           </div>
                           <span>{u.name || u.username}</span>

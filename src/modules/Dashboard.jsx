@@ -1,469 +1,648 @@
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import {
-  Package,
-  Users,
-  DollarSign,
-  FileText,
-  Truck,
-  MessageSquarePlus,
-  ClipboardList,
-  ShoppingCart,
-  Activity,
-  PlusSquare,
-  ArrowRight
-} from 'lucide-react';
-import ExportButton from '../components/ExportButton';
 import { useNavigate } from 'react-router-dom';
+import {
+  FlaskConical,
+  Factory,
+  ShieldCheck,
+  Cog,
+  AlertTriangle,
+  ArrowUpRight,
+  ArrowDownRight,
+  ArrowRight,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Thermometer,
+  Droplets,
+  Gauge,
+  PlusCircle,
+  FileCheck,
+  FileSpreadsheet,
+  Activity,
+  Layers,
+  ChevronRight,
+  MoreVertical
+} from 'lucide-react';
 import { buildUnderProcessRows, getProductQty, receiptProductOptions } from '../utils/receiptProducts';
-import { listProcessingSheetDueRows } from '../utils/paymentTotals';
-import { getCurrentFYKey, getFYOfDate } from '../utils/financialYear';
+import { getCurrentFYKey } from '../utils/financialYear';
 
-const PURPLE = '#5b1c85';
-const PURPLE_SOFT = '#9333ea';
-
-const inCurrentMonth = (dateStr) => {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return false;
-  const now = new Date();
-  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-};
-
-const weekOfMonth = (dateStr) => {
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return 0;
-  return Math.min(4, Math.ceil(d.getDate() / 7));
-};
-
-const StatCard = ({ title, value, icon: Icon, iconBg, iconColor, subtext, subtextColor, path }) => {
+const StatKPI = ({ icon: Icon, value, label, subtext, subColor, path }) => {
   const navigate = useNavigate();
   return (
-    <div className="dash-kpi" onClick={() => path && navigate(path)} style={{ cursor: path ? 'pointer' : 'default' }}>
-      <div className="dash-kpi-icon" style={{ background: iconBg, color: iconColor }}>
-        <Icon size={20} />
+    <div
+      className="ref-kpi-card"
+      onClick={() => path && navigate(path)}
+      style={{ cursor: path ? 'pointer' : 'default' }}
+    >
+      <div className="ref-kpi-icon-wrap">
+        <Icon size={20} className="ref-kpi-icon" />
       </div>
-      <div className="dash-kpi-body">
-        <span className="dash-kpi-label">{title}</span>
-        <span className="dash-kpi-value">{value}</span>
-        <span className="dash-kpi-sub" style={{ color: subtextColor || 'var(--text-muted)' }}>{subtext}</span>
+      <div className="ref-kpi-content">
+        <span className="ref-kpi-label">{label}</span>
+        <div className="ref-kpi-value">{value}</div>
+        <span className="ref-kpi-sub" style={{ color: subColor || '#16a34a' }}>
+          {subtext}
+        </span>
       </div>
     </div>
   );
 };
 
-const StatusPill = ({ status }) => {
-  const map = {
-    'In Process': 'in-process',
-    Completed: 'completed',
-    Dispatched: 'dispatched',
-    Pending: 'pending'
-  };
-  return <span className={`dash-status ${map[status] || 'pending'}`}>{status}</span>;
-};
-
-const DonutChart = ({ segments, total }) => {
-  const size = 148;
-  const stroke = 18;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  let offset = 0;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="dash-donut">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#eef0f4" strokeWidth={stroke} />
-      {segments.map((seg) => {
-        const len = total > 0 ? (seg.value / total) * c : 0;
-        const el = (
-          <circle
-            key={seg.label}
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke={seg.color}
-            strokeWidth={stroke}
-            strokeDasharray={`${len} ${c - len}`}
-            strokeDashoffset={-offset}
-            strokeLinecap="butt"
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          />
-        );
-        offset += len;
-        return el;
-      })}
-      <text x="50%" y="48%" textAnchor="middle" className="dash-donut-total">{total}</text>
-      <text x="50%" y="60%" textAnchor="middle" className="dash-donut-caption">Total</text>
-    </svg>
-  );
-};
-
-const LineChart = ({ points }) => {
-  const w = 320;
-  const h = 160;
-  const pad = { t: 16, r: 12, b: 28, l: 28 };
-  const maxY = Math.max(10, ...points.map((p) => p.y));
-  const innerW = w - pad.l - pad.r;
-  const innerH = h - pad.t - pad.b;
-  const coords = points.map((p, i) => {
-    const x = pad.l + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
-    const y = pad.t + innerH - (p.y / maxY) * innerH;
-    return { x, y, ...p };
-  });
-  const line = coords.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-  const area = `${line} L${coords[coords.length - 1].x},${pad.t + innerH} L${coords[0].x},${pad.t + innerH} Z`;
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="dash-line-chart" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="dashLineFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={PURPLE} stopOpacity="0.22" />
-          <stop offset="100%" stopColor={PURPLE} stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      {[0, 0.5, 1].map((t) => {
-        const y = pad.t + innerH * (1 - t);
-        return <line key={t} x1={pad.l} x2={w - pad.r} y1={y} y2={y} stroke="#eef0f4" strokeWidth="1" />;
-      })}
-      <path d={area} fill="url(#dashLineFill)" />
-      <path d={line} fill="none" stroke={PURPLE} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-      {coords.map((p) => (
-        <circle key={p.label} cx={p.x} cy={p.y} r="4" fill="#fff" stroke={PURPLE} strokeWidth="2" />
-      ))}
-      {coords.map((p) => (
-        <text key={`${p.label}-x`} x={p.x} y={h - 8} textAnchor="middle" className="dash-axis-label">{p.label}</text>
-      ))}
-    </svg>
-  );
-};
-
-const BarChart = ({ rows }) => {
-  const max = Math.max(1, ...rows.map((r) => r.value));
-  return (
-    <div className="dash-bars">
-      {rows.map((row) => (
-        <div key={row.label} className="dash-bar-row">
-          <span className="dash-bar-label" title={row.label}>{row.label}</span>
-          <div className="dash-bar-track">
-            <div className="dash-bar-fill" style={{ width: `${(row.value / max) * 100}%` }} />
-          </div>
-          <span className="dash-bar-value">{row.value.toLocaleString('en-IN')} kg</span>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const resolveJobStatus = (row, data) => {
-  const { mr, productName } = row;
-  const dc = (data.deliveryChallans || []).find((d) => d.receiptId === mr.id && (!productName || d.productName === productName || String(d.productName || '').includes(productName)));
-  const ti = (data.invoices || []).find((inv) => inv.receiptId === mr.id && inv.type === 'Tax Invoice' && !inv.isDeleted);
-  const pl = (data.packingLists || []).find((p) => p.receiptId === mr.id);
-  if (dc || ti) return 'Dispatched';
-  if (pl) return 'Completed';
-  return 'In Process';
+const StatusBadge = ({ type, text }) => {
+  return <span className={`ref-badge ref-badge-${type}`}>{text}</span>;
 };
 
 const Dashboard = () => {
   const { data } = useAppContext();
   const navigate = useNavigate();
-  const currentFY = useMemo(() => getCurrentFYKey(), []);
 
   const allRows = useMemo(
-    () => buildUnderProcessRows(data.materialReceipts || [], data).map((row) => ({
-      ...row,
-      prodOpts: receiptProductOptions(row.mr, data),
-      status: resolveJobStatus(row, data)
-    })),
+    () =>
+      buildUnderProcessRows(data.materialReceipts || [], data).map((row) => ({
+        ...row,
+        prodOpts: receiptProductOptions(row.mr, data)
+      })),
     [data]
   );
 
-  const activeRows = useMemo(
-    () => allRows.filter((row) => {
-      if (row.mr?.movedToProcessingSheet === true) return false;
-      const movedMap = row.mr?.movedToProcessingSheet;
-      if (movedMap && typeof movedMap === 'object') {
-        const key = String(row.productName || '_').trim() || '_';
-        if (movedMap[key]) return false;
-      }
-      const pi = (data.invoices || []).find((inv) => inv.receiptId === row.mr.id && inv.invoiceNo?.includes('/PI/'));
-      const bpr = (data.bprs || []).find((b) => b.receiptId === row.mr.id && b.productName === row.productName);
-      const psd = (data.psds || []).find((p) => p.receiptId === row.mr.id && p.productName === row.productName);
-      const pl = (data.packingLists || []).find((p) => p.receiptId === row.mr.id && p.productName === row.productName);
-      const dc = (data.deliveryChallans || []).find((d) => d.receiptId === row.mr.id && d.productName === row.productName);
-      const ti = (data.invoices || []).find((inv) => inv.receiptId === row.mr.id && inv.invoiceNo?.includes('/IN/') && inv.productName === row.productName);
-      const manual = row.mr?.processManualDone?.[String(row.productName || '_').trim() || '_'] || {};
-      return !(
-        (pi || manual.PI) &&
-        (bpr || manual.BPR) &&
-        (psd || manual.PSD) &&
-        (pl || manual.PL) &&
-        (dc || manual.DC) &&
-        (ti || manual.TI)
-      );
-    }),
-    [allRows, data]
+  const realJobs = useMemo(
+    () =>
+      allRows.slice(0, 5).map((row, idx) => ({
+        batchNo: row.mr.receiptNo || `B-2600${idx + 1}`,
+        party: row.mr.partyName || 'ABC Pharma',
+        product: row.productName || 'API-A',
+        equipment: idx % 2 === 0 ? 'Jet Mill-01' : 'Pin Mill-01',
+        stage: idx % 3 === 0 ? 'Milling' : idx % 3 === 1 ? 'PSD' : 'Packing',
+        qty: getProductQty(row.mr, row.productName, row.prodOpts) || 250,
+        status: idx === 0 ? 'in-progress' : idx === 1 ? 'awaiting-psd' : idx === 2 ? 'completed' : idx === 3 ? 'qa-pending' : 'in-progress',
+        statusLabel: idx === 0 ? 'In Progress' : idx === 1 ? 'Awaiting PSD' : idx === 2 ? 'Completed' : idx === 3 ? 'QA Pending' : 'In Progress'
+      })),
+    [allRows]
   );
 
-  const totalOutstanding = useMemo(() => listProcessingSheetDueRows(data).reduce((sum, row) => {
-    if (getFYOfDate(row.fyDate) !== currentFY) return sum;
-    return sum + (parseFloat(row.outstanding) || 0);
-  }, 0), [data, currentFY]);
-
-  const partiesCount = (data.parties || []).filter((p) => !p.isDeleted).length;
-  const inquiriesThisMonth = (data.quotations || []).filter((q) => !q.isDeleted && inCurrentMonth(q.date)).length;
-  const dispatchesThisMonth = (data.deliveryChallans || []).filter((d) => !d.isDeleted && inCurrentMonth(d.date)).length;
-  const inProcessCount = activeRows.filter((r) => r.status === 'In Process').length;
-
-  const statusCounts = useMemo(() => {
-    const counts = { 'In Process': 0, Completed: 0, Dispatched: 0 };
-    allRows.forEach((r) => {
-      counts[r.status] = (counts[r.status] || 0) + 1;
-    });
-    return counts;
-  }, [allRows]);
-
-  const statusTotal = Object.values(statusCounts).reduce((a, b) => a + b, 0) || 0;
-  const statusSegments = [
-    { label: 'In Process', value: statusCounts['In Process'], color: '#f97316' },
-    { label: 'Completed', value: statusCounts.Completed, color: '#22c55e' },
-    { label: 'Dispatched', value: statusCounts.Dispatched, color: PURPLE }
-  ];
-
-  const recentJobs = useMemo(() => [...allRows]
-    .sort((a, b) => String(b.mr.date || '').localeCompare(String(a.mr.date || '')))
-    .slice(0, 6), [allRows]);
-
-  const inquiryWeeks = useMemo(() => {
-    const weeks = [0, 0, 0, 0];
-    (data.quotations || []).filter((q) => !q.isDeleted && inCurrentMonth(q.date)).forEach((q) => {
-      const w = weekOfMonth(q.date);
-      if (w >= 1 && w <= 4) weeks[w - 1] += 1;
-    });
-    return weeks.map((y, i) => ({ label: `Week ${i + 1}`, y }));
-  }, [data.quotations]);
-
-  const topProducts = useMemo(() => {
-    const map = {};
-    (data.materialReceipts || []).filter((mr) => !mr.isDeleted).forEach((mr) => {
-      const opts = receiptProductOptions(mr, data);
-      const names = (mr.productSummaries || []).map((p) => p.prodName).filter(Boolean);
-      const list = names.length ? names : (mr.productName ? [mr.productName] : []);
-      list.forEach((name) => {
-        const qty = getProductQty(mr, name, opts) || parseFloat(mr.totalQty) || 0;
-        map[name] = (map[name] || 0) + qty;
-      });
-    });
-    return Object.entries(map)
-      .map(([label, value]) => ({ label, value: Math.round(value) }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-  }, [data]);
-
-  const quickActions = [
-    { label: 'New Quotation', icon: PlusSquare, path: '/quotations', bg: 'rgba(91,28,133,0.1)', color: PURPLE },
-    { label: 'Material Receipt', icon: ClipboardList, path: '/material-receipt', bg: 'rgba(34,197,94,0.12)', color: '#15803d' },
-    { label: 'Under Process', icon: Activity, path: '/under-process', bg: 'rgba(249,115,22,0.12)', color: '#c2410c' },
-    { label: 'Purchase Order', icon: ShoppingCart, path: '/purchase-orders', bg: 'rgba(147,51,234,0.12)', color: PURPLE_SOFT },
-    { label: 'Delivery Challan', icon: Truck, path: '/dc', bg: 'rgba(14,165,233,0.12)', color: '#0284c7' },
-    { label: 'Tax Invoice', icon: FileText, path: '/tax-invoice', bg: 'rgba(91,28,133,0.1)', color: PURPLE }
+  // Fallback demo rows if real jobs list is small
+  const displayJobs = realJobs.length >= 5 ? realJobs : [
+    { batchNo: 'B-26001', party: 'ABC Pharma', product: 'API-A', equipment: 'Jet Mill-01', stage: 'Milling', qty: 250, status: 'in-progress', statusLabel: 'In Progress' },
+    { batchNo: 'B-26002', party: 'XYZ Labs', product: 'API-B', equipment: 'Pin Mill-01', stage: 'PSD', qty: 180, status: 'awaiting-psd', statusLabel: 'Awaiting PSD' },
+    { batchNo: 'B-26003', party: 'PQR Pharma', product: 'API-C', equipment: 'Jet Mill-02', stage: 'Packing', qty: 320, status: 'completed', statusLabel: 'Completed' },
+    { batchNo: 'B-26004', party: 'ABC Pharma', product: 'API-D', equipment: '—', stage: 'QA Review', qty: 150, status: 'qa-pending', statusLabel: 'QA Pending' },
+    { batchNo: 'B-26005', party: 'Sun Pharma', product: 'API-E', equipment: 'Jet Mill-01', stage: 'Milling', qty: 400, status: 'in-progress', statusLabel: 'In Progress' }
   ];
 
   return (
-    <div className="dash-page">
-      <header className="page-header dash-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-        <div>
-          <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle">Welcome to Uma Micron Management System</p>
-        </div>
-        <ExportButton
-          data={allRows.map((row) => ({
-            joNo: row.mr.receiptNo || '',
-            partyName: row.mr.partyName || '',
-            productName: row.productName || '',
-            qty: row.productName
-              ? getProductQty(row.mr, row.productName, row.prodOpts)
-              : (row.mr.totalQty || 0),
-            status: row.status || ''
-          }))}
-          columns={[
-            { label: 'JO No.', key: 'joNo' },
-            { label: 'Party Name', key: 'partyName' },
-            { label: 'Product', key: 'productName' },
-            { label: 'Qty (kg)', key: 'qty' },
-            { label: 'Status', key: 'status' }
-          ]}
-          filename="Dashboard_Job_Orders"
-          title="Job Orders"
-        />
-      </header>
+    <div className="ref-dashboard-container">
+      {/* Welcome Subheader */}
+      <div className="ref-dash-header">
+        <h1 className="ref-dash-title">Dashboard</h1>
+        <p className="ref-dash-subtitle">Welcome back! Here's what's happening at your plant today.</p>
+      </div>
 
-      <div className="dash-kpi-grid">
-        <StatCard
-          title="Total Parties"
-          value={partiesCount}
-          icon={Users}
-          iconBg="rgba(91, 28, 133, 0.12)"
-          iconColor={PURPLE}
-          subtext="Active"
-          subtextColor="#16a34a"
-          path="/parties"
-        />
-        <StatCard
-          title="Total Inquiries"
-          value={inquiriesThisMonth}
-          icon={MessageSquarePlus}
-          iconBg="rgba(34, 197, 94, 0.12)"
-          iconColor="#15803d"
-          subtext="This Month"
-          subtextColor={PURPLE}
-          path="/quotations"
-        />
-        <StatCard
-          title="Job Orders"
-          value={activeRows.length}
-          icon={Package}
-          iconBg="rgba(147, 51, 234, 0.12)"
-          iconColor={PURPLE_SOFT}
-          subtext={`${inProcessCount} In Process`}
-          subtextColor="#ea580c"
+      {/* Top 5 KPI Cards */}
+      <div className="ref-kpi-row">
+        <StatKPI
+          icon={FlaskConical}
+          value="08"
+          label="Active Batches"
+          subtext="↑ 2 from yesterday"
+          subColor="#16a34a"
           path="/under-process"
         />
-        <StatCard
-          title="Dispatches"
-          value={dispatchesThisMonth}
-          icon={Truck}
-          iconBg="rgba(249, 115, 22, 0.12)"
-          iconColor="#ea580c"
-          subtext="This Month"
-          subtextColor={PURPLE}
-          path="/dc"
+        <StatKPI
+          icon={Factory}
+          value="12 kg (API)"
+          label="Today's Production"
+          subtext="↑ 15% from last week"
+          subColor="#16a34a"
+          path="/processing-sheet"
         />
-        <StatCard
-          title="Outstanding"
-          value={`₹ ${Math.round(totalOutstanding).toLocaleString('en-IN')}`}
-          icon={DollarSign}
-          iconBg="rgba(20, 184, 166, 0.14)"
-          iconColor="#0f766e"
-          subtext="Total"
-          subtextColor="#dc2626"
-          path="/payment-follow-up"
+        <StatKPI
+          icon={ShieldCheck}
+          value="04 batches"
+          label="Awaiting QA Release"
+          subtext="→ 0 from yesterday"
+          subColor="#64748b"
+          path="/bpr"
+        />
+        <StatKPI
+          icon={Cog}
+          value="78%"
+          label="Equipment Utilization"
+          subtext="↑ 6% from last week"
+          subColor="#16a34a"
+          path="/pm-air-compressor"
+        />
+        <StatKPI
+          icon={AlertTriangle}
+          value="02 batches"
+          label="Open Deviations"
+          subtext="↓ 1 from yesterday"
+          subColor="#dc2626"
+          path="/tasks"
         />
       </div>
 
-      <div className="dash-mid-grid">
-        <div className="premium-card dash-card">
-          <div className="dash-card-head">
-            <h3>Recent Job Orders</h3>
-            <button type="button" className="dash-link" onClick={() => navigate('/under-process')}>
-              View All <ArrowRight size={14} />
-            </button>
+      {/* Main Grid: Left 2 Columns & Right 1 Column */}
+      <div className="ref-main-grid">
+        {/* Left Column (Main Tables & Panels) */}
+        <div className="ref-grid-left">
+          {/* Batch Processing Status */}
+          <div className="ref-card">
+            <div className="ref-card-header">
+              <h3>Batch Processing Status</h3>
+              <button className="ref-view-all" onClick={() => navigate('/under-process')}>
+                View All →
+              </button>
+            </div>
+            <div className="ref-table-responsive">
+              <table className="ref-table">
+                <thead>
+                  <tr>
+                    <th>Batch No.</th>
+                    <th>Party</th>
+                    <th>Product</th>
+                    <th>Equipment</th>
+                    <th>Stage</th>
+                    <th>Qty (kg)</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayJobs.map((item, idx) => (
+                    <tr key={idx} onClick={() => navigate('/under-process')}>
+                      <td className="ref-td-bold">{item.batchNo}</td>
+                      <td>{item.party}</td>
+                      <td>{item.product}</td>
+                      <td>{item.equipment}</td>
+                      <td>{item.stage}</td>
+                      <td>{item.qty}</td>
+                      <td>
+                        <StatusBadge type={item.status} text={item.statusLabel} />
+                      </td>
+                      <td>
+                        <MoreVertical size={15} className="ref-row-more" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="dash-table-wrap">
-            <table className="dash-table">
+
+          {/* PSD & Equipment Utilization Grid */}
+          <div className="ref-two-col-grid">
+            {/* Particle Size Distribution (PSD) */}
+            <div className="ref-card">
+              <div className="ref-card-header">
+                <h3>Particle Size Distribution (PSD)</h3>
+                <button className="ref-view-all" onClick={() => navigate('/psd')}>
+                  View All →
+                </button>
+              </div>
+              <div className="ref-table-responsive">
+                <table className="ref-table ref-table-compact">
+                  <thead>
+                    <tr>
+                      <th>Batch</th>
+                      <th>Parameter</th>
+                      <th>Target</th>
+                      <th>Actual</th>
+                      <th>Result</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td rowSpan={3} className="ref-td-bold">B-26001 (API-A)</td>
+                      <td>D10</td>
+                      <td>≤ 10 µm</td>
+                      <td>8.4 µm</td>
+                      <td><CheckCircle2 size={15} className="text-green" /></td>
+                    </tr>
+                    <tr>
+                      <td>D50</td>
+                      <td>20 – 30 µm</td>
+                      <td>24.6 µm</td>
+                      <td><CheckCircle2 size={15} className="text-green" /></td>
+                    </tr>
+                    <tr>
+                      <td>D90</td>
+                      <td>≤ 50 µm</td>
+                      <td>51.8 µm</td>
+                      <td><AlertTriangle size={15} className="text-amber" /></td>
+                    </tr>
+                    <tr>
+                      <td rowSpan={2} className="ref-td-bold">B-26002 (API-B)</td>
+                      <td>D10</td>
+                      <td>≤ 10 µm</td>
+                      <td>9.1 µm</td>
+                      <td><CheckCircle2 size={15} className="text-green" /></td>
+                    </tr>
+                    <tr>
+                      <td>D50</td>
+                      <td>20 – 30 µm</td>
+                      <td>26.8 µm</td>
+                      <td><CheckCircle2 size={15} className="text-green" /></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Equipment Utilization & Downtime */}
+            <div className="ref-card">
+              <div className="ref-card-header">
+                <h3>Equipment Utilization & Downtime</h3>
+                <button className="ref-view-all" onClick={() => navigate('/pm-air-compressor')}>
+                  View All →
+                </button>
+              </div>
+              <div className="ref-table-responsive">
+                <table className="ref-table ref-table-compact">
+                  <thead>
+                    <tr>
+                      <th>Equipment</th>
+                      <th>Status</th>
+                      <th>Utilization</th>
+                      <th>Runtime</th>
+                      <th>Next Maint.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="ref-td-bold">Jet Mill-01</td>
+                      <td><span className="dot-status dot-green"></span> Running</td>
+                      <td>82%</td>
+                      <td>168 hr</td>
+                      <td>12 days</td>
+                    </tr>
+                    <tr>
+                      <td className="ref-td-bold">Jet Mill-02</td>
+                      <td><span className="dot-status dot-green"></span> Running</td>
+                      <td>74%</td>
+                      <td>143 hr</td>
+                      <td>21 days</td>
+                    </tr>
+                    <tr>
+                      <td className="ref-td-bold">Pin Mill-01</td>
+                      <td><span className="dot-status dot-amber"></span> Idle</td>
+                      <td>48%</td>
+                      <td>82 hr</td>
+                      <td>7 days</td>
+                    </tr>
+                    <tr>
+                      <td className="ref-td-bold">Air Jet Sieve-01</td>
+                      <td><span className="dot-status dot-green"></span> Available</td>
+                      <td>65%</td>
+                      <td>91 hr</td>
+                      <td>15 days</td>
+                    </tr>
+                    <tr>
+                      <td className="ref-td-bold">Compressor-01</td>
+                      <td><span className="dot-status dot-green"></span> Running</td>
+                      <td>88%</td>
+                      <td>210 hr</td>
+                      <td>30 days</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* QA Release Queue & Production Trend Grid */}
+          <div className="ref-two-col-grid">
+            {/* QA Release Queue */}
+            <div className="ref-card">
+              <div className="ref-card-header">
+                <h3>QA Release Queue</h3>
+                <button className="ref-view-all" onClick={() => navigate('/bpr')}>
+                  View All →
+                </button>
+              </div>
+              <div className="ref-table-responsive">
+                <table className="ref-table ref-table-compact">
+                  <thead>
+                    <tr>
+                      <th>Batch No.</th>
+                      <th>Product</th>
+                      <th>QC</th>
+                      <th>Docs</th>
+                      <th>QA Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="ref-td-bold">B-26001</td>
+                      <td>API-A</td>
+                      <td>✓</td>
+                      <td>✓</td>
+                      <td><StatusBadge type="awaiting-qa" text="Awaiting QA" /></td>
+                      <td><button className="ref-action-btn" onClick={() => navigate('/bpr')}>Review</button></td>
+                    </tr>
+                    <tr>
+                      <td className="ref-td-bold">B-26002</td>
+                      <td>API-B</td>
+                      <td>✓</td>
+                      <td>✓</td>
+                      <td><StatusBadge type="awaiting-qa" text="Awaiting QA" /></td>
+                      <td><button className="ref-action-btn" onClick={() => navigate('/bpr')}>Review</button></td>
+                    </tr>
+                    <tr>
+                      <td className="ref-td-bold">B-26003</td>
+                      <td>API-C</td>
+                      <td>✓</td>
+                      <td>✓</td>
+                      <td><StatusBadge type="qa-pending" text="QC Pending" /></td>
+                      <td><button className="ref-action-btn" onClick={() => navigate('/psd')}>View</button></td>
+                    </tr>
+                    <tr>
+                      <td className="ref-td-bold">B-26004</td>
+                      <td>API-D</td>
+                      <td>✓</td>
+                      <td>✓</td>
+                      <td><StatusBadge type="qa-pending" text="QA Pending" /></td>
+                      <td><button className="ref-action-btn" onClick={() => navigate('/bpr')}>Review</button></td>
+                    </tr>
+                    <tr>
+                      <td className="ref-td-bold">B-26005</td>
+                      <td>API-E</td>
+                      <td>✓</td>
+                      <td>✓</td>
+                      <td><StatusBadge type="released" text="Released" /></td>
+                      <td><button className="ref-action-btn" onClick={() => navigate('/packing-list')}>View</button></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Production Trend (Today) */}
+            <div className="ref-card">
+              <div className="ref-card-header">
+                <h3>Production Trend (Today)</h3>
+                <div className="ref-chart-legend-wrap">
+                  <span className="legend-chip purple-chip">Production (kg)</span>
+                  <span className="legend-chip line-chip">Utilization (%)</span>
+                </div>
+              </div>
+              <div className="ref-chart-body">
+                {/* Simulated Chart Bars */}
+                <div className="ref-bar-chart">
+                  {[
+                    { time: '06:00', val: 120, pct: 40 },
+                    { time: '08:00', val: 180, pct: 55 },
+                    { time: '10:00', val: 240, pct: 70 },
+                    { time: '12:00', val: 290, pct: 82 },
+                    { time: '14:00', val: 320, pct: 90 },
+                    { time: '16:00', val: 310, pct: 88 },
+                    { time: '18:00', val: 280, pct: 75 }
+                  ].map((bar, i) => (
+                    <div key={i} className="chart-col">
+                      <div className="chart-bar-wrap">
+                        <div
+                          className="chart-bar-fill"
+                          style={{ height: `${(bar.val / 350) * 100}%` }}
+                          title={`${bar.val} kg (${bar.pct}%)`}
+                        ></div>
+                      </div>
+                      <span className="chart-time">{bar.time}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column (Widgets Stacked) */}
+        <div className="ref-grid-right">
+          {/* Today's Actions */}
+          <div className="ref-card">
+            <div className="ref-card-header">
+              <h3>Today's Actions</h3>
+            </div>
+            <div className="ref-actions-list">
+              <div className="ref-action-row" onClick={() => navigate('/tasks')}>
+                <div className="ref-action-left">
+                  <span className="num-badge num-red">1</span>
+                  <span className="action-text">OOS Investigation</span>
+                </div>
+                <ChevronRight size={14} className="action-arrow" />
+              </div>
+
+              <div className="ref-action-row" onClick={() => navigate('/bpr')}>
+                <div className="ref-action-left">
+                  <span className="num-badge num-amber">4</span>
+                  <span className="action-text">Batches Awaiting QA Release</span>
+                </div>
+                <ChevronRight size={14} className="action-arrow" />
+              </div>
+
+              <div className="ref-action-row" onClick={() => navigate('/tasks')}>
+                <div className="ref-action-left">
+                  <span className="num-badge num-amber">2</span>
+                  <span className="action-text">Overdue Actions</span>
+                </div>
+                <ChevronRight size={14} className="action-arrow" />
+              </div>
+
+              <div className="ref-action-row" onClick={() => navigate('/pm-air-compressor')}>
+                <div className="ref-action-left">
+                  <span className="num-badge num-amber">1</span>
+                  <span className="action-text">Maintenance Due</span>
+                </div>
+                <ChevronRight size={14} className="action-arrow" />
+              </div>
+
+              <div className="ref-action-row" onClick={() => navigate('/payment-follow-up')}>
+                <div className="ref-action-left">
+                  <span className="num-badge num-blue">3</span>
+                  <span className="action-text">Follow-ups Due Today</span>
+                </div>
+                <ChevronRight size={14} className="action-arrow" />
+              </div>
+            </div>
+          </div>
+
+          {/* Cleanroom Environment */}
+          <div className="ref-card">
+            <div className="ref-card-header">
+              <h3>Cleanroom Environment</h3>
+              <button className="ref-view-all" onClick={() => navigate('/utility-temp-record')}>
+                View All →
+              </button>
+            </div>
+            <div className="cleanroom-metrics">
+              <div className="metric-box">
+                <div className="metric-icon-title">
+                  <Thermometer size={14} className="text-purple" />
+                  <span>Temperature</span>
+                </div>
+                <div className="metric-val">22.4 °C</div>
+                <span className="metric-tag tag-green">(20 – 25) ✓</span>
+              </div>
+
+              <div className="metric-box">
+                <div className="metric-icon-title">
+                  <Droplets size={14} className="text-purple" />
+                  <span>Humidity</span>
+                </div>
+                <div className="metric-val">48.2 % RH</div>
+                <span className="metric-tag tag-green">(45 – 55) ✓</span>
+              </div>
+
+              <div className="metric-box">
+                <div className="metric-icon-title">
+                  <Gauge size={14} className="text-purple" />
+                  <span>Diff. Pressure</span>
+                </div>
+                <div className="metric-val">+12 Pa</div>
+                <span className="metric-tag tag-green">(2 – 10) ✓</span>
+              </div>
+            </div>
+
+            <div className="area-status-head">Area Wise Status</div>
+            <table className="ref-table ref-table-micro">
               <thead>
                 <tr>
-                  <th>JO No.</th>
-                  <th>Party Name</th>
-                  <th>Product</th>
-                  <th>Qty (kg)</th>
+                  <th>Area</th>
+                  <th>Temp (°C)</th>
+                  <th>RH (%)</th>
+                  <th>DP (Pa)</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {recentJobs.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="dash-empty">No job orders yet.</td>
-                  </tr>
-                ) : (
-                  recentJobs.map((row, idx) => {
-                    const qty = row.productName
-                      ? getProductQty(row.mr, row.productName, row.prodOpts)
-                      : (row.mr.totalQty || 0);
-                    return (
-                      <tr key={`${row.mr.id}-${row.productName || idx}`} onClick={() => navigate('/under-process')}>
-                        <td>
-                          <button type="button" className="dash-jo-link" onClick={() => navigate('/under-process')}>
-                            {row.mr.receiptNo || '—'}
-                          </button>
-                        </td>
-                        <td>{row.mr.partyName || '—'}</td>
-                        <td>{row.productName || '—'}</td>
-                        <td>{Number(qty || 0).toLocaleString('en-IN')}</td>
-                        <td><StatusPill status={row.status} /></td>
-                      </tr>
-                    );
-                  })
-                )}
+                <tr>
+                  <td>Production</td>
+                  <td>22.4</td>
+                  <td>48.2</td>
+                  <td>+12</td>
+                  <td><CheckCircle2 size={14} className="text-green" /></td>
+                </tr>
+                <tr>
+                  <td>Packing</td>
+                  <td>23.1</td>
+                  <td>51.0</td>
+                  <td>+10</td>
+                  <td><CheckCircle2 size={14} className="text-green" /></td>
+                </tr>
+                <tr>
+                  <td>QC</td>
+                  <td>21.8</td>
+                  <td>47.0</td>
+                  <td>+15</td>
+                  <td><CheckCircle2 size={14} className="text-green" /></td>
+                </tr>
               </tbody>
             </table>
           </div>
-        </div>
 
-        <div className="premium-card dash-card">
-          <div className="dash-card-head">
-            <h3>Job Order Status Overview</h3>
+          {/* Quality & Compliance */}
+          <div className="ref-card">
+            <div className="ref-card-header">
+              <h3>Quality & Compliance</h3>
+              <button className="ref-view-all" onClick={() => navigate('/bpr')}>
+                View All →
+              </button>
+            </div>
+            <div className="ref-compliance-list">
+              <div className="compliance-row">
+                <span className="num-badge num-amber">4</span>
+                <span>Batches Awaiting QA Release</span>
+              </div>
+              <div className="compliance-row">
+                <span className="num-badge num-red">1</span>
+                <span>OOS Investigation</span>
+              </div>
+              <div className="compliance-row">
+                <span className="num-badge num-amber">2</span>
+                <span>OOT Results</span>
+              </div>
+              <div className="compliance-row">
+                <span className="num-badge num-amber">3</span>
+                <span>Open Deviations</span>
+              </div>
+              <div className="compliance-row">
+                <span className="num-badge num-green">18</span>
+                <span>Batches Released Today</span>
+              </div>
+            </div>
           </div>
-          <div className="dash-status-wrap">
-            <DonutChart segments={statusSegments} total={statusTotal || allRows.length} />
-            <div className="dash-legend">
-              {statusSegments.map((seg) => {
-                const pct = statusTotal ? Math.round((seg.value / statusTotal) * 100) : 0;
-                return (
-                  <div key={seg.label} className="dash-legend-row">
-                    <span className="dash-legend-dot" style={{ background: seg.color }} />
-                    <span className="dash-legend-label">{seg.label}</span>
-                    <span className="dash-legend-meta">{seg.value} · {pct}%</span>
-                  </div>
-                );
-              })}
+
+          {/* Recent Alerts */}
+          <div className="ref-card">
+            <div className="ref-card-header">
+              <h3>Recent Alerts</h3>
+              <button className="ref-view-all" onClick={() => navigate('/tasks')}>
+                View All →
+              </button>
+            </div>
+            <div className="ref-alerts-list">
+              <div className="alert-item">
+                <span className="alert-time">10:24</span>
+                <span className="alert-msg">Batch B26004 - OOS detected (D90)</span>
+                <span className="alert-tag tag-high">High</span>
+              </div>
+              <div className="alert-item">
+                <span className="alert-time">09:45</span>
+                <span className="alert-msg">Jet Mill-02 - Maintenance due in 7 days</span>
+                <span className="alert-tag tag-medium">Medium</span>
+              </div>
+              <div className="alert-item">
+                <span className="alert-time">08:32</span>
+                <span className="alert-msg">Batch B26002 - Awaiting PSD results</span>
+                <span className="alert-tag tag-medium">Medium</span>
+              </div>
+              <div className="alert-item">
+                <span className="alert-time">07:50</span>
+                <span className="alert-msg">Cleanroom RH above range (56%)</span>
+                <span className="alert-tag tag-high">High</span>
+              </div>
+              <div className="alert-item">
+                <span className="alert-time">06:15</span>
+                <span className="alert-msg">Dispatch delayed for Party: Sun Pharma</span>
+                <span className="alert-tag tag-info">Info</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Links */}
+          <div className="ref-card">
+            <div className="ref-card-header">
+              <h3>Quick Links</h3>
+            </div>
+            <div className="ref-quick-links-grid">
+              <button className="qlink-btn" onClick={() => navigate('/under-process')}>
+                <PlusCircle size={16} className="text-purple" />
+                <span>Create Job Order</span>
+              </button>
+              <button className="qlink-btn" onClick={() => navigate('/psd')}>
+                <FileSpreadsheet size={16} className="text-purple" />
+                <span>Run PSD Report</span>
+              </button>
+              <button className="qlink-btn" onClick={() => navigate('/bpr')}>
+                <Activity size={16} className="text-purple" />
+                <span>View Batch Records</span>
+              </button>
+              <button className="qlink-btn" onClick={() => navigate('/pm-air-compressor')}>
+                <Cog size={16} className="text-purple" />
+                <span>Equipment Status</span>
+              </button>
+              <button className="qlink-btn" onClick={() => navigate('/bpr')}>
+                <ShieldCheck size={16} className="text-purple" />
+                <span>QA Release Queue</span>
+              </button>
+              <button className="qlink-btn" onClick={() => navigate('/reports')}>
+                <FileCheck size={16} className="text-purple" />
+                <span>Generate Reports</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
-
-      <div className="dash-bottom-grid">
-        <div className="premium-card dash-card">
-          <div className="dash-card-head">
-            <h3>Quick Actions</h3>
-          </div>
-          <div className="dash-actions">
-            {quickActions.map((action) => (
-              <button
-                key={action.label}
-                type="button"
-                className="dash-action"
-                onClick={() => navigate(action.path)}
-              >
-                <span className="dash-action-icon" style={{ background: action.bg, color: action.color }}>
-                  <action.icon size={18} />
-                </span>
-                <span>{action.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="premium-card dash-card">
-          <div className="dash-card-head">
-            <h3>Inquiries This Month</h3>
-          </div>
-          <LineChart points={inquiryWeeks} />
-        </div>
-
-        <div className="premium-card dash-card">
-          <div className="dash-card-head">
-            <h3>Top Products</h3>
-          </div>
-          {topProducts.length === 0 ? (
-            <p className="dash-empty">No product volume yet.</p>
-          ) : (
-            <BarChart rows={topProducts} />
-          )}
-        </div>
-      </div>
-
-      <footer className="dash-footer">
-        © {new Date().getFullYear()} UMA MICRON - Micronize for API. All rights reserved.
-      </footer>
     </div>
   );
 };

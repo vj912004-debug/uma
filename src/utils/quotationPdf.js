@@ -491,7 +491,7 @@ export const buildQuotationHtml = (data, profileInput) => {
   .company-info .line{display:flex;gap:7px;align-items:flex-start;margin-bottom:3px;}
   .company-info .icon{flex-shrink:0;width:14px;height:14px;margin-top:1px;}
   .company-info .icon svg,.meta-row .m-icon svg,.party-head svg{
-    width:14px;height:14px;display:block;fill:none;stroke:#3d2b7d;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+    width:14px;height:14px;display:block;fill:none;stroke:#9b62c4;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
   .reg-details{font-size:10.5px;line-height:1.7;flex-shrink:0;}
   .reg-row{display:grid;grid-template-columns:44px 10px auto;column-gap:4px;align-items:center;white-space:nowrap;}
   .reg-row .label{font-weight:700;color:var(--purple);}
@@ -845,12 +845,12 @@ export const buildQuotationHtml = (data, profileInput) => {
     flex-direction:column;
   }
   .bbox-head{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-shrink:0;}
-  .bbox-head svg{width:14px;height:14px;fill:#2f2263;fill:var(--purple-dark);flex-shrink:0;}
+  .bbox-head svg{width:14px;height:14px;fill:#73399e;fill:var(--purple-dark);flex-shrink:0;}
   .bbox-head h4{color:var(--purple-dark);font-size:11px;font-weight:800;letter-spacing:.2px;margin:0;}
   .bbox ol{list-style:none;counter-reset:bbox;padding-left:0;font-size:10px;line-height:1.5;color:#231f20;margin:0;flex:1 1 auto;
     word-spacing:normal;letter-spacing:normal;white-space:normal;overflow:visible;}
   .bbox ol li{counter-increment:bbox;position:relative;padding-left:18px;color:#231f20;opacity:1;-webkit-text-fill-color:#231f20;margin:0;}
-  .bbox ol li::before{content:counter(bbox) ".";position:absolute;left:0;top:0;font-weight:700;color:#2f2263;-webkit-text-fill-color:#2f2263;}
+  .bbox ol li::before{content:counter(bbox) ".";position:absolute;left:0;top:0;font-weight:700;color:#73399e;-webkit-text-fill-color:#73399e;}
   .bbox ol li + li{margin-top:6px;}
   .sign2{
     text-align:right;margin:6px 0 4px auto;padding:0;flex-shrink:0;

@@ -866,7 +866,7 @@ export const buildBprHtml = (data, profileInput) => {
     white-space:nowrap;overflow:visible;font-size:10px;
   }
   table.items tbody tr.batch-total-row td{
-    background:#f3eef9 !important;color:#4a0080 !important;font-weight:700;
+    background:#F6F0FA !important;color:#4a0080 !important;font-weight:700;
     height:${BPR_P2_ROW_PX}px;min-height:${BPR_P2_ROW_PX}px;max-height:${BPR_P2_ROW_PX}px;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
   }

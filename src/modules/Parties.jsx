@@ -342,8 +342,8 @@ const Parties = () => {
                         padding: '0.25rem 0.75rem', 
                         borderRadius: '20px', 
                         fontSize: '0.75rem',
-                        background: party.type === 'Customer' ? 'rgba(91, 28, 133, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                        color: party.type === 'Customer' ? '#5b1c85' : '#3b82f6',
+                        background: party.type === 'Customer' ? 'rgba(155, 98, 196, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                        color: party.type === 'Customer' ? '#9b62c4' : '#3b82f6',
                         fontWeight: 600
                       }}>
                         {party.type}

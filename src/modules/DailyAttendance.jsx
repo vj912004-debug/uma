@@ -346,7 +346,7 @@ const DailyAttendance = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
           <div style={{
-            background: 'rgba(91, 28, 133, 0.1)',
+            background: 'rgba(155, 98, 196, 0.1)',
             color: 'var(--accent-primary)',
             width: 44,
             height: 44,
@@ -373,7 +373,7 @@ const DailyAttendance = () => {
             className="btn btn-primary"
             onClick={handleSyncBiometric}
             disabled={syncBusy}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.65rem 1.25rem', background: '#5b1c85' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.65rem 1.25rem', background: '#9b62c4' }}
           >
             <RefreshCw size={16} className={syncBusy ? 'esm-spin' : ''} />
             {syncBusy ? 'Syncing...' : 'Sync from Biometric'}
@@ -445,7 +445,7 @@ const DailyAttendance = () => {
 
         {/* Department Filter */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem', minWidth: '170px' }}>
-          <Briefcase size={16} color="#5b1c85" />
+          <Briefcase size={16} color="#9b62c4" />
           <SearchableSelect
             className="input-field"
             value={deptFilter}
@@ -460,7 +460,7 @@ const DailyAttendance = () => {
 
         {/* Shift Filter */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem', minWidth: '140px' }}>
-          <Clock size={16} color="#5b1c85" />
+          <Clock size={16} color="#9b62c4" />
           <SearchableSelect
             className="input-field"
             allowCustom={false}
@@ -476,7 +476,7 @@ const DailyAttendance = () => {
 
         {/* Employee Type Filter */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem', minWidth: '170px' }}>
-          <Users size={16} color="#5b1c85" />
+          <Users size={16} color="#9b62c4" />
           <SearchableSelect
             className="input-field"
             allowCustom={false}
@@ -507,7 +507,7 @@ const DailyAttendance = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
         {/* Total Factory Employees Card */}
         <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '12px', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ background: 'rgba(91, 28, 133, 0.15)', color: '#5b1c85', width: 42, height: 42, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'rgba(155, 98, 196, 0.15)', color: '#9b62c4', width: 42, height: 42, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Users size={20} />
           </div>
           <div>
@@ -571,7 +571,7 @@ const DailyAttendance = () => {
                   fontSize: '0.82rem',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  background: mainTab === 'factory' ? '#5b1c85' : '#f1f5f9',
+                  background: mainTab === 'factory' ? '#9b62c4' : '#f1f5f9',
                   color: mainTab === 'factory' ? '#fff' : 'var(--text-muted)'
                 }}
               >
@@ -587,7 +587,7 @@ const DailyAttendance = () => {
                   fontSize: '0.82rem',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  background: mainTab === 'office' ? '#5b1c85' : '#f1f5f9',
+                  background: mainTab === 'office' ? '#9b62c4' : '#f1f5f9',
                   color: mainTab === 'office' ? '#fff' : 'var(--text-muted)'
                 }}
               >
@@ -636,7 +636,7 @@ const DailyAttendance = () => {
                   pageRows.map((r) => {
                     const isSelected = selectedIds.includes(r.id);
                     return (
-                      <tr key={r.id} style={{ borderBottom: '1px solid var(--border-color)', background: isSelected ? 'rgba(91, 28, 133, 0.04)' : 'transparent' }}>
+                      <tr key={r.id} style={{ borderBottom: '1px solid var(--border-color)', background: isSelected ? 'rgba(155, 98, 196, 0.04)' : 'transparent' }}>
                         <td style={{ padding: '10px 8px' }}>
                           <input
                             type="checkbox"
@@ -728,7 +728,7 @@ const DailyAttendance = () => {
           {mainTab === 'factory' && officeRows.length > 0 && (
             <div style={{ marginTop: '1.5rem', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
               <div style={{ background: '#f8fafc', padding: '0.65rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid #e2e8f0' }}>
-                <Info size={15} color="#5b1c85" />
+                <Info size={15} color="#9b62c4" />
                 <span>Office Employees (Manual Entry – Not Visible for Factory Approval)</span>
               </div>
               <div style={{ padding: '0.5rem 1rem', background: '#fafafa', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
@@ -771,7 +771,7 @@ const DailyAttendance = () => {
                       fontSize: '0.78rem',
                       fontWeight: 700,
                       cursor: 'pointer',
-                      background: page === p ? '#5b1c85' : '#fff',
+                      background: page === p ? '#9b62c4' : '#fff',
                       color: page === p ? '#fff' : 'var(--text-main)'
                     }}
                   >
@@ -810,7 +810,7 @@ const DailyAttendance = () => {
                 fontWeight: 700,
                 cursor: 'pointer',
                 background: mainTab === 'factory' ? '#fff' : 'transparent',
-                color: mainTab === 'factory' ? '#5b1c85' : 'var(--text-muted)',
+                color: mainTab === 'factory' ? '#9b62c4' : 'var(--text-muted)',
                 boxShadow: mainTab === 'factory' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
               }}
             >
@@ -828,7 +828,7 @@ const DailyAttendance = () => {
                 fontWeight: 700,
                 cursor: 'pointer',
                 background: mainTab === 'office' ? '#fff' : 'transparent',
-                color: mainTab === 'office' ? '#5b1c85' : 'var(--text-muted)',
+                color: mainTab === 'office' ? '#9b62c4' : 'var(--text-muted)',
                 boxShadow: mainTab === 'office' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
               }}
             >
@@ -839,7 +839,7 @@ const DailyAttendance = () => {
           {/* CARD 1: APPROVAL ACTIONS */}
           <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.25rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <Shield size={18} color="#5b1c85" />
+              <Shield size={18} color="#9b62c4" />
               <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
                 Approval Actions
               </h3>
@@ -852,7 +852,7 @@ const DailyAttendance = () => {
                 type="button"
                 className="btn btn-primary"
                 onClick={handleApproveSelected}
-                style={{ width: '100%', background: '#5b1c85', padding: '0.65rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                style={{ width: '100%', background: '#9b62c4', padding: '0.65rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
               >
                 <Check size={16} /> Approve Selected ({selectedIds.length})
               </button>
@@ -870,7 +870,7 @@ const DailyAttendance = () => {
           {/* CARD 2: ATTENDANCE SUMMARY */}
           <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.25rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.85rem' }}>
-              <Calendar size={18} color="#5b1c85" />
+              <Calendar size={18} color="#9b62c4" />
               <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
                 Attendance Summary
               </h3>
@@ -916,7 +916,7 @@ const DailyAttendance = () => {
           {/* CARD 3: BIOMETRIC SOURCE */}
           <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.25rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <Fingerprint size={18} color="#5b1c85" />
+              <Fingerprint size={18} color="#9b62c4" />
               <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
                 Biometric Source
               </h3>
@@ -959,7 +959,7 @@ const DailyAttendance = () => {
           <div className="modal-content" style={{ width: '520px', maxWidth: '95vw' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Calendar size={18} color="#5b1c85" />
+                <Calendar size={18} color="#9b62c4" />
                 <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
                   Attendance Detail - {viewingRow.name}
                 </h2>

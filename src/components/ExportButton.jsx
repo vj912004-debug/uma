@@ -175,7 +175,7 @@ const ExportButton = ({ data, columns, filename, title, groupBy, docType, classN
         }}
         title="Export Excel"
       >
-        <FileSpreadsheet size={16} color="#5b1c85" /> Export Excel
+        <FileSpreadsheet size={16} color="#9b62c4" /> Export Excel
       </button>
       <button
         type="button"

@@ -1109,7 +1109,7 @@ const MaterialReceipt = () => {
                           padding: '0.25rem 0.75rem', 
                           borderRadius: '20px', 
                           fontSize: '0.75rem',
-                          background: mr.status === 'Completed' ? 'rgba(91, 28, 133, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                          background: mr.status === 'Completed' ? 'rgba(155, 98, 196, 0.1)' : 'rgba(245, 158, 11, 0.1)',
                           color: mr.status === 'Completed' ? '#10b981' : '#f59e0b',
                           fontWeight: 600
                         }}>
@@ -1350,7 +1350,7 @@ const MaterialReceipt = () => {
 
                         return (
                           <div key={prod.name} style={{ border: '1px solid var(--border-color)', borderRadius: '10px', background: 'var(--bg-card)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 0.9rem', background: 'rgba(91, 28, 133, 0.08)', borderBottom: '1px solid var(--border-color)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 0.9rem', background: 'rgba(155, 98, 196, 0.08)', borderBottom: '1px solid var(--border-color)' }}>
                               <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--accent-primary)', minWidth: 0 }}>
                                 {pIdx + 1}. Product: {prod.name}
                               </div>
@@ -1588,7 +1588,7 @@ const MaterialReceipt = () => {
 
                   {receivedProducts.length > 0 && (
                     <div style={{ marginTop: '1.25rem', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden', background: 'var(--bg-card)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1rem', background: 'rgba(91, 28, 133, 0.08)', borderBottom: '1px solid var(--border-color)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1rem', background: 'rgba(155, 98, 196, 0.08)', borderBottom: '1px solid var(--border-color)' }}>
                         <FileText size={16} color="var(--accent-primary)" />
                         <div>
                           <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Applicable Charges (Common for All Products except Processing)</div>
@@ -1643,7 +1643,7 @@ const MaterialReceipt = () => {
               )}
 
               {formData.partyId && partyProducts.length > 0 && (
-                <div style={{ padding: '1rem', background: 'rgba(91, 28, 133, 0.06)', borderRadius: '8px', border: '1px solid rgba(91, 28, 133, 0.2)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ padding: '1rem', background: 'rgba(155, 98, 196, 0.06)', borderRadius: '8px', border: '1px solid rgba(155, 98, 196, 0.2)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>Receipt Grand Total</span>
                   <span style={{ fontWeight: 600 }}>{activeProductCount} Product{activeProductCount !== 1 ? 's' : ''} · {activeBatchCount} Active Batch{activeBatchCount !== 1 ? 'es' : ''} · {formData.totalDrums || 0} Drums · {(formData.totalQty || 0).toFixed(2)} Kg</span>
                 </div>

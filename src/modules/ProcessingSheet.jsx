@@ -560,7 +560,7 @@ const ProcessingSheet = () => {
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 1rem', minWidth: '220px' }}>
-          <Building2 size={18} color="#5b1c85" />
+          <Building2 size={18} color="#9b62c4" />
           <SearchableSelect 
             style={{ border: 'none', background: 'transparent', padding: '0.85rem', width: '100%', outline: 'none', fontSize: '0.9rem', color: '#475569' }}
             value={partyFilter} onChange={e => setPartyFilter(e.target.value)}
@@ -570,7 +570,7 @@ const ProcessingSheet = () => {
           </SearchableSelect>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 1rem', minWidth: '220px' }}>
-          <Package size={18} color="#5b1c85" />
+          <Package size={18} color="#9b62c4" />
           <SearchableSelect 
             style={{ border: 'none', background: 'transparent', padding: '0.85rem', width: '100%', outline: 'none', fontSize: '0.9rem', color: '#475569' }}
             value={productFilter} onChange={e => setProductFilter(e.target.value)}
@@ -656,7 +656,7 @@ const ProcessingSheet = () => {
                           onClick={() => toggleRowExpanded(row.rowKey)}
                           style={{
                             cursor: 'pointer',
-                            background: isExpanded ? 'rgba(91, 28, 133, 0.04)' : 'transparent',
+                            background: isExpanded ? 'rgba(155, 98, 196, 0.04)' : 'transparent',
                             transition: 'background 0.2s'
                           }}
                           className="hover-row"
@@ -730,7 +730,7 @@ const ProcessingSheet = () => {
                                 
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                    <div style={{ background: 'rgba(91, 28, 133, 0.1)', color: 'var(--accent-primary)', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                                    <div style={{ background: 'rgba(155, 98, 196, 0.1)', color: 'var(--accent-primary)', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
                                       {row.srNo}
                                     </div>
                                     <div>
@@ -872,7 +872,7 @@ const ProcessingSheet = () => {
             {/* Footer Metrics */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', padding: '1.25rem', background: 'var(--bg-card)', borderTop: '1px solid var(--border-color)' }}>
                <StatMini title="Total Bill Amount" value={summaryTotals.totalBill} icon={FileText} color="#3b82f6" bg="#eff6ff" />
-               <StatMini title="Total Received" value={summaryTotals.totalReceived} icon={FileCheck} color="#5b1c85" bg="var(--table-header-bg)" />
+               <StatMini title="Total Received" value={summaryTotals.totalReceived} icon={FileCheck} color="#9b62c4" bg="var(--table-header-bg)" />
                <StatMini title="Outstanding Amount" value={summaryTotals.outstanding} icon={Percent} color="#ef4444" bg="#fee2e2" />
                <StatMini title="TDS Deducted" value={summaryTotals.tds} icon={Receipt} color="#8b5cf6" bg="#f3e8ff" />
                <StatMini title="Invoices" value={String(filteredRows.length)} icon={ShieldAlert} color="#eab308" bg="#fef9c3" />
@@ -941,7 +941,7 @@ const ProcessingSheet = () => {
                 onClick={() => toggleSection('billing')}
                 style={{ background: 'var(--table-header-bg)', padding: '1rem 1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: openSections.billing ? '1px solid var(--border-color)' : 'none' }}
               >
-                <FileCheck size={18} color="#5b1c85" />
+                <FileCheck size={18} color="#9b62c4" />
                 <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem' }}>Invoice / Billing Details</span>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>({filteredRows.length} invoices)</span>
                 <button type="button" style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
@@ -1039,7 +1039,7 @@ const ProcessingSheet = () => {
             {/* Footer Metrics */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                <StatMini title="Total Bill Amount" value={summaryTotals.totalBill} icon={FileText} color="#3b82f6" bg="#eff6ff" />
-               <StatMini title="Total Received" value={summaryTotals.totalReceived} icon={FileCheck} color="#5b1c85" bg="var(--table-header-bg)" />
+               <StatMini title="Total Received" value={summaryTotals.totalReceived} icon={FileCheck} color="#9b62c4" bg="var(--table-header-bg)" />
                <StatMini title="Outstanding Amount" value={summaryTotals.outstanding} icon={Percent} color="#ef4444" bg="#fee2e2" />
                <StatMini title="TDS Deducted" value={summaryTotals.tds} icon={Receipt} color="#8b5cf6" bg="#f3e8ff" />
                <StatMini title="Invoices" value={String(filteredRows.length)} icon={ShieldAlert} color="#eab308" bg="#fef9c3" />

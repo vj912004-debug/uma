@@ -272,11 +272,11 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
 <title>UMA MICRON - Delivery Challan</title>
 <style>
   :root{
-    --purple:#3d2b7d;
-    --purple-dark:#2f2263;
-    --purple-border:#c9bce8;
-    --lav-bg:#efeaf7;
-    --lav-border:#c9bce8;
+    --purple:#9b62c4;
+    --purple-dark:#73399e;
+    --purple-border:#d6c2e8;
+    --lav-bg:#F6F0FA;
+    --lav-border:#d6c2e8;
     --orange:#f47920;
     --green:#2fa84f;
     --text:#231f20;
@@ -394,7 +394,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
   .company-info .line { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 4px; }
   .icon { color: var(--purple); flex-shrink: 0; width: 16px; height: 16px; margin-top: 1px; }
   .icon svg, .m-icon svg, .party-head svg, .box-head svg {
-    width: 16px; height: 16px; display: block; fill: none; stroke: #3d2b7d; stroke-width: 1.6;
+    width: 16px; height: 16px; display: block; fill: none; stroke: #9b62c4; stroke-width: 1.6;
     stroke-linecap: round; stroke-linejoin: round;
   }
   .reg-details { margin-top: 0; font-size: 12px; line-height: 1.7; }
@@ -458,7 +458,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
     gap: 8px;
     border-bottom: 1px solid var(--lav-border);
   }
-  .party-head svg { width: 16px; height: 16px; display: block; fill: none; stroke: #3d2b7d; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .party-head svg { width: 16px; height: 16px; display: block; fill: none; stroke: #9b62c4; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .party-body {
     padding: 8px 12px;
     font-size:12px;
@@ -629,7 +629,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
       gap: 8px;
       border-bottom: 1px solid var(--lav-border);
   }
-  .box-head svg { width: 16px; height: 16px; display: block; fill: none; stroke: #3d2b7d; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .box-head svg { width: 16px; height: 16px; display: block; fill: none; stroke: #9b62c4; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .dc-meta-card > div:not(.box-head) { padding: 4px 12px; font-size:12px; }
   .dc-meta-row { display: flex; margin-bottom: 2px; }
   .dc-meta-label { color: var(--text-black); font-weight: bold; width: 130px; flex-shrink: 0; }

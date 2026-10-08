@@ -403,7 +403,7 @@ const DeliveryChallan = () => {
                 <div style={{ gridColumn: 'span 4', borderTop: '1px solid var(--border-color)', margin: '0.5rem 0' }}></div>
 
                 {availableProducts.length > 1 && (
-                  <div style={{ gridColumn: 'span 4', marginBottom: '0.75rem', background: 'rgba(91, 28, 133, 0.04)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(91, 28, 133, 0.15)' }}>
+                  <div style={{ gridColumn: 'span 4', marginBottom: '0.75rem', background: 'rgba(155, 98, 196, 0.04)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(155, 98, 196, 0.15)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <div>
                         <label style={{ display: 'block', fontWeight: 700, fontSize: '0.9rem', color: 'var(--accent-primary)', margin: 0 }}>
@@ -466,7 +466,7 @@ const DeliveryChallan = () => {
                               background: checked ? '#fff' : 'var(--input-bg)',
                               border: `2px solid ${checked ? 'var(--accent-primary)' : 'var(--border-color)'}`,
                               borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem',
-                              boxShadow: checked ? '0 2px 6px rgba(91, 28, 133, 0.12)' : 'none',
+                              boxShadow: checked ? '0 2px 6px rgba(155, 98, 196, 0.12)' : 'none',
                               transition: 'all 0.15s ease'
                             }}
                           >

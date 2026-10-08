@@ -870,7 +870,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
             <div className="att-title-wrap">
               <span className="esm-no">3</span>
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#5b1c85' }}>Attendance View / Verification</h2>
+                <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#9b62c4' }}>Attendance View / Verification</h2>
                 <p style={{ margin: '0.2rem 0 0' }}>Date-wise logs with IN/OUT, hours, OT and daily summary</p>
               </div>
             </div>

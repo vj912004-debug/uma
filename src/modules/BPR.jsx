@@ -445,7 +445,7 @@ const BPR = () => {
                       </td>
                     </tr>
                   ))}
-                  <tr style={{ background: 'rgba(91, 28, 133, 0.1)', borderBottom: '2px solid var(--accent-primary)' }}>
+                  <tr style={{ background: 'rgba(155, 98, 196, 0.1)', borderBottom: '2px solid var(--accent-primary)' }}>
                     <td colSpan={2} style={{ padding: '0.45rem 0.35rem', textAlign: 'right', fontWeight: 800, color: 'var(--accent-primary)', fontSize: '0.8rem' }}>
                       TOTAL — Batch {group.batchNo}
                     </td>
@@ -556,7 +556,7 @@ const BPR = () => {
   ];
 
   const pageTabBtn = (id, label) => ({
-    background: (listView === id ? 'rgba(91, 28, 133, 0.12)' : 'transparent'),
+    background: (listView === id ? 'rgba(155, 98, 196, 0.12)' : 'transparent'),
     color: (listView === id ? 'var(--accent-primary)' : 'var(--text-muted)'),
     border: (listView === id ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)'),
     padding: '0.45rem 1rem',
@@ -595,7 +595,7 @@ const BPR = () => {
             <button
               type="button"
               className="btn"
-              style={{ border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', background: 'rgba(91, 28, 133, 0.08)' }}
+              style={{ border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', background: 'rgba(155, 98, 196, 0.08)' }}
               onClick={handleDownloadBlankBpr}
               title="Download blank Batch Processing + Packing Record (2 pages)"
             >
@@ -834,7 +834,7 @@ const BPR = () => {
                 className="btn"
                 onClick={() => setActiveTab('page1')}
                 style={{
-                  background: activeTab === 'page1' ? 'rgba(91, 28, 133, 0.12)' : 'transparent',
+                  background: activeTab === 'page1' ? 'rgba(155, 98, 196, 0.12)' : 'transparent',
                   color: activeTab === 'page1' ? 'var(--accent-primary)' : 'var(--text-muted)',
                   border: activeTab === 'page1' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)'
                 }}
@@ -846,7 +846,7 @@ const BPR = () => {
                 className="btn"
                 onClick={() => setActiveTab('page2')}
                 style={{
-                  background: activeTab === 'page2' ? 'rgba(91, 28, 133, 0.12)' : 'transparent',
+                  background: activeTab === 'page2' ? 'rgba(155, 98, 196, 0.12)' : 'transparent',
                   color: activeTab === 'page2' ? 'var(--accent-primary)' : 'var(--text-muted)',
                   border: activeTab === 'page2' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)'
                 }}

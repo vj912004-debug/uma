@@ -236,7 +236,7 @@ const fillItemsBlankRowsToFit = (page, band, rowPx = 18) => {
       td.style.setProperty('font-size', '10px', 'important');
       td.style.setProperty('color', 'transparent', 'important');
       td.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
-      td.style.setProperty('border', '1px solid var(--lav-border, #c9bce8)', 'important');
+      td.style.setProperty('border', '1px solid var(--lav-border, #d6c2e8)', 'important');
       td.style.setProperty('vertical-align', 'middle', 'important');
       if (!td.innerHTML || !String(td.innerHTML).trim()) td.innerHTML = '&nbsp;';
     });
@@ -732,18 +732,18 @@ export const ITEMS_TABLE_FILL_CSS = `
 
 export const getSharedPrintStyles = () => `
   :root {
-    --purple: #3d2b7d;
-    --purple-dark: #2f2263;
-    --lav-bg: #efeaf7;
-    --lav-border: #c9bce8;
+    --purple: #9b62c4;
+    --purple-dark: #73399e;
+    --lav-bg: #F6F0FA;
+    --lav-border: #d6c2e8;
     --orange: #f47920;
     --green: #2fa84f;
     --text: #231f20;
     --grey-line: #d9d9d9;
-    --primary-purple: #3d2b7d;
+    --primary-purple: #9b62c4;
     --brand-green: #2fa84f;
-    --light-purple-bg: #efeaf7;
-    --border-purple: #c9bce8;
+    --light-purple-bg: #F6F0FA;
+    --border-purple: #d6c2e8;
     --grid-line-purple: #d9d9d9;
     --text-black: #231f20;
   }
@@ -896,9 +896,9 @@ export const getSharedPrintStyles = () => `
     text-align: center;
     margin-top: 1px;
   }
-  .icon svg { width: 16px; height: 16px; display: block; fill: none; stroke: #3d2b7d; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  .m-icon svg { width: 15px; height: 15px; display: block; fill: none; stroke: #3d2b7d; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  .party-head svg, .box-head svg { width: 16px; height: 16px; display: block; fill: none; stroke: #3d2b7d; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .icon svg { width: 16px; height: 16px; display: block; fill: none; stroke: #9b62c4; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .m-icon svg { width: 15px; height: 15px; display: block; fill: none; stroke: #9b62c4; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .party-head svg, .box-head svg { width: 16px; height: 16px; display: block; fill: none; stroke: #9b62c4; stroke: var(--purple); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .reg-details {
     margin-top: 10px;
     font-size: 12.5px;
@@ -1320,14 +1320,14 @@ export const buildPartyFootHtml = (gstin, state, stateCode) => {
 
 /** Stroke icons with real paint attributes so they stay visible in print and PDF. */
 const printStrokeIcon = (inner) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3d2b7d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+  `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9b62c4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 
 export const PRINT_ICON_DOC = printStrokeIcon(
-  '<path d="M6 2h9l5 5v15H6z" fill="none" stroke="#3d2b7d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 2v5h5" fill="none" stroke="#3d2b7d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+  '<path d="M6 2h9l5 5v15H6z" fill="none" stroke="#9b62c4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 2v5h5" fill="none" stroke="#9b62c4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
 );
 
 export const PRINT_ICON_CAL = printStrokeIcon(
-  '<rect x="3" y="4.5" width="18" height="16" rx="1.5" fill="none" stroke="#3d2b7d" stroke-width="1.6"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4" fill="none" stroke="#3d2b7d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+  '<rect x="3" y="4.5" width="18" height="16" rx="1.5" fill="none" stroke="#9b62c4" stroke-width="1.6"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4" fill="none" stroke="#9b62c4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
 );
 
 export const buildOptionalMetaRowHtml = (label, value, { iconHtml = '', sub = false } = {}) => {
@@ -1527,12 +1527,12 @@ export const bakePrintSvgPaints = (root) => {
     if (!value || typeof value !== 'string') return value;
     const v = value.trim();
     if (!v.includes('var(')) return v;
-    if (v.includes('--purple-dark')) return readVar(el, '--purple-dark', '#2f2263');
-    if (v.includes('--purple-light')) return readVar(el, '--purple-light', '#efeaf7');
-    if (v.includes('--purple')) return readVar(el, '--purple', '#3d2b7d');
+    if (v.includes('--purple-dark')) return readVar(el, '--purple-dark', '#73399e');
+    if (v.includes('--purple-light')) return readVar(el, '--purple-light', '#F6F0FA');
+    if (v.includes('--purple')) return readVar(el, '--purple', '#9b62c4');
     if (v.includes('--green') || v.includes('--brand-green')) return readVar(el, '--green', '#2fa84f');
     if (v.includes('--orange')) return readVar(el, '--orange', '#f47920');
-    if (v.includes('--lav-bg')) return readVar(el, '--lav-bg', '#efeaf7');
+    if (v.includes('--lav-bg')) return readVar(el, '--lav-bg', '#F6F0FA');
     if (v.includes('--text')) return readVar(el, '--text', '#231f20');
     return v;
   };
@@ -1549,8 +1549,8 @@ export const bakePrintSvgPaints = (root) => {
       el.setAttribute(
         'style',
         style
-          .replace(/var\(\s*--purple-dark\s*\)/gi, readVar(el, '--purple-dark', '#2f2263'))
-          .replace(/var\(\s*--purple\s*\)/gi, readVar(el, '--purple', '#3d2b7d'))
+          .replace(/var\(\s*--purple-dark\s*\)/gi, readVar(el, '--purple-dark', '#73399e'))
+          .replace(/var\(\s*--purple\s*\)/gi, readVar(el, '--purple', '#9b62c4'))
           .replace(/var\(\s*--green\s*\)/gi, readVar(el, '--green', '#2fa84f'))
           .replace(/var\(\s*--brand-green\s*\)/gi, readVar(el, '--brand-green', '#2fa84f'))
           .replace(/var\(\s*--orange\s*\)/gi, readVar(el, '--orange', '#f47920'))
@@ -1575,7 +1575,7 @@ export const bakePrintSvgPaints = (root) => {
     applyResolvedAttrs(svg);
     svg.querySelectorAll('*').forEach(applyResolvedAttrs);
 
-    const purple = readVar(svg, '--purple', '#3d2b7d');
+    const purple = readVar(svg, '--purple', '#9b62c4');
 
     if (isStrokeIconHost(svg)) {
       let stroke = purple;

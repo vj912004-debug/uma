@@ -235,8 +235,8 @@ const EWay = () => {
                           borderRadius: '4px',
                           fontSize: '0.72rem',
                           fontWeight: 700,
-                          background: row.type === 'DC' ? 'rgba(91, 28, 133, 0.1)' : 'rgba(37, 99, 235, 0.1)',
-                          color: row.type === 'DC' ? '#5b1c85' : '#2563eb'
+                          background: row.type === 'DC' ? 'rgba(155, 98, 196, 0.1)' : 'rgba(37, 99, 235, 0.1)',
+                          color: row.type === 'DC' ? '#9b62c4' : '#2563eb'
                         }}
                       >
                         {row.type}

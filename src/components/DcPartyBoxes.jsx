@@ -8,7 +8,7 @@ const boxStyle = {
 };
 
 const headStyle = {
-  background: 'rgba(91, 28, 133, 0.1)',
+  background: 'rgba(155, 98, 196, 0.1)',
   color: 'var(--accent-primary)',
   fontWeight: 800,
   letterSpacing: '0.04em',

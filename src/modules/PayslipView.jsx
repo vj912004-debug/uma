@@ -196,7 +196,7 @@ const PayslipView = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
           <div style={{
-            background: 'rgba(91, 28, 133, 0.1)',
+            background: 'rgba(155, 98, 196, 0.1)',
             color: 'var(--accent-primary)',
             width: 44,
             height: 44,
@@ -222,7 +222,7 @@ const PayslipView = () => {
             type="button"
             className="btn btn-primary"
             onClick={() => window.print()}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.65rem 1.25rem', background: '#5b1c85' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.65rem 1.25rem', background: '#9b62c4' }}
           >
             <Printer size={16} /> Print Payslip
           </button>
@@ -239,7 +239,7 @@ const PayslipView = () => {
       }}>
         {/* Month */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem' }}>
-          <Calendar size={16} color="#5b1c85" />
+          <Calendar size={16} color="#9b62c4" />
           <input
             type="month"
             className="input-field"
@@ -251,7 +251,7 @@ const PayslipView = () => {
 
         {/* Department */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem' }}>
-          <Briefcase size={16} color="#5b1c85" />
+          <Briefcase size={16} color="#9b62c4" />
           <SearchableSelect
             className="input-field"
             value={deptFilter}
@@ -266,7 +266,7 @@ const PayslipView = () => {
 
         {/* Employee Type */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem' }}>
-          <Users size={16} color="#5b1c85" />
+          <Users size={16} color="#9b62c4" />
           <SearchableSelect
             className="input-field"
             allowCustom={false}
@@ -282,7 +282,7 @@ const PayslipView = () => {
 
         {/* Employee Quick Select */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem' }}>
-          <User size={16} color="#5b1c85" />
+          <User size={16} color="#9b62c4" />
           <SearchableSelect
             className="input-field"
             value={selectedEmpId}
@@ -338,7 +338,7 @@ const PayslipView = () => {
                     padding: '0.65rem 0.75rem',
                     borderRadius: '8px',
                     cursor: 'pointer',
-                    background: isSelected ? '#5b1c85' : 'transparent',
+                    background: isSelected ? '#9b62c4' : 'transparent',
                     color: isSelected ? '#fff' : 'var(--text-main)',
                     transition: 'all 0.15s'
                   }}
@@ -347,7 +347,7 @@ const PayslipView = () => {
                     width: 32,
                     height: 32,
                     borderRadius: '50%',
-                    background: isSelected ? 'rgba(255,255,255,0.2)' : 'rgba(91, 28, 133, 0.1)',
+                    background: isSelected ? 'rgba(255,255,255,0.2)' : 'rgba(155, 98, 196, 0.1)',
                     color: isSelected ? '#fff' : 'var(--accent-primary)',
                     display: 'flex',
                     alignItems: 'center',
@@ -386,7 +386,7 @@ const PayslipView = () => {
             {/* ATTENDANCE SUMMARY CARD */}
             <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.25rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.85rem' }}>
-                <Calendar size={18} color="#5b1c85" />
+                <Calendar size={18} color="#9b62c4" />
                 <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
                   Attendance Summary
                 </h3>
@@ -423,7 +423,7 @@ const PayslipView = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>OT Hours</span>
-                  <strong style={{ color: '#5b1c85' }}>{activeEmp.otHours} Hrs</strong>
+                  <strong style={{ color: '#9b62c4' }}>{activeEmp.otHours} Hrs</strong>
                 </div>
               </div>
             </div>
@@ -431,7 +431,7 @@ const PayslipView = () => {
             {/* SHIFT DETAILS CARD */}
             <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.25rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.85rem' }}>
-                <Clock size={18} color="#5b1c85" />
+                <Clock size={18} color="#9b62c4" />
                 <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
                   Shift Details
                 </h3>

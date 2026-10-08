@@ -833,7 +833,7 @@ const ProductionPlanning = () => {
                   <input type="text" className="input-field" value={formData.hours || ''} readOnly placeholder="Auto-calculated" style={{ fontWeight: 600, color: 'var(--accent-primary)', background: 'var(--glass-bg)' }} />
                 </div>
 
-                <div style={{ gridColumn: 'span 3', background: 'rgba(91, 28, 133, 0.04)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
+                <div style={{ gridColumn: 'span 3', background: 'rgba(155, 98, 196, 0.04)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0, fontWeight: 600, fontSize: '0.85rem' }}>
                     <input
                       type="checkbox"

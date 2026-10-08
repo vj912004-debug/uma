@@ -683,7 +683,7 @@ const PackingList = () => {
                                     </td>
                                   </tr>
                                 ))}
-                                <tr style={{ background: 'rgba(91, 28, 133, 0.1)', borderBottom: '2px solid var(--accent-primary)' }}>
+                                <tr style={{ background: 'rgba(155, 98, 196, 0.1)', borderBottom: '2px solid var(--accent-primary)' }}>
                                   <td colSpan={3} style={{ padding: '0.45rem 0.35rem', textAlign: 'right', fontWeight: 800, color: 'var(--accent-primary)', fontSize: '0.8rem' }}>
                                     TOTAL — Batch {group.batchNo}
                                   </td>
@@ -724,7 +724,7 @@ const PackingList = () => {
                           <td style={{ padding: '0.5rem', fontWeight: 700, textAlign: 'center' }}>{grandTotal.lumps.toFixed(2)}</td>
                         </tr>
                       )}
-                      <tr style={{ background: 'rgba(91, 28, 133, 0.1)', borderTop: '2px solid var(--accent-primary)' }}>
+                      <tr style={{ background: 'rgba(155, 98, 196, 0.1)', borderTop: '2px solid var(--accent-primary)' }}>
                         <td colSpan={3} style={{ padding: '0.65rem 0.5rem', textAlign: 'right', fontWeight: 800, color: 'var(--accent-primary)', fontSize: '0.85rem' }}>
                           GRAND TOTAL
                         </td>

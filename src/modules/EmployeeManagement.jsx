@@ -474,7 +474,7 @@ const EmployeeManagement = () => {
                       }}>
                         {MODULE_GROUPS.map(([group, modules]) => (
                           <div key={group} style={{ marginBottom: '0.85rem' }}>
-                            <p style={{ margin: '0 0 0.4rem', fontSize: '0.72rem', fontWeight: 700, color: '#5b1c85', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            <p style={{ margin: '0 0 0.4rem', fontSize: '0.72rem', fontWeight: 700, color: '#9b62c4', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                               {group}
                             </p>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem 0.75rem' }}>
@@ -488,7 +488,7 @@ const EmployeeManagement = () => {
                                     fontSize: '0.82rem',
                                     cursor: 'pointer',
                                     fontWeight: m.highlight ? 700 : 500,
-                                    color: m.highlight ? '#5b1c85' : 'inherit'
+                                    color: m.highlight ? '#9b62c4' : 'inherit'
                                   }}
                                 >
                                   <input

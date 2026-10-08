@@ -4,6 +4,7 @@ import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar';
+import TopHeader from './components/TopHeader';
 import EsslAutoSync from './components/EsslAutoSync';
 import Login from './pages/Login';
 import Dashboard from './modules/Dashboard';
@@ -70,6 +71,7 @@ const AppLayout = () => {
     <EsslAutoSync />
     <Sidebar />
     <main className="app-main">
+      <TopHeader />
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/master" element={<MasterSetup />} />

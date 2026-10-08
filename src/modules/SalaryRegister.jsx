@@ -194,7 +194,7 @@ const SalaryRegister = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
           <div style={{
-            background: 'rgba(91, 28, 133, 0.1)',
+            background: 'rgba(155, 98, 196, 0.1)',
             color: 'var(--accent-primary)',
             width: 44,
             height: 44,
@@ -220,7 +220,7 @@ const SalaryRegister = () => {
             type="button"
             className="btn btn-primary"
             onClick={() => navigate('/salary-calculation')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.65rem 1.25rem', background: '#5b1c85' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.65rem 1.25rem', background: '#9b62c4' }}
           >
             <Settings size={16} /> Generate Salary
           </button>
@@ -237,7 +237,7 @@ const SalaryRegister = () => {
       }}>
         {/* Month */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem' }}>
-          <Calendar size={16} color="#5b1c85" />
+          <Calendar size={16} color="#9b62c4" />
           <input
             type="month"
             className="input-field"
@@ -249,7 +249,7 @@ const SalaryRegister = () => {
 
         {/* Department */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem' }}>
-          <Briefcase size={16} color="#5b1c85" />
+          <Briefcase size={16} color="#9b62c4" />
           <SearchableSelect
             className="input-field"
             value={deptFilter}
@@ -264,7 +264,7 @@ const SalaryRegister = () => {
 
         {/* Employee Type */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem' }}>
-          <Users size={16} color="#5b1c85" />
+          <Users size={16} color="#9b62c4" />
           <SearchableSelect
             className="input-field"
             allowCustom={false}
@@ -280,7 +280,7 @@ const SalaryRegister = () => {
 
         {/* Shift */}
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0 0.85rem' }}>
-          <Clock size={16} color="#5b1c85" />
+          <Clock size={16} color="#9b62c4" />
           <SearchableSelect
             className="input-field"
             allowCustom={false}
@@ -311,7 +311,7 @@ const SalaryRegister = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
         {/* Total Employees */}
         <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '12px', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ background: 'rgba(91, 28, 133, 0.15)', color: '#5b1c85', width: 42, height: 42, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'rgba(155, 98, 196, 0.15)', color: '#9b62c4', width: 42, height: 42, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Users size={20} />
           </div>
           <div>
@@ -472,7 +472,7 @@ const SalaryRegister = () => {
                       fontSize: '0.78rem',
                       fontWeight: 700,
                       cursor: 'pointer',
-                      background: page === p ? '#5b1c85' : '#fff',
+                      background: page === p ? '#9b62c4' : '#fff',
                       color: page === p ? '#fff' : 'var(--text-main)'
                     }}
                   >
@@ -493,7 +493,7 @@ const SalaryRegister = () => {
           {/* CARD 1: SALARY SUMMARY */}
           <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.25rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.85rem' }}>
-              <Calendar size={18} color="#5b1c85" />
+              <Calendar size={18} color="#9b62c4" />
               <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
                 Salary Summary
               </h3>
@@ -524,7 +524,7 @@ const SalaryRegister = () => {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1.5px solid var(--border-color)', paddingTop: '6px', fontSize: '0.9rem', fontWeight: 800 }}>
                 <span>Net Salary</span>
-                <span style={{ color: '#5b1c85' }}>{money(totals.netSalary)}</span>
+                <span style={{ color: '#9b62c4' }}>{money(totals.netSalary)}</span>
               </div>
             </div>
           </div>
