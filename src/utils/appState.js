@@ -52,6 +52,7 @@ export const createBaseState = () => ({
   dcDeliveryNotes: [
     'Material sent for Micronisation on Job Work basis. Goods to be returned after processing.'
   ],
+  tiNotes: [],
   units: ['Kg', 'MT', 'Drum', 'Ltr', 'Pcs'],
   taxes: [
     { name: 'GST 18%', rate: 18 },
@@ -190,6 +191,10 @@ export const normalizeAppState = (parsed) => {
     dcDeliveryNotes: (() => {
       const list = [...(parsed.dcDeliveryNotes || [])];
       if (list.length === 0) return [...(baseState.dcDeliveryNotes || [])];
+      return list;
+    })(),
+    tiNotes: (() => {
+      const list = [...(parsed.tiNotes || [])];
       return list;
     })(),
     settings: {

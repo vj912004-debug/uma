@@ -15,6 +15,13 @@ const TAB_CONFIG = {
     isTax: false,
     multiline: true
   },
+  TINotes: {
+    key: 'tiNotes',
+    title: 'TI Notes Master',
+    placeholder: 'Enter note text for Tax Invoice print...',
+    isTax: false,
+    multiline: true
+  },
   Units: { key: 'units', title: 'Unit Master', placeholder: 'Enter unit (e.g. Kg)...', isTax: false },
   Taxes: { key: 'taxes', title: 'Tax Master', isTax: true }
 };
@@ -124,6 +131,7 @@ const MasterSetup = () => {
         <TabButton name="Materials" icon={Box} tabId="Materials" />
         <TabButton name="PSD Req" icon={SlidersHorizontal} tabId="PSDReq" />
         <TabButton name="DC Notes" icon={FileText} tabId="DCNotes" />
+        <TabButton name="TI Notes" icon={FileText} tabId="TINotes" />
         <TabButton name="Units" icon={Ruler} tabId="Units" />
         <TabButton name="Taxes" icon={Percent} tabId="Taxes" />
       </div>

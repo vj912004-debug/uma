@@ -143,7 +143,7 @@ const TaxInvoice = () => {
       discount: piTerms?.discount ?? 0,
       taxRate: piTerms?.taxRate ?? 18,
       gstType: piTerms?.gstType === 'igst' ? 'igst' : GST_TYPE_CGST_SGST,
-      terms: DEFAULT_INVOICE_TERMS_TEXT
+      terms: mrParty?.tiNote || DEFAULT_INVOICE_TERMS_TEXT
     };
   };
 
@@ -226,7 +226,8 @@ const TaxInvoice = () => {
         billAddress: party.billAddress || prev.billAddress || '',
         shipAddress: party.shipAddress || party.billAddress || prev.shipAddress || '',
         gstinBill: party.gstinBill || prev.gstinBill || '',
-        gstinShip: party.gstinShip || party.gstinBill || prev.gstinShip || ''
+        gstinShip: party.gstinShip || party.gstinBill || prev.gstinShip || '',
+        terms: party.tiNote || prev.terms || DEFAULT_INVOICE_TERMS_TEXT
       }));
       return;
     }

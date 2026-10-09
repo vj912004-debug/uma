@@ -75,6 +75,7 @@ const Parties = () => {
     state: '',
     stateCode: '',
     deliveryNote: '',
+    tiNote: '',
     phone1: '',
     phone2: '',
     phone3: '',
@@ -241,6 +242,7 @@ const Parties = () => {
       state: '',
       stateCode: '',
       deliveryNote: '',
+      tiNote: '',
       phone1: '',
       phone2: '',
       phone3: '',
@@ -524,14 +526,28 @@ const Parties = () => {
             </section>
 
             <section className="premium-card party-section-card">
-              <h3 className="party-section-title">DC Description Notes</h3>
-              <textarea
-                className="input-field"
-                rows="3"
-                placeholder="Prints in the Delivery Challan description for this party"
-                value={formData.deliveryNote || ''}
-                onChange={e => setFormData({ ...formData, deliveryNote: e.target.value })}
-              />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                <div>
+                  <h3 className="party-section-title">DC Description Notes</h3>
+                  <textarea
+                    className="input-field"
+                    rows="3"
+                    placeholder="Prints in the Delivery Challan description for this party"
+                    value={formData.deliveryNote || ''}
+                    onChange={e => setFormData({ ...formData, deliveryNote: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <h3 className="party-section-title">TI Notes</h3>
+                  <textarea
+                    className="input-field"
+                    rows="3"
+                    placeholder="Prints in the Tax Invoice description / notes for this party"
+                    value={formData.tiNote || ''}
+                    onChange={e => setFormData({ ...formData, tiNote: e.target.value })}
+                  />
+                </div>
+              </div>
             </section>
 
             <section className="premium-card party-section-card">

@@ -13,7 +13,8 @@
   --text-main: #1F0B38;
   --text-label: #361363;
   --text-muted: #6E6288;
-  --border-color: #E5DEEF;
+  --border-color: #5E1F99;
+  --border-color-subtle: #6B21A8;
   --glass-bg: rgba(93, 42, 156, 0.04);
   --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --scrollbar-thumb: rgba(94, 31, 153, 0.22);
@@ -153,7 +154,7 @@ body {
 .glass-panel {
   /* Content surface — not sidebar purple (--bg-sidebar is brand chrome only) */
   background: var(--bg-card);
-  border: 1px solid var(--border-color);
+  border: 2px solid #5E1F99;
   border-radius: 10px;
 }
 
@@ -207,7 +208,7 @@ th svg,
 
 .premium-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-color);
+  border: 2px solid #5E1F99;
   border-radius: var(--radius-card);
   padding: 1.25rem 1.35rem;
   box-shadow: var(--shadow-card);
@@ -509,7 +510,7 @@ label {
   width: 100%;
   border-radius: var(--radius-card);
   background: var(--table-container-bg);
-  border: 1px solid var(--border-color);
+  border: 2px solid #6B21A8;
   margin-bottom: 1rem;
   box-shadow: var(--shadow-card);
 }
@@ -5240,7 +5241,7 @@ input[type='number'] {
   width: 100%;
   padding: 0.55rem 1rem 0.55rem 2.5rem;
   border-radius: 999px;
-  border: 1px solid #E5DEEF;
+  border: 1.5px solid #5E1F99;
   background: #FFFFFF;
   color: #1F0B38;
   font-size: 0.82rem;
@@ -5270,7 +5271,7 @@ input[type='number'] {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 1px solid #E5DEEF;
+  border: 1.5px solid #5E1F99;
   background: #FFFFFF;
   color: #361363;
   display: flex;
@@ -5311,7 +5312,7 @@ input[type='number'] {
   padding: 0.42rem 0.85rem;
   border-radius: 999px;
   background: #FFFFFF;
-  border: 1px solid #E5DEEF;
+  border: 1.5px solid #5E1F99;
   font-size: 0.78rem;
   font-weight: 600;
   color: #361363;
@@ -5350,7 +5351,7 @@ input[type='number'] {
   padding: 0.35rem 0.85rem 0.35rem 0.4rem;
   border-radius: 999px;
   background: #FFFFFF;
-  border: 1px solid #E5DEEF;
+  border: 1.5px solid #5E1F99;
   box-shadow: 0 1px 3px rgba(74, 39, 126, 0.03);
 }
 
@@ -5422,7 +5423,7 @@ input[type='number'] {
 
 .ref-kpi-card {
   background: #FFFFFF;
-  border: 1px solid #E5DEEF;
+  border: 2px solid #5E1F99;
   border-radius: 12px;
   padding: 1rem 1.1rem;
   display: flex;
@@ -5434,8 +5435,8 @@ input[type='number'] {
 
 .ref-kpi-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(74, 39, 126, 0.08);
-  border-color: #D4C5E9;
+  box-shadow: 0 6px 18px rgba(94, 31, 153, 0.16);
+  border-color: #3A1069;
 }
 
 .ref-kpi-icon-wrap {
@@ -5511,7 +5512,7 @@ input[type='number'] {
 /* Reference Cards */
 .ref-card {
   background: #FFFFFF;
-  border: 1px solid #E5DEEF;
+  border: 2px solid #5E1F99;
   border-radius: 12px;
   padding: 1.1rem 1.25rem;
   box-shadow: 0 2px 10px rgba(74, 39, 126, 0.03);
@@ -5552,6 +5553,9 @@ input[type='number'] {
 /* Reference Tables */
 .ref-table-responsive {
   overflow-x: auto;
+  border: 2px solid #6B21A8;
+  border-radius: 10px;
+  background: #FFFFFF;
 }
 
 .ref-table {
@@ -5562,19 +5566,19 @@ input[type='number'] {
 
 .ref-table th {
   background: #F0EAFA !important;
-  color: #49227A !important;
+  color: #3A1069 !important;
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: none;
   padding: 0.55rem 0.65rem;
-  border-bottom: 1px solid #E5DEEF;
+  border-bottom: 2px solid #6B21A8;
   text-align: left;
   white-space: nowrap;
 }
 
 .ref-table td {
   padding: 0.65rem 0.65rem;
-  border-bottom: 1px solid #F0EBF5;
+  border-bottom: 1px solid #E5DEEF;
   color: #1F0B38;
   vertical-align: middle;
   background: transparent;
@@ -5585,12 +5589,20 @@ input[type='number'] {
 }
 
 .ref-table tbody tr {
-  transition: background 0.15s ease;
+  transition: all 0.15s ease;
   cursor: pointer;
+  border-left: 4px solid transparent;
 }
 
-.ref-table tbody tr:hover td {
-  background: #F9F7FC;
+.ref-table tbody tr:first-child,
+.ref-table tbody tr.is-active,
+.ref-table tbody tr.active {
+  background: #F0EAFA;
+  border-left: 4px solid #3A1069;
+}
+
+.ref-table tbody tr:hover {
+  background: #FAF5FF;
 }
 
 .ref-table-compact th,
@@ -5750,7 +5762,7 @@ input[type='number'] {
 
 .metric-box {
   background: #FAF9FE;
-  border: 1px solid #E5DEEF;
+  border: 1.5px solid #6B21A8;
   border-radius: 10px;
   padding: 0.65rem 0.5rem;
   display: flex;
@@ -5844,7 +5856,7 @@ input[type='number'] {
   gap: 0.55rem;
   padding: 0.65rem 0.75rem;
   border-radius: 10px;
-  border: 1px solid #E5DEEF;
+  border: 1.5px solid #6B21A8;
   background: #FAF9FE;
   color: #361363;
   font-size: 0.75rem;
