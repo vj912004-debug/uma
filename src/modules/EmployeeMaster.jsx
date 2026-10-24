@@ -29,7 +29,7 @@ import DateField from '../components/DateField';
 import SearchableSelect from '../components/SearchableSelect';
 import ExportButton from '../components/ExportButton';
 import { formatDate, newestFirst } from '../utils/dateUtils';
-import { generateEmployeeId } from '../utils/auth';
+import { generateEmployeeId, nextUserRecordId } from '../utils/auth';
 import { getEffectiveRate, money, isPendingApproval, approvalPatch } from '../utils/payroll';
 import { DEPARTMENTS } from './EmployeeManagement';
 
@@ -133,23 +133,26 @@ const EmployeeMaster = () => {
   );
 
   const [selectedUserId, setSelectedUserId] = useState(() => (employees[0]?.id || null));
+  const [creatingNew, setCreatingNew] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [savedNotice, setSavedNotice] = useState(false);
 
   // Sync selectedUserId if currently selected employee gets deleted or list changes
   useEffect(() => {
+    if (creatingNew) return;
     if (!selectedUserId && employees.length > 0) {
       setSelectedUserId(employees[0].id);
     }
-  }, [employees, selectedUserId]);
+  }, [employees, selectedUserId, creatingNew]);
 
   const selectedUser = useMemo(
-    () => employees.find((u) => u.id === selectedUserId) || null,
+    () => employees.find((u) => String(u.id) === String(selectedUserId)) || null,
     [employees, selectedUserId]
   );
 
   // Populate form whenever selected employee changes
   useEffect(() => {
+    if (creatingNew) return;
     if (selectedUser) {
       const rate = getEffectiveRate(selectedUser);
       const userStatus = selectedUser.status || (selectedUser.active === false ? 'Inactive' : 'Active');
@@ -186,10 +189,10 @@ const EmployeeMaster = () => {
         role: selectedUser.role || 'Staff',
         permissions: selectedUser.permissions || []
       });
-    } else {
+    } else if (!creatingNew) {
       setForm(emptyForm());
     }
-  }, [selectedUser]);
+  }, [selectedUser, creatingNew]);
 
   const departmentOptions = [...new Set([...DEPARTMENTS, ...users.map((u) => u.department).filter(Boolean)])];
   const designationOptions = [...new Set(users.map((u) => u.designation).filter(Boolean))];
@@ -253,6 +256,7 @@ const EmployeeMaster = () => {
 
   const openNewEmployee = () => {
     const nextCode = generateEmployeeId(users);
+    setCreatingNew(true);
     setForm({
       ...emptyForm(),
       employeeId: nextCode
@@ -263,6 +267,7 @@ const EmployeeMaster = () => {
   };
 
   const selectEmployee = (u) => {
+    setCreatingNew(false);
     setSelectedUserId(u.id);
     setViewMode('employee-wise');
   };
@@ -346,17 +351,22 @@ const EmployeeMaster = () => {
       });
     } else {
       const { history, effectiveFrom } = withRateHistory(null, perDayRate, otRate);
-      const newId = `emp-${Date.now()}`;
+      const newId = nextUserRecordId(users);
       const newEmpCode = payload.employeeId;
+      const usernameBase = String(newEmpCode || newId).trim().toLowerCase().replace(/\s+/g, '');
+      const taken = new Set((users || []).map((u) => String(u.username || '').toLowerCase()));
+      let username = usernameBase || `emp${newId}`;
+      if (taken.has(username)) username = `${usernameBase || 'emp'}${newId}`;
       updateData('users', {
         ...payload,
         id: newId,
-        username: newEmpCode.toLowerCase(),
+        username,
         approvalStatus: 'Pending',
         rateHistory: history,
         effectiveFrom,
         createdAt: new Date().toISOString()
       });
+      setCreatingNew(false);
       setSelectedUserId(newId);
     }
 
@@ -557,11 +567,12 @@ const EmployeeMaster = () => {
           <User size={18} color="var(--accent-primary)" />
           <SearchableSelect
             className="input-field"
-            value={selectedUserId || ''}
+            value={creatingNew ? 'NEW' : (selectedUserId || '')}
             onChange={(e) => {
               if (e.target.value === 'NEW') openNewEmployee();
               else {
-                const found = employees.find((u) => u.id === e.target.value);
+                setCreatingNew(false);
+                const found = employees.find((u) => String(u.id) === String(e.target.value));
                 if (found) selectEmployee(found);
               }
             }}

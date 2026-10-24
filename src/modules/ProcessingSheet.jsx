@@ -10,18 +10,8 @@ import {
   Receipt,
   FileCheck,
   Percent,
-  ShieldAlert,
-  ChevronDown,
-  ChevronUp,
-  ChevronRight,
-  Eye,
-  Layers,
+  ChevronLeft,
   Truck,
-  Calendar,
-  CreditCard,
-  CheckCircle2,
-  AlertTriangle,
-  Clock,
   Table
 } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
@@ -82,37 +72,13 @@ const ProcessingSheet = () => {
   const [partyFilter, setPartyFilter] = useState(location.state?.partyName || '');
   const [productFilter, setProductFilter] = useState('');
   const [statusTab, setStatusTab] = useState('pending');
-  const [expandedRows, setExpandedRows] = useState({});
-  const [viewMode, setViewMode] = useState('master'); // 'master' | 'sections'
-  const [openSections, setOpenSections] = useState({ receipt: true, billing: false, recon: false });
+  const [openedKey, setOpenedKey] = useState(null);
 
   useEffect(() => {
     if (location.state?.partyName) {
       setPartyFilter(location.state.partyName);
     }
   }, [location.state?.partyName]);
-
-  const toggleRowExpanded = (rowKey) => {
-    setExpandedRows((prev) => ({
-      ...prev,
-      [rowKey]: !prev[rowKey]
-    }));
-  };
-
-  const toggleAllExpanded = (expand) => {
-    const next = {};
-    if (expand) {
-      filteredRows.forEach((r) => { next[r.rowKey] = true; });
-    }
-    setExpandedRows(next);
-  };
-
-  const toggleSection = (sectionKey) => {
-    setOpenSections((prev) => ({
-      ...prev,
-      [sectionKey]: !prev[sectionKey]
-    }));
-  };
 
   // Table Helpers to retrieve downstream details
   const getPIs = (mrId) => (data.invoices || []).filter(inv => inv.receiptId === mrId && inv.invoiceNo?.includes('/PI/'));
@@ -472,6 +438,7 @@ const ProcessingSheet = () => {
   const thStyle = { padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-muted)', background: 'var(--bg-card)', borderBottom: '1px solid var(--border-color)', fontSize: '0.78rem', whiteSpace: 'nowrap' };
   const tdStyle = { padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'visible' };
   const tableStyle = { width: '100%', borderCollapse: 'collapse', textAlign: 'center', tableLayout: 'auto' };
+  const openedRow = openedKey ? rows.find((row) => row.rowKey === openedKey) : null;
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
@@ -482,61 +449,17 @@ const ProcessingSheet = () => {
             Excel Processing Sheet
           </h1>
           <p style={{ color: 'var(--text-muted)', margin: '0.25rem 0 0', fontSize: '0.88rem' }}>
-            Interactive master tracking sheet. Click any row to expand complete material, billing, & payment details.
+            Click a row to open that sheet.
           </p>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {/* View Mode Switcher */}
-          <div style={{ display: 'flex', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <button
-              type="button"
-              onClick={() => setViewMode('master')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                border: 'none',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                background: viewMode === 'master' ? 'var(--bg-card, #fff)' : 'transparent',
-                color: viewMode === 'master' ? 'var(--accent-primary)' : 'var(--text-muted)',
-                boxShadow: viewMode === 'master' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all 0.2s'
-              }}
-            >
-              <Eye size={14} /> Unified Table View
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('sections')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                border: 'none',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                background: viewMode === 'sections' ? 'var(--bg-card, #fff)' : 'transparent',
-                color: viewMode === 'sections' ? 'var(--accent-primary)' : 'var(--text-muted)',
-                boxShadow: viewMode === 'sections' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all 0.2s'
-              }}
-            >
-              <Layers size={14} /> Collapsible Sections
-            </button>
-          </div>
-
           <ExportButton data={filteredRows} columns={tableCols} filename="Master_Processing_Sheet" title="Master Processing Sheet" />
         </div>
       </header>
 
+      {!openedRow && (
+      <>
       <StatusTabBar
         value={statusTab}
         onChange={setStatusTab}
@@ -580,471 +503,152 @@ const ProcessingSheet = () => {
           </SearchableSelect>
         </div>
       </div>
+      </>
+      )}
 
       <div>
-        {rows.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '5rem', color: 'var(--text-muted)', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)' }}>
-            <div style={{ background: '#f1f5f9', padding: '1.5rem', borderRadius: '50%' }}>
-              <Building2 size={48} color="#94a3b8" />
+        {openedRow ? (
+          <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.25rem' }}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setOpenedKey(null)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginBottom: '1rem' }}
+            >
+              <ChevronLeft size={16} /> Back to list
+            </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>{openedRow.partyName || 'Sheet'}</h2>
+                <p style={{ margin: '0.3rem 0 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                  {openedRow.productName || '—'} · {openedRow.date ? new Date(openedRow.date).toLocaleDateString('en-GB') : '—'} · {openedRow.tiNo !== 'Pending' ? openedRow.tiNo : openedRow.piNo}
+                </p>
+              </div>
+              <strong style={{ color: (parseFloat(openedRow.outstanding) || 0) <= 0.01 ? '#10b981' : '#ef4444' }}>
+                {(parseFloat(openedRow.outstanding) || 0) <= 0.01
+                  ? 'Cleared'
+                  : `Outstanding ₹${parseFloat(openedRow.outstanding || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+              </strong>
             </div>
-            <div>
-              <h3 style={{ fontSize: '1.3rem', color: '#334155', margin: '0 0 0.5rem 0', fontWeight: 700 }}>No Records Yet</h3>
-              <p style={{ margin: 0, fontSize: '0.95rem' }}>Create Material Receipts and Tax Invoices to see them listed here.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+              <div style={{ border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1rem' }}>
+                <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#5b1c85', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><FileText size={16} /> Receipt</h3>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>M.R. Date</label>
+                {renderCell(openedRow, { key: 'date' })}
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Received Qty</label>
+                {renderCell(openedRow, { key: 'receivedQty' })}
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>PI No</label>
+                {renderCell(openedRow, { key: 'piNo' })}
+              </div>
+              <div style={{ border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1rem' }}>
+                <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#5b1c85', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Truck size={16} /> Delivery</h3>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>BPR Date</label>
+                {renderCell(openedRow, { key: 'bprDate' })}
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>BPR Qty</label>
+                {renderCell(openedRow, { key: 'bprNetQty' })}
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>DC No</label>
+                {renderCell(openedRow, { key: 'dcNo' })}
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>DC Date</label>
+                {renderCell(openedRow, { key: 'dcDate' })}
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>E-Way</label>
+                {renderCell(openedRow, { key: 'ewayStatus' })}
+              </div>
+              <div style={{ border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1rem' }}>
+                <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#5b1c85', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><FileCheck size={16} /> Invoice</h3>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Tax Invoice</label>
+                {renderCell(openedRow, { key: 'tiNo' })}
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Invoice Date</label>
+                {renderCell(openedRow, { key: 'invoiceDate' })}
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Bill Amount</label>
+                {renderCell(openedRow, { key: 'totalBill' })}
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Received (Auto)</label>
+                {renderCell(openedRow, { key: 'paid' })}
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Received (Manual)</label>
+                {renderCell(openedRow, { key: 'manualPaid' })}
+              </div>
+              <div style={{ border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1rem' }}>
+                <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#5b1c85', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Receipt size={16} /> Payment</h3>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Cheque / Ref</label>
+                {renderCell(openedRow, { key: 'paymentRef' })}
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>TDS</label>
+                {renderCell(openedRow, { key: 'tdsDeduction' })}
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Due Status</label>
+                {renderCell(openedRow, { key: 'dueStatus' })}
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Outstanding</label>
+                {renderCell(openedRow, { key: 'outstanding' })}
+              </div>
             </div>
+          </div>
+        ) : rows.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '5rem', color: 'var(--text-muted)', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+            <h3 style={{ margin: '0 0 0.5rem', fontWeight: 700 }}>No Records Yet</h3>
+            <p style={{ margin: 0 }}>Create Material Receipts and Tax Invoices to see them listed here.</p>
           </div>
         ) : filteredRows.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-            No master logs found matching your filters.
+            No sheets match these filters.
           </div>
-        ) : viewMode === 'master' ? (
-          /* ================= MODE 1: UNIFIED MASTER TABLE WITH EXPANDABLE ROWS ================= */
-          <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)' }}>
-            
-            {/* Table Header Bar */}
-            <div style={{ padding: '0.85rem 1.25rem', borderBottom: '1px solid var(--border-color)', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)' }}>Master Processing Logs</span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>({filteredRows.length} records)</span>
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={() => toggleAllExpanded(true)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Expand All
-                </button>
-                <span style={{ color: 'var(--border-color)' }}>|</span>
-                <button
-                  type="button"
-                  onClick={() => toggleAllExpanded(false)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Collapse All
-                </button>
-              </div>
-            </div>
-
+        ) : (
+          <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
               <table style={tableStyle}>
                 <thead>
                   <tr>
-                    <th style={{ ...thStyle, width: '40px', padding: '0.85rem 0.5rem' }}></th>
-                    <th style={thStyle}>Sr No</th>
-                    <th style={thStyle}>M.R. Date</th>
-                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '160px' }}>Party Name</th>
-                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '140px' }}>Product</th>
-                    <th style={thStyle}>Recd Qty</th>
-                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '140px' }}>Inv / PI No</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Bill Amount</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Total Recd</th>
+                    <th style={thStyle}>Sr</th>
+                    <th style={thStyle}>Date</th>
+                    <th style={{ ...thStyle, textAlign: 'left' }}>Party</th>
+                    <th style={{ ...thStyle, textAlign: 'left' }}>Product</th>
+                    <th style={{ ...thStyle, textAlign: 'left' }}>Invoice</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>Outstanding</th>
                     <th style={thStyle}>Status</th>
-                    <th style={{ ...thStyle, textAlign: 'center', width: '120px' }}>Action</th>
+                    <th style={thStyle}>Open</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRows.map((row) => {
-                    const isExpanded = !!expandedRows[row.rowKey];
                     const isPaidOff = (parseFloat(row.outstanding) || 0) <= 0.01;
                     const isOverdue = row.dueStatus === 'Overdue';
-
                     return (
-                      <React.Fragment key={row.rowKey}>
-                        {/* Summary Master Row */}
-                        <tr 
-                          onClick={() => toggleRowExpanded(row.rowKey)}
-                          style={{
-                            cursor: 'pointer',
-                            background: isExpanded ? 'rgba(155, 98, 196, 0.04)' : 'transparent',
-                            transition: 'background 0.2s'
-                          }}
-                          className="hover-row"
-                        >
-                          <td style={{ ...tdStyle, padding: '0.85rem 0.5rem', textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); toggleRowExpanded(row.rowKey); }}
-                              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center' }}
-                            >
-                              {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                            </button>
-                          </td>
-                          <td style={tdStyle}>{row.srNo}</td>
-                          <td style={tdStyle}>{row.date ? new Date(row.date).toLocaleDateString('en-GB') : '-'}</td>
-                          <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 600, color: 'var(--text-main)' }}>{row.partyName || '-'}</td>
-                          <td style={{ ...tdStyle, textAlign: 'left', color: 'var(--text-muted)' }}>{row.productName || '-'}</td>
-                          <td style={{ ...tdStyle, fontWeight: 600 }}>{row.receivedQty}</td>
-                          <td style={{ ...tdStyle, textAlign: 'left', color: row.tiNo !== 'Pending' ? 'var(--accent-primary)' : '#8b5cf6', fontWeight: 600 }}>
-                            {row.tiNo !== 'Pending' ? row.tiNo : row.piNo}
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>
-                            ₹{parseFloat(row.totalBill || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                            ₹{parseFloat(row.amountsReceivedTotal || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: isPaidOff ? '#10b981' : '#ef4444' }}>
-                            ₹{parseFloat(row.outstanding || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}
-                          </td>
-                          <td style={tdStyle}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '4px 10px',
-                              borderRadius: '12px',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              background: isPaidOff ? '#ecfdf5' : isOverdue ? '#fef2f2' : '#fefce8',
-                              color: isPaidOff ? '#047857' : isOverdue ? '#dc2626' : '#d97706'
-                            }}>
-                              {isPaidOff ? <CheckCircle2 size={12} /> : isOverdue ? <AlertTriangle size={12} /> : <Clock size={12} />}
-                              {isPaidOff ? 'Cleared' : isOverdue ? 'Overdue' : 'Due'}
-                            </span>
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); toggleRowExpanded(row.rowKey); }}
-                              className="btn btn-sm"
-                              style={{
-                                fontSize: '0.75rem',
-                                padding: '4px 10px',
-                                background: isExpanded ? 'var(--accent-primary)' : 'var(--bg-input, #f1f5f9)',
-                                color: isExpanded ? '#fff' : 'var(--text-main)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '6px'
-                              }}
-                            >
-                              {isExpanded ? 'Close' : 'Details'}
-                            </button>
-                          </td>
-                        </tr>
-
-                        {/* Expandable Inline Detail Panel */}
-                        {isExpanded && (
-                          <tr key={`expanded-panel-${row.rowKey}`} style={{ background: '#f8fafc' }}>
-                            <td colSpan={12} style={{ padding: '1.25rem', borderBottom: '2px solid var(--accent-primary)' }}>
-                              <div style={{ background: 'var(--bg-card, #fff)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1.25rem', boxShadow: '0 4px 12px rgba(0,0,0,0.04)' }}>
-                                
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                    <div style={{ background: 'rgba(155, 98, 196, 0.1)', color: 'var(--accent-primary)', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
-                                      {row.srNo}
-                                    </div>
-                                    <div>
-                                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                                        {row.partyName}
-                                      </h3>
-                                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                        Product: <strong>{row.productName || 'N/A'}</strong> | M.R. Date: {row.date ? new Date(row.date).toLocaleDateString('en-GB') : 'N/A'}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isPaidOff ? '#10b981' : '#ef4444' }}>
-                                      {isPaidOff ? 'Fully Paid & Cleared' : `Outstanding: ₹${parseFloat(row.outstanding || 0).toFixed(2)}`}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* 4 Grid Cards for full Record Details */}
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-                                  
-                                  {/* Card 1: Receipt & Material */}
-                                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', background: '#f8fafc' }}>
-                                    <h4 style={{ margin: '0 0 0.85rem 0', fontSize: '0.88rem', fontWeight: 700, color: '#2563eb', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                      <FileText size={16} /> Receipt & Material
-                                    </h4>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', fontSize: '0.82rem' }}>
-                                      <div>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>M.R. Date</span>
-                                        {renderCell(row, { key: 'date' })}
-                                      </div>
-                                      <div>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Received Qty</span>
-                                        {renderCell(row, { key: 'receivedQty' })}
-                                      </div>
-                                      <div style={{ gridColumn: 'span 2' }}>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Proforma Invoice (P/I No)</span>
-                                        {renderCell(row, { key: 'piNo' })}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Card 2: BPR & Delivery (DC) */}
-                                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', background: '#f8fafc' }}>
-                                    <h4 style={{ margin: '0 0 0.85rem 0', fontSize: '0.88rem', fontWeight: 700, color: '#7c3aed', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                      <Truck size={16} /> BPR & Delivery (DC)
-                                    </h4>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', fontSize: '0.82rem' }}>
-                                      <div>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>BPR Date</span>
-                                        {renderCell(row, { key: 'bprDate' })}
-                                      </div>
-                                      <div>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>BPR Net Qty</span>
-                                        {renderCell(row, { key: 'bprNetQty' })}
-                                      </div>
-                                      <div>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>DC No</span>
-                                        {renderCell(row, { key: 'dcNo' })}
-                                      </div>
-                                      <div>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>DC Date</span>
-                                        {renderCell(row, { key: 'dcDate' })}
-                                      </div>
-                                      <div style={{ gridColumn: 'span 2' }}>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>E-Way Status</span>
-                                        {renderCell(row, { key: 'ewayStatus' })}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Card 3: Tax Invoice & Billing */}
-                                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', background: '#f8fafc' }}>
-                                    <h4 style={{ margin: '0 0 0.85rem 0', fontSize: '0.88rem', fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                      <FileCheck size={16} /> Tax Invoice & Billing
-                                    </h4>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', fontSize: '0.82rem' }}>
-                                      <div>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Tax Inv No</span>
-                                        {renderCell(row, { key: 'tiNo' })}
-                                      </div>
-                                      <div>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Invoice Date</span>
-                                        {renderCell(row, { key: 'invoiceDate' })}
-                                      </div>
-                                      <div style={{ gridColumn: 'span 2' }}>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Total Bill Amount</span>
-                                        {renderCell(row, { key: 'totalBill' })}
-                                      </div>
-                                      <div>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Payment Recd (Auto)</span>
-                                        {renderCell(row, { key: 'paid' })}
-                                      </div>
-                                      <div>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Total Recd (Manual)</span>
-                                        {renderCell(row, { key: 'manualPaid' })}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Card 4: Reconciliation & TDS */}
-                                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', background: '#f8fafc' }}>
-                                    <h4 style={{ margin: '0 0 0.85rem 0', fontSize: '0.88rem', fontWeight: 700, color: '#d97706', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                      <Receipt size={16} /> Reconciliation & TDS
-                                    </h4>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', fontSize: '0.82rem' }}>
-                                      <div style={{ gridColumn: 'span 2' }}>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Cheque / Ref Details</span>
-                                        {renderCell(row, { key: 'paymentRef' })}
-                                      </div>
-                                      <div>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>TDS Deduction</span>
-                                        {renderCell(row, { key: 'tdsDeduction' })}
-                                      </div>
-                                      <div>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Due Status</span>
-                                        {renderCell(row, { key: 'dueStatus' })}
-                                      </div>
-                                      <div style={{ gridColumn: 'span 2' }}>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Outstanding Amount</span>
-                                        {renderCell(row, { key: 'outstanding' })}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                </div>
-
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
+                      <tr key={row.rowKey} onClick={() => setOpenedKey(row.rowKey)} style={{ cursor: 'pointer' }}>
+                        <td style={tdStyle}>{row.srNo}</td>
+                        <td style={tdStyle}>{row.date ? new Date(row.date).toLocaleDateString('en-GB') : '-'}</td>
+                        <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 700 }}>{row.partyName || '-'}</td>
+                        <td style={{ ...tdStyle, textAlign: 'left' }}>{row.productName || '-'}</td>
+                        <td style={{ ...tdStyle, textAlign: 'left', color: 'var(--accent-primary)', fontWeight: 600 }}>
+                          {row.tiNo !== 'Pending' ? row.tiNo : row.piNo}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: isPaidOff ? '#10b981' : '#ef4444' }}>
+                          ₹{parseFloat(row.outstanding || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{
+                            padding: '3px 8px',
+                            borderRadius: '10px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            background: isPaidOff ? '#ecfdf5' : isOverdue ? '#fef2f2' : '#fefce8',
+                            color: isPaidOff ? '#047857' : isOverdue ? '#dc2626' : '#d97706'
+                          }}>
+                            {isPaidOff ? 'Cleared' : isOverdue ? 'Overdue' : 'Due'}
+                          </span>
+                        </td>
+                        <td style={tdStyle}>
+                          <button type="button" className="btn btn-primary" style={{ padding: '0.3rem 0.7rem', fontSize: '0.78rem' }} onClick={(e) => { e.stopPropagation(); setOpenedKey(row.rowKey); }}>
+                            Open
+                          </button>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-
-            {/* Footer Metrics */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', padding: '1.25rem', background: 'var(--bg-card)', borderTop: '1px solid var(--border-color)' }}>
-               <StatMini title="Total Bill Amount" value={summaryTotals.totalBill} icon={FileText} color="#3b82f6" bg="#eff6ff" />
-               <StatMini title="Total Received" value={summaryTotals.totalReceived} icon={FileCheck} color="#9b62c4" bg="var(--table-header-bg)" />
-               <StatMini title="Outstanding Amount" value={summaryTotals.outstanding} icon={Percent} color="#ef4444" bg="#fee2e2" />
-               <StatMini title="TDS Deducted" value={summaryTotals.tds} icon={Receipt} color="#8b5cf6" bg="#f3e8ff" />
-               <StatMini title="Invoices" value={String(filteredRows.length)} icon={ShieldAlert} color="#eab308" bg="#fef9c3" />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', padding: '1rem', borderTop: '1px solid var(--border-color)' }}>
+              <StatMini title="Total Bill Amount" value={summaryTotals.totalBill} icon={FileText} color="#3b82f6" bg="#eff6ff" />
+              <StatMini title="Total Received" value={summaryTotals.totalReceived} icon={FileCheck} color="#9b62c4" bg="var(--table-header-bg)" />
+              <StatMini title="Outstanding Amount" value={summaryTotals.outstanding} icon={Percent} color="#ef4444" bg="#fee2e2" />
+              <StatMini title="TDS Deducted" value={summaryTotals.tds} icon={Receipt} color="#8b5cf6" bg="#f3e8ff" />
             </div>
-
-          </div>
-        ) : (
-          /* ================= MODE 2: COLLAPSIBLE ACCORDION SECTIONS ================= */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-            {/* Section 1 — Receipt Details */}
-            <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-              <div 
-                onClick={() => toggleSection('receipt')}
-                style={{ background: '#f8fafc', padding: '1rem 1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: openSections.receipt ? '1px solid var(--border-color)' : 'none' }}
-              >
-                <FileText size={18} color="#3b82f6" />
-                <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem' }}>Receipt Details</span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>({filteredRows.length} records)</span>
-                <button type="button" style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                  {openSections.receipt ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                </button>
-              </div>
-
-              {openSections.receipt && (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={tableStyle}>
-                    <thead>
-                       <tr>
-                         <th style={thStyle}>Sr No</th>
-                         <th style={thStyle}>M.R. Date</th>
-                         <th style={{ ...thStyle, minWidth: '160px' }}>Party Name</th>
-                         <th style={{ ...thStyle, minWidth: '140px' }}>Product</th>
-                         <th style={thStyle}>Recd Qty</th>
-                         <th style={{ ...thStyle, minWidth: '170px' }}>P / I No</th>
-                         <th style={thStyle}>BPR Date</th>
-                         <th style={{ ...thStyle, minWidth: '150px' }}>DC No</th>
-                         <th style={thStyle}>DC Date</th>
-                         <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
-                       </tr>
-                    </thead>
-                    <tbody>
-                      {filteredRows.map((row) => (
-                       <tr key={`receipt-${row.rowKey}`}>
-                         <td style={tdStyle}>{renderCell(row, {key: 'srNo'})}</td>
-                         <td style={tdStyle}>{renderCell(row, {key: 'date'})}</td>
-                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'partyName'})}</td>
-                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'productName'})}</td>
-                         <td style={tdStyle}>{renderCell(row, {key: 'receivedQty'})}</td>
-                         <td style={{...tdStyle, color: '#8b5cf6', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'piNo'})}</td>
-                         <td style={tdStyle}>{renderCell(row, {key: 'bprDate'})}</td>
-                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'dcNo'})}</td>
-                         <td style={tdStyle}>{renderCell(row, {key: 'dcDate'})}</td>
-                         <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'tiNo'})}</td>
-                       </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Section 2 — Invoice / Billing Details */}
-            <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-              <div 
-                onClick={() => toggleSection('billing')}
-                style={{ background: 'var(--table-header-bg)', padding: '1rem 1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: openSections.billing ? '1px solid var(--border-color)' : 'none' }}
-              >
-                <FileCheck size={18} color="#9b62c4" />
-                <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem' }}>Invoice / Billing Details</span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>({filteredRows.length} invoices)</span>
-                <button type="button" style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                  {openSections.billing ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                </button>
-              </div>
-
-              {openSections.billing && (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={tableStyle}>
-                    <thead>
-                       <tr>
-                         <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
-                         <th style={thStyle}>Invoice Date</th>
-                         <th style={thStyle}>Bill Amount</th>
-                         <th style={thStyle}>Payment Recd (Auto)</th>
-                         <th style={thStyle}>Total Recd (Manual)</th>
-                         <th style={{ ...thStyle, minWidth: '140px' }}>Cheque / Ref Details</th>
-                         <th style={{ ...thStyle, minWidth: '120px' }}>Payment Dates</th>
-                         <th style={{ ...thStyle, minWidth: '140px' }}>Amounts Received</th>
-                         <th style={thStyle}>TDS Deducted</th>
-                       </tr>
-                    </thead>
-                    <tbody>
-                      {filteredRows.map((row) => (
-                       <tr key={`billing-${row.rowKey}`}>
-                         <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'tiNo'})}</td>
-                         <td style={tdStyle}>{renderCell(row, {key: 'invoiceDate'})}</td>
-                         <td style={tdStyle}>{renderCell(row, {key: 'totalBill'})}</td>
-                         <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600 }}>{renderCell(row, {key: 'paid'})}</td>
-                         <td style={tdStyle}>{renderCell(row, {key: 'manualPaid'})}</td>
-                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentRef'})}</td>
-                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentDates'})}</td>
-                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentAmounts'})}</td>
-                         <td style={{...tdStyle, color: '#8b5cf6', fontWeight: 600 }}>{renderCell(row, {key: 'tdsDeduction'})}</td>
-                       </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Section 3 — Payment Reconciliation */}
-            <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-              <div 
-                onClick={() => toggleSection('recon')}
-                style={{ background: '#fefce8', padding: '1rem 1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: openSections.recon ? '1px solid var(--border-color)' : 'none' }}
-              >
-                <Receipt size={18} color="#eab308" />
-                <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem' }}>Payment Reconciliation</span>
-                <button type="button" style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                  {openSections.recon ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                </button>
-              </div>
-
-              {openSections.recon && (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={tableStyle}>
-                    <thead>
-                       <tr>
-                         <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
-                         <th style={thStyle}>Payment Recd (Auto)</th>
-                         <th style={thStyle}>Total Recd (Manual)</th>
-                         <th style={{ ...thStyle, minWidth: '140px' }}>Cheque / Ref Details</th>
-                         <th style={{ ...thStyle, minWidth: '120px' }}>Payment Dates</th>
-                         <th style={{ ...thStyle, minWidth: '140px' }}>Amounts Received</th>
-                         <th style={thStyle}>TDS Deduction</th>
-                         <th style={thStyle}>Due Status</th>
-                         <th style={thStyle}>Outstanding</th>
-                         <th style={thStyle}>E-Way</th>
-                       </tr>
-                    </thead>
-                    <tbody>
-                      {filteredRows.map((row) => (
-                       <tr key={`recon-${row.rowKey}`}>
-                         <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'tiNo'})}</td>
-                         <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600 }}>{renderCell(row, {key: 'paid'})}</td>
-                         <td style={tdStyle}>{renderCell(row, {key: 'manualPaid'})}</td>
-                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentRef'})}</td>
-                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentDates'})}</td>
-                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentAmounts'})}</td>
-                         <td style={{...tdStyle, color: '#8b5cf6', fontWeight: 600 }}>{renderCell(row, {key: 'tdsDeduction'})}</td>
-                         <td style={tdStyle}>{renderCell(row, {key: 'dueStatus'})}</td>
-                         <td style={{...tdStyle, color: '#ef4444', fontWeight: 600 }}>{renderCell(row, {key: 'outstanding'})}</td>
-                         <td style={tdStyle}>{renderCell(row, {key: 'ewayStatus'})}</td>
-                       </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Footer Metrics */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-               <StatMini title="Total Bill Amount" value={summaryTotals.totalBill} icon={FileText} color="#3b82f6" bg="#eff6ff" />
-               <StatMini title="Total Received" value={summaryTotals.totalReceived} icon={FileCheck} color="#9b62c4" bg="var(--table-header-bg)" />
-               <StatMini title="Outstanding Amount" value={summaryTotals.outstanding} icon={Percent} color="#ef4444" bg="#fee2e2" />
-               <StatMini title="TDS Deducted" value={summaryTotals.tds} icon={Receipt} color="#8b5cf6" bg="#f3e8ff" />
-               <StatMini title="Invoices" value={String(filteredRows.length)} icon={ShieldAlert} color="#eab308" bg="#fef9c3" />
-            </div>
-
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Calendar,
   Users,
@@ -19,11 +20,14 @@ import {
   X,
   FileText,
   UserCheck,
-  UserX
+  UserX,
+  Plus,
+  Edit2
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import DateField from '../components/DateField';
+import TimeField from '../components/TimeField';
 import SearchableSelect from '../components/SearchableSelect';
 import ExportButton from '../components/ExportButton';
 import { formatDate } from '../utils/dateUtils';
@@ -33,7 +37,11 @@ import {
   calculateTimes,
   punchesForAttendanceRow,
   getRawPunches,
-  money
+  money,
+  SHIFTS,
+  SHIFT_TYPES,
+  STATUS_CODES,
+  getShiftStdHours
 } from '../utils/payroll';
 import { DEPARTMENTS } from './EmployeeManagement';
 
@@ -74,7 +82,7 @@ const getEmployeeCategory = (u) => {
 };
 
 const DailyAttendance = () => {
-  const { data, updateData, updateItem, setData } = useAppContext();
+  const { data, setData } = useAppContext();
   const { currentUser, isAdmin } = useAuth();
 
   const [selectedDate, setSelectedDate] = useState(todayIso());
@@ -87,6 +95,17 @@ const DailyAttendance = () => {
   const [selectedIds, setSelectedIds] = useState([]);
   const [syncBusy, setSyncBusy] = useState(false);
   const [viewingRow, setViewingRow] = useState(null);
+  const [attModal, setAttModal] = useState(false);
+  const [attEditingId, setAttEditingId] = useState(null);
+  const [attForm, setAttForm] = useState({
+    userId: '',
+    date: todayIso(),
+    shift: 'Day',
+    inTime: '09:00',
+    outTime: '18:30',
+    statusCode: 'P',
+    remark: ''
+  });
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
@@ -104,6 +123,108 @@ const DailyAttendance = () => {
     d.setDate(d.getDate() + offsetDays);
     setSelectedDate(d.toISOString().slice(0, 10));
     setPage(1);
+  };
+
+  const replaceAttendance = (nextList) => {
+    setData((prev) => ({ ...prev, attendance: nextList }));
+  };
+
+  const upsertAttendanceRecord = (record) => {
+    setData((prev) => {
+      const list = [...(prev.attendance || [])];
+      const idx = list.findIndex(
+        (a) => !a.isDeleted && (
+          (record.id && String(a.id) === String(record.id))
+          || (String(a.userId) === String(record.userId) && a.date === record.date)
+        )
+      );
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...record, id: list[idx].id };
+      } else {
+        list.push(record);
+      }
+      return { ...prev, attendance: list };
+    });
+  };
+
+  const openManualCreate = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    const first = users[0];
+    const cfg = SHIFT_TYPES[first?.shiftType === '12hr' ? '12hr' : '9hr'] || SHIFT_TYPES['9hr'];
+    setAttEditingId(null);
+    setAttForm({
+      userId: String(first?.id || ''),
+      date: selectedDate,
+      shift: 'Day',
+      inTime: cfg.start,
+      outTime: cfg.end,
+      statusCode: 'P',
+      remark: ''
+    });
+    setAttModal(true);
+  };
+
+  const openManualEdit = (row) => {
+    const existing = row.rawRecord;
+    setAttEditingId(existing?.id || null);
+    setAttForm({
+      userId: String(row.userId),
+      date: selectedDate,
+      shift: row.shift === 'Night' ? 'Night' : 'Day',
+      inTime: row.inTime || '09:00',
+      outTime: row.outTime || '18:30',
+      statusCode: row.statusCode || (row.status === 'Absent' ? 'A' : 'P'),
+      remark: row.remark || ''
+    });
+    setAttModal(true);
+  };
+
+  const submitManualAtt = (e) => {
+    e.preventDefault();
+    const user = users.find((u) => String(u.id) === String(attForm.userId));
+    if (!user) {
+      alert('Please select an employee.');
+      return;
+    }
+    let calc = { totalHours: 0, otHours: 0, isLate: false, isEarlyLeave: false };
+    if (attForm.statusCode === 'P' || attForm.statusCode === 'HD') {
+      calc = calculateTimes(attForm.inTime, attForm.outTime, attForm.shift, getShiftStdHours(user));
+    }
+    const category = getEmployeeCategory(user);
+    const existing = (data.attendance || []).find(
+      (a) => !a.isDeleted && (
+        (attEditingId && String(a.id) === String(attEditingId))
+        || (String(a.userId) === String(attForm.userId) && a.date === attForm.date)
+      )
+    );
+    const record = {
+      ...(existing || {}),
+      id: existing?.id || attEditingId || `att-${attForm.userId}-${attForm.date}`,
+      userId: user.id,
+      date: attForm.date,
+      username: user.name || user.username,
+      employeeId: user.employeeId || '',
+      department: user.department || 'General',
+      shift: attForm.shift,
+      inTime: attForm.inTime || '',
+      outTime: attForm.outTime || '',
+      statusCode: attForm.statusCode,
+      status: STATUS_CODES[attForm.statusCode] || attForm.statusCode,
+      totalHours: calc.totalHours,
+      otHours: calc.otHours,
+      isLate: calc.isLate,
+      isEarlyLeave: calc.isEarlyLeave,
+      remark: attForm.remark || '',
+      source: 'manual',
+      approvalStatus: category === 'Factory' ? (existing?.approvalStatus || 'Pending') : 'Not Applicable',
+      updatedAt: new Date().toISOString(),
+      createdAt: existing?.createdAt || new Date().toISOString()
+    };
+    upsertAttendanceRecord(record);
+    if (attForm.date !== selectedDate) setSelectedDate(attForm.date);
+    setAttModal(false);
+    setAttEditingId(null);
   };
 
   // Synchronize biometric devices
@@ -277,7 +398,7 @@ const DailyAttendance = () => {
       }
     });
 
-    updateData('attendance', currentAtt);
+    replaceAttendance(currentAtt);
     setSelectedIds([]);
     alert(`Approved attendance for ${selectedIds.length} employee(s).`);
   };
@@ -307,7 +428,7 @@ const DailyAttendance = () => {
       }
     });
 
-    updateData('attendance', currentAtt);
+    replaceAttendance(currentAtt);
     setSelectedIds([]);
     alert(`Reset status to Pending for ${selectedIds.length} employee(s).`);
   };
@@ -367,7 +488,15 @@ const DailyAttendance = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={openManualCreate}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.65rem 1.25rem', background: '#5b1c85' }}
+          >
+            <Plus size={16} /> Manual Entry
+          </button>
           <button
             type="button"
             className="btn btn-primary"
@@ -707,14 +836,25 @@ const DailyAttendance = () => {
                         </td>
 
                         <td style={{ padding: '10px 8px', textAlign: 'right' }}>
-                          <button
-                            type="button"
-                            className="btn btn-sm"
-                            onClick={() => setViewingRow(r)}
-                            style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid var(--border-color)' }}
-                          >
-                            <Eye size={13} /> View
-                          </button>
+                          <div style={{ display: 'inline-flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              onClick={() => openManualEdit(r)}
+                              title="Manual entry / edit"
+                              style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid var(--border-color)' }}
+                            >
+                              <Edit2 size={13} /> {r.category === 'Office' || r.source === 'manual' ? 'Manual' : 'Edit'}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              onClick={() => setViewingRow(r)}
+                              style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid var(--border-color)' }}
+                            >
+                              <Eye size={13} /> View
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1029,7 +1169,7 @@ const DailyAttendance = () => {
                   if (idx >= 0) currentAtt[idx] = { ...currentAtt[idx], ...updatedItem };
                   else currentAtt.push(updatedItem);
 
-                  updateData('attendance', currentAtt);
+                  replaceAttendance(currentAtt);
                   setViewingRow(null);
                 }}
               >
@@ -1041,6 +1181,98 @@ const DailyAttendance = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {attModal && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 5000,
+            background: 'rgba(31, 11, 56, 0.45)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            padding: '4.5rem 1rem 2rem',
+            overflowY: 'auto'
+          }}
+        >
+          <div className="premium-card" style={{ maxWidth: 720, width: '100%', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>
+                {attEditingId ? 'Edit Manual Attendance' : 'Manual Attendance Entry'}
+              </h2>
+              <button type="button" className="btn" onClick={() => setAttModal(false)}><X size={16} /></button>
+            </div>
+            <form onSubmit={submitManualAtt}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group pm-field">
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600 }}>Date *</label>
+                  <DateField className="input-field" required value={attForm.date} onChange={(e) => setAttForm({ ...attForm, date: e.target.value })} />
+                </div>
+                <div className="form-group pm-field">
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600 }}>Employee *</label>
+                  <SearchableSelect className="input-field" required value={attForm.userId} onChange={(e) => setAttForm({ ...attForm, userId: e.target.value })}>
+                    <option value="">Select employee</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={String(u.id)}>
+                        {u.employeeId ? `${u.employeeId} - ` : ''}{u.name || u.username}
+                      </option>
+                    ))}
+                  </SearchableSelect>
+                </div>
+                <div className="form-group pm-field">
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600 }}>Status *</label>
+                  <SearchableSelect className="input-field" value={attForm.statusCode} onChange={(e) => setAttForm({ ...attForm, statusCode: e.target.value })}>
+                    {Object.entries(STATUS_CODES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </SearchableSelect>
+                </div>
+                <div className="form-group pm-field">
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600 }}>Shift Band</label>
+                  <SearchableSelect
+                    className="input-field"
+                    value={attForm.shift}
+                    onChange={(e) => {
+                      const shift = e.target.value;
+                      const cfg = SHIFTS[shift] || SHIFTS.Day;
+                      setAttForm({ ...attForm, shift, inTime: cfg.start, outTime: cfg.end });
+                    }}
+                  >
+                    {Object.entries(SHIFTS).map(([k, v]) => (
+                      <option key={k} value={k}>{k} ({v.start} – {v.end})</option>
+                    ))}
+                  </SearchableSelect>
+                </div>
+                {['P', 'HD'].includes(attForm.statusCode) && (
+                  <>
+                    <div className="form-group pm-field">
+                      <label style={{ fontSize: '0.82rem', fontWeight: 600 }}>In Time</label>
+                      <TimeField className="input-field" required value={attForm.inTime} onChange={(e) => setAttForm({ ...attForm, inTime: e.target.value })} />
+                    </div>
+                    <div className="form-group pm-field">
+                      <label style={{ fontSize: '0.82rem', fontWeight: 600 }}>Out Time</label>
+                      <TimeField className="input-field" required value={attForm.outTime} onChange={(e) => setAttForm({ ...attForm, outTime: e.target.value })} />
+                    </div>
+                  </>
+                )}
+                <div className="form-group pm-field" style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600 }}>Remark</label>
+                  <input className="input-field" value={attForm.remark} onChange={(e) => setAttForm({ ...attForm, remark: e.target.value })} placeholder="Optional note" />
+                </div>
+              </div>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0.75rem 0 0' }}>
+                Manual entries are saved for office staff and for any employee when biometric data is missing. Factory rows stay pending until approved.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
+                <button type="button" className="btn" onClick={() => setAttModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Save Entry</button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
 
     </div>

@@ -38,3 +38,13 @@ export function generateEmployeeId(existingUsers = []) {
   const next = nums.length ? Math.max(...nums) + 1 : 1;
   return `EMP${String(next).padStart(3, '0')}`;
 }
+
+/** Numeric user id for DB sync (PostgreSQL SERIAL) and stable list keys. */
+export function nextUserRecordId(existingUsers = []) {
+  let max = 0;
+  (existingUsers || []).forEach((u) => {
+    const n = parseInt(String(u?.id ?? ''), 10);
+    if (Number.isFinite(n) && n > max) max = n;
+  });
+  return String(max + 1);
+}

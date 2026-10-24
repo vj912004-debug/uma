@@ -75,6 +75,40 @@ export async function saveErpState(data) {
   );
 }
 
+function parseDbUserId(id) {
+  const n = parseInt(String(id ?? ''), 10);
+  if (!Number.isFinite(n) || n <= 0 || n > 2147483647) return null;
+  return n;
+}
+
+function mergeUsersFromErp(dbUsers = [], erpUsers = []) {
+  if (!Array.isArray(erpUsers) || !erpUsers.length) return dbUsers;
+  const authByUsername = new Map(
+    dbUsers.map((u) => [String(u.username || '').toLowerCase(), u])
+  );
+  const authById = new Map(dbUsers.map((u) => [String(u.id), u]));
+  const merged = erpUsers.map((u) => {
+    const auth =
+      authById.get(String(u.id))
+      || authByUsername.get(String(u.username || '').toLowerCase());
+    if (!auth) return u;
+    return {
+      ...u,
+      id: u.id ?? auth.id,
+      passwordHash: auth.passwordHash || u.passwordHash,
+      active: auth.active !== undefined ? auth.active : u.active
+    };
+  });
+  erpUsers.forEach((u) => {
+    const exists = merged.some(
+      (m) => String(m.id) === String(u.id)
+        || (m.username && u.username && String(m.username).toLowerCase() === String(u.username).toLowerCase())
+    );
+    if (!exists) merged.push(u);
+  });
+  return merged;
+}
+
 export async function syncUsers(users = []) {
   for (const user of users) {
     if (!user?.username) continue;
@@ -82,7 +116,8 @@ export async function syncUsers(users = []) {
     const passwordHash = user.passwordHash
       || '0000000000000000000000000000000000000000000000000000000000000000';
 
-    if (user.id) {
+    const dbId = parseDbUserId(user.id);
+    if (dbId) {
       await query(
         `INSERT INTO users (id, employee_id, username, password_hash, name, department, role, permissions, active)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -100,7 +135,7 @@ export async function syncUsers(users = []) {
            END,
            updated_at = NOW()`,
         [
-          user.id,
+          dbId,
           user.employeeId || null,
           user.username,
           passwordHash,
@@ -139,7 +174,8 @@ export async function syncUsers(users = []) {
 }
 
 export async function buildFullState() {
-  const [users, erpState] = await Promise.all([fetchUsers(), fetchErpState()]);
+  const [dbUsers, erpState] = await Promise.all([fetchUsers(), fetchErpState()]);
+  const users = mergeUsersFromErp(dbUsers, erpState.users);
   return {
     ...erpState,
     users,
@@ -150,7 +186,7 @@ export async function buildFullState() {
 export async function persistClientState(payload) {
   const { users = [], currentUser, ...erpState } = payload || {};
   await syncUsers(users);
-  await saveErpState(erpState);
+  await saveErpState({ ...erpState, users });
 }
 
 export async function appendAuditLogs(logs = []) {

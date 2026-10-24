@@ -84,16 +84,17 @@ const mergeChargeDefs = (catalog = [], own = []) => {
   return [...byKey.values()];
 };
 
-/** Company quote header charges; `sectionKey` is the print row each one feeds. */
+/** Company quote header charges; `sectionKey` is the charge key used for print / drag. */
 const COMPANY_HEADER_CHARGES = [
-  { field: 'minimum', key: 'minimum', label: 'Minimum Charge', hint: 'Prints with Cleaning' },
-  { field: 'filterBag', key: 'filterBag', label: 'Filter Bag Charge' },
-  { field: 'sieving', key: 'sieving', label: 'Sieving Charge' },
-  { field: 'cleaning', key: 'cleaning', label: 'Cleaning Charge' },
-  { field: 'other', key: 'other', label: 'Other Charges (If Any)' }
+  { field: 'minimum', sectionKey: 'cleaning', label: 'Minimum Charge', hint: 'Prints with Cleaning' },
+  { field: 'filterBag', sectionKey: 'filterBag', label: 'Filter Bag Charge' },
+  { field: 'sieving', sectionKey: 'sieving', label: 'Sieving Charge' },
+  { field: 'processing', sectionKey: 'processing', label: 'Processing Charge' },
+  { field: 'cleaning', sectionKey: 'cleaning', label: 'Cleaning Charge' },
+  { field: 'other', sectionKey: 'other', label: 'Other Charges (If Any)' }
 ];
 
-const COMPANY_HEADER_KEYS = new Set(COMPANY_HEADER_CHARGES.map((item) => item.key));
+const COMPANY_HEADER_KEYS = new Set(COMPANY_HEADER_CHARGES.map((item) => item.sectionKey));
 
 const CHARGE_NOTE_SUGGESTIONS = [
   'Nil if Qty is more than 500kg',
@@ -1032,8 +1033,8 @@ const handleSameCompanyQuote = (q) => {
 
   const companyChargeCards = (section) => {
     const header = COMPANY_HEADER_CHARGES
-      .filter((item) => getChargeSection(formData.chargeSection, item.key) === section)
-      .map((item) => ({ ...item, kind: 'header', id: `h-${item.field}`, sectionKey: item.key }));
+      .filter((item) => getChargeSection(formData.chargeSection, item.sectionKey) === section)
+      .map((item) => ({ ...item, kind: 'header', id: `h-${item.field}`, key: item.sectionKey }));
     const extra = chargeDefsOf(formData)
       .filter((item) => !COMPANY_HEADER_KEYS.has(item.key) && item.key !== 'processing' && sectionOfDef(formData.chargeSection, item) === section)
       .map((item) => ({ ...item, kind: 'catalog', id: item.key, sectionKey: item.key }));
@@ -1068,7 +1069,7 @@ const handleSameCompanyQuote = (q) => {
         >
           <GripVertical size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           {isMain && isHeader ? (
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#9b62c4', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#5b1c85', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {card.label}
             </span>
           ) : (
@@ -1145,7 +1146,7 @@ const handleSameCompanyQuote = (q) => {
         onDrop={(e) => handleChargeDrop(e, zone)}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', gap: '0.5rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#9b62c4', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#5b1c85', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <span>{section === 'main' ? 'Main Charges' : 'Optional Charges'}</span>
             <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.72rem' }}>
               {section === 'main'
@@ -1163,7 +1164,7 @@ const handleSameCompanyQuote = (q) => {
               alignItems: 'center',
               gap: '0.25rem',
               border: '1px solid #c4b5fd',
-              color: '#9b62c4',
+              color: '#5b1c85',
               background: '#fff',
               fontWeight: 600
             }}
@@ -1464,7 +1465,7 @@ const handleSameCompanyQuote = (q) => {
 
               {formData.companyQuoteMode && (
                 <div style={{ border: '1px solid #ddd6fe', borderRadius: '12px', overflow: 'hidden', marginBottom: '1.25rem', background: '#fff' }}>
-                  <div style={{ background: '#9b62c4', color: '#fff', padding: '0.75rem 1rem', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ background: '#5b1c85', color: '#fff', padding: '0.75rem 1rem', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>Products &amp; Default Charges</span>
                     <span style={{ fontSize: '0.75rem', fontWeight: 400, opacity: 0.9 }}>
                       Drag &amp; drop charges between Main and Optional
