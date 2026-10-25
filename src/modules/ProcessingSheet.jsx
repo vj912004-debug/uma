@@ -41,6 +41,13 @@ const toDateInputValue = (val) => {
   return d.toISOString().split('T')[0];
 };
 
+const SheetField = ({ label, children }) => (
+  <div className="ps-field">
+    <label>{label}</label>
+    {children}
+  </div>
+);
+
 const StatMini = ({ title, value, icon: Icon, color, bg }) => {
   const isCurrency = typeof value === 'number' && title !== 'Due Status';
   const displayValue = isCurrency ? `₹${parseFloat(value || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : value;
@@ -325,137 +332,43 @@ const ProcessingSheet = () => {
     { key: 'ewayStatus', label: 'E-Way' }
   ];
 
-  const fullTextStyle = (value, minPx = 80) => {
-    const len = String(value ?? '').length;
-    return {
-      minWidth: `${Math.max(minPx, Math.ceil(len * 8.2) + 16)}px`,
-      width: 'auto',
-      textAlign: 'left',
-      overflow: 'visible'
-    };
+  const renderSheetField = (row, key) => {
+    const value = row[key];
+    if (key !== 'paymentDates' && DATE_COLUMNS.has(key)) {
+      return (
+        <DateField
+          className="input-field"
+          value={toDateInputValue(value)}
+          onChange={(e) => handleCellChange(row.id, key, e.target.value, row.invoiceId)}
+        />
+      );
+    }
+    if (key === 'paid') {
+      return <input className="input-field" readOnly value={`₹${parseFloat(value || 0).toFixed(2)}`} />;
+    }
+    return (
+      <input
+        className="input-field"
+        type="text"
+        value={value ?? ''}
+        onChange={(e) => handleCellChange(row.id, key, e.target.value, row.invoiceId)}
+      />
+    );
   };
 
-  const renderInput = (row, field, value, extraStyle = {}) => (
-    <input
-      type="text"
-      value={value ?? ''}
-      size={Math.max(8, String(value ?? '').length + 1)}
-      onChange={(e) => handleCellChange(row.id, field, e.target.value, row.invoiceId)}
-      title={value ?? ''}
-      style={{
-        background: 'transparent',
-        border: '1px solid transparent',
-        color: 'inherit',
-        width: 'auto',
-        minWidth: '60px',
-        fontSize: 'inherit',
-        outline: 'none',
-        fontFamily: 'inherit',
-        fontWeight: 'inherit',
-        padding: '2px 4px',
-        borderRadius: '4px',
-        textAlign: 'center',
-        transition: 'all 0.2s ease',
-        overflow: 'visible',
-        ...extraStyle
-      }}
-      onFocus={(e) => { 
-        e.target.style.background = 'var(--bg-input, #fff)';
-        e.target.style.border = '1px solid var(--accent-primary)'; 
-      }}
-      onBlur={(e) => { 
-        e.target.style.background = 'transparent';
-        e.target.style.border = '1px solid transparent'; 
-      }}
-    />
-  );
-
-  const renderDateInput = (row, field, value) => (
-    <DateField
-      className="dt-cell-input"
-      value={toDateInputValue(value)}
-      onChange={(e) => handleCellChange(row.id, field, e.target.value, row.invoiceId)}
-      style={{
-        width: '100%',
-        minWidth: '118px',
-      }}
-    />
-  );
-
-  const renderCell = (row, col) => {
-    const value = row[col.key];
-    if (DATE_COLUMNS.has(col.key)) {
-      return renderDateInput(row, col.key, value);
-    }
-    switch (col.key) {
-      case 'srNo':
-        return <span style={{ fontWeight: 600 }}>{row.srNo}</span>;
-      case 'paid':
-        return <span>₹{parseFloat(value || 0).toFixed(2)}</span>;
-      case 'tdsDeduction':
-        return renderInput(row, 'tdsDeduction', value, fullTextStyle(value, 70));
-      case 'dueStatus':
-        return renderInput(row, 'dueStatus', value, {
-          ...fullTextStyle(value, 70),
-          textAlign: 'center',
-          fontWeight: 700,
-          color: value === 'Overdue' ? '#ef4444' : value === '0' ? '#10b981' : '#f59e0b'
-        });
-      case 'outstanding':
-        return renderInput(row, 'outstanding', value, {
-          ...fullTextStyle(value, 90),
-          textAlign: 'right',
-          fontWeight: 700,
-          color: parseFloat(value) > 0 ? '#ef4444' : 'inherit'
-        });
-      case 'piNo':
-        return renderInput(row, 'piNo', value, fullTextStyle(value, 170));
-      case 'tiNo':
-        return renderInput(row, 'tiNo', value, fullTextStyle(value, 170));
-      case 'dcNo':
-        return renderInput(row, 'dcNo', value, fullTextStyle(value, 150));
-      case 'manualPaid':
-        return renderInput(row, 'manualPaid', value, fullTextStyle(value, 80));
-      case 'partyName':
-        return renderInput(row, 'partyName', value, fullTextStyle(value, 160));
-      case 'productName':
-        return renderInput(row, 'productName', value, fullTextStyle(value, 140));
-      case 'paymentAmounts':
-        return renderInput(row, 'paymentAmounts', value, fullTextStyle(value, 140));
-      case 'paymentRef':
-        return renderInput(row, 'paymentRef', value, fullTextStyle(value, 140));
-      case 'totalBill':
-        return renderInput(row, 'totalBill', value, fullTextStyle(value, 90));
-      case 'receivedQty':
-        return renderInput(row, 'receivedQty', value, fullTextStyle(value, 70));
-      case 'ewayStatus':
-        return renderInput(row, 'ewayStatus', value, fullTextStyle(value, 80));
-      default:
-        return renderInput(row, col.key, value, fullTextStyle(value, 80));
-    }
-  };
-
-  const thStyle = { padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-muted)', background: 'var(--bg-card)', borderBottom: '1px solid var(--border-color)', fontSize: '0.78rem', whiteSpace: 'nowrap' };
-  const tdStyle = { padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'visible' };
-  const tableStyle = { width: '100%', borderCollapse: 'collapse', textAlign: 'center', tableLayout: 'auto' };
   const openedRow = openedKey ? rows.find((row) => row.rowKey === openedKey) : null;
 
   return (
-    <div style={{ paddingBottom: '2rem' }}>
-      <header style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '1rem' }}>
+    <div className="ps-page">
+      <header className="page-header">
         <div>
-          <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Table size={26} color="var(--accent-primary)" />
-            Excel Processing Sheet
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Table size={22} />
+            Processing Sheet
           </h1>
-          <p style={{ color: 'var(--text-muted)', margin: '0.25rem 0 0', fontSize: '0.88rem' }}>
-            Click a row to open that sheet.
-          </p>
+          <p className="page-subtitle">Click a row to open that sheet and edit the details.</p>
         </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <ExportButton data={filteredRows} columns={tableCols} filename="Master_Processing_Sheet" title="Master Processing Sheet" />
-        </div>
+        <ExportButton data={filteredRows} columns={tableCols} filename="Master_Processing_Sheet" title="Master Processing Sheet" />
       </header>
 
       {!openedRow && (
@@ -508,7 +421,7 @@ const ProcessingSheet = () => {
 
       <div>
         {openedRow ? (
-          <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.25rem' }}>
+          <div className="premium-card ps-sheet">
             <button
               type="button"
               className="btn"
@@ -517,66 +430,54 @@ const ProcessingSheet = () => {
             >
               <ChevronLeft size={16} /> Back to list
             </button>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>{openedRow.partyName || 'Sheet'}</h2>
-                <p style={{ margin: '0.3rem 0 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-                  {openedRow.productName || '—'} · {openedRow.date ? new Date(openedRow.date).toLocaleDateString('en-GB') : '—'} · {openedRow.tiNo !== 'Pending' ? openedRow.tiNo : openedRow.piNo}
-                </p>
+            <div className="ps-sheet-head">
+              <div style={{ flex: '1 1 280px', minWidth: 0 }}>
+                <SheetField label="Party Name">
+                  {renderSheetField(openedRow, 'partyName')}
+                </SheetField>
+                <SheetField label="Product">
+                  {renderSheetField(openedRow, 'productName')}
+                </SheetField>
               </div>
-              <strong style={{ color: (parseFloat(openedRow.outstanding) || 0) <= 0.01 ? '#10b981' : '#ef4444' }}>
+              <strong className={(parseFloat(openedRow.outstanding) || 0) <= 0.01 ? 'ps-cleared' : 'ps-due'}>
                 {(parseFloat(openedRow.outstanding) || 0) <= 0.01
                   ? 'Cleared'
                   : `Outstanding ₹${parseFloat(openedRow.outstanding || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
               </strong>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-              <div style={{ border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1rem' }}>
-                <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#5b1c85', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><FileText size={16} /> Receipt</h3>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>M.R. Date</label>
-                {renderCell(openedRow, { key: 'date' })}
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Received Qty</label>
-                {renderCell(openedRow, { key: 'receivedQty' })}
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>PI No</label>
-                {renderCell(openedRow, { key: 'piNo' })}
-              </div>
-              <div style={{ border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1rem' }}>
-                <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#5b1c85', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Truck size={16} /> Delivery</h3>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>BPR Date</label>
-                {renderCell(openedRow, { key: 'bprDate' })}
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>BPR Qty</label>
-                {renderCell(openedRow, { key: 'bprNetQty' })}
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>DC No</label>
-                {renderCell(openedRow, { key: 'dcNo' })}
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>DC Date</label>
-                {renderCell(openedRow, { key: 'dcDate' })}
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>E-Way</label>
-                {renderCell(openedRow, { key: 'ewayStatus' })}
-              </div>
-              <div style={{ border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1rem' }}>
-                <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#5b1c85', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><FileCheck size={16} /> Invoice</h3>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Tax Invoice</label>
-                {renderCell(openedRow, { key: 'tiNo' })}
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Invoice Date</label>
-                {renderCell(openedRow, { key: 'invoiceDate' })}
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Bill Amount</label>
-                {renderCell(openedRow, { key: 'totalBill' })}
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Received (Auto)</label>
-                {renderCell(openedRow, { key: 'paid' })}
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Received (Manual)</label>
-                {renderCell(openedRow, { key: 'manualPaid' })}
-              </div>
-              <div style={{ border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1rem' }}>
-                <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#5b1c85', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Receipt size={16} /> Payment</h3>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Cheque / Ref</label>
-                {renderCell(openedRow, { key: 'paymentRef' })}
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>TDS</label>
-                {renderCell(openedRow, { key: 'tdsDeduction' })}
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Due Status</label>
-                {renderCell(openedRow, { key: 'dueStatus' })}
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.6rem' }}>Outstanding</label>
-                {renderCell(openedRow, { key: 'outstanding' })}
-              </div>
+            <div className="ps-sheet-grid">
+              <section className="ps-sheet-card">
+                <h3><FileText size={16} /> Receipt</h3>
+                <SheetField label="M.R. Date">{renderSheetField(openedRow, 'date')}</SheetField>
+                <SheetField label="Received Qty">{renderSheetField(openedRow, 'receivedQty')}</SheetField>
+                <SheetField label="PI No">{renderSheetField(openedRow, 'piNo')}</SheetField>
+              </section>
+              <section className="ps-sheet-card">
+                <h3><Truck size={16} /> Delivery</h3>
+                <SheetField label="BPR Date">{renderSheetField(openedRow, 'bprDate')}</SheetField>
+                <SheetField label="BPR Qty">{renderSheetField(openedRow, 'bprNetQty')}</SheetField>
+                <SheetField label="DC No">{renderSheetField(openedRow, 'dcNo')}</SheetField>
+                <SheetField label="DC Date">{renderSheetField(openedRow, 'dcDate')}</SheetField>
+                <SheetField label="DC Qty">{renderSheetField(openedRow, 'dcNetQty')}</SheetField>
+                <SheetField label="E-Way">{renderSheetField(openedRow, 'ewayStatus')}</SheetField>
+              </section>
+              <section className="ps-sheet-card">
+                <h3><FileCheck size={16} /> Invoice</h3>
+                <SheetField label="Tax Invoice">{renderSheetField(openedRow, 'tiNo')}</SheetField>
+                <SheetField label="Invoice Date">{renderSheetField(openedRow, 'invoiceDate')}</SheetField>
+                <SheetField label="Bill Amount">{renderSheetField(openedRow, 'totalBill')}</SheetField>
+                <SheetField label="Received (Auto)">{renderSheetField(openedRow, 'paid')}</SheetField>
+                <SheetField label="Received (Manual)">{renderSheetField(openedRow, 'manualPaid')}</SheetField>
+              </section>
+              <section className="ps-sheet-card">
+                <h3><Receipt size={16} /> Payment</h3>
+                <SheetField label="Cheque / Ref">{renderSheetField(openedRow, 'paymentRef')}</SheetField>
+                <SheetField label="Payment Dates">{renderSheetField(openedRow, 'paymentDates')}</SheetField>
+                <SheetField label="Amounts Received">{renderSheetField(openedRow, 'paymentAmounts')}</SheetField>
+                <SheetField label="TDS">{renderSheetField(openedRow, 'tdsDeduction')}</SheetField>
+                <SheetField label="Due Status">{renderSheetField(openedRow, 'dueStatus')}</SheetField>
+                <SheetField label="Outstanding">{renderSheetField(openedRow, 'outstanding')}</SheetField>
+              </section>
             </div>
           </div>
         ) : rows.length === 0 ? (
@@ -589,19 +490,29 @@ const ProcessingSheet = () => {
             No sheets match these filters.
           </div>
         ) : (
-          <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={tableStyle}>
+          <div className="premium-card ps-list-card">
+            <div>
+              <table className="ps-table">
+                <colgroup>
+                  <col className="ps-col-sr" />
+                  <col className="ps-col-date" />
+                  <col className="ps-col-party" />
+                  <col className="ps-col-product" />
+                  <col className="ps-col-inv" />
+                  <col className="ps-col-out" />
+                  <col className="ps-col-status" />
+                  <col className="ps-col-open" />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th style={thStyle}>Sr</th>
-                    <th style={thStyle}>Date</th>
-                    <th style={{ ...thStyle, textAlign: 'left' }}>Party</th>
-                    <th style={{ ...thStyle, textAlign: 'left' }}>Product</th>
-                    <th style={{ ...thStyle, textAlign: 'left' }}>Invoice</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Outstanding</th>
-                    <th style={thStyle}>Status</th>
-                    <th style={thStyle}>Open</th>
+                    <th>Sr</th>
+                    <th>Date</th>
+                    <th>Party</th>
+                    <th>Product</th>
+                    <th>Invoice</th>
+                    <th>Outstanding</th>
+                    <th>Status</th>
+                    <th>Open</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -609,31 +520,22 @@ const ProcessingSheet = () => {
                     const isPaidOff = (parseFloat(row.outstanding) || 0) <= 0.01;
                     const isOverdue = row.dueStatus === 'Overdue';
                     return (
-                      <tr key={row.rowKey} onClick={() => setOpenedKey(row.rowKey)} style={{ cursor: 'pointer' }}>
-                        <td style={tdStyle}>{row.srNo}</td>
-                        <td style={tdStyle}>{row.date ? new Date(row.date).toLocaleDateString('en-GB') : '-'}</td>
-                        <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 700 }}>{row.partyName || '-'}</td>
-                        <td style={{ ...tdStyle, textAlign: 'left' }}>{row.productName || '-'}</td>
-                        <td style={{ ...tdStyle, textAlign: 'left', color: 'var(--accent-primary)', fontWeight: 600 }}>
-                          {row.tiNo !== 'Pending' ? row.tiNo : row.piNo}
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: isPaidOff ? '#10b981' : '#ef4444' }}>
+                      <tr key={row.rowKey} onClick={() => setOpenedKey(row.rowKey)}>
+                        <td>{row.srNo}</td>
+                        <td className="ps-date">{row.date ? new Date(row.date).toLocaleDateString('en-GB') : '-'}</td>
+                        <td className="ps-party">{row.partyName || '-'}</td>
+                        <td>{row.productName || '-'}</td>
+                        <td className="ps-inv">{row.tiNo !== 'Pending' ? row.tiNo : row.piNo}</td>
+                        <td className={isPaidOff ? 'ps-money ps-cleared' : 'ps-money ps-due'}>
                           ₹{parseFloat(row.outstanding || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
-                        <td style={tdStyle}>
-                          <span style={{
-                            padding: '3px 8px',
-                            borderRadius: '10px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            background: isPaidOff ? '#ecfdf5' : isOverdue ? '#fef2f2' : '#fefce8',
-                            color: isPaidOff ? '#047857' : isOverdue ? '#dc2626' : '#d97706'
-                          }}>
+                        <td>
+                          <span className={`ps-status ${isPaidOff ? 'is-cleared' : isOverdue ? 'is-overdue' : 'is-due'}`}>
                             {isPaidOff ? 'Cleared' : isOverdue ? 'Overdue' : 'Due'}
                           </span>
                         </td>
-                        <td style={tdStyle}>
-                          <button type="button" className="btn btn-primary" style={{ padding: '0.3rem 0.7rem', fontSize: '0.78rem' }} onClick={(e) => { e.stopPropagation(); setOpenedKey(row.rowKey); }}>
+                        <td>
+                          <button type="button" className="btn btn-primary ps-open" onClick={(e) => { e.stopPropagation(); setOpenedKey(row.rowKey); }}>
                             Open
                           </button>
                         </td>

@@ -41,8 +41,7 @@ import {
   PhoneCall,
   Fingerprint,
   RefreshCw,
-  CheckCircle2,
-  Hexagon
+  CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { canAccessModule } from '../utils/moduleAccess';
@@ -94,7 +93,7 @@ const Sidebar = () => {
     },
     {
       key: 'payments',
-      title: 'Payments & Due',
+      title: 'Payments',
       icon: CreditCard,
       items: [
         { name: 'Payment Follow-Up', icon: Phone, path: '/payment-follow-up', roles: ['Admin', 'Staff'] },
@@ -104,7 +103,7 @@ const Sidebar = () => {
     },
     {
       key: 'marketing',
-      title: 'Marketing & Leads',
+      title: 'Marketing',
       icon: Megaphone,
       items: [
         { name: 'Lead Entry', icon: UserPlus, path: '/marketing', roles: ['Admin', 'Staff'] },
@@ -113,7 +112,7 @@ const Sidebar = () => {
     },
     {
       key: 'procurement',
-      title: 'Procurement & Utility',
+      title: 'Procurement & Maintenance',
       icon: Wrench,
       items: [
         { name: 'Purchase Dashboard', icon: ShoppingCart, path: '/purchase-management', roles: ['Admin', 'Staff'] },
@@ -154,7 +153,7 @@ const Sidebar = () => {
     },
     {
       key: 'reports',
-      title: 'Reports & Sheets',
+      title: 'Reports & Logs',
       icon: Grid,
       items: [
         { name: 'Processing Sheet', icon: Grid, path: '/processing-sheet', roles: ['Admin', 'Staff'] },
@@ -216,71 +215,64 @@ const Sidebar = () => {
 
   const loginId = String(currentUser?.username || '').trim();
   const storedName = String(currentUser?.name || '').trim();
-  const displayName = storedName || loginId || 'Amit Patel';
+  const displayName = storedName || loginId || 'Admin';
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 1)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase() || 'A';
 
   return (
     <aside className="sidebar">
-      {/* Brand Header */}
-      <div className="sidebar-brand-container">
-        <div className="sidebar-logo-icon">
-          <Hexagon size={24} className="logo-hex-icon" />
-          <span className="logo-center-letter">U</span>
-        </div>
-        <div className="sidebar-brand-text">
-          <h1 className="brand-title">UMA MICRONS</h1>
-          <p className="brand-subtitle">API Micronization ERP</p>
+      <div className="sidebar-brand">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div className="sidebar-brand-logo">M</div>
+          <div>
+            <h1>UMA MICRON</h1>
+            <p>Micronization of API's</p>
+          </div>
         </div>
       </div>
 
-      {/* Nav Section */}
       <nav className="sidebar-nav">
-        {/* Main Section Header */}
-        <div className="sidebar-nav-section-label">MAIN MENU</div>
-
-        {/* Dashboard Direct Link */}
         {userRole && canSee('/') && (
           <NavLink
             to="/"
             end
             className={({ isActive }) =>
-              ['sidebar-main-link', isActive ? 'active' : ''].filter(Boolean).join(' ')
+              ['nav-link', isActive ? 'active' : ''].filter(Boolean).join(' ')
             }
           >
-            <LayoutDashboard size={16} />
+            <LayoutDashboard size={15} />
             <span>Dashboard</span>
           </NavLink>
         )}
 
-        {/* Master Data Direct Link */}
         {userRole && canSee('/parties') && (
           <NavLink
             to="/parties"
             className={({ isActive }) =>
-              ['sidebar-main-link', isActive ? 'active' : ''].filter(Boolean).join(' ')
+              ['nav-link', isActive ? 'active' : ''].filter(Boolean).join(' ')
             }
           >
-            <Users size={16} />
+            <Users size={15} />
             <span>Master Data</span>
           </NavLink>
         )}
 
-        {/* Production Planning Direct Link */}
         {userRole && canSee('/production-planning') && (
           <NavLink
             to="/production-planning"
             className={({ isActive }) =>
-              ['sidebar-main-link', isActive ? 'active' : ''].filter(Boolean).join(' ')
+              ['nav-link', isActive ? 'active' : ''].filter(Boolean).join(' ')
             }
           >
-            <Calendar size={16} />
+            <Calendar size={15} />
             <span>Production Planning</span>
           </NavLink>
         )}
-
-        {/* Section Divider Label */}
-        <div className="sidebar-nav-section-label" style={{ marginTop: '0.85rem' }}>
-          MODULES & WORKFLOW
-        </div>
 
         {/* Collapsible Accordion Groups */}
         {groups.map((group) => {
@@ -295,29 +287,22 @@ const Sidebar = () => {
 
           const isExpanded = expandedGroups[group.key];
 
-          const isChildActive = visibleItems.some((item) => {
-            if (item.hash) {
-              return location.pathname === '/purchase-management' && location.hash === item.hash;
-            }
-            return location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
-          });
-
           return (
             <div key={group.key} className="sidebar-group">
               <button
-                className={`sidebar-group-header ${isChildActive ? 'has-active-child' : ''} ${isExpanded ? 'expanded' : ''}`}
+                className="sidebar-group-header"
                 onClick={() => toggleGroup(group.key)}
                 aria-expanded={isExpanded}
               >
-                <span className="sidebar-group-header-left">
-                  <group.icon size={16} />
+                <span className="sidebar-group-header-content">
+                  <group.icon size={15} />
                   <span>{group.title}</span>
                 </span>
                 {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </button>
 
               {isExpanded && (
-                <div className="sidebar-group-subitems">
+                <div className="sidebar-group-items">
                   {visibleItems.map((item) => (
                     <NavLink
                       key={item.name + item.path}
@@ -329,7 +314,7 @@ const Sidebar = () => {
                           ? location.pathname === pathOnly && (location.hash || '') === hashOnly
                           : isActive;
                         const on = hashOnly ? onHash : isActive;
-                        return ['sidebar-sublink', on ? 'active' : ''].filter(Boolean).join(' ');
+                        return ['nav-link', on ? 'active' : ''].filter(Boolean).join(' ');
                       }}
                     >
                       <item.icon size={14} />
@@ -345,9 +330,15 @@ const Sidebar = () => {
 
       {/* Footer Section */}
       <div className="sidebar-footer">
-        <button onClick={logout} className="sidebar-logout-btn">
-          <LogOut size={14} />
-          <span>Logout System</span>
+        <div className="sidebar-user">
+          <div className="sidebar-avatar">{initials}</div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p className="sidebar-user-name">{displayName}</p>
+            <p className="sidebar-user-meta">{userRole}</p>
+          </div>
+        </div>
+        <button type="button" onClick={logout} className="sidebar-logout">
+          <LogOut size={13} /> Logout
         </button>
       </div>
     </aside>

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   Calendar,
   Users,
@@ -85,7 +86,13 @@ const DailyAttendance = () => {
   const { data, setData } = useAppContext();
   const { currentUser, isAdmin } = useAuth();
 
-  const [selectedDate, setSelectedDate] = useState(todayIso());
+  const [searchParams] = useSearchParams();
+  const [selectedDate, setSelectedDate] = useState(() => searchParams.get('date') || todayIso());
+
+  useEffect(() => {
+    const fromQuery = searchParams.get('date');
+    if (fromQuery && /^\d{4}-\d{2}-\d{2}$/.test(fromQuery)) setSelectedDate(fromQuery);
+  }, [searchParams]);
   const [deptFilter, setDeptFilter] = useState('');
   const [shiftFilter, setShiftFilter] = useState('');
   const [empTypeFilter, setEmpTypeFilter] = useState('All'); // 'All' | 'Factory' | 'Office'

@@ -809,13 +809,27 @@ const UnderProcess = () => {
         </div>
       </div>
 
-      <div className="premium-card data-table-container under-process-table-card" style={{ padding: '1.5rem', background: '#ffffff' }}>
+      <div className="premium-card data-table-container under-process-table-card" style={{ padding: '1rem 0.75rem 0.85rem', background: '#ffffff' }}>
         <div style={{ marginBottom: '1.25rem', flexShrink: 0 }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#9b62c4', margin: 0 }}>Material Processing Status</h2>
           <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: '0.25rem 0 0' }}>View and manage document generation for each material</p>
         </div>
         <div className="under-process-table-scroll">
         <table className="workflow-table">
+          <colgroup>
+            <col className="up-col-date" />
+            <col className="up-col-party" />
+            <col className="up-col-product" />
+            <col className="up-col-qty" />
+            <col className="up-col-doc" />
+            <col className="up-col-doc" />
+            <col className="up-col-doc" />
+            <col className="up-col-doc" />
+            <col className="up-col-doc" />
+            <col className="up-col-doc" />
+            <col className="up-col-doc" />
+            <col className="up-col-action" />
+          </colgroup>
           <thead>
             <tr>
               <th>Material Received Date</th>
