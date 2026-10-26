@@ -31,12 +31,36 @@ export function generateEmployeeId(existingUsers = []) {
   const nums = existingUsers
     .map((u) => {
       const code = String(u.employeeId || u.empCode || '').trim();
-      const match = code.match(/(\d+)/);
+      const match = code.match(/^EMP(\d+)$/i);
       return match ? parseInt(match[1], 10) : 0;
     })
     .filter((n) => n > 0 && !isNaN(n));
   const next = nums.length ? Math.max(...nums) + 1 : 1;
   return `EMP${String(next).padStart(3, '0')}`;
+}
+
+/** Auto code for the software record. Separate from the employee code the company types. */
+function readSystemCodeNumber(user) {
+  const saved = String(user?.systemCode || '').trim();
+  const fromSaved = saved.match(/^SYS(\d+)$/i);
+  if (fromSaved) return parseInt(fromSaved[1], 10);
+  const n = parseInt(String(user?.id ?? ''), 10);
+  if (Number.isFinite(n) && n > 0 && n < 100000) return n;
+  return 0;
+}
+
+export function generateSystemCode(existingUsers = []) {
+  const nums = (existingUsers || []).map(readSystemCodeNumber).filter((n) => n > 0);
+  const next = nums.length ? Math.max(...nums) + 1 : 1;
+  return `SYS${String(next).padStart(3, '0')}`;
+}
+
+export function systemCodeFor(user) {
+  const saved = String(user?.systemCode || '').trim();
+  if (saved) return saved;
+  const n = parseInt(String(user?.id ?? ''), 10);
+  if (Number.isFinite(n) && n > 0 && n < 100000) return `SYS${String(n).padStart(3, '0')}`;
+  return '';
 }
 
 /** Numeric user id for DB sync (PostgreSQL SERIAL) and stable list keys. */

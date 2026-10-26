@@ -29,7 +29,7 @@ import DateField from '../components/DateField';
 import SearchableSelect from '../components/SearchableSelect';
 import ExportButton from '../components/ExportButton';
 import { formatDate, newestFirst } from '../utils/dateUtils';
-import { generateEmployeeId, nextUserRecordId } from '../utils/auth';
+import { generateEmployeeId, generateSystemCode, nextUserRecordId, systemCodeFor } from '../utils/auth';
 import { getEffectiveRate, money, isPendingApproval, approvalPatch } from '../utils/payroll';
 import { DEPARTMENTS } from './EmployeeManagement';
 
@@ -71,6 +71,7 @@ const ALL_MODULES = [
 const today = () => new Date().toISOString().slice(0, 10);
 
 const emptyForm = () => ({
+  systemCode: '',
   employeeId: '',
   name: '',
   department: '',
@@ -157,6 +158,7 @@ const EmployeeMaster = () => {
       const rate = getEffectiveRate(selectedUser);
       const userStatus = selectedUser.status || (selectedUser.active === false ? 'Inactive' : 'Active');
       setForm({
+        systemCode: systemCodeFor(selectedUser),
         employeeId: selectedUser.employeeId || '',
         name: selectedUser.name || selectedUser.username || '',
         department: selectedUser.department || '',
@@ -235,6 +237,7 @@ const EmployeeMaster = () => {
     const rate = getEffectiveRate(u);
     const statusStr = u.status || (u.active === false ? 'Inactive' : 'Active');
     return {
+      systemCode: systemCodeFor(u),
       employeeId: u.employeeId || '',
       name: u.name || u.username || '',
       department: u.department || '',
@@ -255,11 +258,11 @@ const EmployeeMaster = () => {
   const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const openNewEmployee = () => {
-    const nextCode = generateEmployeeId(users);
     setCreatingNew(true);
     setForm({
       ...emptyForm(),
-      employeeId: nextCode
+      systemCode: generateSystemCode(users),
+      employeeId: ''
     });
     setSelectedUserId(null);
     setViewMode('employee-wise');
@@ -304,9 +307,21 @@ const EmployeeMaster = () => {
     const status = form.status || 'Active';
     const isActive = status === 'Active' || status === 'On Hold';
 
+    const systemCode = String(form.systemCode || selectedUser?.systemCode || '').trim() || generateSystemCode(users);
+    const employeeId = form.employeeId.trim();
+    if (!employeeId) {
+      alert('Employee Code is required, and it must be different from the system code.');
+      return;
+    }
+    if (employeeId.toUpperCase() === systemCode.toUpperCase()) {
+      alert('Employee Code must be different from the system code.');
+      return;
+    }
+
     const payload = {
       name,
-      employeeId: form.employeeId.trim() || selectedUser?.employeeId || generateEmployeeId(users),
+      systemCode,
+      employeeId,
       department: form.department.trim(),
       designation: form.designation.trim(),
       joiningDate: form.joiningDate || '',
@@ -494,6 +509,7 @@ const EmployeeMaster = () => {
           <ExportButton
             data={exportRows}
             columns={[
+              { label: 'System Code', key: 'systemCode' },
               { label: 'Employee Code', key: 'employeeId' },
               { label: 'Employee Name', key: 'name' },
               { label: 'Department', key: 'department' },
@@ -638,7 +654,10 @@ const EmployeeMaster = () => {
                 {form.name || 'New Employee'}
               </h2>
               <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                {form.employeeId || 'EMP---'}
+                {form.systemCode || 'SYS---'}
+              </p>
+              <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Employee code: <strong style={{ color: 'var(--text-main)' }}>{form.employeeId || '—'}</strong>
               </p>
               <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                 {form.department ? `${form.department} Department` : 'No Department'}
@@ -777,7 +796,16 @@ const EmployeeMaster = () => {
               {/* TAB 1: PERSONAL DETAILS */}
               {activeTab === 'personal' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                  <Field label="Employee Code" required hint="Unique ID assigned to the employee">
+                  <Field label="System Code" hint="Created by the software. This stays different from the employee code.">
+                    <input
+                      className="input-field"
+                      value={form.systemCode || ''}
+                      readOnly
+                      style={{ fontWeight: 700, background: 'var(--lavender, #F3EEF9)' }}
+                    />
+                  </Field>
+
+                  <Field label="Employee Code" required hint="Your own code for this employee. Do not use the system code.">
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <input
                         className="input-field"
@@ -1148,7 +1176,8 @@ const EmployeeMaster = () => {
             <table className="pm-table">
               <thead>
                 <tr>
-                  <th>Code</th>
+                  <th>System Code</th>
+                  <th>Employee Code</th>
                   <th>Employee Name</th>
                   <th>Department</th>
                   <th>Designation</th>
@@ -1164,7 +1193,7 @@ const EmployeeMaster = () => {
               </thead>
               <tbody>
                 {filteredEmployees.length === 0 ? (
-                  <tr><td colSpan={12} className="pm-empty">No employees found matching filters.</td></tr>
+                  <tr><td colSpan={13} className="pm-empty">No employees found matching filters.</td></tr>
                 ) : filteredEmployees.map((u) => {
                   const rate = getEffectiveRate(u);
                   const userStatus = u.status || (u.active === false ? 'Inactive' : 'Active');
@@ -1173,6 +1202,7 @@ const EmployeeMaster = () => {
 
                   return (
                     <tr key={u.id} className="pm-click-row" title="Click to view employee details" onClick={() => selectEmployee(u)}>
+                      <td><strong>{systemCodeFor(u)}</strong></td>
                       <td><strong>{u.employeeId || '—'}</strong></td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

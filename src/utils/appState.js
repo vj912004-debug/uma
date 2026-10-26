@@ -284,6 +284,9 @@ export const normalizeAppState = (parsed) => {
       return {
         ...u,
         employeeId: u.employeeId || `EMP00${i + 1}`,
+        systemCode: u.systemCode || (Number.isFinite(parseInt(u.id, 10)) && parseInt(u.id, 10) > 0 && parseInt(u.id, 10) < 100000
+          ? `SYS${String(parseInt(u.id, 10)).padStart(3, '0')}`
+          : ''),
         department: u.department || 'General',
         name: u.name || u.username,
         username,

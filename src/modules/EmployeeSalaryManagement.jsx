@@ -27,7 +27,7 @@ import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import { formatDate, newestFirst } from '../utils/dateUtils';
 import { DEPARTMENTS } from './EmployeeManagement';
-import { generateEmployeeId } from '../utils/auth';
+import { generateEmployeeId, systemCodeFor } from '../utils/auth';
 import {
   SHIFTS,
   SHIFT_TYPES,
@@ -147,7 +147,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
   const filteredMaster = payrollUsers.filter((u) => {
     if (!masterSearch) return true;
     const q = masterSearch.toLowerCase();
-    return [u.name, u.username, u.employeeId, u.esslId, u.department, u.designation]
+    return [u.name, u.username, u.employeeId, systemCodeFor(u), u.esslId, u.department, u.designation]
       .some((v) => String(v || '').toLowerCase().includes(q));
   });
 
@@ -210,9 +210,17 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
     else history.push(entry);
     history.sort((a, b) => String(b.effectiveFrom).localeCompare(String(a.effectiveFrom)));
 
+    const systemCode = user.systemCode || systemCodeFor(user);
+    const nextEmployeeId = String(masterForm.employeeId || '').trim() || user.employeeId || generateEmployeeId(data.users || []);
+    if (nextEmployeeId.toUpperCase() === String(systemCode || '').toUpperCase()) {
+      alert('Employee Code must be different from the system code.');
+      return;
+    }
+
     updateItem('users', user.id, {
       ...user,
-      employeeId: String(masterForm.employeeId || '').trim() || user.employeeId || generateEmployeeId(data.users || []),
+      systemCode,
+      employeeId: nextEmployeeId,
       name: String(masterForm.name || '').trim() || user.name,
       department: String(masterForm.department || '').trim(),
       designation: String(masterForm.designation || '').trim(),
@@ -521,6 +529,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                 data={filteredMaster.map((u) => {
                   const rate = getEffectiveRate(u);
                   return {
+                    systemCode: systemCodeFor(u),
                     employeeId: u.employeeId,
                     name: u.name || u.username,
                     department: u.department || '',
@@ -535,6 +544,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                   };
                 })}
                 columns={[
+                  { label: 'System Code', key: 'systemCode' },
                   { label: 'Employee Code', key: 'employeeId' },
                   { label: 'Employee Name', key: 'name' },
                   { label: 'Department', key: 'department' },
@@ -570,6 +580,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                 <table className="att-table">
                   <thead>
                     <tr>
+                      <th>System Code</th>
                       <th>Employee Code</th>
                       <th>Employee Name</th>
                       <th>Department</th>
@@ -584,7 +595,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                   </thead>
                   <tbody>
                     {filteredMaster.length === 0 ? (
-                      <tr><td colSpan={10} className="pm-empty">No employees yet. Edit Staff under Employees, then set rates here.</td></tr>
+                      <tr><td colSpan={11} className="pm-empty">No employees yet. Edit Staff under Employees, then set rates here.</td></tr>
                     ) : filteredMaster.map((u) => {
                       const rate = getEffectiveRate(u);
                       return (
@@ -595,6 +606,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                           style={{ cursor: 'pointer' }}
                           title="Click to open employee details"
                         >
+                          <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{systemCodeFor(u)}</td>
                           <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{u.employeeId}</td>
                           <td className="att-emp">{u.name || u.username}</td>
                           <td>{u.department || '—'}</td>
@@ -648,6 +660,15 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                         <option key={u.id} value={String(u.id)}>{u.name || u.username} ({u.employeeId}){u.active === false ? ' - Inactive' : ''}</option>
                       ))}
                     </SearchableSelect>
+                  </div>
+                  <div className="form-group pm-field">
+                    <label>System Code</label>
+                    <input
+                      className="input-field"
+                      value={systemCodeFor((data.users || []).find((x) => String(x.id) === String(masterForm.userId || editingUserId))) || ''}
+                      readOnly
+                      style={{ fontWeight: 700, background: 'var(--lavender, #F3EEF9)' }}
+                    />
                   </div>
                   <div className="form-group pm-field">
                     <label>Employee Code</label>

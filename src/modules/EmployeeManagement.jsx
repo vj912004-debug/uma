@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { hashPassword, generatePassword, generateEmployeeId } from '../utils/auth';
+import { hashPassword, generatePassword, generateEmployeeId, generateSystemCode, nextUserRecordId, systemCodeFor } from '../utils/auth';
 import { Plus, Edit2, KeyRound, UserX, UserCheck, Copy, Check, RefreshCw } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
 import { ALL_STAFF_MODULE_IDS, groupModuleOptions, parsePermissionsList } from '../utils/moduleAccess';
@@ -23,10 +23,11 @@ export const DEPARTMENTS = [
 ];
 const MODULE_GROUPS = groupModuleOptions();
 
-const emptyForm = (employeeId = '') => ({
+const emptyForm = (employeeId = '', systemCode = '') => ({
   name: '',
   username: '',
   password: '',
+  systemCode,
   employeeId,
   department: 'Production',
   role: 'Staff',
@@ -44,7 +45,7 @@ const EmployeeManagement = () => {
   const [form, setForm] = useState(emptyForm());
 
   const resetForm = () => {
-    setForm(emptyForm(generateEmployeeId(data.users || [])));
+    setForm(emptyForm(generateEmployeeId(data.users || []), generateSystemCode(data.users || [])));
     setEditingUser(null);
     setGeneratedCreds(null);
   };
@@ -53,6 +54,7 @@ const EmployeeManagement = () => {
     resetForm();
     setForm((f) => ({
       ...f,
+      systemCode: generateSystemCode(data.users || []),
       employeeId: generateEmployeeId(data.users || []),
       permissions: [...ALL_STAFF_MODULE_IDS]
     }));
@@ -66,6 +68,7 @@ const EmployeeManagement = () => {
       name: user.name || user.username,
       username: user.username,
       password: '',
+      systemCode: systemCodeFor(user),
       employeeId: user.employeeId,
       department: user.department || 'General',
       role: user.role || 'Staff',
@@ -132,10 +135,18 @@ const EmployeeManagement = () => {
       return;
     }
 
+    const systemCode = String(form.systemCode || editingUser?.systemCode || '').trim() || generateSystemCode(data.users || []);
+    const employeeId = String(form.employeeId || '').trim() || editingUser?.employeeId || generateEmployeeId(data.users || []);
+    if (employeeId.toUpperCase() === systemCode.toUpperCase()) {
+      alert('Employee Code must be different from the system code.');
+      return;
+    }
+
     const userData = {
       name: form.name.trim(),
       username: form.username.trim(),
-      employeeId: String(form.employeeId || '').trim() || editingUser?.employeeId || generateEmployeeId(data.users || []),
+      systemCode,
+      employeeId,
       department: form.department,
       role: form.role,
       active: form.active,
@@ -154,7 +165,7 @@ const EmployeeManagement = () => {
       }
     } else {
       const newUser = {
-        id: Date.now(),
+        id: nextUserRecordId(data.users || []),
         ...userData,
         approvalStatus: form.role === 'Admin' ? 'Approved' : 'Pending',
         createdAt: new Date().toISOString()
@@ -215,6 +226,7 @@ const EmployeeManagement = () => {
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <ExportButton
             data={newestFirst(data.users || []).map((user) => ({
+              systemCode: systemCodeFor(user),
               employeeId: user.employeeId,
               name: user.name || user.username,
               username: user.username,
@@ -224,6 +236,7 @@ const EmployeeManagement = () => {
               status: user.active !== false ? 'Active' : 'Inactive'
             }))}
             columns={[
+              { label: 'System Code', key: 'systemCode' },
               { label: 'Employee ID', key: 'employeeId' },
               { label: 'Name', key: 'name' },
               { label: 'Username', key: 'username' },
@@ -246,6 +259,7 @@ const EmployeeManagement = () => {
           <table>
             <thead>
               <tr>
+                <th>System Code</th>
                 <th>Employee ID</th>
                 <th>Name</th>
                 <th>Username</th>
@@ -259,13 +273,14 @@ const EmployeeManagement = () => {
             <tbody>
               {(data.users || []).length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                     No employees found. Add your first employee.
                   </td>
                 </tr>
               ) : (
                 newestFirst(data.users || []).map((user) => (
                   <tr key={user.id}>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{systemCodeFor(user)}</td>
                     <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{user.employeeId}</td>
                     <td>{user.name || user.username}</td>
                     <td>{user.username}</td>
@@ -369,6 +384,15 @@ const EmployeeManagement = () => {
                         onChange={(e) => setForm({ ...form, name: e.target.value })}
                         placeholder="Employee name"
                         required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>System Code</label>
+                      <input
+                        className="input-field"
+                        value={form.systemCode || ''}
+                        readOnly
+                        style={{ fontWeight: 700, background: 'var(--lavender, #F3EEF9)' }}
                       />
                     </div>
                     <div className="form-group">
