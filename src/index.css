@@ -235,7 +235,7 @@ label {
 
 .app-main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="range"]),
 .app-main textarea,
-.app-main select:not(.top-plant-select) {
+.app-main select {
   border: 1px solid var(--border-color);
   border-radius: 8px;
 }
@@ -5508,46 +5508,6 @@ input[type='number'] {
   box-shadow: 0 1px 3px rgba(74, 39, 126, 0.03);
 }
 
-.top-plant-pill {
-  position: relative;
-  cursor: pointer;
-  padding: 0.38rem 2rem 0.38rem 0.8rem;
-  background: #f6f3fb;
-  border: 1.5px solid #7c3aed;
-  color: #4c1d95;
-  gap: 0.4rem;
-}
-
-.top-plant-pill svg {
-  color: #6d28d9;
-  flex-shrink: 0;
-}
-
-.top-plant-select {
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent !important;
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #4c1d95;
-  outline: none;
-  cursor: pointer;
-  padding: 0.15rem 0.15rem 0.15rem 0 !important;
-  width: auto;
-  min-width: 118px;
-  line-height: 1.2;
-}
-
-.top-plant-caret {
-  position: absolute;
-  right: 0.65rem;
-  color: #6d28d9;
-  pointer-events: none;
-}
-
 .top-header-pop {
   position: relative;
 }
@@ -5627,48 +5587,6 @@ input[type='number'] {
 
 .top-date-panel {
   width: 240px;
-}
-
-.top-user-pill {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.35rem 0.85rem 0.35rem 0.4rem;
-  border-radius: 999px;
-  background: #FFFFFF;
-  border: 1.5px solid #5E1F99;
-  box-shadow: 0 1px 3px rgba(74, 39, 126, 0.03);
-}
-
-.top-user-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: #5E1F99;
-  color: #FFFFFF;
-  font-weight: 700;
-  font-size: 0.72rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.top-user-info {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.1;
-}
-
-.top-user-name {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #1F0B38;
-}
-
-.top-user-role {
-  font-size: 0.65rem;
-  color: #8C7B9E;
-  font-weight: 500;
 }
 
 /* ==========================================

@@ -1,17 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, Bell, Calendar, MapPin, ChevronDown } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { Search, Bell, Calendar } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import DateField from './DateField';
 
 const TopHeader = () => {
-  const { currentUser } = useAuth();
   const { data } = useAppContext();
   const navigate = useNavigate();
   const headerRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPlant, setSelectedPlant] = useState('Ranoli Plant');
   const [openPanel, setOpenPanel] = useState(null);
   const [pickedDate, setPickedDate] = useState(() => new Date().toISOString().slice(0, 10));
 
@@ -20,16 +17,6 @@ const TopHeader = () => {
     month: 'short',
     year: 'numeric'
   });
-
-  const displayName = currentUser?.name || currentUser?.username || 'Amit Patel';
-  const roleName = currentUser?.role || 'Admin';
-  const initials = displayName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase() || 'AP';
 
   const alerts = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -156,30 +143,6 @@ const TopHeader = () => {
               </button>
             </div>
           )}
-        </div>
-
-        {/* Location / Plant Selector */}
-        <div className="top-header-pill top-plant-pill">
-          <MapPin size={15} />
-          <select
-            value={selectedPlant}
-            onChange={(e) => setSelectedPlant(e.target.value)}
-            className="top-plant-select"
-          >
-            <option value="Ranoli Plant">Ranoli Plant</option>
-            <option value="Unit 2 Plant">Unit 2 Plant</option>
-            <option value="Head Office">Head Office</option>
-          </select>
-          <ChevronDown size={14} className="top-plant-caret" />
-        </div>
-
-        {/* User Profile Pill */}
-        <div className="top-user-pill">
-          <div className="top-user-avatar">{initials}</div>
-          <div className="top-user-info">
-            <span className="top-user-name">{displayName}</span>
-            <span className="top-user-role">{roleName}</span>
-          </div>
         </div>
       </div>
     </header>

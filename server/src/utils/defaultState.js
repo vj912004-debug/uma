@@ -15,6 +15,7 @@ export const ALL_STAFF_MODULE_IDS = [
   '/invoices-pi',
   '/tax-invoice',
   '/monthly-billing',
+  '/monthly-summary',
   '/debit-notes',
   '/credit-notes',
   '/bpr',

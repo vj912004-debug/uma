@@ -31,6 +31,7 @@ import PurchaseOrders from './modules/PurchaseOrders';
 import DebitNotes from './modules/DebitNotes';
 import CreditNotes from './modules/CreditNotes';
 import MonthlyBilling from './modules/MonthlyBilling';
+import MonthlySummary from './modules/MonthlySummary';
 import PurchaseManagement from './modules/PurchaseManagement';
 import UtilityRecord from './modules/UtilityRecord';
 import UtilityTempRecord from './modules/UtilityTempRecord';
@@ -99,6 +100,7 @@ const AppLayout = () => {
         <Route path="/debit-notes" element={<DebitNotes />} />
         <Route path="/credit-notes" element={<CreditNotes />} />
         <Route path="/monthly-billing" element={<MonthlyBilling />} />
+        <Route path="/monthly-summary" element={<MonthlySummary />} />
         <Route path="/purchase-management" element={<PurchaseManagement />} />
         <Route path="/utility-record" element={<UtilityRecord />} />
         <Route path="/utility-record-list" element={<Navigate to="/utility-record" replace />} />

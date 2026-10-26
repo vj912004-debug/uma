@@ -10,6 +10,7 @@ export const MODULE_OPTIONS = [
   { id: '/invoices-pi', label: 'Proforma Invoice', group: 'Invoices & Billing' },
   { id: '/tax-invoice', label: 'Tax Invoice', group: 'Invoices & Billing' },
   { id: '/monthly-billing', label: 'Monthly Billing', group: 'Invoices & Billing' },
+  { id: '/monthly-summary', label: 'Monthly Summary', group: 'Invoices & Billing' },
   { id: '/debit-notes', label: 'Debit Note', group: 'Invoices & Billing' },
   { id: '/credit-notes', label: 'Credit Note', group: 'Invoices & Billing' },
 
