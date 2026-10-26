@@ -11,7 +11,7 @@ const TopHeader = () => {
   const navigate = useNavigate();
   const headerRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPlant, setSelectedPlant] = useState('Kotambi Plant');
+  const [selectedPlant, setSelectedPlant] = useState('Ranoli Plant');
   const [openPanel, setOpenPanel] = useState(null);
   const [pickedDate, setPickedDate] = useState(() => new Date().toISOString().slice(0, 10));
 
@@ -166,7 +166,7 @@ const TopHeader = () => {
             onChange={(e) => setSelectedPlant(e.target.value)}
             className="top-plant-select"
           >
-            <option value="Kotambi Plant">Kotambi Plant</option>
+            <option value="Ranoli Plant">Ranoli Plant</option>
             <option value="Unit 2 Plant">Unit 2 Plant</option>
             <option value="Head Office">Head Office</option>
           </select>

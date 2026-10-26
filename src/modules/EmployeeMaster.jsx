@@ -261,8 +261,7 @@ const EmployeeMaster = () => {
     setCreatingNew(true);
     setForm({
       ...emptyForm(),
-      systemCode: generateSystemCode(users),
-      employeeId: ''
+      employeeId: generateEmployeeId(users)
     });
     setSelectedUserId(null);
     setViewMode('employee-wise');
@@ -654,10 +653,7 @@ const EmployeeMaster = () => {
                 {form.name || 'New Employee'}
               </h2>
               <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                {form.systemCode || 'SYS---'}
-              </p>
-              <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Employee code: <strong style={{ color: 'var(--text-main)' }}>{form.employeeId || '—'}</strong>
+                {form.employeeId || '—'}
               </p>
               <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                 {form.department ? `${form.department} Department` : 'No Department'}
@@ -796,16 +792,7 @@ const EmployeeMaster = () => {
               {/* TAB 1: PERSONAL DETAILS */}
               {activeTab === 'personal' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                  <Field label="System Code" hint="Created by the software. This stays different from the employee code.">
-                    <input
-                      className="input-field"
-                      value={form.systemCode || ''}
-                      readOnly
-                      style={{ fontWeight: 700, background: 'var(--lavender, #F3EEF9)' }}
-                    />
-                  </Field>
-
-                  <Field label="Employee Code" required hint="Your own code for this employee. Do not use the system code.">
+                  <Field label="Employee Code" required hint="Your own code for this employee.">
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <input
                         className="input-field"

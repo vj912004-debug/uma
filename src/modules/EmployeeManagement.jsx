@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { hashPassword, generatePassword, generateEmployeeId, generateSystemCode, nextUserRecordId, systemCodeFor } from '../utils/auth';
+import { hashPassword, generatePassword, generateSystemCode, nextUserRecordId, systemCodeFor } from '../utils/auth';
 import { Plus, Edit2, KeyRound, UserX, UserCheck, Copy, Check, RefreshCw } from 'lucide-react';
 import SearchableSelect from '../components/SearchableSelect';
 import { ALL_STAFF_MODULE_IDS, groupModuleOptions, parsePermissionsList } from '../utils/moduleAccess';
@@ -45,7 +45,7 @@ const EmployeeManagement = () => {
   const [form, setForm] = useState(emptyForm());
 
   const resetForm = () => {
-    setForm(emptyForm(generateEmployeeId(data.users || []), generateSystemCode(data.users || [])));
+    setForm(emptyForm('', generateSystemCode(data.users || [])));
     setEditingUser(null);
     setGeneratedCreds(null);
   };
@@ -55,7 +55,7 @@ const EmployeeManagement = () => {
     setForm((f) => ({
       ...f,
       systemCode: generateSystemCode(data.users || []),
-      employeeId: generateEmployeeId(data.users || []),
+      employeeId: '',
       permissions: [...ALL_STAFF_MODULE_IDS]
     }));
     setShowModal(true);
@@ -136,9 +136,9 @@ const EmployeeManagement = () => {
     }
 
     const systemCode = String(form.systemCode || editingUser?.systemCode || '').trim() || generateSystemCode(data.users || []);
-    const employeeId = String(form.employeeId || '').trim() || editingUser?.employeeId || generateEmployeeId(data.users || []);
-    if (employeeId.toUpperCase() === systemCode.toUpperCase()) {
-      alert('Employee Code must be different from the system code.');
+    const employeeId = String(editingUser?.employeeId || '').trim();
+    if (employeeId && employeeId.toUpperCase() === systemCode.toUpperCase()) {
+      alert('System ID must be different from the employee code.');
       return;
     }
 
@@ -226,7 +226,7 @@ const EmployeeManagement = () => {
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <ExportButton
             data={newestFirst(data.users || []).map((user) => ({
-              systemCode: systemCodeFor(user),
+              systemId: systemCodeFor(user),
               employeeId: user.employeeId,
               name: user.name || user.username,
               username: user.username,
@@ -236,7 +236,7 @@ const EmployeeManagement = () => {
               status: user.active !== false ? 'Active' : 'Inactive'
             }))}
             columns={[
-              { label: 'System Code', key: 'systemCode' },
+              { label: 'System ID', key: 'systemId' },
               { label: 'Employee ID', key: 'employeeId' },
               { label: 'Name', key: 'name' },
               { label: 'Username', key: 'username' },
@@ -259,8 +259,7 @@ const EmployeeManagement = () => {
           <table>
             <thead>
               <tr>
-                <th>System Code</th>
-                <th>Employee ID</th>
+                <th>System ID</th>
                 <th>Name</th>
                 <th>Username</th>
                 <th>Department</th>
@@ -273,7 +272,7 @@ const EmployeeManagement = () => {
             <tbody>
               {(data.users || []).length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                     No employees found. Add your first employee.
                   </td>
                 </tr>
@@ -281,7 +280,6 @@ const EmployeeManagement = () => {
                 newestFirst(data.users || []).map((user) => (
                   <tr key={user.id}>
                     <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{systemCodeFor(user)}</td>
-                    <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{user.employeeId}</td>
                     <td>{user.name || user.username}</td>
                     <td>{user.username}</td>
                     <td>{user.department}</td>
@@ -387,33 +385,27 @@ const EmployeeManagement = () => {
                       />
                     </div>
                     <div className="form-group">
-                      <label>System Code</label>
-                      <input
-                        className="input-field"
-                        value={form.systemCode || ''}
-                        readOnly
-                        style={{ fontWeight: 700, background: 'var(--lavender, #F3EEF9)' }}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Employee Code</label>
+                      <label>System ID</label>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <input
                           className="input-field"
-                          value={form.employeeId || ''}
-                          onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
-                          placeholder="e.g. EMP001"
+                          value={form.systemCode || ''}
+                          onChange={(e) => setForm({ ...form, systemCode: e.target.value })}
+                          placeholder="e.g. SYS001"
+                          readOnly={Boolean(editingUser)}
                           style={{ flex: 1, fontWeight: 600 }}
                         />
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={() => setForm({ ...form, employeeId: generateEmployeeId(data.users || []) })}
-                          title="Generate next available Employee Code"
-                          style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                        >
-                          <RefreshCw size={14} /> Generate
-                        </button>
+                        {!editingUser && (
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => setForm({ ...form, systemCode: generateSystemCode(data.users || []) })}
+                            title="Generate next System ID"
+                            style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                          >
+                            <RefreshCw size={14} /> Generate
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
