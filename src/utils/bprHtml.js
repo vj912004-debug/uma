@@ -68,7 +68,7 @@ const BD_COLS = [
 
 const cell = (obj, colKey, metricKey) => escHtml((obj?.[colKey] || {})[metricKey] || '');
 
-const penIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4a0080" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
+const penIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3D2B7D" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
 
 const emptyBatchRow = () => ({ batchNo: '', drumNo: '', gross: '', tare: '', net: '' });
 
@@ -650,12 +650,12 @@ export const buildBprHtml = (data, profileInput) => {
     height:auto;min-height:1123px;max-height:none;overflow:visible;padding:8px;
   }
   .sheet{
-    flex:1 1 auto;height:auto;max-height:100%;min-height:0;border:2px solid #5a009d;padding:10px 10px 8px 10px;
+    flex:1 1 auto;height:auto;max-height:100%;min-height:0;border:2px solid #3D2B7D;padding:10px 10px 8px 10px;
     display:flex;flex-direction:column;box-sizing:border-box;position:relative;overflow:hidden;
   }
   table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:-1px;}
   table.g th,table.g td{
-    border:1px solid #7c12bd;text-align:center;vertical-align:middle;
+    border:1px solid #CFC4EA;text-align:center;vertical-align:middle;
     font-size:11px;font-weight:700;color:#231f20 !important;padding:4px 3px;
     word-break:normal;overflow-wrap:normal;white-space:normal;hyphens:none;
     line-height:1.2;
@@ -671,8 +671,8 @@ export const buildBprHtml = (data, profileInput) => {
     word-break:normal;overflow-wrap:anywhere;white-space:normal;
   }
   table.g td.nowrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .purple-header{background:#5a009d !important;color:#fff !important;}
-  .light-purple-header td,.light-purple-header th{background:#e2d3f3 !important;color:#4a0080 !important;}
+  .purple-header{background:#3D2B7D !important;color:#fff !important;}
+  .light-purple-header td,.light-purple-header th{background:#EFEAF7 !important;color:#3D2B7D !important;}
   .left-align{text-align:left !important;padding-left:6px !important;}
   .header-table{border:none;margin-bottom:8px;}
   .header-table td{border:none !important;padding:2px;}
@@ -681,10 +681,10 @@ export const buildBprHtml = (data, profileInput) => {
   .logo-wrap img{width:100%;height:100%;object-fit:contain;display:block;}
   .brand-lockup{width:280px;height:70px;flex-shrink:0;display:flex;align-items:center;}
   .brand-lockup img{width:100%;height:100%;object-fit:contain;object-position:left center;display:block;}
-  .company-title{font-size:26px;font-weight:900;color:#4a0080;letter-spacing:1px;line-height:1.1;}
+  .company-title{font-size:26px;font-weight:900;color:#3D2B7D;letter-spacing:1px;line-height:1.1;}
   .company-subtitle{font-size:12px;font-weight:700;color:#008822;margin-top:2px;}
   .bpr-badge{
-    background:#5a009d;color:#fff;border-radius:12px;padding:8px 10px;text-align:center;
+    background:#3D2B7D;color:#fff;border-radius:12px;padding:8px 10px;text-align:center;
   }
   .bpr-badge .title{font-size:12px;font-weight:700;letter-spacing:.4px;}
   .bpr-badge .code{font-size:12px;font-weight:700;margin-top:3px;}
@@ -699,7 +699,7 @@ export const buildBprHtml = (data, profileInput) => {
     line-height:1.2;
   }
   .pill-badge{
-    background:#5a009d;color:#fff;border-radius:10px;padding:4px 14px;
+    background:#3D2B7D;color:#fff;border-radius:10px;padding:4px 14px;
     display:inline-block;font-size:12px;font-weight:700;line-height:1.25;
     position:relative;z-index:2;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
@@ -714,18 +714,18 @@ export const buildBprHtml = (data, profileInput) => {
     min-height:48px;
     display:flex;
     flex-direction:column;
-    border:1px solid #7c12bd;
+    border:1px solid #CFC4EA;
     margin-bottom:-1px;
     overflow:visible;
   }
   .psd-note-head{
-    background:#e2d3f3;
-    color:#4a0080;
+    background:#EFEAF7;
+    color:#3D2B7D;
     font-size:12px;
     font-weight:700;
     padding:3px 8px;
     text-align:left;
-    border-bottom:1px solid #7c12bd;
+    border-bottom:1px solid #CFC4EA;
     flex-shrink:0;
   }
   .psd-note-body{
@@ -735,8 +735,8 @@ export const buildBprHtml = (data, profileInput) => {
     text-align:left;
     font-size:12px;
     font-weight:700;
-    color:#4a0080 !important;
-    -webkit-text-fill-color:#4a0080 !important;
+    color:#3D2B7D !important;
+    -webkit-text-fill-color:#3D2B7D !important;
     white-space:pre-wrap;
     word-break:break-word;
     line-height:1.3;
@@ -745,14 +745,14 @@ export const buildBprHtml = (data, profileInput) => {
   .remark-box {
     flex: 0 0 auto;
     display: flex;
-    border: 1px solid #7c12bd;
+    border: 1px solid #CFC4EA;
     margin: 0;
     min-height: 36px;
   }
   .remark-label {
     width: 20%;
-    border-right: 1px solid #7c12bd;
-    color: #4a0080;
+    border-right: 1px solid #CFC4EA;
+    color: #3D2B7D;
     font-size:12px;
     font-weight: 700;
     padding: 6px;
@@ -760,7 +760,7 @@ export const buildBprHtml = (data, profileInput) => {
   }
   .remark-content {
     width: 80%;
-    color: #4a0080;
+    color: #3D2B7D;
     font-size:12px;
     font-weight: 700;
     padding: 6px;
@@ -776,29 +776,29 @@ export const buildBprHtml = (data, profileInput) => {
   }
   .signature-container{
     display:flex;justify-content:space-between;margin:0;
-    border:1px solid #7c12bd;flex:0 0 auto;
+    border:1px solid #CFC4EA;flex:0 0 auto;
   }
   .signature-box{
     width:50%;min-height:52px;height:52px;max-height:56px;
     display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;
     box-sizing:border-box;
   }
-  .signature-box:first-child{border-right:1px solid #7c12bd;}
+  .signature-box:first-child{border-right:1px solid #CFC4EA;}
   .signature-label{
-    font-size:11px;font-weight:700;color:#4a0080;display:flex;align-items:center;gap:6px;
+    font-size:11px;font-weight:700;color:#3D2B7D;display:flex;align-items:center;gap:6px;
   }
 
-  .p2-header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #5a009d;}
+  .p2-header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #3D2B7D;}
   .p2-brand{display:flex;align-items:center;gap:10px;}
   .p2-logo{width:50px;height:50px;}
   .p2-logo img,.p2-logo > div,.p2-logo .logo-wrap{width:100%;height:100%;object-fit:contain;}
-  .meta{display:flex;flex-wrap:wrap;border:1.5px solid #5a009d;margin-bottom:6px;border-radius:4px;overflow:hidden;}
-  .meta-item{padding:4px 8px;border-right:1px solid #e2d3f3;border-bottom:1px solid #e2d3f3;font-size:12px;width:32%;box-sizing:border-box;color:#4a0080;font-weight:600;}
-  .meta-item.label{color:#5a009d;font-weight:700;background:#e2d3f3;width:18%;}
+  .meta{display:flex;flex-wrap:wrap;border:1.5px solid #3D2B7D;margin-bottom:6px;border-radius:4px;overflow:hidden;}
+  .meta-item{padding:4px 8px;border-right:1px solid #EFEAF7;border-bottom:1px solid #EFEAF7;font-size:12px;width:32%;box-sizing:border-box;color:#3D2B7D;font-weight:600;}
+  .meta-item.label{color:#3D2B7D;font-weight:700;background:#EFEAF7;width:18%;}
   table.items{
     width:100%;border-collapse:separate;border-spacing:0;empty-cells:show;margin:0;font-size:12px;
     flex:0 0 auto;height:auto;table-layout:fixed;background:#fff;
-    border-top:1px solid #7c12bd;border-left:1px solid #7c12bd;
+    border-top:1px solid #CFC4EA;border-left:1px solid #CFC4EA;
   }
   .page-p2 .table-wrap{
     flex:0 0 auto;min-height:0;display:block;margin-bottom:6px;
@@ -811,9 +811,9 @@ export const buildBprHtml = (data, profileInput) => {
   table.items col.c-drum{width:7%;}
   table.items col.c-wt{width:7%;}
   table.items thead th{
-    background:#5a009d !important;color:#fff !important;font-weight:700;
+    background:#3D2B7D !important;color:#fff !important;font-weight:700;
     padding:3px 2px;text-align:center;vertical-align:middle;
-    border:none;border-right:1px solid #7c12bd;border-bottom:1px solid #7c12bd;
+    border:none;border-right:1px solid #CFC4EA;border-bottom:1px solid #CFC4EA;
     border-radius:0;margin:0;
     font-size:10px;line-height:1.15;height:auto;max-height:none;
     white-space:normal;word-break:break-word;
@@ -823,7 +823,7 @@ export const buildBprHtml = (data, profileInput) => {
     white-space:nowrap;overflow:visible;
   }
   table.items tbody td{
-    border:none;border-right:1px solid #7c12bd;border-bottom:1px solid #7c12bd;
+    border:none;border-right:1px solid #CFC4EA;border-bottom:1px solid #CFC4EA;
     border-radius:0;margin:0;padding:1px 2px;height:${BPR_P2_ROW_PX}px;min-height:${BPR_P2_ROW_PX}px;max-height:${BPR_P2_ROW_PX}px;
     text-align:center;vertical-align:middle;color:#231f20 !important;font-weight:700;
     font-size:10px;line-height:1 !important;white-space:nowrap;
@@ -844,7 +844,7 @@ export const buildBprHtml = (data, profileInput) => {
     font-weight:700;font-size:10px;white-space:nowrap;overflow:visible;
   }
   table.items tbody tr.total-hl td{
-    background:#e2d3f3 !important;color:#4a0080 !important;font-weight:700;height:36px;min-height:36px;
+    background:#EFEAF7 !important;color:#3D2B7D !important;font-weight:700;height:36px;min-height:36px;
   }
   table.items tbody tr.filler-row{
     height:${BPR_P2_ROW_PX}px;
@@ -857,7 +857,7 @@ export const buildBprHtml = (data, profileInput) => {
   table.items tbody tr.summary-row td{
     background:#fff !important;color:#231f20 !important;font-weight:700;
     height:${BPR_P2_ROW_PX}px;min-height:${BPR_P2_ROW_PX}px;max-height:${BPR_P2_ROW_PX}px;padding:1px 2px;
-    border:none;border-right:1px solid #7c12bd;border-bottom:1px solid #7c12bd;
+    border:none;border-right:1px solid #CFC4EA;border-bottom:1px solid #CFC4EA;
     border-radius:0;margin:0;font-size:10px;line-height:1;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
@@ -866,7 +866,7 @@ export const buildBprHtml = (data, profileInput) => {
     white-space:nowrap;overflow:visible;font-size:10px;
   }
   table.items tbody tr.batch-total-row td{
-    background:#F6F0FA !important;color:#4a0080 !important;font-weight:700;
+    background:#EFEAF7 !important;color:#3D2B7D !important;font-weight:700;
     height:${BPR_P2_ROW_PX}px;min-height:${BPR_P2_ROW_PX}px;max-height:${BPR_P2_ROW_PX}px;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
@@ -880,7 +880,7 @@ export const buildBprHtml = (data, profileInput) => {
     flex:0 0 auto;min-height:0;display:block;
   }
   .barfoot{
-    background:#5a009d;color:#fff;padding:7px 14px;display:flex;justify-content:space-between;align-items:center;
+    background:#3D2B7D;color:#fff;padding:7px 14px;display:flex;justify-content:space-between;align-items:center;
     font-size:12px;margin:auto -10px -10px -10px;border-radius:0;flex-shrink:0;width:auto;box-sizing:border-box;
     letter-spacing:0.01px;word-spacing:normal;
   }
@@ -890,23 +890,25 @@ export const buildBprHtml = (data, profileInput) => {
   .barfoot span{white-space:normal;letter-spacing:0.01px;word-spacing:0.02em;line-height:1.2;}
   .barfoot span:last-child{white-space:nowrap;flex-shrink:0;}
   .page-p2 .signs{
-    display:flex;border:1.5px solid #7c12bd;margin:10px 0 0 0;border-radius:4px;overflow:hidden;
+    display:flex;border:1.5px solid #CFC4EA;margin:10px 0 0 0;border-radius:4px;overflow:hidden;
     flex:0 0 ${BPR_P2_SIGN_PX}px;width:420px;max-width:58%;height:${BPR_P2_SIGN_PX}px;min-height:${BPR_P2_SIGN_PX}px;max-height:${BPR_P2_SIGN_PX}px;
     box-sizing:border-box;align-self:flex-start;
   }
-  .page-p2 .sign{flex:1;padding:10px 14px;min-height:0;height:${BPR_P2_SIGN_PX}px;max-height:${BPR_P2_SIGN_PX}px;display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.2;font-weight:700;color:#4a0080;box-sizing:border-box;}
+  .page-p2 .sign{flex:1;padding:10px 14px;min-height:0;height:${BPR_P2_SIGN_PX}px;max-height:${BPR_P2_SIGN_PX}px;display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.2;font-weight:700;color:#3D2B7D;box-sizing:border-box;}
   .page-p2 .sign svg{width:18px;height:18px;flex-shrink:0;}
   .page-p2 .sign .line{flex:1;border-bottom:1.5px solid #777;margin-left:6px;min-height:0;height:1px;align-self:center;}
   .signs{
-    display:flex;border:1.5px solid #7c12bd;margin:0;border-radius:4px;overflow:hidden;
+    display:flex;border:1.5px solid #CFC4EA;margin:0;border-radius:4px;overflow:hidden;
     flex:0 0 ${BPR_P2_SIGN_PX}px;width:420px;max-width:58%;height:${BPR_P2_SIGN_PX}px;min-height:${BPR_P2_SIGN_PX}px;max-height:${BPR_P2_SIGN_PX}px;
     box-sizing:border-box;align-self:flex-start;
   }
-  .sign{flex:1;padding:10px 14px;min-height:0;height:${BPR_P2_SIGN_PX}px;max-height:${BPR_P2_SIGN_PX}px;display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.2;font-weight:700;color:#4a0080;box-sizing:border-box;}
-  .sign + .sign{border-left:1px solid #7c12bd;}
+  .sign{flex:1;padding:10px 14px;min-height:0;height:${BPR_P2_SIGN_PX}px;max-height:${BPR_P2_SIGN_PX}px;display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.2;font-weight:700;color:#3D2B7D;box-sizing:border-box;}
+  .sign + .sign{border-left:1px solid #CFC4EA;}
   .sign svg{width:18px;height:18px;flex-shrink:0;}
   .sign .line{flex:1;border-bottom:1.5px solid #777;margin-left:6px;min-height:0;height:1px;align-self:center;}
   .page-p2 .sheet{height:100%;}
+
+  table.items tbody tr:nth-child(even):not(.filler-row) td{background:#EFEAF7;}
 </style>
 </head>
 <body>
@@ -1451,8 +1453,8 @@ const fitBprPage1ToA4 = (pageEl, pageHeightPx = 1123) => {
       body.style.minHeight = '28px';
       body.style.maxHeight = 'none';
       body.style.overflow = 'visible';
-      body.style.setProperty('color', '#4a0080', 'important');
-      body.style.setProperty('-webkit-text-fill-color', '#4a0080', 'important');
+      body.style.setProperty('color', '#3D2B7D', 'important');
+      body.style.setProperty('-webkit-text-fill-color', '#3D2B7D', 'important');
       body.style.setProperty('visibility', 'visible', 'important');
       body.style.setProperty('opacity', '1', 'important');
     }
@@ -1545,8 +1547,8 @@ const fitBprPage1ToA4 = (pageEl, pageHeightPx = 1123) => {
           body.style.maxHeight = '48px';
           body.style.overflow = 'hidden';
           body.style.padding = '2px 6px';
-          body.style.setProperty('color', '#4a0080', 'important');
-          body.style.setProperty('-webkit-text-fill-color', '#4a0080', 'important');
+          body.style.setProperty('color', '#3D2B7D', 'important');
+          body.style.setProperty('-webkit-text-fill-color', '#3D2B7D', 'important');
           body.style.setProperty('visibility', 'visible', 'important');
         }
       }
@@ -1770,8 +1772,8 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
               body.style.minHeight = '28px';
               body.style.maxHeight = 'none';
               body.style.overflow = 'visible';
-              body.style.setProperty('color', '#4a0080', 'important');
-              body.style.setProperty('-webkit-text-fill-color', '#4a0080', 'important');
+              body.style.setProperty('color', '#3D2B7D', 'important');
+              body.style.setProperty('-webkit-text-fill-color', '#3D2B7D', 'important');
               body.style.setProperty('visibility', 'visible', 'important');
               body.style.setProperty('opacity', '1', 'important');
             }
@@ -1791,14 +1793,14 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.overflow = 'visible';
             el.style.setProperty('border-collapse', 'separate', 'important');
             el.style.setProperty('border-spacing', '0', 'important');
-            el.style.setProperty('border-top', '1px solid #7c12bd', 'important');
-            el.style.setProperty('border-left', '1px solid #7c12bd', 'important');
+            el.style.setProperty('border-top', '1px solid #CFC4EA', 'important');
+            el.style.setProperty('border-left', '1px solid #CFC4EA', 'important');
           });
           clonedDoc.querySelectorAll('.page.page-p2 table.items thead th, .page.page-p2 table.items tbody td').forEach((el) => {
             el.style.setProperty('border-top', 'none', 'important');
             el.style.setProperty('border-left', 'none', 'important');
-            el.style.setProperty('border-right', '1px solid #7c12bd', 'important');
-            el.style.setProperty('border-bottom', '1px solid #7c12bd', 'important');
+            el.style.setProperty('border-right', '1px solid #CFC4EA', 'important');
+            el.style.setProperty('border-bottom', '1px solid #CFC4EA', 'important');
             el.style.setProperty('border-radius', '0', 'important');
             el.style.margin = '0';
             el.style.boxSizing = 'border-box';
@@ -1882,7 +1884,9 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.whiteSpace = 'nowrap';
             el.style.lineHeight = '1.1';
             el.style.fontSize = getComputedStyle(clonedDoc.documentElement).getPropertyValue('--print-fs').trim() || '11px';
-            el.style.setProperty('background', el.classList.contains('purple-header') ? '#5a009d' : '#ffffff', 'important');
+            const stripeRow = el.closest('tr');
+            const stripe = stripeRow && Array.prototype.indexOf.call(stripeRow.parentElement.children, stripeRow) % 2 === 1;
+            el.style.setProperty('background', el.classList.contains('purple-header') ? '#3D2B7D' : (stripe ? '#EFEAF7' : '#ffffff'), 'important');
             el.style.setProperty('color', el.classList.contains('purple-header') ? '#ffffff' : '#231f20', 'important');
             el.style.setProperty('-webkit-text-fill-color', el.classList.contains('purple-header') ? '#ffffff' : '#231f20', 'important');
             el.style.setProperty('opacity', '1', 'important');
@@ -1949,14 +1953,14 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.boxSizing = 'border-box';
           });
           clonedDoc.querySelectorAll('table.g td').forEach((el) => {
-            el.style.setProperty('background', el.classList.contains('purple-header') ? '#5a009d' : '#ffffff', 'important');
+            el.style.setProperty('background', el.classList.contains('purple-header') ? '#3D2B7D' : '#ffffff', 'important');
             el.style.setProperty('color', el.classList.contains('purple-header') ? '#ffffff' : '#231f20', 'important');
             el.style.setProperty('opacity', '1', 'important');
             el.style.setProperty('visibility', 'visible', 'important');
           });
           clonedDoc.querySelectorAll('table.items thead th, table.g .light-purple-header td').forEach((el) => {
             if (el.closest('thead')) {
-              el.style.setProperty('background', '#5a009d', 'important');
+              el.style.setProperty('background', '#3D2B7D', 'important');
               el.style.setProperty('color', '#ffffff', 'important');
             }
           });

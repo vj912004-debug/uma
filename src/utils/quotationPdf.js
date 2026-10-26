@@ -362,11 +362,11 @@ export const buildQuotationHtml = (data, profileInput) => {
 <title>Quotation - ${companyName}</title>
 <style>
   :root{
-    --purple:#5a2d81;
-    --purple-dark:#3a1c5c;
-    --purple-light:#f2edf8;
-    --purple-border:#d9cdec;
-    --green:#2e8b3d;
+    --purple:#3D2B7D;
+    --purple-dark:#3D2B7D;
+    --purple-light:#EFEAF7;
+    --purple-border:#CFC4EA;
+    --green:#2fa84f;
     --orange:#f5811f;
     --text:#2b2b2b;
     --muted:#5a5a5a;
@@ -453,7 +453,7 @@ export const buildQuotationHtml = (data, profileInput) => {
   .contact-bar .citem.c-tight span{
     white-space:nowrap;overflow:visible;text-overflow:clip;max-width:none;
   }
-  .ic{width:12px;height:12px;flex-shrink:0;fill:#5a2d81;fill:var(--purple);margin-top:2px;}
+  .ic{width:12px;height:12px;flex-shrink:0;fill:#3D2B7D;fill:var(--purple);margin-top:2px;}
 
   .body-pad{padding:0 22px 4px;flex:1 1 auto;width:100%;box-sizing:border-box;min-width:0;min-height:0;overflow:visible;display:flex;flex-direction:column;}
   .sheet.quot-hide-features .body-pad{flex:0 0 auto;}
@@ -491,7 +491,7 @@ export const buildQuotationHtml = (data, profileInput) => {
   .company-info .line{display:flex;gap:7px;align-items:flex-start;margin-bottom:3px;}
   .company-info .icon{flex-shrink:0;width:14px;height:14px;margin-top:1px;}
   .company-info .icon svg,.meta-row .m-icon svg,.party-head svg{
-    width:14px;height:14px;display:block;fill:none;stroke:#9b62c4;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+    width:14px;height:14px;display:block;fill:none;stroke:#3D2B7D;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
   .reg-details{font-size:10.5px;line-height:1.7;flex-shrink:0;}
   .reg-row{display:grid;grid-template-columns:44px 10px auto;column-gap:4px;align-items:center;white-space:nowrap;}
   .reg-row .label{font-weight:700;color:var(--purple);}
@@ -845,12 +845,12 @@ export const buildQuotationHtml = (data, profileInput) => {
     flex-direction:column;
   }
   .bbox-head{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-shrink:0;}
-  .bbox-head svg{width:14px;height:14px;fill:#73399e;fill:var(--purple-dark);flex-shrink:0;}
+  .bbox-head svg{width:14px;height:14px;fill:#3D2B7D;fill:var(--purple-dark);flex-shrink:0;}
   .bbox-head h4{color:var(--purple-dark);font-size:11px;font-weight:800;letter-spacing:.2px;margin:0;}
   .bbox ol{list-style:none;counter-reset:bbox;padding-left:0;font-size:10px;line-height:1.5;color:#231f20;margin:0;flex:1 1 auto;
     word-spacing:normal;letter-spacing:normal;white-space:normal;overflow:visible;}
   .bbox ol li{counter-increment:bbox;position:relative;padding-left:18px;color:#231f20;opacity:1;-webkit-text-fill-color:#231f20;margin:0;}
-  .bbox ol li::before{content:counter(bbox) ".";position:absolute;left:0;top:0;font-weight:700;color:#73399e;-webkit-text-fill-color:#73399e;}
+  .bbox ol li::before{content:counter(bbox) ".";position:absolute;left:0;top:0;font-weight:700;color:#3D2B7D;-webkit-text-fill-color:#3D2B7D;}
   .bbox ol li + li{margin-top:6px;}
   .sign2{
     text-align:right;margin:6px 0 4px auto;padding:0;flex-shrink:0;
@@ -922,6 +922,8 @@ export const buildQuotationHtml = (data, profileInput) => {
     .sheet{box-shadow:none;margin:0;width:210mm;min-height:297mm;border-radius:0;}
     .sheet.page2{min-height:297mm;}
   }
+
+  table.items tbody tr:nth-child(even):not(.filler-row) td{background:#EFEAF7;}
 </style>
 </head>
 <body>
@@ -1012,7 +1014,7 @@ export const buildQuotationHtml = (data, profileInput) => {
       <div class="terms-grid">
         <div class="term">
           <div class="term-head">
-            <svg class="ticon" viewBox="0 0 24 24" fill="#5a2d81"><path d="M6 2h9l5 5v15H6zm8 1.5V8h4.5z"/></svg>
+            <svg class="ticon" viewBox="0 0 24 24" fill="#3D2B7D"><path d="M6 2h9l5 5v15H6zm8 1.5V8h4.5z"/></svg>
             <h4>TAXES</h4>
           </div>
           <p>GST will be charged extra as applicable.</p>
@@ -1026,7 +1028,7 @@ export const buildQuotationHtml = (data, profileInput) => {
         </div>
         <div class="term">
           <div class="term-head">
-            <svg class="ticon" viewBox="0 0 24 24" fill="#2e8b3d"><path d="M12 4V1L8 5l4 4V6a6 6 0 11-6 6H4a8 8 0 108-8z"/></svg>
+            <svg class="ticon" viewBox="0 0 24 24" fill="#2fa84f"><path d="M12 4V1L8 5l4 4V6a6 6 0 11-6 6H4a8 8 0 108-8z"/></svg>
             <h4>BATCH / CHANGE OVER</h4>
           </div>
           <p>If same material is required to be micronized in separate batch<span class="sym">(es)</span> or different PSD specification, Change Over Charge <span class="sym">@ ₹&nbsp;500/-</span> per batch or per specification will be applicable.</p>
@@ -1092,7 +1094,7 @@ export const buildQuotationHtml = (data, profileInput) => {
 
   <div class="features">
     <div class="feat">
-      <div class="circ" style="background:#eee6f7;"><svg viewBox="0 0 24 24" fill="#5a2d81"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm-1 13l5.5-5.5-1.4-1.4L11 12.2 8.9 10 7.5 11.5 11 15z"/></svg></div>
+      <div class="circ" style="background:#eee6f7;"><svg viewBox="0 0 24 24" fill="#3D2B7D"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm-1 13l5.5-5.5-1.4-1.4L11 12.2 8.9 10 7.5 11.5 11 15z"/></svg></div>
       <p>cGMP COMPLIANT FACILITY</p>
     </div>
     <div class="feat">
@@ -1100,7 +1102,7 @@ export const buildQuotationHtml = (data, profileInput) => {
       <p>CONTRACT MICRONIZATION EXPERTS</p>
     </div>
     <div class="feat">
-      <div class="circ" style="background:#e3f4e5;"><svg viewBox="0 0 24 24" fill="#2e8b3d"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 17a7 7 0 110-14 7 7 0 010 14zm0-11a4 4 0 100 8 4 4 0 000-8zm0 6a2 2 0 110-4 2 2 0 010 4z"/></svg></div>
+      <div class="circ" style="background:#e3f4e5;"><svg viewBox="0 0 24 24" fill="#2fa84f"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 17a7 7 0 110-14 7 7 0 010 14zm0-11a4 4 0 100 8 4 4 0 000-8zm0 6a2 2 0 110-4 2 2 0 010 4z"/></svg></div>
       <p>PARTICLE SIZE ANALYSIS &amp; DEVELOPMENT</p>
     </div>
     <div class="feat">

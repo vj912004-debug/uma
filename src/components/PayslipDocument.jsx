@@ -94,12 +94,12 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
   return (
     <div className="payslip-container-single" style={{
       background: '#ffffff',
-      border: '1.5px solid #cfd5f5',
+      border: '1.5px solid #CFC4EA',
       borderRadius: '8px',
       padding: '0.65rem 0.95rem',
       boxSizing: 'border-box',
       fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-      color: '#1e1b4b',
+      color: '#231f20',
       fontSize: '0.76rem',
       lineHeight: '1.3',
       width: '100%',
@@ -121,7 +121,7 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
             margin: 0,
             fontSize: '1.45rem',
             fontWeight: 900,
-            color: '#2b2667',
+            color: '#3D2B7D',
             letterSpacing: '0.01em',
             lineHeight: 1.1
           }}>
@@ -130,7 +130,7 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
           <div style={{
             fontSize: '0.78rem',
             fontWeight: 600,
-            color: '#4a457e',
+            color: '#3D2B7D',
             margin: '0.12rem 0 0.08rem 0'
           }}>
             {tagline}
@@ -138,7 +138,7 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
           <div style={{
             fontSize: '0.65rem',
             fontWeight: 800,
-            color: '#64609a',
+            color: '#3D2B7D',
             letterSpacing: '0.05em',
             textTransform: 'uppercase'
           }}>
@@ -148,8 +148,8 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
 
         {/* Right Badge Box */}
         <div style={{
-          background: '#eaeefd',
-          border: '1.5px solid #d4d8f6',
+          background: '#EFEAF7',
+          border: '1.5px solid #CFC4EA',
           borderRadius: '6px',
           padding: '0.4rem 1.1rem',
           textAlign: 'center',
@@ -158,7 +158,7 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
           <div style={{
             fontSize: '1.05rem',
             fontWeight: 900,
-            color: '#2b2667',
+            color: '#3D2B7D',
             letterSpacing: '0.04em'
           }}>
             SALARY PAYSLIP
@@ -166,7 +166,7 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
           <div style={{
             fontSize: '0.75rem',
             fontWeight: 700,
-            color: '#3b347a',
+            color: '#3D2B7D',
             marginTop: '0.12rem',
             letterSpacing: '0.02em'
           }}>
@@ -184,18 +184,18 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
       }}>
         {/* Left Box: EMPLOYEE DETAILS */}
         <div style={{
-          border: '1.5px solid #cfd5f5',
+          border: '1.5px solid #CFC4EA',
           borderRadius: '6px',
           overflow: 'hidden',
           background: '#ffffff'
         }}>
           <div style={{
-            background: '#eaeefd',
+            background: '#EFEAF7',
             padding: '0.35rem 0.75rem',
             fontWeight: 800,
             fontSize: '0.75rem',
-            color: '#2b2667',
-            borderBottom: '1.5px solid #cfd5f5',
+            color: '#3D2B7D',
+            borderBottom: '1.5px solid #CFC4EA',
             letterSpacing: '0.03em'
           }}>
             EMPLOYEE DETAILS
@@ -208,27 +208,27 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
             fontSize: '0.76rem'
           }}>
             <div style={{ display: 'grid', gridTemplateColumns: '108px 10px 1fr' }}>
-              <span style={{ color: '#332e67', fontWeight: 600 }}>Employee Code</span>
+              <span style={{ color: '#3D2B7D', fontWeight: 600 }}>Employee Code</span>
               <span style={{ fontWeight: 700 }}>:</span>
-              <strong style={{ color: '#1e1b4b' }}>{empCode}</strong>
+              <strong style={{ color: '#231f20' }}>{empCode}</strong>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '108px 10px 1fr' }}>
-              <span style={{ color: '#332e67', fontWeight: 600 }}>Employee Name</span>
+              <span style={{ color: '#3D2B7D', fontWeight: 600 }}>Employee Name</span>
               <span style={{ fontWeight: 700 }}>:</span>
-              <strong style={{ color: '#1e1b4b' }}>{empName}</strong>
+              <strong style={{ color: '#231f20' }}>{empName}</strong>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '108px 10px 1fr' }}>
-              <span style={{ color: '#332e67', fontWeight: 600 }}>Department</span>
+              <span style={{ color: '#3D2B7D', fontWeight: 600 }}>Department</span>
               <span style={{ fontWeight: 700 }}>:</span>
               <span>{department}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '108px 10px 1fr' }}>
-              <span style={{ color: '#332e67', fontWeight: 600 }}>Designation</span>
+              <span style={{ color: '#3D2B7D', fontWeight: 600 }}>Designation</span>
               <span style={{ fontWeight: 700 }}>:</span>
               <span>{designation}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '108px 10px 1fr' }}>
-              <span style={{ color: '#332e67', fontWeight: 600 }}>Pay Month</span>
+              <span style={{ color: '#3D2B7D', fontWeight: 600 }}>Pay Month</span>
               <span style={{ fontWeight: 700 }}>:</span>
               <span>{payMonthLabel}</span>
             </div>
@@ -237,18 +237,18 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
 
         {/* Right Box: SALARY DETAILS */}
         <div style={{
-          border: '1.5px solid #cfd5f5',
+          border: '1.5px solid #CFC4EA',
           borderRadius: '6px',
           overflow: 'hidden',
           background: '#ffffff'
         }}>
           <div style={{
-            background: '#eaeefd',
+            background: '#EFEAF7',
             padding: '0.35rem 0.75rem',
             fontWeight: 800,
             fontSize: '0.75rem',
-            color: '#2b2667',
-            borderBottom: '1.5px solid #cfd5f5',
+            color: '#3D2B7D',
+            borderBottom: '1.5px solid #CFC4EA',
             letterSpacing: '0.03em'
           }}>
             SALARY DETAILS
@@ -261,27 +261,27 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
             fontSize: '0.76rem'
           }}>
             <div style={{ display: 'grid', gridTemplateColumns: '108px 10px 1fr' }}>
-              <span style={{ color: '#332e67', fontWeight: 600 }}>Gross Salary</span>
+              <span style={{ color: '#3D2B7D', fontWeight: 600 }}>Gross Salary</span>
               <span style={{ fontWeight: 700 }}>:</span>
-              <strong style={{ color: '#1e1b4b' }}>{formatCurrency(grossSalary)}</strong>
+              <strong style={{ color: '#231f20' }}>{formatCurrency(grossSalary)}</strong>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '108px 10px 1fr' }}>
-              <span style={{ color: '#332e67', fontWeight: 600 }}>Net Salary</span>
+              <span style={{ color: '#3D2B7D', fontWeight: 600 }}>Net Salary</span>
               <span style={{ fontWeight: 700 }}>:</span>
-              <strong style={{ color: '#1e1b4b' }}>{formatCurrency(netSalary)}</strong>
+              <strong style={{ color: '#231f20' }}>{formatCurrency(netSalary)}</strong>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '108px 10px 1fr' }}>
-              <span style={{ color: '#332e67', fontWeight: 600 }}>Working Days</span>
+              <span style={{ color: '#3D2B7D', fontWeight: 600 }}>Working Days</span>
               <span style={{ fontWeight: 700 }}>:</span>
               <span>{workingDays}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '108px 10px 1fr' }}>
-              <span style={{ color: '#332e67', fontWeight: 600 }}>Absence</span>
+              <span style={{ color: '#3D2B7D', fontWeight: 600 }}>Absence</span>
               <span style={{ fontWeight: 700 }}>:</span>
               <span>{absentDays}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '108px 10px 1fr' }}>
-              <span style={{ color: '#332e67', fontWeight: 600 }}>Leaves</span>
+              <span style={{ color: '#3D2B7D', fontWeight: 600 }}>Leaves</span>
               <span style={{ fontWeight: 700 }}>:</span>
               <span>{leaveDays}</span>
             </div>
@@ -291,19 +291,19 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
 
       {/* 3. ATTENDANCE & OT SUMMARY */}
       <div style={{
-        border: '1.5px solid #cfd5f5',
+        border: '1.5px solid #CFC4EA',
         borderRadius: '6px',
         overflow: 'hidden',
         marginBottom: '0.55rem',
         background: '#ffffff'
       }}>
         <div style={{
-          background: '#eaeefd',
+          background: '#EFEAF7',
           padding: '0.35rem 0.75rem',
           fontWeight: 800,
           fontSize: '0.75rem',
-          color: '#2b2667',
-          borderBottom: '1.5px solid #cfd5f5',
+          color: '#3D2B7D',
+          borderBottom: '1.5px solid #CFC4EA',
           letterSpacing: '0.03em'
         }}>
           ATTENDANCE & OT SUMMARY
@@ -315,19 +315,19 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
           fontSize: '0.74rem'
         }}>
           {/* Header Row */}
-          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #cfd5f5', borderBottom: '1px solid #cfd5f5', background: '#f8f9ff', fontWeight: 700, color: '#332e67' }}>Present Days</div>
-          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #cfd5f5', borderBottom: '1px solid #cfd5f5', background: '#f8f9ff', fontWeight: 700, color: '#332e67' }}>Absent Days</div>
-          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #cfd5f5', borderBottom: '1px solid #cfd5f5', background: '#f8f9ff', fontWeight: 700, color: '#332e67' }}>Leave Days</div>
-          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #cfd5f5', borderBottom: '1px solid #cfd5f5', background: '#f8f9ff', fontWeight: 700, color: '#332e67' }}>OT Hours</div>
-          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #cfd5f5', borderBottom: '1px solid #cfd5f5', background: '#f8f9ff', fontWeight: 700, color: '#332e67' }}>Total Working Hours</div>
-          <div style={{ padding: '0.35rem 0.25rem', borderBottom: '1px solid #cfd5f5', background: '#f8f9ff', fontWeight: 700, color: '#332e67' }}>Shift Type</div>
+          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Present Days</div>
+          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Absent Days</div>
+          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Leave Days</div>
+          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>OT Hours</div>
+          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Total Working Hours</div>
+          <div style={{ padding: '0.35rem 0.25rem', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Shift Type</div>
 
           {/* Value Row */}
-          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #cfd5f5', fontWeight: 700 }}>{presentDays}</div>
-          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #cfd5f5', fontWeight: 700 }}>{absentDays}</div>
-          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #cfd5f5', fontWeight: 700 }}>{leaveDays}</div>
-          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #cfd5f5', fontWeight: 700 }}>{formatNumber(otHours, 2)}</div>
-          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #cfd5f5', fontWeight: 700 }}>{formatNumber(totalHours, 2)}</div>
+          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{presentDays}</div>
+          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{absentDays}</div>
+          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{leaveDays}</div>
+          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{formatNumber(otHours, 2)}</div>
+          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{formatNumber(totalHours, 2)}</div>
           <div style={{ padding: '0.38rem 0.25rem', fontWeight: 700 }}>{shiftType}</div>
         </div>
       </div>
@@ -341,7 +341,7 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
       }}>
         {/* Left Box: EARNINGS */}
         <div style={{
-          border: '1.5px solid #cfd5f5',
+          border: '1.5px solid #CFC4EA',
           borderRadius: '6px',
           overflow: 'hidden',
           background: '#ffffff',
@@ -349,12 +349,12 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
           flexDirection: 'column'
         }}>
           <div style={{
-            background: '#eaeefd',
+            background: '#EFEAF7',
             padding: '0.35rem 0.75rem',
             fontWeight: 800,
             fontSize: '0.75rem',
-            color: '#2b2667',
-            borderBottom: '1.5px solid #cfd5f5',
+            color: '#3D2B7D',
+            borderBottom: '1.5px solid #CFC4EA',
             letterSpacing: '0.03em'
           }}>
             EARNINGS
@@ -362,16 +362,16 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #cfd5f5', background: '#f8f9ff' }}>
-                  <th style={{ textAlign: 'left', padding: '0.3rem 0.75rem', fontWeight: 700, color: '#332e67' }}>Description</th>
-                  <th style={{ textAlign: 'right', padding: '0.3rem 0.75rem', fontWeight: 700, color: '#332e67' }}>Amount (₹)</th>
+                <tr style={{ borderBottom: '1px solid #CFC4EA', background: '#3D2B7D' }}>
+                  <th style={{ textAlign: 'left', padding: '0.3rem 0.75rem', fontWeight: 700, color: '#fff' }}>Description</th>
+                  <th style={{ textAlign: 'right', padding: '0.3rem 0.75rem', fontWeight: 700, color: '#fff' }}>Amount (₹)</th>
                 </tr>
               </thead>
               <tbody>
                 {earningsRows.map((row, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid #eef1fc' }}>
-                    <td style={{ padding: '0.28rem 0.75rem', color: '#1e1b4b' }}>{row.label}</td>
-                    <td style={{ textAlign: 'right', padding: '0.28rem 0.75rem', color: '#1e1b4b' }}>
+                  <tr key={idx} style={{ borderBottom: '1px solid #CFC4EA' }}>
+                    <td style={{ padding: '0.28rem 0.75rem', color: '#231f20' }}>{row.label}</td>
+                    <td style={{ textAlign: 'right', padding: '0.28rem 0.75rem', color: '#231f20' }}>
                       {formatNumber(row.amount)}
                     </td>
                   </tr>
@@ -383,11 +383,11 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
               justify: 'space-between',
               alignItems: 'center',
               padding: '0.35rem 0.75rem',
-              borderTop: '1.5px solid #cfd5f5',
-              background: '#f8f9ff',
+              borderTop: '1.5px solid #CFC4EA',
+              background: '#EFEAF7',
               fontWeight: 800,
               fontSize: '0.78rem',
-              color: '#2b2667'
+              color: '#3D2B7D'
             }}>
               <span>Total Earning</span>
               <span>{formatNumber(totalEarning)}</span>
@@ -397,7 +397,7 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
 
         {/* Right Box: DEDUCTIONS */}
         <div style={{
-          border: '1.5px solid #cfd5f5',
+          border: '1.5px solid #CFC4EA',
           borderRadius: '6px',
           overflow: 'hidden',
           background: '#ffffff',
@@ -405,12 +405,12 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
           flexDirection: 'column'
         }}>
           <div style={{
-            background: '#eaeefd',
+            background: '#EFEAF7',
             padding: '0.35rem 0.75rem',
             fontWeight: 800,
             fontSize: '0.75rem',
-            color: '#2b2667',
-            borderBottom: '1.5px solid #cfd5f5',
+            color: '#3D2B7D',
+            borderBottom: '1.5px solid #CFC4EA',
             letterSpacing: '0.03em'
           }}>
             DEDUCTIONS
@@ -418,16 +418,16 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #cfd5f5', background: '#f8f9ff' }}>
-                  <th style={{ textAlign: 'left', padding: '0.3rem 0.75rem', fontWeight: 700, color: '#332e67' }}>Description</th>
-                  <th style={{ textAlign: 'right', padding: '0.3rem 0.75rem', fontWeight: 700, color: '#332e67' }}>Amount (₹)</th>
+                <tr style={{ borderBottom: '1px solid #CFC4EA', background: '#3D2B7D' }}>
+                  <th style={{ textAlign: 'left', padding: '0.3rem 0.75rem', fontWeight: 700, color: '#fff' }}>Description</th>
+                  <th style={{ textAlign: 'right', padding: '0.3rem 0.75rem', fontWeight: 700, color: '#fff' }}>Amount (₹)</th>
                 </tr>
               </thead>
               <tbody>
                 {deductionsRows.map((row, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid #eef1fc' }}>
-                    <td style={{ padding: '0.28rem 0.75rem', color: '#1e1b4b' }}>{row.label}</td>
-                    <td style={{ textAlign: 'right', padding: '0.28rem 0.75rem', color: '#1e1b4b' }}>
+                  <tr key={idx} style={{ borderBottom: '1px solid #CFC4EA' }}>
+                    <td style={{ padding: '0.28rem 0.75rem', color: '#231f20' }}>{row.label}</td>
+                    <td style={{ textAlign: 'right', padding: '0.28rem 0.75rem', color: '#231f20' }}>
                       {formatNumber(row.amount)}
                     </td>
                   </tr>
@@ -439,11 +439,11 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
               justify: 'space-between',
               alignItems: 'center',
               padding: '0.35rem 0.75rem',
-              borderTop: '1.5px solid #cfd5f5',
-              background: '#f8f9ff',
+              borderTop: '1.5px solid #CFC4EA',
+              background: '#EFEAF7',
               fontWeight: 800,
               fontSize: '0.78rem',
-              color: '#2b2667'
+              color: '#3D2B7D'
             }}>
               <span>Total Deduction</span>
               <span>{formatNumber(totalDeduction)}</span>
@@ -454,8 +454,8 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
 
       {/* 5. NET PAYMENT BANNER */}
       <div style={{
-        background: '#eaeefd',
-        border: '1.5px solid #cfd5f5',
+        background: '#EFEAF7',
+        border: '1.5px solid #CFC4EA',
         borderRadius: '6px',
         padding: '0.45rem 0.85rem',
         display: 'flex',
@@ -463,10 +463,10 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
         alignItems: 'center',
         marginBottom: '0.55rem'
       }}>
-        <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#2b2667', letterSpacing: '0.01em' }}>
+        <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#3D2B7D', letterSpacing: '0.01em' }}>
           Net Payment
         </span>
-        <span style={{ fontWeight: 900, fontSize: '1.2rem', color: '#2b2667' }}>
+        <span style={{ fontWeight: 900, fontSize: '1.2rem', color: '#3D2B7D' }}>
           {formatCurrency(finalNetPayment)}
         </span>
       </div>
@@ -480,7 +480,7 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
         fontSize: '0.72rem'
       }}>
         <div>
-          <div style={{ fontWeight: 800, color: '#2b2667', fontSize: '0.78rem' }}>
+          <div style={{ fontWeight: 800, color: '#3D2B7D', fontSize: '0.78rem' }}>
             For {companyName}
           </div>
           <div style={{
@@ -499,7 +499,7 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
             marginBottom: '4px',
             display: 'inline-block'
           }}></div>
-          <div style={{ fontWeight: 700, color: '#2b2667', fontSize: '0.75rem' }}>
+          <div style={{ fontWeight: 700, color: '#3D2B7D', fontSize: '0.75rem' }}>
             Authorised Signatory
           </div>
         </div>
@@ -527,7 +527,7 @@ export const DualPayslipPrintView = ({ emp = {}, selectedMonth = '', companyProf
           left: 0,
           right: 0,
           top: '50%',
-          borderTop: '1.5px dashed #8b92b2',
+          borderTop: '1.5px dashed #CFC4EA',
           zIndex: 1
         }}></div>
         <div style={{

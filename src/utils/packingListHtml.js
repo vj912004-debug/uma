@@ -271,10 +271,10 @@ export const buildPackingListHtml = (data, profileInput) => {
 <title>UMA MICRON - Packing List</title>
 <style>
   :root{
-    --purple:#9b62c4;
-    --purple-dark:#73399e;
-    --lav-bg:#F6F0FA;
-    --lav-border:#d6c2e8;
+    --purple:#3D2B7D;
+    --purple-dark:#3D2B7D;
+    --lav-bg:#EFEAF7;
+    --lav-border:#CFC4EA;
     --green:#2fa84f;
     --text:#231f20;
   }
@@ -384,6 +384,8 @@ export const buildPackingListHtml = (data, profileInput) => {
     font-size:12px;flex-shrink:0;min-width:0;
   }
   .barfoot span{min-width:0;overflow-wrap:anywhere;}
+
+  table.items tbody tr:nth-child(even):not(.filler-row) td{background:#EFEAF7;}
 </style>
 </head>
 <body>

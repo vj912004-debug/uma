@@ -333,7 +333,7 @@ export const buildPrintPrefsCss = (prefs) => {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    color: #9b62c4 !important;
+    color: #3D2B7D !important;
   }
   .uma-print-root .meta-row .m-icon svg,
   .uma-print-root .icon svg,
@@ -351,7 +351,7 @@ export const buildPrintPrefsCss = (prefs) => {
     max-height: 16px !important;
     flex: 0 0 16px !important;
     fill: none !important;
-    stroke: #9b62c4 !important;
+    stroke: #3D2B7D !important;
     stroke-width: 1.6 !important;
     stroke-linecap: round !important;
     stroke-linejoin: round !important;
@@ -365,7 +365,7 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root .sign svg *,
   .uma-print-root .signature-label svg * {
     fill: none !important;
-    stroke: #9b62c4 !important;
+    stroke: #3D2B7D !important;
     stroke-width: 1.6 !important;
     stroke-linecap: round !important;
     stroke-linejoin: round !important;
@@ -884,7 +884,7 @@ export const buildPrintPrefsCss = (prefs) => {
   }
   .uma-print-root table.items tbody tr.filler-row td {
     min-height: 18px !important;
-    border-color: #d6c2e8 !important;
+    border-color: #CFC4EA !important;
     visibility: visible !important;
     opacity: 1 !important;
     background: #ffffff !important;
@@ -898,7 +898,7 @@ export const buildPrintPrefsCss = (prefs) => {
   }
   .uma-print-root table.items tbody tr.empty td {
     min-height: 18px !important;
-    border: 1px solid #d6c2e8 !important;
+    border: 1px solid #CFC4EA !important;
     visibility: visible !important;
     background: #ffffff !important;
   }
@@ -912,8 +912,8 @@ export const buildPrintPrefsCss = (prefs) => {
     line-height: 1 !important;
     border-top: none !important;
     border-left: none !important;
-    border-right: 1px solid #7c12bd !important;
-    border-bottom: 1px solid #7c12bd !important;
+    border-right: 1px solid #CFC4EA !important;
+    border-bottom: 1px solid #CFC4EA !important;
     border-radius: 0 !important;
     margin: 0 !important;
   }
@@ -934,14 +934,14 @@ export const buildPrintPrefsCss = (prefs) => {
     height: auto !important;
     border-collapse: separate !important;
     border-spacing: 0 !important;
-    border-top: 1px solid #7c12bd !important;
-    border-left: 1px solid #7c12bd !important;
+    border-top: 1px solid #CFC4EA !important;
+    border-left: 1px solid #CFC4EA !important;
   }
   .uma-print-root .page-p2 table.items thead th {
     border-top: none !important;
     border-left: none !important;
-    border-right: 1px solid #7c12bd !important;
-    border-bottom: 1px solid #7c12bd !important;
+    border-right: 1px solid #CFC4EA !important;
+    border-bottom: 1px solid #CFC4EA !important;
     border-radius: 0 !important;
   }
   .uma-print-root table.items tbody tr.summary-row td {
@@ -1083,6 +1083,10 @@ export const buildPrintPrefsCss = (prefs) => {
     line-height: 1.2 !important;
     font-size: ${bodyFs}px !important;
     white-space: nowrap !important;
+  }
+  .uma-print-root table.items tbody tr:nth-child(even):not(.filler-row) td,
+  .uma-print-root table.items tbody tr:nth-child(even):not(.filler-row) td.wt {
+    background: #EFEAF7 !important;
   }
   .uma-print-root table.items tbody td.left {
     vertical-align: top !important;

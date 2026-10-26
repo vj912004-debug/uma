@@ -129,10 +129,10 @@ export const calcNoteLines = (data) => {
 
 const getCommonStyle = () => `
   :root{
-    --purple:#9b62c4;
-    --purple-dark:#73399e;
-    --lav-bg:#F6F0FA;
-    --lav-border:#d6c2e8;
+    --purple:#3D2B7D;
+    --purple-dark:#3D2B7D;
+    --lav-bg:#EFEAF7;
+    --lav-border:#CFC4EA;
     --orange:#f47920;
     --green:#2fa84f;
     --text:#231f20;
@@ -210,11 +210,11 @@ const getCommonStyle = () => `
     white-space: nowrap;
     letter-spacing:0.5px;
     word-spacing:normal;
-    color:#123282;
+    color:#3D2B7D;
     line-height:1;
   }
   .brand-text .tagline{
-    color:#1d9444;
+    color:#2fa84f;
     font-family:Cambria,Georgia,serif;
     font-weight:700;
     font-size:13px;
@@ -286,9 +286,9 @@ const getCommonStyle = () => `
     text-align:center;
     margin-top:1px;
   }
-  .icon svg{width:16px;height:16px;display:block;fill:none;stroke:#9b62c4;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
-  .m-icon svg{width:15px;height:15px;display:block;fill:none;stroke:#9b62c4;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
-  .party-head svg, .box-head svg{width:16px;height:16px;display:block;fill:none;stroke:#9b62c4;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .icon svg{width:16px;height:16px;display:block;fill:none;stroke:#3D2B7D;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .m-icon svg{width:15px;height:15px;display:block;fill:none;stroke:#3D2B7D;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .party-head svg, .box-head svg{width:16px;height:16px;display:block;fill:none;stroke:#3D2B7D;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
   .reg-details{
     margin-top:10px;
     font-size:12px;
@@ -789,7 +789,9 @@ const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
 <head>
 <meta charset="UTF-8">
 <title>${noteType} - ${escHtml(profile.companyName)}</title>
-<style>${getCommonStyle()}</style>
+<style>${getCommonStyle()}
+  table.items tbody tr:nth-child(even):not(.filler-row) td{background:#EFEAF7;}
+</style>
 </head>
 <body>
 <div class="page pdf-page ${noteType === 'Debit Note' ? 'dn-page' : 'cn-page'}">

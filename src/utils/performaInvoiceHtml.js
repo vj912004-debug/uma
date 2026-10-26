@@ -161,10 +161,10 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
 <title>UMA MICRON - Performa Invoice</title>
 <style>
   :root{
-    --purple:#9b62c4;
-    --purple-dark:#73399e;
-    --lav-bg:#F6F0FA;
-    --lav-border:#d6c2e8;
+    --purple:#3D2B7D;
+    --purple-dark:#3D2B7D;
+    --lav-bg:#EFEAF7;
+    --lav-border:#CFC4EA;
     --orange:#f47920;
     --green:#2fa84f;
     --text:#231f20;
@@ -241,11 +241,11 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
     white-space: nowrap;
     letter-spacing:0.5px;
     word-spacing:normal;
-    color:#123282;
+    color:#3D2B7D;
     line-height:1;
   }
   .brand-text .tagline{
-    color:#1d9444;
+    color:#2fa84f;
     font-family:Cambria,Georgia,serif;
     font-weight:700;
     font-size:13px;
@@ -317,9 +317,9 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
     text-align:center;
     margin-top:1px;
   }
-  .icon svg{width:16px;height:16px;display:block;fill:none;stroke:#9b62c4;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
-  .m-icon svg{width:15px;height:15px;display:block;fill:none;stroke:#9b62c4;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
-  .party-head svg, .box-head svg{width:16px;height:16px;display:block;fill:none;stroke:#9b62c4;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .icon svg{width:16px;height:16px;display:block;fill:none;stroke:#3D2B7D;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .m-icon svg{width:15px;height:15px;display:block;fill:none;stroke:#3D2B7D;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .party-head svg, .box-head svg{width:16px;height:16px;display:block;fill:none;stroke:#3D2B7D;stroke:var(--purple);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
   .reg-details{
     margin-top:10px;
     font-size:12px;
@@ -631,6 +631,8 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
     .page {margin:0;padding: 0;width:794px;height: 1123px;max-height:1123px;overflow:hidden;display:flex;flex-direction:column;}
     .content-wrapper { display:flex; flex-direction:column; width:100%; height:100%; min-height:0; border:2px solid var(--purple); box-sizing:border-box; }
   }
+
+  table.items tbody tr:nth-child(even):not(.filler-row) td{background:#EFEAF7;}
 </style>
 </head>
 <body>
