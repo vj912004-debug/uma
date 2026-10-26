@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
 import GstTaxBlock from '../components/GstTaxBlock';
 import { formatDate, newestFirst } from '../utils/dateUtils';
 import ExportButton from '../components/ExportButton';
@@ -150,7 +151,7 @@ const MonthlyBilling = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [reviewStep, setReviewStep] = useState(1);
   const [partyId, setPartyId] = useState('');
-  const [billingMonth, setBillingMonth] = useState(monthValue());
+  const [billingMonth, setBillingMonth] = useState(() => new Date().toISOString().slice(0, 10));
   const [loaded, setLoaded] = useState(false);
   const [rows, setRows] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -881,8 +882,7 @@ const MonthlyBilling = () => {
               </div>
               <div className="mb-field">
                 <label>Billing Month</label>
-                <input
-                  type="month"
+                <DateField
                   className="input-field"
                   value={billingMonth}
                   onChange={(e) => {

@@ -2809,6 +2809,22 @@ tbody tr:hover td {
   padding: 0.65rem 0.75rem;
   margin-bottom: 0.75rem;
 }
+.gst-tax-block.is-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-width: 0;
+}
+.gst-tax-block.is-compact .searchable-select {
+  width: 100%;
+  min-width: 0;
+  flex: none;
+}
+.gst-tax-block.is-compact .searchable-select-combo-input {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .mb-generate { width: 100%; justify-content: center; }
 
 .mb-invoice-block { margin-top: 0.25rem; }

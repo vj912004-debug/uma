@@ -39,12 +39,15 @@ const GstTaxBlock = ({
     fontSize: compact ? '0.8rem' : '0.85rem',
     gap: '0.5rem'
   };
+  const fieldStyle = compact
+    ? { display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '0.3rem', minWidth: 0 }
+    : rowStyle;
   const selectStyle = compact
-    ? { width: '120px', padding: '0.2rem', height: 'auto' }
-    : { width: '140px', padding: '0.2rem', height: 'auto' };
+    ? { width: '100%', minWidth: 0, padding: '0.4rem 1.8rem 0.4rem 0.55rem', height: 'auto', boxSizing: 'border-box' }
+    : { width: '180px', padding: '0.2rem 1.6rem 0.2rem 0.35rem', height: 'auto', boxSizing: 'border-box' };
 
   return (
-    <>
+    <div className={compact ? 'gst-tax-block is-compact' : 'gst-tax-block'}>
       {showSubtotal && (
         <div style={rowStyle}>
           <span>Subtotal:</span>
@@ -54,12 +57,14 @@ const GstTaxBlock = ({
         </div>
       )}
       {showDiscountInput && (
-        <div style={rowStyle}>
+        <div style={fieldStyle}>
           <span>Discount (₹):</span>
           <input
             type="number"
             className="input-field"
-            style={{ width: '100px', padding: '0.2rem', height: 'auto' }}
+            style={compact
+              ? { width: '100%', padding: '0.4rem 0.55rem', height: 'auto', boxSizing: 'border-box' }
+              : { width: '100px', padding: '0.2rem', height: 'auto' }}
             value={discountValue}
             onChange={(e) => onDiscountChange?.(parseFloat(e.target.value) || 0)}
           />
@@ -71,7 +76,7 @@ const GstTaxBlock = ({
           <span>₹{taxableAmt.toFixed(2)}</span>
         </div>
       )}
-      <div style={rowStyle}>
+      <div style={fieldStyle}>
         <span>GST Type:</span>
         <SearchableSelect
           className="input-field"
@@ -86,11 +91,13 @@ const GstTaxBlock = ({
           <option value={GST_TYPE_IGST}>IGST (Out of Gujarat)</option>
         </SearchableSelect>
       </div>
-      <div style={rowStyle}>
+      <div style={fieldStyle}>
         <span>GST Rate (%):</span>
         <SearchableSelect
           className="input-field"
-          style={{ width: '100px', padding: '0.2rem', height: 'auto' }}
+          style={compact
+            ? selectStyle
+            : { width: '100px', padding: '0.2rem 1.6rem 0.2rem 0.35rem', height: 'auto', boxSizing: 'border-box' }}
           value={rate}
           onChange={(e) => onTaxRateChange?.(parseInt(e.target.value, 10) || 0)}
         >
@@ -133,7 +140,7 @@ const GstTaxBlock = ({
           <span>₹{grand.toFixed(2)}</span>
         </div>
       )}
-    </>
+    </div>
   );
 };
 
