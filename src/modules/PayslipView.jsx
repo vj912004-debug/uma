@@ -22,8 +22,7 @@ import SearchableSelect from '../components/SearchableSelect';
 import ExportButton from '../components/ExportButton';
 import { formatDate } from '../utils/dateUtils';
 import { getEffectiveRate, money } from '../utils/payroll';
-import { getPrintStampSrc } from '../utils/companyProfile';
-import { SinglePayslipCard, DualPayslipPrintView } from '../components/PayslipDocument';
+import { DualPayslipPrintView, PayslipA4Preview } from '../components/PayslipDocument';
 import { DEPARTMENTS } from './EmployeeManagement';
 
 const currentMonthStr = () => {
@@ -176,7 +175,6 @@ const PayslipView = () => {
   }, [employeeList, selectedEmpId]);
 
   const companyProfile = data.companyProfile || {};
-  const stampSrc = getPrintStampSrc(companyProfile);
 
   return (
     <div className="pm-page" style={{ paddingBottom: '2.5rem' }}>
@@ -309,7 +307,7 @@ const PayslipView = () => {
       </div>
 
       {/* 3-PANEL SPLIT MAIN LAYOUT */}
-      <div style={{ display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr) 280px', gap: '1.25rem', alignItems: 'start' }}>
+      <div className="payslip-workbench">
         
         {/* PANEL A: LEFT EMPLOYEE LIST */}
         <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
@@ -346,19 +344,21 @@ const PayslipView = () => {
                   <div style={{
                     width: 32,
                     height: 32,
+                    minWidth: 32,
+                    flex: '0 0 32px',
                     borderRadius: '50%',
                     background: isSelected ? 'rgba(255,255,255,0.2)' : 'rgba(155, 98, 196, 0.1)',
                     color: isSelected ? '#fff' : 'var(--accent-primary)',
                     display: 'flex',
                     alignItems: 'center',
-                    justify: 'center',
+                    justifyContent: 'center',
                     fontWeight: 800,
                     fontSize: '0.85rem'
                   }}>
                     {emp.name.charAt(0).toUpperCase()}
                   </div>
 
-                  <div style={{ overflow: 'hidden' }}>
+                  <div style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden' }}>
                     <div style={{ fontSize: '0.85rem', fontWeight: 700, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                       {emp.name} <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>({emp.empId})</span>
                     </div>
@@ -373,15 +373,9 @@ const PayslipView = () => {
         </div>
 
         {/* PANEL B: CENTER MAIN PAYSLIP CARD (DUAL A4 PAGE PREVIEW) */}
+        {/* PANEL C: SUMMARY CARDS */}
         {activeEmp && (
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <DualPayslipPrintView emp={activeEmp} selectedMonth={selectedMonth} companyProfile={companyProfile} />
-          </div>
-        )}
-
-        {/* PANEL C: RIGHT SIDEBAR CARDS */}
-        {activeEmp && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div className="payslip-side">
             
             {/* ATTENDANCE SUMMARY CARD */}
             <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.25rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
@@ -453,6 +447,12 @@ const PayslipView = () => {
               </div>
             </div>
 
+          </div>
+        )}
+
+        {activeEmp && (
+          <div className="payslip-sheet-wrap">
+            <PayslipA4Preview emp={activeEmp} selectedMonth={selectedMonth} companyProfile={companyProfile} />
           </div>
         )}
 

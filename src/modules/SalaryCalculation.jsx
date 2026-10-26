@@ -28,8 +28,7 @@ import ExportButton from '../components/ExportButton';
 import { formatDate } from '../utils/dateUtils';
 import { getEffectiveRate, money, calculateMonthSalary } from '../utils/payroll';
 import { DEPARTMENTS } from './EmployeeManagement';
-import { getPrintStampSrc } from '../utils/companyProfile';
-import { SinglePayslipCard, DualPayslipPrintView } from '../components/PayslipDocument';
+import { DualPayslipPrintView, PayslipA4Preview } from '../components/PayslipDocument';
 
 const currentMonthStr = () => {
   const d = new Date();
@@ -253,7 +252,6 @@ const SalaryCalculation = () => {
 
   const departmentOptions = [...new Set([...DEPARTMENTS, ...users.map((u) => u.department).filter(Boolean)])];
   const companyProfile = data.companyProfile || {};
-  const stampSrc = getPrintStampSrc(companyProfile);
 
   return (
     <div className="pm-page" style={{ paddingBottom: '2.5rem' }}>
@@ -897,6 +895,9 @@ const SalaryCalculation = () => {
 
             {/* Dual A4 Payslip Container */}
             <div id="printable-payslip" style={{ background: '#fff', borderRadius: '8px', overflowY: 'auto', maxHeight: '78vh' }}>
+              <PayslipA4Preview emp={payslipModalUser} selectedMonth={selectedMonth} companyProfile={companyProfile} />
+            </div>
+            <div className="payslip-print-container" style={{ display: 'none' }}>
               <DualPayslipPrintView emp={payslipModalUser} selectedMonth={selectedMonth} companyProfile={companyProfile} />
             </div>
 

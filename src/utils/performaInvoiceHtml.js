@@ -1,4 +1,4 @@
-import { mergeCompanyProfile } from './companyProfile';
+import { getPrintStampSrc, mergeCompanyProfile } from './companyProfile';
 import {
   splitPartyAddressLines,
   partyAddressHtml,
@@ -783,7 +783,7 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
   </div>
 
   <!-- TERMS / DECLARATION / SIGNATORY -->
-  ${buildFooterTerms(profile.companyName || 'UMA MICRON', formatPiPrintTermsHtml(data.terms), DEFAULT_INVOICE_DECLARATION, '', profile.stamp)}
+  ${buildFooterTerms(profile.companyName || 'UMA MICRON', formatPiPrintTermsHtml(data.terms), DEFAULT_INVOICE_DECLARATION, '', getPrintStampSrc(profile))}
 
   <!-- BAR FOOTER -->
   ${buildStatusBar('Page 1 of 1', PRINT_FOOTER_MESSAGES.PI)}

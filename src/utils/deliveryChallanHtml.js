@@ -1,5 +1,4 @@
 import { mergeCompanyProfile } from './companyProfile';
-import { DEFAULT_PRINT_STAMP_SRC } from './defaultPrintStamp';
 import { buildDcPrintLines, getDcAppData, resolveLinkedMr } from './deliveryChallanLayout';
 import { formatPdfDateDmy, splitPartyAddressLines, partyAddressHtml } from './taxInvoiceLayout';
 import { escHtml, fmtQty, buildPrintBrandHtml, renderHtmlToPdf, fillPrintPartyFields, buildStatusBar, buildPartyFootHtml, buildOptionalMetaRowHtml, PRINT_FOOTER_MESSAGES, PRINT_ICON_DOC, PRINT_ICON_CAL } from './printTheme';
@@ -763,7 +762,7 @@ export const buildDeliveryChallanHtml = (raw, profileInput, appDataInput) => {
         <div class="dc-sign-stack">
           <div class="dc-sign-card">
             <div class="dc-sign-title">For ${escHtml(profile.companyName || 'UMA MICRON')}</div>
-            <div class="dc-sign-space" style="display:flex;align-items:center;justify-content:center;position:relative;">${(profile.stamp || DEFAULT_PRINT_STAMP_SRC) ? `<img src="${profile.stamp || DEFAULT_PRINT_STAMP_SRC}" alt="Stamp" style="max-height:46px;max-width:95px;object-fit:contain;display:block;mix-blend-mode:multiply;" />` : ''}</div>
+            <div class="dc-sign-space"></div>
             <span style="font-size:12px; color: #333;">Authorised Signatory</span>
           </div>
           <div class="dc-sign-card">

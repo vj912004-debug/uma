@@ -963,7 +963,7 @@ const buildNoteHtmlCommon = (raw, profileInput, noteType, reasonsArray) => {
     formatPrintTermsHtml(data.terms, DEFAULT_INVOICE_TERMS),
     `This ${noteType} is issued against the above tax invoice and forms an integral part of the original transaction.`,
     '',
-    profile.stamp
+    ''
   )}
 
   <!-- BAR FOOTER -->

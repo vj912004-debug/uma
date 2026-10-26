@@ -2942,18 +2942,86 @@ tbody tr:hover td {
   }
 }
 
-/* Payslip Print Rules - Single A4 Page Guarantee */
+.payslip-workbench {
+  display: grid;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.payslip-sheet-wrap {
+  grid-column: 1 / -1;
+}
+
+.payslip-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .payslip-workbench,
+  .payslip-side {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Two payslips on one A4 portrait sheet */
+.printable-payslip-page {
+  width: 210mm;
+  height: 297mm;
+  box-sizing: border-box;
+  padding: 4mm 5mm 3mm;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.payslip-container-single {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.payslip-cut-line {
+  flex: 0 0 6mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.payslip-cut-line::before,
+.payslip-cut-line::after {
+  content: '';
+  flex: 1 1 auto;
+  border-top: 1.5px dashed #CFC4EA;
+}
+
+/* Payslip Print Rules - one A4 page, two copies */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 2mm 3mm;
+    margin: 0;
   }
 
   html, body {
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
-    height: 100vh !important;
+    width: 210mm !important;
+    height: 297mm !important;
     overflow: hidden !important;
   }
 
@@ -2961,33 +3029,33 @@ tbody tr:hover td {
     visibility: hidden;
   }
 
+  .payslip-screen-preview {
+    display: none !important;
+  }
+
   .payslip-print-container,
-  .payslip-print-container *,
-  .printable-payslip-page,
-  .printable-payslip-page * {
+  .payslip-print-container * {
     visibility: visible !important;
   }
 
-  .payslip-print-container,
-  .printable-payslip-page {
-    position: absolute !important;
+  .payslip-print-container {
+    display: block !important;
+    position: fixed !important;
     left: 0 !important;
     top: 0 !important;
-    width: 100% !important;
-    max-height: 100vh !important;
+    width: 210mm !important;
+    height: 297mm !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    page-break-before: avoid !important;
-    page-break-after: avoid !important;
     overflow: hidden !important;
+    z-index: 99999 !important;
   }
 
-  .payslip-container-single {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
+  .payslip-print-container .printable-payslip-page {
+    width: 210mm !important;
+    height: 297mm !important;
+    transform: none !important;
   }
 }
 

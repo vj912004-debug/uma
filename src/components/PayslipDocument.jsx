@@ -1,4 +1,8 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { getPrintStampSrc } from '../utils/companyProfile';
+
+const A4_WIDTH_PX = (210 * 96) / 25.4;
+const A4_HEIGHT_PX = (297 * 96) / 25.4;
 
 const formatCurrency = (val) => {
   const num = parseFloat(val) || 0;
@@ -28,6 +32,7 @@ const formatMonthYearLabel = (monthVal) => {
 export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile = {} }) => {
   const monthStr = formatMonthYearLabel(selectedMonth || emp.payMonth);
   const companyName = companyProfile.companyName || 'UMA MICRON';
+  const stampSrc = getPrintStampSrc(companyProfile);
   const tagline = companyProfile.tagline || 'Micronization for a Better Tomorrow';
   const subHeader = companyProfile.subHeader || 'ERP & PROCESS TRACKING';
 
@@ -96,67 +101,70 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
       background: '#ffffff',
       border: '1.5px solid #CFC4EA',
       borderRadius: '8px',
-      padding: '0.65rem 0.95rem',
+      padding: '1.6mm 2.2mm 1.2mm',
       boxSizing: 'border-box',
       fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
       color: '#231f20',
-      fontSize: '0.76rem',
-      lineHeight: '1.3',
+      fontSize: '9.5px',
+      lineHeight: 1.2,
       width: '100%',
-      maxWidth: '790px',
-      margin: '0 auto',
-      boxShadow: '0 1px 4px rgba(43, 38, 103, 0.02)'
+      margin: 0,
+      boxShadow: 'none',
+      display: 'flex',
+      flexDirection: 'column'
     }}>
       {/* 1. HEADER SECTION */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '0.55rem',
-        gap: '0.5rem'
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr) auto',
+        alignItems: 'start',
+        columnGap: '4mm',
+        marginBottom: '1.4mm'
       }}>
-        {/* Left Company Titles */}
-        <div>
+        <div style={{ minWidth: 0 }}>
           <h1 style={{
             margin: 0,
-            fontSize: '1.45rem',
+            fontSize: '15px',
             fontWeight: 900,
             color: '#3D2B7D',
             letterSpacing: '0.01em',
-            lineHeight: 1.1
+            lineHeight: 1.1,
+            overflowWrap: 'anywhere'
           }}>
             {companyName}
           </h1>
           <div style={{
-            fontSize: '0.78rem',
+            fontSize: '9px',
             fontWeight: 600,
             color: '#3D2B7D',
-            margin: '0.12rem 0 0.08rem 0'
+            margin: '0.4mm 0 0.2mm 0',
+            overflowWrap: 'anywhere'
           }}>
             {tagline}
           </div>
           <div style={{
-            fontSize: '0.65rem',
+            fontSize: '8px',
             fontWeight: 800,
             color: '#3D2B7D',
-            letterSpacing: '0.05em',
-            textTransform: 'uppercase'
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            overflowWrap: 'anywhere'
           }}>
             {subHeader}
           </div>
         </div>
 
-        {/* Right Badge Box */}
         <div style={{
           background: '#EFEAF7',
           border: '1.5px solid #CFC4EA',
           borderRadius: '6px',
-          padding: '0.4rem 1.1rem',
+          padding: '1.2mm 3mm',
           textAlign: 'center',
-          minWidth: '180px'
+          justifySelf: 'end',
+          whiteSpace: 'nowrap'
         }}>
           <div style={{
-            fontSize: '1.05rem',
+            fontSize: '12px',
             fontWeight: 900,
             color: '#3D2B7D',
             letterSpacing: '0.04em'
@@ -164,10 +172,10 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
             SALARY PAYSLIP
           </div>
           <div style={{
-            fontSize: '0.75rem',
+            fontSize: '9px',
             fontWeight: 700,
             color: '#3D2B7D',
-            marginTop: '0.12rem',
+            marginTop: '0.4mm',
             letterSpacing: '0.02em'
           }}>
             FOR {monthStr}
@@ -179,8 +187,8 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
-        gap: '0.6rem',
-        marginBottom: '0.55rem'
+        gap: '2mm',
+        marginBottom: '1.4mm'
       }}>
         {/* Left Box: EMPLOYEE DETAILS */}
         <div style={{
@@ -191,9 +199,9 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
         }}>
           <div style={{
             background: '#EFEAF7',
-            padding: '0.35rem 0.75rem',
+            padding: '1mm 2.2mm',
             fontWeight: 800,
-            fontSize: '0.75rem',
+            fontSize: '8.5px',
             color: '#3D2B7D',
             borderBottom: '1.5px solid #CFC4EA',
             letterSpacing: '0.03em'
@@ -201,11 +209,11 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
             EMPLOYEE DETAILS
           </div>
           <div style={{
-            padding: '0.45rem 0.75rem',
+            padding: '1.1mm 2.2mm',
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.26rem',
-            fontSize: '0.76rem'
+            gap: '0.5mm',
+            fontSize: '9px'
           }}>
             <div style={{ display: 'grid', gridTemplateColumns: '108px 10px 1fr' }}>
               <span style={{ color: '#3D2B7D', fontWeight: 600 }}>Employee Code</span>
@@ -244,9 +252,9 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
         }}>
           <div style={{
             background: '#EFEAF7',
-            padding: '0.35rem 0.75rem',
+            padding: '1mm 2.2mm',
             fontWeight: 800,
-            fontSize: '0.75rem',
+            fontSize: '8.5px',
             color: '#3D2B7D',
             borderBottom: '1.5px solid #CFC4EA',
             letterSpacing: '0.03em'
@@ -254,11 +262,11 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
             SALARY DETAILS
           </div>
           <div style={{
-            padding: '0.45rem 0.75rem',
+            padding: '1.1mm 2.2mm',
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.26rem',
-            fontSize: '0.76rem'
+            gap: '0.5mm',
+            fontSize: '9px'
           }}>
             <div style={{ display: 'grid', gridTemplateColumns: '108px 10px 1fr' }}>
               <span style={{ color: '#3D2B7D', fontWeight: 600 }}>Gross Salary</span>
@@ -294,14 +302,14 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
         border: '1.5px solid #CFC4EA',
         borderRadius: '6px',
         overflow: 'hidden',
-        marginBottom: '0.55rem',
+        marginBottom: '1.4mm',
         background: '#ffffff'
       }}>
         <div style={{
           background: '#EFEAF7',
-          padding: '0.35rem 0.75rem',
+          padding: '1mm 2.2mm',
           fontWeight: 800,
-          fontSize: '0.75rem',
+          fontSize: '8.5px',
           color: '#3D2B7D',
           borderBottom: '1.5px solid #CFC4EA',
           letterSpacing: '0.03em'
@@ -312,23 +320,23 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
           display: 'grid',
           gridTemplateColumns: 'repeat(6, 1fr)',
           textAlign: 'center',
-          fontSize: '0.74rem'
+          fontSize: '8.5px'
         }}>
           {/* Header Row */}
-          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Present Days</div>
-          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Absent Days</div>
-          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Leave Days</div>
-          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>OT Hours</div>
-          <div style={{ padding: '0.35rem 0.25rem', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Total Working Hours</div>
-          <div style={{ padding: '0.35rem 0.25rem', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Shift Type</div>
+          <div style={{ padding: '0.8mm 0.4mm', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Present Days</div>
+          <div style={{ padding: '0.8mm 0.4mm', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Absent Days</div>
+          <div style={{ padding: '0.8mm 0.4mm', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Leave Days</div>
+          <div style={{ padding: '0.8mm 0.4mm', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>OT Hours</div>
+          <div style={{ padding: '0.8mm 0.4mm', borderRight: '1px solid #CFC4EA', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Total Working Hours</div>
+          <div style={{ padding: '0.8mm 0.4mm', borderBottom: '1px solid #CFC4EA', background: '#EFEAF7', fontWeight: 700, color: '#3D2B7D' }}>Shift Type</div>
 
           {/* Value Row */}
-          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{presentDays}</div>
-          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{absentDays}</div>
-          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{leaveDays}</div>
-          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{formatNumber(otHours, 2)}</div>
-          <div style={{ padding: '0.38rem 0.25rem', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{formatNumber(totalHours, 2)}</div>
-          <div style={{ padding: '0.38rem 0.25rem', fontWeight: 700 }}>{shiftType}</div>
+          <div style={{ padding: '0.9mm 0.4mm', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{presentDays}</div>
+          <div style={{ padding: '0.9mm 0.4mm', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{absentDays}</div>
+          <div style={{ padding: '0.9mm 0.4mm', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{leaveDays}</div>
+          <div style={{ padding: '0.9mm 0.4mm', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{formatNumber(otHours, 2)}</div>
+          <div style={{ padding: '0.9mm 0.4mm', borderRight: '1px solid #CFC4EA', fontWeight: 700 }}>{formatNumber(totalHours, 2)}</div>
+          <div style={{ padding: '0.9mm 0.4mm', fontWeight: 700 }}>{shiftType}</div>
         </div>
       </div>
 
@@ -336,8 +344,8 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
-        gap: '0.6rem',
-        marginBottom: '0.55rem'
+        gap: '2mm',
+        marginBottom: '1.4mm'
       }}>
         {/* Left Box: EARNINGS */}
         <div style={{
@@ -350,9 +358,9 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
         }}>
           <div style={{
             background: '#EFEAF7',
-            padding: '0.35rem 0.75rem',
+            padding: '1mm 2.2mm',
             fontWeight: 800,
-            fontSize: '0.75rem',
+            fontSize: '8.5px',
             color: '#3D2B7D',
             borderBottom: '1.5px solid #CFC4EA',
             letterSpacing: '0.03em'
@@ -360,18 +368,18 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
             EARNINGS
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #CFC4EA', background: '#3D2B7D' }}>
-                  <th style={{ textAlign: 'left', padding: '0.3rem 0.75rem', fontWeight: 700, color: '#fff' }}>Description</th>
-                  <th style={{ textAlign: 'right', padding: '0.3rem 0.75rem', fontWeight: 700, color: '#fff' }}>Amount (₹)</th>
+                  <th style={{ textAlign: 'left', padding: '0.8mm 2.2mm', fontWeight: 700, color: '#fff' }}>Description</th>
+                  <th style={{ textAlign: 'right', padding: '0.8mm 2.2mm', fontWeight: 700, color: '#fff' }}>Amount (₹)</th>
                 </tr>
               </thead>
               <tbody>
                 {earningsRows.map((row, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid #CFC4EA' }}>
-                    <td style={{ padding: '0.28rem 0.75rem', color: '#231f20' }}>{row.label}</td>
-                    <td style={{ textAlign: 'right', padding: '0.28rem 0.75rem', color: '#231f20' }}>
+                    <td style={{ padding: '0.6mm 2.2mm', color: '#231f20' }}>{row.label}</td>
+                    <td style={{ textAlign: 'right', padding: '0.6mm 2.2mm', color: '#231f20' }}>
                       {formatNumber(row.amount)}
                     </td>
                   </tr>
@@ -380,13 +388,13 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
             </table>
             <div style={{
               display: 'flex',
-              justify: 'space-between',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '0.35rem 0.75rem',
+              padding: '1mm 2.2mm',
               borderTop: '1.5px solid #CFC4EA',
               background: '#EFEAF7',
               fontWeight: 800,
-              fontSize: '0.78rem',
+              fontSize: '9px',
               color: '#3D2B7D'
             }}>
               <span>Total Earning</span>
@@ -406,9 +414,9 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
         }}>
           <div style={{
             background: '#EFEAF7',
-            padding: '0.35rem 0.75rem',
+            padding: '1mm 2.2mm',
             fontWeight: 800,
-            fontSize: '0.75rem',
+            fontSize: '8.5px',
             color: '#3D2B7D',
             borderBottom: '1.5px solid #CFC4EA',
             letterSpacing: '0.03em'
@@ -416,18 +424,18 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
             DEDUCTIONS
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #CFC4EA', background: '#3D2B7D' }}>
-                  <th style={{ textAlign: 'left', padding: '0.3rem 0.75rem', fontWeight: 700, color: '#fff' }}>Description</th>
-                  <th style={{ textAlign: 'right', padding: '0.3rem 0.75rem', fontWeight: 700, color: '#fff' }}>Amount (₹)</th>
+                  <th style={{ textAlign: 'left', padding: '0.8mm 2.2mm', fontWeight: 700, color: '#fff' }}>Description</th>
+                  <th style={{ textAlign: 'right', padding: '0.8mm 2.2mm', fontWeight: 700, color: '#fff' }}>Amount (₹)</th>
                 </tr>
               </thead>
               <tbody>
                 {deductionsRows.map((row, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid #CFC4EA' }}>
-                    <td style={{ padding: '0.28rem 0.75rem', color: '#231f20' }}>{row.label}</td>
-                    <td style={{ textAlign: 'right', padding: '0.28rem 0.75rem', color: '#231f20' }}>
+                    <td style={{ padding: '0.6mm 2.2mm', color: '#231f20' }}>{row.label}</td>
+                    <td style={{ textAlign: 'right', padding: '0.6mm 2.2mm', color: '#231f20' }}>
                       {formatNumber(row.amount)}
                     </td>
                   </tr>
@@ -436,13 +444,13 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
             </table>
             <div style={{
               display: 'flex',
-              justify: 'space-between',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '0.35rem 0.75rem',
+              padding: '1mm 2.2mm',
               borderTop: '1.5px solid #CFC4EA',
               background: '#EFEAF7',
               fontWeight: 800,
-              fontSize: '0.78rem',
+              fontSize: '9px',
               color: '#3D2B7D'
             }}>
               <span>Total Deduction</span>
@@ -457,16 +465,16 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
         background: '#EFEAF7',
         border: '1.5px solid #CFC4EA',
         borderRadius: '6px',
-        padding: '0.45rem 0.85rem',
+        padding: '1.2mm 2.4mm',
         display: 'flex',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '0.55rem'
+        marginBottom: '1.2mm'
       }}>
-        <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#3D2B7D', letterSpacing: '0.01em' }}>
+        <span style={{ fontWeight: 800, fontSize: '11px', color: '#3D2B7D', letterSpacing: '0.01em' }}>
           Net Payment
         </span>
-        <span style={{ fontWeight: 900, fontSize: '1.2rem', color: '#3D2B7D' }}>
+        <span style={{ fontWeight: 900, fontSize: '14px', color: '#3D2B7D' }}>
           {formatCurrency(finalNetPayment)}
         </span>
       </div>
@@ -474,32 +482,48 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
       {/* 6. SIGNATURE & COMPUTER GENERATED FOOTER */}
       <div style={{
         display: 'flex',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         alignItems: 'flex-end',
-        paddingTop: '0.3rem',
-        fontSize: '0.72rem'
+        gap: '2mm',
+        paddingTop: '0.4mm',
+        marginTop: 'auto',
+        fontSize: '8.5px'
       }}>
-        <div>
-          <div style={{ fontWeight: 800, color: '#3D2B7D', fontSize: '0.78rem' }}>
+        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+          <div style={{ fontWeight: 800, color: '#3D2B7D', fontSize: '9.5px' }}>
             For {companyName}
           </div>
           <div style={{
-            fontSize: '0.68rem',
+            fontSize: '8px',
             color: '#64748b',
-            marginTop: '0.75rem'
+            marginTop: '0.6mm'
           }}>
             This is a computer-generated payslip. Signature is not required.
           </div>
         </div>
 
-        <div style={{ textAlign: 'right' }}>
+        <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          {stampSrc ? (
+            <img
+              src={stampSrc}
+              alt="Stamp"
+              style={{
+                height: 38,
+                width: 'auto',
+                maxWidth: 84,
+                objectFit: 'contain',
+                display: 'block',
+                marginBottom: 2,
+                mixBlendMode: 'multiply'
+              }}
+            />
+          ) : null}
           <div style={{
             borderBottom: '1px dashed #64748b',
-            width: '150px',
-            marginBottom: '4px',
-            display: 'inline-block'
+            width: '132px',
+            marginBottom: '4px'
           }}></div>
-          <div style={{ fontWeight: 700, color: '#3D2B7D', fontSize: '0.75rem' }}>
+          <div style={{ fontWeight: 700, color: '#3D2B7D', fontSize: '8.5px', whiteSpace: 'nowrap' }}>
             Authorised Signatory
           </div>
         </div>
@@ -510,43 +534,56 @@ export const SinglePayslipCard = ({ emp = {}, selectedMonth = '', companyProfile
 
 export const DualPayslipPrintView = ({ emp = {}, selectedMonth = '', companyProfile = {} }) => {
   return (
-    <div className="printable-payslip-page" style={{ width: '100%', maxWidth: '790px', margin: '0 auto', background: '#fff', boxSizing: 'border-box' }}>
-      {/* Top Copy */}
+    <div className="printable-payslip-page">
       <SinglePayslipCard emp={emp} selectedMonth={selectedMonth} companyProfile={companyProfile} />
+      <div className="payslip-cut-line">
+        <span>✂ Cut Here</span>
+      </div>
+      <SinglePayslipCard emp={emp} selectedMonth={selectedMonth} companyProfile={companyProfile} />
+    </div>
+  );
+};
 
-      {/* Cut Line Divider */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justify: 'center',
-        margin: '0.4rem 0',
-        position: 'relative'
-      }}>
-        <div style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          top: '50%',
-          borderTop: '1.5px dashed #CFC4EA',
-          zIndex: 1
-        }}></div>
-        <div style={{
-          background: '#ffffff',
-          padding: '0 8px',
-          zIndex: 2,
-          fontSize: '0.7rem',
-          color: '#64748b',
-          fontWeight: 700,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px'
-        }}>
-          <span>✂</span> <span>Cut Here</span> <span>---------------------------------------------------------------------------------------------------------</span>
+export const PayslipA4Preview = (props) => {
+  const slotRef = useRef(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const el = slotRef.current;
+    if (!el) return undefined;
+    const fit = () => {
+      const width = el.clientWidth || A4_WIDTH_PX;
+      setScale(Math.min(1, width / A4_WIDTH_PX));
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={slotRef} className="payslip-screen-preview" style={{ width: '100%' }}>
+      <div
+        className="payslip-a4-slot"
+        style={{
+          width: A4_WIDTH_PX * scale,
+          height: A4_HEIGHT_PX * scale,
+          margin: '0 auto',
+          overflow: 'hidden'
+        }}
+      >
+        <div
+          className="payslip-a4-scale"
+          style={{
+            width: A4_WIDTH_PX,
+            height: A4_HEIGHT_PX,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left'
+          }}
+        >
+          <DualPayslipPrintView {...props} />
         </div>
       </div>
-
-      {/* Bottom Copy */}
-      <SinglePayslipCard emp={emp} selectedMonth={selectedMonth} companyProfile={companyProfile} />
     </div>
   );
 };

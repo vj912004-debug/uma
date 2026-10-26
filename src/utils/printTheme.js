@@ -3,7 +3,6 @@
 import { applyPrintPrefsToHtml, getStoredPrintPrefs, PRINT_ROOT_CLASS, getPrintDensity, getPrintMinFitScale, normalizePrintPrefs } from './printPrefs';
 import { partyAddressHtml } from './taxInvoiceLayout';
 import { DEFAULT_PRINT_LOGO_SRC } from './defaultPrintLogo';
-import { DEFAULT_PRINT_STAMP_SRC } from './defaultPrintStamp';
 import { getBankDetailRows } from './companyProfile';
 import { buildPdfDownloadFileName } from './pdfFileName';
 
@@ -1457,7 +1456,7 @@ export const buildFooterTerms = (companyName, termsHtml, declarationHtml, notesH
         <div class="f3-body">${notesBlock}</div>
       </td>`
     : '';
-  const activeStampUrl = stampUrl || DEFAULT_PRINT_STAMP_SRC;
+  const activeStampUrl = String(stampUrl || '').trim();
   const stampImg = activeStampUrl
     ? `<img src="${activeStampUrl}" alt="Stamp" style="max-height:52px;max-width:110px;object-fit:contain;display:block;margin:0 auto;mix-blend-mode:multiply;" />`
     : '';
