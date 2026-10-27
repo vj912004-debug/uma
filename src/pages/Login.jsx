@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { LogIn, Eye, EyeOff } from 'lucide-react';
+import { LogIn, Eye, EyeOff, ArrowLeftRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { usePortal } from '../context/PortalContext';
 
 const Login = () => {
   const { login, isAuthenticated } = useAuth();
+  const { portal, setPortal, isMarketing } = usePortal();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -13,7 +15,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={isMarketing ? '/marketing' : '/'} replace />;
   }
 
   const handleSubmit = async (e) => {
@@ -25,7 +27,7 @@ const Login = () => {
     setLoading(false);
 
     if (result.success) {
-      navigate('/');
+      navigate(portal === 'marketing' ? '/marketing' : '/');
     } else {
       setError(result.error);
     }
@@ -58,7 +60,12 @@ const Login = () => {
             UMA MICRON
           </h1>
           <p style={{ color: '#059669', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem' }}>Micronization of API's</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Sign in to your account</p>
+          <p style={{ color: '#5b1c85', fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.2rem' }}>
+            {isMarketing ? 'Marketing Portal' : 'ERP'}
+          </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            {isMarketing ? 'Sign in to the marketing portal' : 'Sign in to the ERP'}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -131,6 +138,26 @@ const Login = () => {
           >
             <LogIn size={18} />
             {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setError('');
+              setPortal(isMarketing ? 'erp' : 'marketing');
+            }}
+            style={{
+              width: '100%',
+              marginTop: '0.75rem',
+              padding: '0.7rem',
+              border: '1px solid #5b1c85',
+              color: '#5b1c85',
+              background: '#fff',
+              fontWeight: 700
+            }}
+          >
+            <ArrowLeftRight size={16} />
+            {isMarketing ? 'Switch to ERP' : 'Switch to Marketing Portal'}
           </button>
         </form>
 

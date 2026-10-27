@@ -424,7 +424,7 @@ label {
   width: 100%;
 }
 .searchable-select-combo-input {
-  padding-right: 2rem;
+  padding-right: 0.85rem;
 }
 .searchable-select-caret-hit {
   position: absolute;
@@ -502,6 +502,40 @@ label {
   padding: 0.75rem;
   color: var(--text-muted);
   font-size: 0.82rem;
+}
+
+.quote-charge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.5rem;
+}
+
+.quote-charge-rate {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.quote-charge-rupee {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.quote-charge-rate-input {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.75rem;
+}
+
+.quote-charge-rate .searchable-select {
+  min-width: 0;
+  width: 5.6rem;
+  max-width: 46%;
+  flex: 0 0 5.6rem;
 }
 
 /* Table Container (Prevents horizontal overflow and text wrapping) */
@@ -1025,6 +1059,27 @@ tbody tr:hover td {
   color: #5b1c85;
   font-size: 0.72rem;
   flex-shrink: 0;
+}
+
+.sidebar-switch {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.55rem 0.4rem;
+  color: #5b1c85;
+  background: #ffffff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.sidebar-switch:hover {
+  background: #f3e8ff;
 }
 
 .sidebar-logout {
@@ -1810,6 +1865,28 @@ tbody tr:hover td {
   gap: 0.5rem;
 }
 
+.charge-row-grip {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  cursor: grab;
+  color: var(--text-muted);
+  touch-action: none;
+}
+
+.charge-row-grip:active {
+  cursor: grabbing;
+}
+
+.charge-row-dragging {
+  opacity: 0.45;
+}
+
+.charge-row-drop {
+  outline: 2px dashed var(--accent-primary);
+  outline-offset: -2px;
+}
+
 .charge-row label {
   display: flex;
   align-items: center;
@@ -1818,6 +1895,14 @@ tbody tr:hover td {
   cursor: pointer;
   margin: 0;
   flex: 1;
+  min-width: 0;
+}
+
+.charge-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .charge-row-fields {
@@ -2503,7 +2588,7 @@ tbody tr:hover td {
 }
 .mb-select-row {
   display: grid;
-  grid-template-columns: 1.2fr 1fr auto;
+  grid-template-columns: 1.4fr 0.8fr 0.8fr auto;
   gap: 0.75rem;
   align-items: end;
   margin-bottom: 1rem;
@@ -5472,15 +5557,23 @@ tbody tr:hover td {
   .pm-quote-form { grid-template-columns: 1fr; }
 }
 
-/* Number fields: no up/down spinner arrows anywhere */
+/* Number fields and dropdowns: no spinner or arrow anywhere */
 input[type='number']::-webkit-outer-spin-button,
 input[type='number']::-webkit-inner-spin-button {
-  -webkit-appearance: none;
+  -webkit-appearance: none !important;
   margin: 0;
+  display: none;
 }
 input[type='number'] {
   -moz-appearance: textfield;
   appearance: textfield;
+}
+select,
+.searchable-select-native {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: none;
 }
 
 /* ==========================================

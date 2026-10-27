@@ -43,8 +43,8 @@ const GstTaxBlock = ({
     ? { display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '0.3rem', minWidth: 0 }
     : rowStyle;
   const selectStyle = compact
-    ? { width: '100%', minWidth: 0, padding: '0.4rem 1.8rem 0.4rem 0.55rem', height: 'auto', boxSizing: 'border-box' }
-    : { width: '180px', padding: '0.2rem 1.6rem 0.2rem 0.35rem', height: 'auto', boxSizing: 'border-box' };
+    ? { width: '100%', minWidth: 0, padding: '0.4rem 0.55rem', height: 'auto', boxSizing: 'border-box' }
+    : { width: '180px', padding: '0.2rem 0.35rem', height: 'auto', boxSizing: 'border-box' };
 
   return (
     <div className={compact ? 'gst-tax-block is-compact' : 'gst-tax-block'}>
@@ -97,7 +97,7 @@ const GstTaxBlock = ({
           className="input-field"
           style={compact
             ? selectStyle
-            : { width: '100px', padding: '0.2rem 1.6rem 0.2rem 0.35rem', height: 'auto', boxSizing: 'border-box' }}
+            : { width: '100px', padding: '0.2rem 0.35rem', height: 'auto', boxSizing: 'border-box' }}
           value={rate}
           onChange={(e) => onTaxRateChange?.(parseInt(e.target.value, 10) || 0)}
         >

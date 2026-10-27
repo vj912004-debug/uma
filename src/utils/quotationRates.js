@@ -15,11 +15,8 @@ export const DEFAULT_RATE_UNITS = {
   processing: '/-',
   sieving: '/ Kg',
   filterBag: '/Nos',
-  psdReport: '/Each',
-  liner: '/No',
   hdpeDrum: '/No',
   fiberDrum: '/No',
-  courier: '/Each',
   transportation: '',
   batchChangeover: 'per process'
 };

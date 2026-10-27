@@ -51,9 +51,6 @@ const MAIN_PRINT_CHARGES = [
 
 const OPTIONAL_PRINT_CHARGES = [
   { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
-  { key: 'psdReport', label: 'PSD Report Charges (998346)', isQtyRate: false },
-  { key: 'liner', label: 'Liner (39233090)', isQtyRate: false },
-  { key: 'courier', label: 'Courier (996812)', isQtyRate: false },
   { key: 'fiberDrum', label: 'Fiber Drum (7310)', isQtyRate: false },
   { key: 'transportation', label: 'Transportation (996511)', isQtyRate: false },
   { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },

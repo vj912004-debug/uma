@@ -1398,6 +1398,72 @@ export const buildPrintPrefsCss = (prefs) => {
     line-height: 1 !important;
     font-size: 12px !important;
     align-items: center !important;
+    color: #4a0080 !important;
+  }
+  /* BPR print keeps its own dark purple (#5a009d), not the shared print lavender */
+  .uma-print-root .page-p1 .purple-header,
+  .uma-print-root .page-p1 .bpr-badge,
+  .uma-print-root .page-p1 .pill-badge,
+  .uma-print-root .page-p1 .barfoot,
+  .uma-print-root .page-p2 .barfoot,
+  .uma-print-root .page-p2 table.items thead th {
+    background: #5a009d !important;
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+  }
+  .uma-print-root .page-p1 .sheet,
+  .uma-print-root .page-p2 .sheet {
+    border-color: #5a009d !important;
+  }
+  .uma-print-root .page-p1 .light-purple-header td,
+  .uma-print-root .page-p1 .light-purple-header th,
+  .uma-print-root .page-p1 .psd-note-head,
+  .uma-print-root .page-p2 table.items tbody tr.total-hl td {
+    background: #e2d3f3 !important;
+    color: #4a0080 !important;
+    -webkit-text-fill-color: #4a0080 !important;
+  }
+  .uma-print-root .page-p2 table.items tbody tr.batch-total-row td {
+    background: #F6F0FA !important;
+    color: #4a0080 !important;
+    -webkit-text-fill-color: #4a0080 !important;
+  }
+  .uma-print-root .page-p2 table.items tbody tr:nth-child(even):not(.filler-row):not(.summary-row):not(.batch-total-row):not(.total-hl) td {
+    background: #e2d3f3 !important;
+  }
+  .uma-print-root .page-p1 .company-title,
+  .uma-print-root .page-p1 .psd-note-body,
+  .uma-print-root .page-p1 .remark-label,
+  .uma-print-root .page-p1 .remark-content,
+  .uma-print-root .page-p1 .signature-label,
+  .uma-print-root .page-p2 .meta-item,
+  .uma-print-root .page-p2 .sign {
+    color: #4a0080 !important;
+    -webkit-text-fill-color: #4a0080 !important;
+  }
+  .uma-print-root .page-p2 .meta-item.label {
+    color: #5a009d !important;
+    -webkit-text-fill-color: #5a009d !important;
+    background: #e2d3f3 !important;
+  }
+  .uma-print-root .page-p1 table.g th,
+  .uma-print-root .page-p1 table.g td,
+  .uma-print-root .page-p1 .psd-note-box,
+  .uma-print-root .page-p1 .remark-box,
+  .uma-print-root .page-p1 .signature-container,
+  .uma-print-root .page-p1 .signature-box:first-child,
+  .uma-print-root .page-p2 table.items,
+  .uma-print-root .page-p2 table.items thead th,
+  .uma-print-root .page-p2 table.items tbody td,
+  .uma-print-root .page-p2 .signs,
+  .uma-print-root .page-p2 .sign + .sign {
+    border-color: #7c12bd !important;
+  }
+  .uma-print-root .page-p1 .signature-label svg,
+  .uma-print-root .page-p1 .signature-label svg *,
+  .uma-print-root .page-p2 .sign svg,
+  .uma-print-root .page-p2 .sign svg * {
+    stroke: #4a0080 !important;
   }
 `;
 };

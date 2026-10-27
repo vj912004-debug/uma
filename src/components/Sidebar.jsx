@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -37,6 +37,7 @@ import {
   Thermometer,
   Fan,
   Megaphone,
+  ArrowLeftRight,
   UserPlus,
   PhoneCall,
   Fingerprint,
@@ -45,10 +46,15 @@ import {
   BarChart3
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { usePortal } from '../context/PortalContext';
 import { canAccessModule } from '../utils/moduleAccess';
+
+const MARKETING_PORTAL_GROUPS = new Set(['marketing', 'procurement']);
 
 const Sidebar = () => {
   const { currentUser, logout } = useAuth();
+  const { isMarketing, setPortal } = usePortal();
+  const navigate = useNavigate();
   const userRole = currentUser?.role || 'Staff';
   const location = useLocation();
 
@@ -125,7 +131,7 @@ const Sidebar = () => {
     },
     {
       key: 'employee',
-      title: 'EMPLOYEE',
+      title: 'Employee',
       icon: Users,
       items: [
         { name: 'Employee Master', icon: Users, path: '/employee-master', roles: ['Admin', 'Staff'] }
@@ -133,7 +139,7 @@ const Sidebar = () => {
     },
     {
       key: 'attendance',
-      title: 'ATTENDANCE',
+      title: 'Attendance',
       icon: Calendar,
       items: [
         { name: 'Biometric Sync', icon: RefreshCw, path: '/device-management', roles: ['Admin', 'Staff'] },
@@ -145,7 +151,7 @@ const Sidebar = () => {
     },
     {
       key: 'salary',
-      title: 'SALARY',
+      title: 'Salary',
       icon: DollarSign,
       items: [
         { name: 'Salary Calculation', icon: Calculator, path: '/salary-calculation', roles: ['Admin', 'Staff'] },
@@ -233,13 +239,13 @@ const Sidebar = () => {
           <div className="sidebar-brand-logo">M</div>
           <div>
             <h1>UMA MICRON</h1>
-            <p>Micronization of API's</p>
+            <p>{isMarketing ? 'Marketing Portal' : 'ERP'}</p>
           </div>
         </div>
       </div>
 
       <nav className="sidebar-nav">
-        {userRole && canSee('/') && (
+        {!isMarketing && userRole && canSee('/') && (
           <NavLink
             to="/"
             end
@@ -252,7 +258,7 @@ const Sidebar = () => {
           </NavLink>
         )}
 
-        {userRole && canSee('/parties') && (
+        {!isMarketing && userRole && canSee('/parties') && (
           <NavLink
             to="/parties"
             className={({ isActive }) =>
@@ -264,7 +270,7 @@ const Sidebar = () => {
           </NavLink>
         )}
 
-        {userRole && canSee('/production-planning') && (
+        {!isMarketing && userRole && canSee('/production-planning') && (
           <NavLink
             to="/production-planning"
             className={({ isActive }) =>
@@ -277,7 +283,7 @@ const Sidebar = () => {
         )}
 
         {/* Collapsible Accordion Groups */}
-        {groups.map((group) => {
+        {groups.filter((group) => (isMarketing ? MARKETING_PORTAL_GROUPS.has(group.key) : group.key !== 'marketing')).map((group) => {
           const visibleItems = group.items.filter((item) => {
             if (!item.roles?.includes(userRole)) return false;
             if (item.permissionIds?.length) {
@@ -339,6 +345,22 @@ const Sidebar = () => {
             <p className="sidebar-user-meta">{userRole}</p>
           </div>
         </div>
+        <button
+          type="button"
+          className="sidebar-switch"
+          onClick={() => {
+            if (isMarketing) {
+              setPortal('erp');
+              navigate('/');
+            } else {
+              setPortal('marketing');
+              navigate('/marketing');
+            }
+          }}
+        >
+          <ArrowLeftRight size={14} />
+          {isMarketing ? 'Switch to ERP' : 'Switch to Marketing Portal'}
+        </button>
         <button type="button" onClick={logout} className="sidebar-logout">
           <LogOut size={13} /> Logout
         </button>

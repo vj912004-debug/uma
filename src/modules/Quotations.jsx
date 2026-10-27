@@ -48,9 +48,6 @@ const MAIN_CHARGES = [
 
 const OPTIONAL_SERVICE_CHARGES = [
   { key: 'filterBag', label: 'Filter Bag Charges (591190)', isQtyRate: false },
-  { key: 'psdReport', label: 'PSD Report Charges (998346)', isQtyRate: false },
-  { key: 'liner', label: 'Liner (39233090)', isQtyRate: false },
-  { key: 'courier', label: 'Courier (996812)', isQtyRate: false },
   { key: 'fiberDrum', label: 'Fiber Drum (7310)', isQtyRate: false },
   { key: 'transportation', label: 'Transportation (996511)', isQtyRate: false },
   { key: 'hdpeDrum', label: 'HDPE Drum (39233090)', isQtyRate: false },
@@ -149,13 +146,13 @@ const RateUnitSelect = ({ chargeKey, value, onChange }) => (
 /** Quotation only: nothing selected until the user checks a charge. */
 const DEFAULT_CHARGES = {
   cleaning: false, filterBag: false, processing: false, sieving: false,
-  psdReport: false, liner: false, courier: false, fiberDrum: false,
+  fiberDrum: false,
   transportation: false, hdpeDrum: false, batchChangeover: false
 };
 
 const DEFAULT_RATES = {
-  cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0,
-  liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
+  cleaning: 0, filterBag: 0, processing: 0, sieving: 0,
+  fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0
 };
 
 const masterCharge = (products, key) => {
@@ -1057,6 +1054,8 @@ const handleSameCompanyQuote = (q) => {
           display: 'flex',
           flexDirection: 'column',
           gap: '0.35rem',
+          minWidth: 0,
+          overflow: 'hidden',
           boxShadow: dropTarget ? 'none' : '0 1px 2px rgba(0,0,0,0.04)'
         }}
       >
@@ -1104,14 +1103,13 @@ const handleSameCompanyQuote = (q) => {
             {card.hint && <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{card.hint}</span>}
           </>
         ) : on && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>₹</span>
+          <div className="quote-charge-rate">
+            <span className="quote-charge-rupee">₹</span>
             <input
               type="number"
               min="0"
               step="any"
-              className="input-field"
-              style={{ padding: '0.25rem 0.35rem', width: '80px', fontSize: '0.75rem' }}
+              className="input-field quote-charge-rate-input"
               value={isHeader ? (formData.defaultRates?.[card.field] ?? '') : rateInputValue(formData.rates?.[card.key])}
               placeholder="0"
               onChange={(e) => isHeader ? setDefaultCharge(card.field, e.target.value) : handleMaterialRateChange(card.key, e.target.value)}
@@ -1197,7 +1195,7 @@ const handleSameCompanyQuote = (q) => {
           </div>
         )}
         <div style={dropZoneStyle(zone)}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.5rem' }}>
+          <div className="quote-charge-grid">
             {cards.map(renderCompanyChargeCard)}
           </div>
           {!cards.length && (
@@ -1747,12 +1745,11 @@ const handleSameCompanyQuote = (q) => {
                       </label>
                       {formData.charges?.[item.key] && (
                         <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingLeft: '1.5rem' }}>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate: ₹</span>
+                        <div className="quote-charge-rate" style={{ paddingLeft: '1.5rem' }}>
+                          <span className="quote-charge-rupee">Rate: ₹</span>
                           <input
                             type="number"
-                            className="input-field"
-                            style={{ padding: '0.25rem', width: '90px', fontSize: '0.8rem' }}
+                            className="input-field quote-charge-rate-input"
                             value={rateInputValue(formData.rates?.[item.key])}
                             placeholder="0"
                             onChange={e => handleMaterialRateChange(item.key, e.target.value)}
@@ -1814,12 +1811,11 @@ const handleSameCompanyQuote = (q) => {
                       </label>
                       {formData.charges?.[item.key] && (
                         <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingLeft: '1.5rem' }}>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate: ₹</span>
+                        <div className="quote-charge-rate" style={{ paddingLeft: '1.5rem' }}>
+                          <span className="quote-charge-rupee">Rate: ₹</span>
                           <input
                             type="number"
-                            className="input-field"
-                            style={{ padding: '0.25rem', width: '90px', fontSize: '0.8rem' }}
+                            className="input-field quote-charge-rate-input"
                             value={rateInputValue(formData.rates?.[item.key])}
                             placeholder="0"
                             onChange={e => handleMaterialRateChange(item.key, e.target.value)}

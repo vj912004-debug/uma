@@ -1,11 +1,34 @@
 import React from 'react';
+import { GripVertical } from 'lucide-react';
 import { qtyInputValue, rateInputValue } from '../utils/documentCharges';
 
-const DocChargeRow = ({ item, label, charges, rates, qtys, materialQty, onToggle, onQtyChange, onRateChange }) => (
-  <div className="charge-row">
+const DocChargeRow = ({
+  item, label, charges, rates, qtys, materialQty, onToggle, onQtyChange, onRateChange,
+  draggable: canDrag, dragging, dropActive, onDragStart, onDragEnd, onDragOver, onDrop
+}) => (
+  <div
+    className={`charge-row${dragging ? ' charge-row-dragging' : ''}${dropActive ? ' charge-row-drop' : ''}`}
+    onDragOver={canDrag ? onDragOver : undefined}
+    onDrop={canDrag ? onDrop : undefined}
+  >
+    {canDrag && (
+      <span
+        className="charge-row-grip"
+        draggable
+        role="button"
+        aria-label={`Reorder ${label || item.label}`}
+        title="Drag to reorder"
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+      >
+        <GripVertical size={14} />
+      </span>
+    )}
     <label>
       <input type="checkbox" checked={!!charges?.[item.key]} onChange={() => onToggle(item.key)} />
-      {label || item.label}
+      <span className="charge-row-name">{label || item.label}</span>
     </label>
     {charges?.[item.key] && (
       <div className="charge-row-fields">

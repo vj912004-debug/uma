@@ -16,6 +16,25 @@ export const TI_CHARGES_LIST = [
 
 export const TI_EMPTY_ROWS = 2;
 
+/** Saved form order, then any charge that is not in that list. */
+export const orderedTiCharges = (data) => {
+  const order = Array.isArray(data?.chargeOrder) ? data.chargeOrder : [];
+  if (!order.length) return TI_CHARGES_LIST;
+  const byKey = new Map(TI_CHARGES_LIST.map((c) => [c.key, c]));
+  const seen = new Set();
+  const ordered = [];
+  order.forEach((key) => {
+    const charge = byKey.get(key);
+    if (!charge || seen.has(charge.key)) return;
+    ordered.push(charge);
+    seen.add(charge.key);
+  });
+  TI_CHARGES_LIST.forEach((charge) => {
+    if (!seen.has(charge.key)) ordered.push(charge);
+  });
+  return ordered;
+};
+
 /**
  * Resolve invoice GST from form taxRate (e.g. 18) and gstType.
  * - cgst_sgst (default, within Gujarat): half rate each on CGST + SGST
@@ -363,7 +382,7 @@ const collectTiChargeLines = (data) => {
 export const buildTiPrintChargeRows = (data) => {
   const { aggregated, processingLines } = collectTiChargeLines(data);
   const rows = [];
-  TI_CHARGES_LIST.forEach((charge) => {
+  orderedTiCharges(data).forEach((charge) => {
     if (charge.key === 'processing') {
       processingLines.forEach((line) => {
         rows.push({ key: charge.key, label: charge.label, ...line });

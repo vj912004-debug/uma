@@ -1,6 +1,5 @@
 import React, { useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown } from 'lucide-react';
 import { AppContext } from '../context/AppContext';
 
 const sameText = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
@@ -428,6 +427,12 @@ const SearchableSelect = ({
               );
               emit(match ? match.value : v);
             }}
+            onMouseDown={() => {
+              if (disabled || open) return;
+              setQuery('');
+              setTyping(false);
+              setOpen(true);
+            }}
             onFocus={() => {
               if (disabled || open) return;
               setQuery('');
@@ -436,22 +441,6 @@ const SearchableSelect = ({
             }}
             onKeyDown={onSearchKey}
           />
-          <button
-            type="button"
-            className="searchable-select-caret-hit"
-            tabIndex={-1}
-            disabled={disabled}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              if (disabled) return;
-              if (open) {
-                if (allowCustom && typing && query.trim()) commitCustom(query);
-                else close();
-              } else openMenu();
-            }}
-          >
-            <ChevronDown size={16} className="searchable-select-caret" />
-          </button>
         </div>
       ) : (
         <button
@@ -465,7 +454,6 @@ const SearchableSelect = ({
           <span className={`searchable-select-value${!selected && !customActive ? ' is-placeholder' : ''}`}>
             {displayLabel}
           </span>
-          <ChevronDown size={16} className="searchable-select-caret" />
         </button>
       )}
       {menu}

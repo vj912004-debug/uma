@@ -33,7 +33,7 @@ import {
 } from '../utils/taxInvoiceLayout';
 
 const STEPS = [
-  'Select Party & Month',
+  'Select Party & Dates',
   'Verify Dispatches',
   'Generate Invoice',
   'Review & Send'
@@ -44,19 +44,30 @@ const REVIEW_STEPS = ['Dispatch Summary', 'Invoice Summary', 'Download / Print']
 const money = (n) =>
   `₹ ${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
-const monthValue = (d = new Date()) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+const isoDate = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-const shortMonth = (ym) => {
-  if (!ym) return '';
-  const [y, m] = ym.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+const monthStart = () => {
+  const d = new Date();
+  return isoDate(new Date(d.getFullYear(), d.getMonth(), 1));
 };
 
-const monthLabel = (ym) => {
-  if (!ym) return '';
-  const [y, m] = ym.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+const monthEnd = () => {
+  const d = new Date();
+  return isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+};
+
+const dateStamp = (raw) => {
+  const parts = parseDcDateParts(raw);
+  if (!parts) return null;
+  return parts.y * 10000 + parts.mo * 100 + parts.d;
+};
+
+const rangeLabel = (from, to) => {
+  const a = from ? formatDate(from) : '';
+  const b = to ? formatDate(to) : '';
+  if (a && b) return `${a} to ${b}`;
+  return a || b;
 };
 
 const parseMoney = (v) => {
@@ -151,7 +162,8 @@ const MonthlyBilling = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [reviewStep, setReviewStep] = useState(1);
   const [partyId, setPartyId] = useState('');
-  const [billingMonth, setBillingMonth] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dateFrom, setDateFrom] = useState(monthStart);
+  const [dateTo, setDateTo] = useState(monthEnd);
   const [loaded, setLoaded] = useState(false);
   const [rows, setRows] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -166,6 +178,8 @@ const MonthlyBilling = () => {
 
   const selectedParty = parties.find((p) => sameId(p.id, partyId)) || null;
   const partyName = selectedParty?.name || '';
+  const period = rangeLabel(dateFrom, dateTo);
+  const periodFile = `${dateFrom || 'from'}_to_${dateTo || 'to'}`;
 
   const findMr = (dc) =>
     mrs.find((m) => !m.isDeleted && (
@@ -201,10 +215,14 @@ const MonthlyBilling = () => {
     );
   };
 
-  const dcInBillingMonth = (dc, y, m) => {
-    const parts = parseDcDateParts(dc.date);
-    if (!parts) return false;
-    return parts.y === y && parts.mo === m;
+  const dcInDateRange = (dc, from, to) => {
+    const stamp = dateStamp(dc.date);
+    if (stamp == null) return false;
+    const start = dateStamp(from);
+    const end = dateStamp(to);
+    if (start != null && stamp < start) return false;
+    if (end != null && stamp > end) return false;
+    return true;
   };
 
   const isMonthlyInvoiced = (dc) => {
@@ -296,12 +314,16 @@ const MonthlyBilling = () => {
       alert('Please select a party first.');
       return;
     }
-    if (!billingMonth) {
-      alert('Please select a billing month.');
+    if (!dateFrom || !dateTo) {
+      alert('Please select a From date and a To date.');
+      return;
+    }
+    if (dateStamp(dateFrom) > dateStamp(dateTo)) {
+      alert('From date must be on or before the To date.');
       return;
     }
 
-    const [y, m] = billingMonth.split('-').map(Number);
+    const period = rangeLabel(dateFrom, dateTo);
     const party = parties.find((p) => sameId(p.id, partyId));
     if (!party) {
       alert('Selected party was not found.');
@@ -309,18 +331,18 @@ const MonthlyBilling = () => {
     }
 
     const partyDcs = dcs.filter((dc) => !dc.isDeleted && dcMatchesParty(dc, party));
-    let matched = partyDcs.filter((dc) => dcInBillingMonth(dc, y, m));
+    let matched = partyDcs.filter((dc) => dcInDateRange(dc, dateFrom, dateTo));
     let msg = '';
 
     if (!matched.length && partyDcs.length) {
       const widen = window.confirm(
-        `No delivery challans for "${party.name}" in ${monthLabel(billingMonth)}.\n\n` +
-        `Found ${partyDcs.length} DC(s) for this party in other months.\n\n` +
+        `No delivery challans for "${party.name}" from ${period}.\n\n` +
+        `Found ${partyDcs.length} DC(s) for this party outside this range.\n\n` +
         `Load all DCs for this party anyway?`
       );
       if (widen) {
         matched = partyDcs;
-        msg = `Showing all ${partyDcs.length} DC(s) for this party (none dated in ${monthLabel(billingMonth)}).`;
+        msg = `Showing all ${partyDcs.length} DC(s) for this party (none dated from ${period}).`;
       } else {
         setRows([]);
         setSelectedIds([]);
@@ -329,7 +351,7 @@ const MonthlyBilling = () => {
         setActiveStep(1);
         setFilterTab('all');
         setSearch('');
-        setLoadMessage(`No delivery challans for this party in ${monthLabel(billingMonth)}.`);
+        setLoadMessage(`No delivery challans for this party from ${period}.`);
         return;
       }
     } else if (!matched.length) {
@@ -345,7 +367,7 @@ const MonthlyBilling = () => {
       );
       return;
     } else {
-      msg = `Loaded ${matched.length} dispatch(es) for ${monthLabel(billingMonth)}.`;
+      msg = `Loaded ${matched.length} dispatch(es) from ${period}.`;
     }
 
     const next = newestFirst(matched.map(mapDcToRow));
@@ -509,8 +531,10 @@ const MonthlyBilling = () => {
       date: invoiceDate,
       type: 'Tax Invoice',
       monthlyBilling: true,
-      billingMonth,
-      billingMonthLabel: monthLabel(billingMonth),
+      dateFrom,
+      dateTo,
+      billingMonth: dateFrom,
+      billingMonthLabel: period,
       partyId: selectedParty.id,
       partyName: selectedParty.name,
       billAddress: selectedParty.billAddress || '',
@@ -533,7 +557,7 @@ const MonthlyBilling = () => {
       subtotal: totals.subtotal,
       taxAmount: totals.taxAmount,
       total: totals.grand,
-      terms: `Monthly consolidated invoice for ${monthLabel(billingMonth)}.`,
+      terms: `Consolidated invoice for ${period}.`,
       declaration: ''
     };
 
@@ -606,7 +630,7 @@ const MonthlyBilling = () => {
 
     const summary = [{
       Party: partyName || inv?.partyName || '',
-      'Billing Month': monthLabel(billingMonth),
+      'Period': period,
       'Invoice No': inv?.invoiceNo || '',
       'Invoice Date': inv?.date ? formatDate(inv.date) : '',
       'Total Qty': inv?.qty ?? totals.qty,
@@ -622,7 +646,7 @@ const MonthlyBilling = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), 'Summary');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detail), 'Dispatches');
-    const fileStub = (inv?.invoiceNo || `Monthly_${billingMonth}`).replace(/\//g, '-');
+    const fileStub = (inv?.invoiceNo || `Monthly_${periodFile}`).replace(/\//g, '-');
     XLSX.writeFile(wb, `${fileStub}.xlsx`);
     setActiveStep(3);
     setReviewStep(2);
@@ -664,7 +688,7 @@ const MonthlyBilling = () => {
     });
     const summary = [{
       Party: partyName || inv?.partyName || '',
-      'Billing Month': monthLabel(billingMonth),
+      'Period': period,
       'Invoice No': inv?.invoiceNo || '',
       'Invoice Date': inv?.date ? formatDate(inv.date) : '',
       'Total Qty': inv?.qty ?? totals.qty,
@@ -676,7 +700,7 @@ const MonthlyBilling = () => {
         : { CGST: split.cgst, SGST: split.sgst }),
       'Grand Total': inv?.total ?? totals.grand
     }];
-    const fileStub = (inv?.invoiceNo || `Monthly_${billingMonth}`).replace(/\//g, '-');
+    const fileStub = (inv?.invoiceNo || `Monthly_${periodFile}`).replace(/\//g, '-');
     await downloadTablesWord(fileStub, 'Monthly Invoice', [
       { name: 'Summary', rows: summary },
       { name: 'Dispatches', rows: detail }
@@ -717,8 +741,10 @@ const MonthlyBilling = () => {
       date: new Date().toISOString().split('T')[0],
       type: 'Tax Invoice',
       monthlyBilling: true,
-      billingMonth,
-      billingMonthLabel: monthLabel(billingMonth),
+      dateFrom,
+      dateTo,
+      billingMonth: dateFrom,
+      billingMonthLabel: period,
       partyId: selectedParty?.id || '',
       partyName: selectedParty?.name || partyName,
       billAddress: selectedParty?.billAddress || '',
@@ -739,7 +765,7 @@ const MonthlyBilling = () => {
       subtotal: totals.subtotal,
       taxAmount: totals.taxAmount,
       total: totals.grand,
-      terms: `Monthly consolidated invoice for ${monthLabel(billingMonth)}.`,
+      terms: `Consolidated invoice for ${period}.`,
       companyProfile: data.companyProfile,
       appData: data
     };
@@ -820,12 +846,12 @@ const MonthlyBilling = () => {
           />
           <div className="mb-chip">
             <Calendar size={14} />
-            <span>{shortMonth(billingMonth)}</span>
+            <span>{period}</span>
           </div>
           {generatedInvoice?.invoiceNo ? (
             <div className="mb-chip mb-chip-code">Invoice: {generatedInvoice.invoiceNo}</div>
           ) : (
-            <div className="mb-chip mb-chip-code">Month: {monthLabel(billingMonth)}</div>
+            <div className="mb-chip mb-chip-code">{period}</div>
           )}
         </div>
       </div>
@@ -854,7 +880,7 @@ const MonthlyBilling = () => {
         <div className="mb-main">
           <section className="mb-card">
             <div className="mb-card-head">
-              <h2>1. Select Party &amp; Month</h2>
+              <h2>1. Select Party &amp; Dates</h2>
             </div>
             <div className="mb-select-row">
               <div className="mb-field">
@@ -881,12 +907,26 @@ const MonthlyBilling = () => {
                 </SearchableSelect>
               </div>
               <div className="mb-field">
-                <label>Billing Month</label>
+                <label>From</label>
                 <DateField
                   className="input-field"
-                  value={billingMonth}
+                  value={dateFrom}
                   onChange={(e) => {
-                    setBillingMonth(e.target.value);
+                    setDateFrom(e.target.value);
+                    setLoaded(false);
+                    setGeneratedInvoice(null);
+                    setLoadMessage('');
+                    setActiveStep(0);
+                  }}
+                />
+              </div>
+              <div className="mb-field">
+                <label>To</label>
+                <DateField
+                  className="input-field"
+                  value={dateTo}
+                  onChange={(e) => {
+                    setDateTo(e.target.value);
                     setLoaded(false);
                     setGeneratedInvoice(null);
                     setLoadMessage('');
@@ -1012,13 +1052,13 @@ const MonthlyBilling = () => {
                   {!loaded ? (
                     <tr>
                       <td colSpan={10} className="mb-empty">
-                        Select party &amp; month, then click Load Data.
+                        Select party and a From / To date, then click Load Data.
                       </td>
                     </tr>
                   ) : filteredRows.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="mb-empty">
-                        {loadMessage || `No delivery challans found for this party in ${monthLabel(billingMonth)}.`}
+                        {loadMessage || `No delivery challans found for this party from ${period}.`}
                       </td>
                     </tr>
                   ) : (
@@ -1209,7 +1249,7 @@ const MonthlyBilling = () => {
                 <div className="mb-invoice-meta">
                   <div><span>Invoice No.</span><strong>{displayInvoiceNo}</strong></div>
                   <div><span>Date</span><strong>{displayInvoiceDate}</strong></div>
-                  <div><span>Month</span><strong>{monthLabel(billingMonth)}</strong></div>
+                  <div><span>Period</span><strong>{period}</strong></div>
                 </div>
               </div>
 

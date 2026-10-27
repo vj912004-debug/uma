@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
+import { PortalProvider, usePortal, isMarketingPath } from './context/PortalContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar';
 import TopHeader from './components/TopHeader';
@@ -51,6 +52,10 @@ import CompanyProfileSettings from './modules/CompanyProfileSettings';
 import EmployeeManagement from './modules/EmployeeManagement';
 
 const AppLayout = () => {
+  const location = useLocation();
+  const { isMarketing } = usePortal();
+  const onMarketingPath = isMarketingPath(location.pathname);
+
   useEffect(() => {
     const main = document.querySelector('.app-main');
     if (!main) return undefined;
@@ -66,6 +71,13 @@ const AppLayout = () => {
     observer.observe(main, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, []);
+
+  if (isMarketing && !onMarketingPath) {
+    return <Navigate to="/marketing" replace />;
+  }
+  if (!isMarketing && onMarketingPath) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
   <div className="app-layout">
@@ -131,10 +143,12 @@ function App() {
     <AppProvider>
       <AuthProvider>
         <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/*" element={<ProtectedRoute><AppLayout /></ProtectedRoute>} />
-          </Routes>
+          <PortalProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/*" element={<ProtectedRoute><AppLayout /></ProtectedRoute>} />
+            </Routes>
+          </PortalProvider>
         </Router>
       </AuthProvider>
     </AppProvider>

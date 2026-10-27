@@ -53,6 +53,8 @@ const TaxInvoice = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedPL, setSelectedPL] = useState(null);
+  const [dragKey, setDragKey] = useState(null);
+  const [overKey, setOverKey] = useState(null);
 
   // TI Form State
   const [form, setForm] = useState({
@@ -534,7 +536,60 @@ const TaxInvoice = () => {
     );
   });
 
-  const chargesList = STANDARD_CHARGES_LIST;
+  const chargesList = useMemo(() => {
+    const order = form.chargeOrder || [];
+    if (!order.length) return STANDARD_CHARGES_LIST;
+    const byKey = new Map(STANDARD_CHARGES_LIST.map((c) => [c.key, c]));
+    const ordered = order.map((key) => byKey.get(key)).filter(Boolean);
+    STANDARD_CHARGES_LIST.forEach((item) => {
+      if (!order.includes(item.key)) ordered.push(item);
+    });
+    return ordered;
+  }, [form.chargeOrder]);
+
+  const reorderCharges = (fromKey, toKey) => {
+    if (!fromKey || !toKey || fromKey === toKey) return;
+    setForm((prev) => {
+      const next = (prev.chargeOrder && prev.chargeOrder.length)
+        ? [...prev.chargeOrder]
+        : STANDARD_CHARGES_LIST.map((item) => item.key);
+      STANDARD_CHARGES_LIST.forEach((item) => {
+        if (!next.includes(item.key)) next.push(item.key);
+      });
+      const from = next.indexOf(fromKey);
+      const to = next.indexOf(toKey);
+      if (from < 0 || to < 0) return prev;
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return { ...prev, chargeOrder: next };
+    });
+  };
+
+  const chargeDragProps = (item) => ({
+    draggable: true,
+    dragging: dragKey === item.key,
+    dropActive: Boolean(dragKey) && overKey === item.key && dragKey !== item.key,
+    onDragStart: (e) => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', item.key);
+      setDragKey(item.key);
+    },
+    onDragEnd: () => {
+      setDragKey(null);
+      setOverKey(null);
+    },
+    onDragOver: (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (overKey !== item.key) setOverKey(item.key);
+    },
+    onDrop: (e) => {
+      e.preventDefault();
+      reorderCharges(e.dataTransfer.getData('text/plain') || dragKey, item.key);
+      setDragKey(null);
+      setOverKey(null);
+    }
+  });
   const materialQty = parseFloat(form.qty) || 0;
   const exportRows = filteredInvoices.map((inv) => {
     const mr = (data.materialReceipts || []).find((m) => m.id === inv.receiptId);
@@ -807,6 +862,7 @@ const TaxInvoice = () => {
                                 onToggle={(key) => toggleProductCharge(prodName, key)}
                                 onQtyChange={(key, val) => handleProductQtyChange(prodName, key, val)}
                                 onRateChange={(key, val) => handleProductRateChange(prodName, key, val)}
+                                {...chargeDragProps(item)}
                               />
                             ))}
                           </div>
@@ -826,6 +882,7 @@ const TaxInvoice = () => {
                           onToggle={toggleCharge}
                           onQtyChange={handleQtyChange}
                           onRateChange={handleRateChange}
+                          {...chargeDragProps(item)}
                         />
                       ))}
                     </div>
