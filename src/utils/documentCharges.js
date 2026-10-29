@@ -319,10 +319,12 @@ export const findAnyProformaInvoice = (invoices, receiptId) =>
   ) || null;
 
 /** One TI per Material Receipt — ignores per-product duplicate records. */
+/** Separate (per-receipt) Tax Invoice only — monthly consolidated TIs are ignored. */
 export const findAnyTaxInvoice = (invoices, receiptId) =>
   (invoices || []).find(inv =>
     inv.receiptId === receiptId &&
     !inv.isDeleted &&
+    !inv.monthlyBilling &&
     (inv.type === 'Tax Invoice' || inv.invoiceNo?.includes('/IN/'))
   ) || null;
 

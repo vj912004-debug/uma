@@ -616,7 +616,8 @@ const MonthlyBilling = () => {
       shipAddress: selectedParty.shipAddress || selectedParty.billAddress || '',
       gstinBill: selectedParty.gstinBill || selectedParty.gstin || '',
       gstinShip: selectedParty.gstinShip || selectedParty.gstinBill || '',
-      receiptId: first.receiptId || '',
+      // No single receiptId — monthly TI must not block separate per-MR Tax Invoices.
+      receiptId: '',
       linkedDcIds,
       linkedReceiptIds: [...new Set(selectedRows.map((r) => r.receiptId).filter(Boolean))],
       dcNo: selectedRows.map((r) => r.dcNo).join(', '),

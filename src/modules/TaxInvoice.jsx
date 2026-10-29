@@ -476,6 +476,10 @@ const TaxInvoice = () => {
       taxAmount,
       total,
       type: 'Tax Invoice',
+      // Separate TI from this module — never mark as monthly consolidated.
+      monthlyBilling: false,
+      linkedDcIds: undefined,
+      linkedReceiptIds: undefined,
       ewayBillNo: editingDoc?.ewayBillNo || '',
       ewayBillDate: editingDoc?.ewayBillDate || ''
     };
