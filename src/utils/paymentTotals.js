@@ -125,10 +125,9 @@ export const getReceiptOutstanding = (mr, ti, payments) => {
     return outstanding;
   };
 
-  if (o.outstandingManual === true && hasSheetOverride(o, 'outstanding')) {
-    const v = parseFloat(o.outstanding);
-    const calc = computed();
-    if ((!Number.isFinite(v) || v <= 0) && calc > 0.01) return calc;
+  if (o.outstandingManual === true) {
+    if (!hasSheetOverride(o, 'outstanding')) return 0;
+    const v = parseFloat(String(o.outstanding).replace(/[₹,\s]/g, ''));
     return Number.isFinite(v) && v > 0 ? v : 0;
   }
   const hasBill = !!ti || hasSheetOverride(o, 'totalBill');
@@ -312,17 +311,17 @@ export const getPartyOutstandingByFY = (data, party, fyKeys, currentFY) => {
     if (!samePartyRef(party, partyId, partyName) && !samePartyRef(party, mr?.partyId, mr?.partyName)) return;
     if (mr) coveredMrs.add(String(mr.id));
 
-    const bill = parseMoney(ti.total) || (parseMoney(ti.subtotal) + parseMoney(ti.taxAmount));
-    if (bill < 0.01) return;
     const baseMr = mr || {
       id: ti.receiptId || `orphan-${ti.id}`,
       partyId,
       partyName,
       sheetOverrides: {}
     };
-    const paid = getReceiptEffectivePaid(baseMr, payments, ti.id);
-    const tds = getReceiptEffectiveTds(baseMr, payments, ti.id);
-    add(ti.date || mr?.date, ti.invoiceNo, bill - paid - tds);
+    const due = getReceiptOutstanding(baseMr, ti, payments);
+    if (due < 0.01) return;
+    const merged = getMergedSheetOverrides(baseMr, ti.id);
+    const fyDate = hasSheetOverride(merged, 'invoiceDate') ? merged.invoiceDate : (ti.date || mr?.date);
+    add(fyDate, ti.invoiceNo, due);
   });
 
   (data?.materialReceipts || []).forEach((mr) => {

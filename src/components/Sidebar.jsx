@@ -50,6 +50,12 @@ import { usePortal } from '../context/PortalContext';
 import { canAccessModule } from '../utils/moduleAccess';
 
 const MARKETING_PORTAL_GROUPS = new Set(['marketing', 'procurement']);
+const MARKETING_PORTAL_HIDDEN = new Set([
+  '/utility-record',
+  '/utility-temp-record',
+  '/pm-air-compressor'
+]);
+const ERP_PORTAL_HIDDEN = new Set(['/purchase-management']);
 
 const Sidebar = () => {
   const { currentUser, logout } = useAuth();
@@ -105,7 +111,7 @@ const Sidebar = () => {
       icon: CreditCard,
       items: [
         { name: 'Payment Follow-Up', icon: Phone, path: '/payment-follow-up', roles: ['Admin', 'Staff'] },
-        { name: 'Party Due Status', icon: DollarSign, path: '/party-due', roles: ['Admin', 'Staff'] },
+        { name: 'Party Wise Due', icon: DollarSign, path: '/party-due', roles: ['Admin', 'Staff'] },
         { name: 'Payments Register', icon: CreditCard, path: '/payments', roles: ['Admin', 'Staff'] }
       ]
     },
@@ -285,6 +291,8 @@ const Sidebar = () => {
         {/* Collapsible Accordion Groups */}
         {groups.filter((group) => (isMarketing ? MARKETING_PORTAL_GROUPS.has(group.key) : group.key !== 'marketing')).map((group) => {
           const visibleItems = group.items.filter((item) => {
+            if (isMarketing && MARKETING_PORTAL_HIDDEN.has(item.path)) return false;
+            if (!isMarketing && ERP_PORTAL_HIDDEN.has(item.path)) return false;
             if (!item.roles?.includes(userRole)) return false;
             if (item.permissionIds?.length) {
               return item.permissionIds.some((id) => canSee(id));

@@ -5,10 +5,7 @@ const PortalContext = createContext(null);
 
 const MARKETING_PORTAL_PATHS = [
   '/marketing',
-  '/purchase-management',
-  '/utility-record',
-  '/utility-temp-record',
-  '/pm-air-compressor'
+  '/purchase-management'
 ];
 
 export const isMarketingPath = (pathname = '') =>

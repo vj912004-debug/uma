@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
 import {
   buildMonthlySummaryStatement,
   downloadMonthlySummaryPdf,
@@ -9,8 +10,18 @@ import {
 } from '../utils/monthlySummaryPdf';
 import { formatGstPercent } from '../utils/taxInvoiceLayout';
 
-const monthValue = (d = new Date()) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+const isoDate = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const monthStart = () => {
+  const d = new Date();
+  return isoDate(new Date(d.getFullYear(), d.getMonth(), 1));
+};
+
+const monthEnd = () => {
+  const d = new Date();
+  return isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+};
 
 const todayValue = () => new Date().toISOString().slice(0, 10);
 
@@ -21,7 +32,8 @@ const showPercent = (value) => (value === '' || value == null ? '' : formatGstPe
 const MonthlySummary = () => {
   const { data } = useAppContext();
   const [companyValue, setCompanyValue] = useState('');
-  const [month, setMonth] = useState(monthValue());
+  const [dateFrom, setDateFrom] = useState(monthStart);
+  const [dateTo, setDateTo] = useState(monthEnd);
   const [refNo, setRefNo] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
   const [summaryDate, setSummaryDate] = useState(todayValue());
@@ -37,7 +49,8 @@ const MonthlySummary = () => {
   const selectedParty = parties.find((party) => String(party.id) === String(companyValue)) || null;
   const companyName = selectedParty?.name || String(companyValue || '').trim();
   const companyId = selectedParty?.id || '';
-  const ready = Boolean(companyName && month);
+  const rangeReady = Boolean(dateFrom && dateTo && dateFrom <= dateTo);
+  const ready = Boolean(companyName && rangeReady);
 
   const statement = useMemo(() => {
     if (!ready) return null;
@@ -45,25 +58,34 @@ const MonthlySummary = () => {
       data,
       companyId,
       companyName,
-      month,
+      dateFrom,
+      dateTo,
       refNo,
       invoiceNo,
       summaryDate
     });
-  }, [ready, data, companyId, companyName, month, refNo, invoiceNo, summaryDate]);
+  }, [ready, data, companyId, companyName, dateFrom, dateTo, refNo, invoiceNo, summaryDate]);
 
   useEffect(() => {
     setInvoiceNo('');
-  }, [companyValue, month]);
+  }, [companyValue, dateFrom, dateTo]);
 
   useEffect(() => {
     if (!statement?.suggestedInvoiceNo) return;
     setInvoiceNo((current) => current || statement.suggestedInvoiceNo);
-  }, [statement?.suggestedInvoiceNo, companyValue, month]);
+  }, [statement?.suggestedInvoiceNo, companyValue, dateFrom, dateTo]);
 
   const downloadPdf = () => {
+    if (!dateFrom || !dateTo) {
+      alert('Select a From date and a To date.');
+      return;
+    }
+    if (dateFrom > dateTo) {
+      alert('From date must be on or before the To date.');
+      return;
+    }
     if (!statement) {
-      alert('Select a company and a month first.');
+      alert('Select a company and a date range first.');
       return;
     }
     downloadMonthlySummaryPdf(statement);
@@ -71,13 +93,14 @@ const MonthlySummary = () => {
 
   const taxLeft = statement?.igst ? 'IGST' : 'SGST';
   const taxRight = statement?.igst ? '' : 'CGST';
+  const periodLabel = `${summaryDateText(dateFrom, '/')} to ${summaryDateText(dateTo, '/')}`;
 
   return (
     <div>
       <header className="page-header">
         <div>
           <h1 className="page-title">Monthly Summary</h1>
-          <p className="page-subtitle">Select a company and a month, then download that company’s summary as a PDF.</p>
+          <p className="page-subtitle">Select a company and a date range, then download that company’s summary as a PDF.</p>
         </div>
         <button type="button" className="btn btn-primary" onClick={downloadPdf} disabled={!ready} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
           <Download size={16} /> Download PDF
@@ -102,13 +125,21 @@ const MonthlySummary = () => {
             </SearchableSelect>
           </div>
           <div className="form-group" style={{ margin: 0 }}>
-            <label htmlFor="monthly-summary-month">Month</label>
-            <input
-              id="monthly-summary-month"
-              type="month"
+            <label htmlFor="monthly-summary-from">From</label>
+            <DateField
+              id="monthly-summary-from"
               className="input-field"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
+          </div>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label htmlFor="monthly-summary-to">To</label>
+            <DateField
+              id="monthly-summary-to"
+              className="input-field"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
             />
           </div>
           <div className="form-group" style={{ margin: 0 }}>
@@ -144,9 +175,13 @@ const MonthlySummary = () => {
         </div>
       </section>
 
-      {!statement ? (
+      {!companyName ? (
         <section className="premium-card" style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>
-          Select a company to see and download the summary for the chosen month.
+          Select a company to see and download the summary for the chosen dates.
+        </section>
+      ) : !rangeReady ? (
+        <section className="premium-card" style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>
+          From date must be on or before the To date.
         </section>
       ) : (
         <section className="premium-card" style={{ marginTop: '1rem', padding: 0, overflow: 'hidden' }}>
@@ -181,7 +216,7 @@ const MonthlySummary = () => {
                 {statement.rows.length === 0 ? (
                   <tr>
                     <td colSpan={14} style={{ textAlign: 'center', padding: '1.25rem', color: 'var(--text-muted)' }}>
-                      No delivery challans for {companyName} in this month.
+                      No delivery challans for {companyName} from {periodLabel}.
                     </td>
                   </tr>
                 ) : statement.rows.map((row, index) => (

@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { Plus, CreditCard } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 import { formatDate, newestFirst } from '../utils/dateUtils';
-import { getReceiptOutstanding, getPartyOutstandingByFY, collectPartyDueEntities } from '../utils/paymentTotals';
+import { getReceiptOutstanding, getPartyOutstandingByFY, collectPartyDueEntities, hasSheetOverride, samePartyRef } from '../utils/paymentTotals';
 import { getCurrentFYKey, getFYKeysThroughCurrent } from '../utils/financialYear';
 import { useNavigate } from 'react-router-dom';
 import SearchableSelect from '../components/SearchableSelect';
@@ -19,8 +19,7 @@ const PartyDue = () => {
   const [statusTab, setStatusTab] = useState('pending');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [columnFilters, setColumnFilters] = useState({});
-  const fyKeys = useMemo(() => ['26-27'], []);
-  const bucketKeys = useMemo(() => getFYKeysThroughCurrent('21-22'), []);
+  const fyKeys = useMemo(() => getFYKeysThroughCurrent('21-22'), []);
   const currentFY = useMemo(() => getCurrentFYKey(), []);
 
   // Payment Form State
@@ -75,18 +74,43 @@ const PartyDue = () => {
     });
   };
 
-  // Outstanding = unpaid tax invoice totals (bill − received − TDS) per party
+  const parseDue = (value) => {
+    const n = parseFloat(String(value ?? '').replace(/[₹,\s]/g, ''));
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const handleDueChange = (partyId, partyName, fy, value, commitEmpty = false) => {
+    const party = (data.parties || []).find((p) => !p.isDeleted && (
+      String(p.id) === String(partyId) || samePartyRef(p, partyId, partyName)
+    ));
+    if (!party) return;
+    const dueOverrides = { ...(party.dueOverrides || {}) };
+    if (commitEmpty && String(value).trim() === '') delete dueOverrides[fy];
+    else dueOverrides[fy] = value;
+    updateItem('parties', party.id, { ...party, dueOverrides });
+  };
+
+  // Outstanding follows the Processing Sheet, unless this year was typed here.
   const partyRows = newestFirst(collectPartyDueEntities(data)).map((party) => {
-    const invoiceDuesByFY = getPartyOutstandingByFY(data, party, bucketKeys, currentFY);
+    const master = (data.parties || []).find((p) => !p.isDeleted && (
+      String(p.id) === String(party.id) || samePartyRef(p, party.id, party.name)
+    ));
+    const invoiceDuesByFY = getPartyOutstandingByFY(data, party, fyKeys, currentFY);
+    const overrides = master?.dueOverrides || {};
     const finals = {};
     fyKeys.forEach((fy) => {
-      finals[fy] = invoiceDuesByFY[fy] || 0;
+      const raw = overrides[fy];
+      finals[fy] = raw !== undefined && String(raw).trim() !== ''
+        ? parseDue(raw)
+        : (invoiceDuesByFY[fy] || 0);
     });
-    const totalDue = bucketKeys.reduce((sum, fy) => sum + (invoiceDuesByFY[fy] || 0), 0);
+    const totalDue = fyKeys.reduce((sum, fy) => sum + (finals[fy] || 0), 0);
 
     return {
       id: party.id,
       name: party.name,
+      editable: Boolean(master),
+      overrides,
       ...finals,
       totalDue
     };
@@ -137,7 +161,7 @@ const PartyDue = () => {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Party Wise Outstanding</h1>
-          <p style={{ color: 'var(--text-muted)' }}>These totals match the Processing Sheet outstanding for each party. Enter Total Recd / TDS / Outstanding on the sheet — this page updates automatically.</p>
+          <p style={{ color: 'var(--text-muted)' }}>Type a year amount to set that party’s due. Clear the cell to use the Processing Sheet outstanding again.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <ExportButton data={filteredDues} columns={tableCols} filename="Party_Outstanding_Dues" title="Party Wise Outstanding" />
@@ -220,7 +244,36 @@ const PartyDue = () => {
                           fontWeight: party[fy] > 0 ? 600 : 400
                         }}
                       >
-                        {renderAmount(party[fy])}
+                        {party.editable ? (
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            aria-label={`Due FY ${fy} for ${party.name}`}
+                            value={Object.prototype.hasOwnProperty.call(party.overrides || {}, fy) ? party.overrides[fy] : (party[fy] || '')}
+                            onChange={(e) => handleDueChange(party.id, party.name, fy, e.target.value)}
+                            onBlur={(e) => {
+                              if (String(e.target.value).trim() === '') handleDueChange(party.id, party.name, fy, '', true);
+                              e.target.style.background = 'transparent';
+                              e.target.style.border = '1px solid transparent';
+                            }}
+                            style={{
+                              width: '120px',
+                              marginLeft: 'auto',
+                              display: 'block',
+                              textAlign: 'right',
+                              background: 'transparent',
+                              border: '1px solid transparent',
+                              color: 'inherit',
+                              fontWeight: 'inherit',
+                              fontSize: 'inherit',
+                              fontFamily: 'inherit',
+                              outline: 'none',
+                              padding: '2px 4px',
+                              borderRadius: '4px'
+                            }}
+                            onFocus={(e) => { e.target.style.background = 'var(--bg-input, #fff)'; e.target.style.border = '1px solid var(--accent-primary)'; }}
+                          />
+                        ) : renderAmount(party[fy])}
                       </td>
                     ))}
                     <td style={{ padding: '1rem', textAlign: 'right', color: party.totalDue > 0 ? '#ef4444' : 'var(--status-done-text)', fontWeight: 700, fontSize: '0.95rem' }}>

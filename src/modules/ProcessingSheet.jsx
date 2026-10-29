@@ -10,8 +10,15 @@ import {
   Receipt,
   FileCheck,
   Percent,
-  ChevronLeft,
-  Truck,
+  ShieldAlert,
+  ChevronDown,
+  ChevronUp,
+  ChevronRight,
+  Eye,
+  Layers,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
   Table
 } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
@@ -24,10 +31,12 @@ import {
   getReceiptEffectivePaid,
   getReceiptEffectiveTds,
   hasSheetOverride,
-  getMergedSheetOverrides
+  getMergedSheetOverrides,
+  samePartyRef
 } from '../utils/paymentTotals';
 import SearchableSelect from '../components/SearchableSelect';
 import StatusTabBar from '../components/StatusTabBar';
+import { getCurrentFYKey, getFYKeysThroughCurrent, getFYOfDate } from '../utils/financialYear';
 
 const DATE_COLUMNS = new Set(['date', 'bprDate', 'dcDate', 'invoiceDate', 'paymentDates']);
 
@@ -40,13 +49,6 @@ const toDateInputValue = (val) => {
   if (Number.isNaN(d.getTime())) return '';
   return d.toISOString().split('T')[0];
 };
-
-const SheetField = ({ label, children }) => (
-  <div className="ps-field">
-    <label>{label}</label>
-    {children}
-  </div>
-);
 
 const StatMini = ({ title, value, icon: Icon, color, bg }) => {
   const isCurrency = typeof value === 'number' && title !== 'Due Status';
@@ -79,13 +81,37 @@ const ProcessingSheet = () => {
   const [partyFilter, setPartyFilter] = useState(location.state?.partyName || '');
   const [productFilter, setProductFilter] = useState('');
   const [statusTab, setStatusTab] = useState('pending');
-  const [openedKey, setOpenedKey] = useState(null);
+  const [expandedRows, setExpandedRows] = useState({});
+  const [viewMode, setViewMode] = useState('master'); // 'master' | 'sections'
+  const [openSections, setOpenSections] = useState({ receipt: true, billing: false, recon: false });
 
   useEffect(() => {
     if (location.state?.partyName) {
       setPartyFilter(location.state.partyName);
     }
   }, [location.state?.partyName]);
+
+  const toggleRowExpanded = (rowKey) => {
+    setExpandedRows((prev) => ({
+      ...prev,
+      [rowKey]: !prev[rowKey]
+    }));
+  };
+
+  const toggleAllExpanded = (expand) => {
+    const next = {};
+    if (expand) {
+      filteredRows.forEach((r) => { next[r.rowKey] = true; });
+    }
+    setExpandedRows(next);
+  };
+
+  const toggleSection = (sectionKey) => {
+    setOpenSections((prev) => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey]
+    }));
+  };
 
   // Table Helpers to retrieve downstream details
   const getPIs = (mrId) => (data.invoices || []).filter(inv => inv.receiptId === mrId && inv.invoiceNo?.includes('/PI/'));
@@ -109,7 +135,13 @@ const ProcessingSheet = () => {
   const getPaymentHistory = (mrId) => getReceiptPayments(data.payments, mrId);
 
   const handleCellChange = (mrId, field, value, invoiceId = null) => {
-    const mr = data.materialReceipts.find(m => m.id === mrId);
+    let mr = (data.materialReceipts || []).find((m) => String(m.id) === String(mrId));
+    if (!mr && invoiceId) {
+      const ti = (data.invoices || []).find((inv) => String(inv.id) === String(invoiceId));
+      if (ti?.receiptId) {
+        mr = (data.materialReceipts || []).find((m) => String(m.id) === String(ti.receiptId));
+      }
+    }
     if (!mr) return;
     const currentOverrides = { ...(mr.sheetOverrides || {}) };
     const numericFields = new Set([
@@ -117,11 +149,11 @@ const ProcessingSheet = () => {
     ]);
     const paymentFields = new Set(['totalBill', 'manualPaid', 'tdsDeduction', 'outstanding', 'paymentAmounts']);
     const recalcFields = new Set(['totalBill', 'tdsDeduction', 'paymentAmounts']);
-    const nextVal = numericFields.has(field) && (value === '' || value === null || value === undefined)
+    const nextVal = numericFields.has(field) && field !== 'outstanding' && (value === '' || value === null || value === undefined)
       ? '0'
       : value;
 
-    const fieldValue = field === 'paymentAmounts' ? value : nextVal;
+    const fieldValue = field === 'paymentAmounts' || field === 'outstanding' ? value : nextVal;
 
     const applyChange = (bucket) => {
       bucket[field] = fieldValue;
@@ -130,8 +162,10 @@ const ProcessingSheet = () => {
         delete bucket.outstandingManual;
         delete bucket.dueStatus;
       } else if (field === 'outstanding') {
+        bucket.outstanding = value;
         bucket.outstandingManual = true;
-        bucket.dueStatus = (parseFloat(nextVal) || 0) <= 0 ? '0' : 'Due';
+        const typedDue = parseFloat(String(value).replace(/[₹,\s]/g, ''));
+        bucket.dueStatus = Number.isFinite(typedDue) && typedDue > 0 ? 'Due' : '0';
       }
     };
 
@@ -147,19 +181,23 @@ const ProcessingSheet = () => {
       applyChange(currentOverrides);
     }
 
-    updateItem('materialReceipts', mrId, {
+    updateItem('materialReceipts', mr.id, {
       ...mr,
       sheetOverrides: currentOverrides
     });
+  };
 
-    if (paymentFields.has(field)) {
-      const party = data.parties.find(p => p.id === mr.partyId)
-        || data.parties.find(p => String(p.name || '').trim().toLowerCase()
-          === String((currentOverrides.partyName || mr.partyName) || '').trim().toLowerCase());
-      if (party?.dueOverrides && Object.keys(party.dueOverrides).length > 0) {
-        updateItem('parties', party.id, { ...party, dueOverrides: {} });
-      }
-    }
+  const findPartyRecord = (partyId, partyName) => (data.parties || []).find((p) => !p.isDeleted && (
+    (partyId && String(p.id) === String(partyId)) || samePartyRef(p, partyId, partyName)
+  ));
+
+  const handlePartyDueChange = (partyId, partyName, fy, value, commitEmpty = false) => {
+    const party = findPartyRecord(partyId, partyName);
+    if (!party) return;
+    const dueOverrides = { ...(party.dueOverrides || {}) };
+    if (commitEmpty && String(value).trim() === '') delete dueOverrides[fy];
+    else dueOverrides[fy] = value;
+    updateItem('parties', party.id, { ...party, dueOverrides });
   };
 
   const buildSheetRow = (mr, ti, srNo) => {
@@ -184,6 +222,7 @@ const ProcessingSheet = () => {
       id: mr.id,
       rowKey: `${mr.id}__${ti?.id || 'pending'}`,
       invoiceId: ti?.id || null,
+      partyId: mr.partyId || ti?.partyId || '',
       srNo,
       date: hasSheetOverride(o, 'date') ? o.date : mr.date,
       partyName: hasSheetOverride(o, 'partyName') ? o.partyName : (mr.partyName || ti?.partyName || ''),
@@ -208,6 +247,9 @@ const ProcessingSheet = () => {
       amountsReceivedTotal:
         getReceiptEffectivePaid(mr, data.payments, ti?.id) + getReceiptEffectiveTds(mr, data.payments, ti?.id),
       outstanding: compOutstanding,
+      outstandingText: o.outstandingManual === true
+        ? String(o.outstanding ?? '')
+        : (compOutstanding ? String(compOutstanding) : ''),
       dueStatus: compOutstanding <= 0
         ? '0'
         : (hasSheetOverride(o, 'dueStatus') && o.dueStatus !== '0'
@@ -306,6 +348,57 @@ const ProcessingSheet = () => {
   );
 
   const partyOptions = Array.from(new Set(rows.map(r => r.partyName))).filter(Boolean).sort();
+  const fyKeys = useMemo(() => getFYKeysThroughCurrent('21-22'), []);
+  const partyDueRows = useMemo(() => {
+    const currentFY = getCurrentFYKey();
+    const byParty = new Map();
+    rows.forEach((row) => {
+      const name = String(row.partyName || '').trim() || 'Unknown';
+      if (partyFilter && name.toLowerCase() !== partyFilter.trim().toLowerCase()) return;
+      if (!byParty.has(name)) {
+        byParty.set(name, {
+          name,
+          partyId: row.partyId || '',
+          byFy: Object.fromEntries(fyKeys.map((key) => [key, 0])),
+          totalDue: 0
+        });
+      } else if (row.partyId && !byParty.get(name).partyId) {
+        byParty.get(name).partyId = row.partyId;
+      }
+      const due = parseFloat(row.outstanding) || 0;
+      if (due < 0.01) return;
+      const bucket = byParty.get(name);
+      let fy = getFYOfDate(row.invoiceDate || row.date);
+      if (!fyKeys.includes(fy)) {
+        const fromNo = String(row.tiNo || '').match(/(\d{2}-\d{2})/);
+        fy = fromNo && fyKeys.includes(fromNo[1]) ? fromNo[1] : currentFY;
+      }
+      if (fyKeys.includes(fy)) bucket.byFy[fy] += due;
+      bucket.totalDue += due;
+    });
+    byParty.forEach((bucket) => {
+      const master = (data.parties || []).find((p) => !p.isDeleted && (
+        (bucket.partyId && String(p.id) === String(bucket.partyId)) || samePartyRef(p, bucket.partyId, bucket.name)
+      ));
+      bucket.id = master?.id || '';
+      bucket.overrides = master?.dueOverrides || {};
+      fyKeys.forEach((fy) => {
+        const raw = bucket.overrides[fy];
+        if (raw !== undefined && String(raw).trim() !== '') {
+          const typed = parseFloat(String(raw).replace(/[₹,\s]/g, ''));
+          bucket.byFy[fy] = Number.isFinite(typed) ? typed : 0;
+        }
+      });
+      bucket.totalDue = fyKeys.reduce((sum, fy) => sum + (bucket.byFy[fy] || 0), 0);
+    });
+    return [...byParty.values()]
+      .filter((party) => party.totalDue > 0.01 || fyKeys.some((fy) => {
+        const raw = party.overrides?.[fy];
+        return raw !== undefined && String(raw).trim() !== '';
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows, fyKeys, partyFilter, data.parties]);
+  const formatInr = (value) => `₹${(parseFloat(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const productOptions = Array.from(new Set(rows.map(r => r.productName))).filter(Boolean).sort();
 
   const tableCols = [
@@ -332,47 +425,185 @@ const ProcessingSheet = () => {
     { key: 'ewayStatus', label: 'E-Way' }
   ];
 
-  const renderSheetField = (row, key) => {
-    const value = row[key];
-    if (key !== 'paymentDates' && DATE_COLUMNS.has(key)) {
-      return (
-        <DateField
-          className="input-field"
-          value={toDateInputValue(value)}
-          onChange={(e) => handleCellChange(row.id, key, e.target.value, row.invoiceId)}
-        />
-      );
-    }
-    if (key === 'paid') {
-      return <input className="input-field" readOnly value={`₹${parseFloat(value || 0).toFixed(2)}`} />;
-    }
-    return (
-      <input
-        className="input-field"
-        type="text"
-        value={value ?? ''}
-        onChange={(e) => handleCellChange(row.id, key, e.target.value, row.invoiceId)}
-      />
-    );
+  const fullTextStyle = (value, minPx = 80) => {
+    const len = String(value ?? '').length;
+    return {
+      minWidth: `${Math.max(minPx, Math.ceil(len * 8.2) + 16)}px`,
+      width: 'auto',
+      textAlign: 'left',
+      overflow: 'visible'
+    };
   };
 
-  const openedRow = openedKey ? rows.find((row) => row.rowKey === openedKey) : null;
+  const renderInput = (row, field, value, extraStyle = {}) => (
+    <input
+      type="text"
+      value={value ?? ''}
+      size={Math.max(8, String(value ?? '').length + 1)}
+      onChange={(e) => handleCellChange(row.id, field, e.target.value, row.invoiceId)}
+      title={value ?? ''}
+      style={{
+        background: 'transparent',
+        border: '1px solid transparent',
+        color: 'inherit',
+        width: 'auto',
+        minWidth: '60px',
+        fontSize: 'inherit',
+        outline: 'none',
+        fontFamily: 'inherit',
+        fontWeight: 'inherit',
+        padding: '2px 4px',
+        borderRadius: '4px',
+        textAlign: 'center',
+        transition: 'all 0.2s ease',
+        overflow: 'visible',
+        ...extraStyle
+      }}
+      onFocus={(e) => { 
+        e.target.style.background = 'var(--bg-input, #fff)';
+        e.target.style.border = '1px solid var(--accent-primary)'; 
+      }}
+      onBlur={(e) => { 
+        e.target.style.background = 'transparent';
+        e.target.style.border = '1px solid transparent'; 
+      }}
+    />
+  );
+
+  const renderDateInput = (row, field, value) => (
+    <DateField
+      className="dt-cell-input"
+      value={toDateInputValue(value)}
+      onChange={(e) => handleCellChange(row.id, field, e.target.value, row.invoiceId)}
+      style={{
+        width: '100%',
+        minWidth: '118px',
+      }}
+    />
+  );
+
+  const renderCell = (row, col) => {
+    const value = row[col.key];
+    if (DATE_COLUMNS.has(col.key)) {
+      return renderDateInput(row, col.key, value);
+    }
+    switch (col.key) {
+      case 'srNo':
+        return <span style={{ fontWeight: 600 }}>{row.srNo}</span>;
+      case 'paid':
+        return <span>₹{parseFloat(value || 0).toFixed(2)}</span>;
+      case 'tdsDeduction':
+        return renderInput(row, 'tdsDeduction', value, fullTextStyle(value, 70));
+      case 'dueStatus':
+        return renderInput(row, 'dueStatus', value, {
+          ...fullTextStyle(value, 70),
+          textAlign: 'center',
+          fontWeight: 700,
+          color: value === 'Overdue' ? '#ef4444' : value === '0' ? '#10b981' : '#f59e0b'
+        });
+      case 'outstanding':
+        return renderInput(row, 'outstanding', row.outstandingText ?? value, {
+          ...fullTextStyle(value, 90),
+          textAlign: 'right',
+          fontWeight: 700,
+          color: parseFloat(value) > 0 ? '#ef4444' : 'inherit'
+        });
+      case 'piNo':
+        return renderInput(row, 'piNo', value, fullTextStyle(value, 170));
+      case 'tiNo':
+        return renderInput(row, 'tiNo', value, fullTextStyle(value, 170));
+      case 'dcNo':
+        return renderInput(row, 'dcNo', value, fullTextStyle(value, 150));
+      case 'manualPaid':
+        return renderInput(row, 'manualPaid', value, fullTextStyle(value, 80));
+      case 'partyName':
+        return renderInput(row, 'partyName', value, fullTextStyle(value, 160));
+      case 'productName':
+        return renderInput(row, 'productName', value, fullTextStyle(value, 140));
+      case 'paymentAmounts':
+        return renderInput(row, 'paymentAmounts', value, fullTextStyle(value, 140));
+      case 'paymentRef':
+        return renderInput(row, 'paymentRef', value, fullTextStyle(value, 140));
+      case 'totalBill':
+        return renderInput(row, 'totalBill', value, fullTextStyle(value, 90));
+      case 'receivedQty':
+        return renderInput(row, 'receivedQty', value, fullTextStyle(value, 70));
+      case 'ewayStatus':
+        return renderInput(row, 'ewayStatus', value, fullTextStyle(value, 80));
+      default:
+        return renderInput(row, col.key, value, fullTextStyle(value, 80));
+    }
+  };
+
+  const thStyle = { padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-muted)', background: 'var(--bg-card)', borderBottom: '1px solid var(--border-color)', fontSize: '0.78rem', whiteSpace: 'nowrap' };
+  const tdStyle = { padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'visible' };
+  const tableStyle = { width: '100%', borderCollapse: 'collapse', textAlign: 'center', tableLayout: 'auto' };
+  const sheetStyle = { width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', textAlign: 'center', whiteSpace: 'nowrap', tableLayout: 'auto' };
 
   return (
-    <div className="ps-page">
-      <header className="page-header">
+    <div style={{ paddingBottom: '2rem' }}>
+      <header style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Table size={22} />
-            Processing Sheet
+          <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Table size={26} color="var(--accent-primary)" />
+            Excel Processing Sheet
           </h1>
-          <p className="page-subtitle">Click a row to open that sheet and edit the details.</p>
+          <p style={{ color: 'var(--text-muted)', margin: '0.25rem 0 0', fontSize: '0.88rem' }}>
+            Interactive master tracking sheet. Click any row to expand complete material, billing, & payment details.
+          </p>
         </div>
-        <ExportButton data={filteredRows} columns={tableCols} filename="Master_Processing_Sheet" title="Master Processing Sheet" />
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {/* View Mode Switcher */}
+          <div style={{ display: 'flex', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <button
+              type="button"
+              onClick={() => setViewMode('master')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                background: viewMode === 'master' ? 'var(--bg-card, #fff)' : 'transparent',
+                color: viewMode === 'master' ? 'var(--accent-primary)' : 'var(--text-muted)',
+                boxShadow: viewMode === 'master' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.2s'
+              }}
+            >
+              <Eye size={14} /> Unified Table View
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('sections')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                background: viewMode === 'sections' ? 'var(--bg-card, #fff)' : 'transparent',
+                color: viewMode === 'sections' ? 'var(--accent-primary)' : 'var(--text-muted)',
+                boxShadow: viewMode === 'sections' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.2s'
+              }}
+            >
+              <Layers size={14} /> Collapsible Sections
+            </button>
+          </div>
+
+          <ExportButton data={filteredRows} columns={tableCols} filename="Master_Processing_Sheet" title="Master Processing Sheet" />
+        </div>
       </header>
 
-      {!openedRow && (
-      <>
       <StatusTabBar
         value={statusTab}
         onChange={setStatusTab}
@@ -416,143 +647,532 @@ const ProcessingSheet = () => {
           </SearchableSelect>
         </div>
       </div>
-      </>
-      )}
 
       <div>
-        {openedRow ? (
-          <div className="premium-card ps-sheet">
-            <button
-              type="button"
-              className="btn"
-              onClick={() => setOpenedKey(null)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginBottom: '1rem' }}
-            >
-              <ChevronLeft size={16} /> Back to list
-            </button>
-            <div className="ps-sheet-head">
-              <div style={{ flex: '1 1 280px', minWidth: 0 }}>
-                <SheetField label="Party Name">
-                  {renderSheetField(openedRow, 'partyName')}
-                </SheetField>
-                <SheetField label="Product">
-                  {renderSheetField(openedRow, 'productName')}
-                </SheetField>
-              </div>
-              <strong className={(parseFloat(openedRow.outstanding) || 0) <= 0.01 ? 'ps-cleared' : 'ps-due'}>
-                {(parseFloat(openedRow.outstanding) || 0) <= 0.01
-                  ? 'Cleared'
-                  : `Outstanding ₹${parseFloat(openedRow.outstanding || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
-              </strong>
+        {rows.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '5rem', color: 'var(--text-muted)', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)' }}>
+            <div style={{ background: '#f1f5f9', padding: '1.5rem', borderRadius: '50%' }}>
+              <Building2 size={48} color="#94a3b8" />
             </div>
-            <div className="ps-sheet-grid">
-              <section className="ps-sheet-card">
-                <h3><FileText size={16} /> Receipt</h3>
-                <SheetField label="M.R. Date">{renderSheetField(openedRow, 'date')}</SheetField>
-                <SheetField label="Received Qty">{renderSheetField(openedRow, 'receivedQty')}</SheetField>
-                <SheetField label="PI No">{renderSheetField(openedRow, 'piNo')}</SheetField>
-              </section>
-              <section className="ps-sheet-card">
-                <h3><Truck size={16} /> Delivery</h3>
-                <SheetField label="BPR Date">{renderSheetField(openedRow, 'bprDate')}</SheetField>
-                <SheetField label="BPR Qty">{renderSheetField(openedRow, 'bprNetQty')}</SheetField>
-                <SheetField label="DC No">{renderSheetField(openedRow, 'dcNo')}</SheetField>
-                <SheetField label="DC Date">{renderSheetField(openedRow, 'dcDate')}</SheetField>
-                <SheetField label="DC Qty">{renderSheetField(openedRow, 'dcNetQty')}</SheetField>
-                <SheetField label="E-Way">{renderSheetField(openedRow, 'ewayStatus')}</SheetField>
-              </section>
-              <section className="ps-sheet-card">
-                <h3><FileCheck size={16} /> Invoice</h3>
-                <SheetField label="Tax Invoice">{renderSheetField(openedRow, 'tiNo')}</SheetField>
-                <SheetField label="Invoice Date">{renderSheetField(openedRow, 'invoiceDate')}</SheetField>
-                <SheetField label="Bill Amount">{renderSheetField(openedRow, 'totalBill')}</SheetField>
-                <SheetField label="Received (Auto)">{renderSheetField(openedRow, 'paid')}</SheetField>
-                <SheetField label="Received (Manual)">{renderSheetField(openedRow, 'manualPaid')}</SheetField>
-              </section>
-              <section className="ps-sheet-card">
-                <h3><Receipt size={16} /> Payment</h3>
-                <SheetField label="Cheque / Ref">{renderSheetField(openedRow, 'paymentRef')}</SheetField>
-                <SheetField label="Payment Dates">{renderSheetField(openedRow, 'paymentDates')}</SheetField>
-                <SheetField label="Amounts Received">{renderSheetField(openedRow, 'paymentAmounts')}</SheetField>
-                <SheetField label="TDS">{renderSheetField(openedRow, 'tdsDeduction')}</SheetField>
-                <SheetField label="Due Status">{renderSheetField(openedRow, 'dueStatus')}</SheetField>
-                <SheetField label="Outstanding">{renderSheetField(openedRow, 'outstanding')}</SheetField>
-              </section>
+            <div>
+              <h3 style={{ fontSize: '1.3rem', color: '#334155', margin: '0 0 0.5rem 0', fontWeight: 700 }}>No Records Yet</h3>
+              <p style={{ margin: 0, fontSize: '0.95rem' }}>Create Material Receipts and Tax Invoices to see them listed here.</p>
             </div>
-          </div>
-        ) : rows.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '5rem', color: 'var(--text-muted)', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-            <h3 style={{ margin: '0 0 0.5rem', fontWeight: 700 }}>No Records Yet</h3>
-            <p style={{ margin: 0 }}>Create Material Receipts and Tax Invoices to see them listed here.</p>
           </div>
         ) : filteredRows.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-            No sheets match these filters.
+            No master logs found matching your filters.
           </div>
-        ) : (
-          <div className="premium-card ps-list-card">
-            <div>
-              <table className="ps-table">
-                <colgroup>
-                  <col className="ps-col-sr" />
-                  <col className="ps-col-date" />
-                  <col className="ps-col-party" />
-                  <col className="ps-col-product" />
-                  <col className="ps-col-inv" />
-                  <col className="ps-col-out" />
-                  <col className="ps-col-status" />
-                  <col className="ps-col-open" />
-                </colgroup>
+        ) : viewMode === 'master' ? (
+          /* ================= MODE 1: UNIFIED MASTER TABLE WITH EXPANDABLE ROWS ================= */
+          <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)' }}>
+            
+            {/* Table Header Bar */}
+            <div style={{ padding: '0.85rem 1.25rem', borderBottom: '1px solid var(--border-color)', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)' }}>Master Processing Logs</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>({filteredRows.length} records)</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => toggleAllExpanded(true)}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Expand All
+                </button>
+                <span style={{ color: 'var(--border-color)' }}>|</span>
+                <button
+                  type="button"
+                  onClick={() => toggleAllExpanded(false)}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Collapse All
+                </button>
+              </div>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={tableStyle}>
                 <thead>
                   <tr>
-                    <th>Sr</th>
-                    <th>Date</th>
-                    <th>Party</th>
-                    <th>Product</th>
-                    <th>Invoice</th>
-                    <th>Outstanding</th>
-                    <th>Status</th>
-                    <th>Open</th>
+                    <th style={{ ...thStyle, width: '40px', padding: '0.85rem 0.5rem' }}></th>
+                    <th style={thStyle}>Sr No</th>
+                    <th style={thStyle}>M.R. Date</th>
+                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '160px' }}>Party Name</th>
+                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '140px' }}>Product</th>
+                    <th style={thStyle}>Recd Qty</th>
+                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '140px' }}>Inv / PI No</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Bill Amount</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Total Recd</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Outstanding</th>
+                    <th style={thStyle}>Status</th>
+                    <th style={{ ...thStyle, textAlign: 'center', width: '120px' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRows.map((row) => {
+                    const isExpanded = !!expandedRows[row.rowKey];
                     const isPaidOff = (parseFloat(row.outstanding) || 0) <= 0.01;
                     const isOverdue = row.dueStatus === 'Overdue';
+
                     return (
-                      <tr key={row.rowKey} onClick={() => setOpenedKey(row.rowKey)}>
-                        <td>{row.srNo}</td>
-                        <td className="ps-date">{row.date ? new Date(row.date).toLocaleDateString('en-GB') : '-'}</td>
-                        <td className="ps-party">{row.partyName || '-'}</td>
-                        <td>{row.productName || '-'}</td>
-                        <td className="ps-inv">{row.tiNo !== 'Pending' ? row.tiNo : row.piNo}</td>
-                        <td className={isPaidOff ? 'ps-money ps-cleared' : 'ps-money ps-due'}>
-                          ₹{parseFloat(row.outstanding || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td>
-                          <span className={`ps-status ${isPaidOff ? 'is-cleared' : isOverdue ? 'is-overdue' : 'is-due'}`}>
-                            {isPaidOff ? 'Cleared' : isOverdue ? 'Overdue' : 'Due'}
-                          </span>
-                        </td>
-                        <td>
-                          <button type="button" className="btn btn-primary ps-open" onClick={(e) => { e.stopPropagation(); setOpenedKey(row.rowKey); }}>
-                            Open
-                          </button>
-                        </td>
-                      </tr>
+                      <React.Fragment key={row.rowKey}>
+                        {/* Summary Master Row */}
+                        <tr 
+                          onClick={() => toggleRowExpanded(row.rowKey)}
+                          style={{
+                            cursor: 'pointer',
+                            background: isExpanded ? 'rgba(155, 98, 196, 0.04)' : 'transparent',
+                            transition: 'background 0.2s'
+                          }}
+                          className="hover-row"
+                        >
+                          <td style={{ ...tdStyle, padding: '0.85rem 0.5rem', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); toggleRowExpanded(row.rowKey); }}
+                              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center' }}
+                            >
+                              {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                            </button>
+                          </td>
+                          <td style={tdStyle}>{row.srNo}</td>
+                          <td style={tdStyle}>{row.date ? new Date(row.date).toLocaleDateString('en-GB') : '-'}</td>
+                          <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 600, color: 'var(--text-main)' }}>{row.partyName || '-'}</td>
+                          <td style={{ ...tdStyle, textAlign: 'left', color: 'var(--text-muted)' }}>{row.productName || '-'}</td>
+                          <td style={{ ...tdStyle, fontWeight: 600 }}>{row.receivedQty}</td>
+                          <td style={{ ...tdStyle, textAlign: 'left', color: row.tiNo !== 'Pending' ? 'var(--accent-primary)' : '#8b5cf6', fontWeight: 600 }}>
+                            {row.tiNo !== 'Pending' ? row.tiNo : row.piNo}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>
+                            ₹{parseFloat(row.totalBill || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                            ₹{parseFloat(row.amountsReceivedTotal || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}
+                          </td>
+                          <td
+                            style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: isPaidOff ? '#10b981' : '#ef4444' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {renderCell(row, { key: 'outstanding' })}
+                          </td>
+                          <td style={tdStyle}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 10px',
+                              borderRadius: '12px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              background: isPaidOff ? '#ecfdf5' : isOverdue ? '#fef2f2' : '#fefce8',
+                              color: isPaidOff ? '#047857' : isOverdue ? '#dc2626' : '#d97706'
+                            }}>
+                              {isPaidOff ? <CheckCircle2 size={12} /> : isOverdue ? <AlertTriangle size={12} /> : <Clock size={12} />}
+                              {isPaidOff ? 'Cleared' : isOverdue ? 'Overdue' : 'Due'}
+                            </span>
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); toggleRowExpanded(row.rowKey); }}
+                              className="btn btn-sm"
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '4px 10px',
+                                background: isExpanded ? 'var(--accent-primary)' : 'var(--bg-input, #f1f5f9)',
+                                color: isExpanded ? '#fff' : 'var(--text-main)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '6px'
+                              }}
+                            >
+                              {isExpanded ? 'Close' : 'Details'}
+                            </button>
+                          </td>
+                        </tr>
+
+                        {isExpanded && (
+                          <tr key={`expanded-panel-${row.rowKey}`} style={{ background: '#f8fafc' }}>
+                            <td colSpan={12} style={{ padding: '0.75rem', borderBottom: '2px solid var(--accent-primary)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+                                  <div style={{ background: '#f8fafc', padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <FileText size={16} color="#3b82f6" />
+                                    <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)' }}>Receipt Details</span>
+                                  </div>
+                                  <div style={{ overflowX: 'auto' }}>
+                                    <table style={sheetStyle}>
+                                      <thead>
+                                        <tr>
+                                          <th style={thStyle}>Sr No</th>
+                                          <th style={thStyle}>M.R. Date</th>
+                                          <th style={{ ...thStyle, minWidth: '160px' }}>Party Name</th>
+                                          <th style={{ ...thStyle, minWidth: '140px' }}>Product</th>
+                                          <th style={thStyle}>Recd Qty</th>
+                                          <th style={{ ...thStyle, minWidth: '170px' }}>P / I No</th>
+                                          <th style={thStyle}>BPR Date</th>
+                                          <th style={thStyle}>BPR Net Qty</th>
+                                          <th style={{ ...thStyle, minWidth: '150px' }}>DC No</th>
+                                          <th style={thStyle}>DC Date</th>
+                                          <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        <tr>
+                                          <td style={tdStyle}>{renderCell(row, { key: 'srNo' })}</td>
+                                          <td style={tdStyle}>{renderCell(row, { key: 'date' })}</td>
+                                          <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, { key: 'partyName' })}</td>
+                                          <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, { key: 'productName' })}</td>
+                                          <td style={tdStyle}>{renderCell(row, { key: 'receivedQty' })}</td>
+                                          <td style={{ ...tdStyle, color: '#8b5cf6', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, { key: 'piNo' })}</td>
+                                          <td style={tdStyle}>{renderCell(row, { key: 'bprDate' })}</td>
+                                          <td style={tdStyle}>{renderCell(row, { key: 'bprNetQty' })}</td>
+                                          <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, { key: 'dcNo' })}</td>
+                                          <td style={tdStyle}>{renderCell(row, { key: 'dcDate' })}</td>
+                                          <td style={{ ...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, { key: 'tiNo' })}</td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+
+                                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+                                  <div style={{ background: 'var(--table-header-bg)', padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <FileCheck size={16} color="#5b1c85" />
+                                    <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)' }}>Invoice / Billing Details</span>
+                                  </div>
+                                  <div style={{ overflowX: 'auto' }}>
+                                    <table style={sheetStyle}>
+                                      <thead>
+                                        <tr>
+                                          <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
+                                          <th style={thStyle}>Invoice Date</th>
+                                          <th style={thStyle}>Bill Amount</th>
+                                          <th style={thStyle}>Payment Recd (Auto)</th>
+                                          <th style={thStyle}>Total Recd (Manual)</th>
+                                          <th style={{ ...thStyle, minWidth: '140px' }}>Cheque / Ref Details</th>
+                                          <th style={{ ...thStyle, minWidth: '120px' }}>Payment Dates</th>
+                                          <th style={{ ...thStyle, minWidth: '140px' }}>Amounts Received</th>
+                                          <th style={thStyle}>TDS Deducted</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        <tr>
+                                          <td style={{ ...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, { key: 'tiNo' })}</td>
+                                          <td style={tdStyle}>{renderCell(row, { key: 'invoiceDate' })}</td>
+                                          <td style={tdStyle}>{renderCell(row, { key: 'totalBill' })}</td>
+                                          <td style={{ ...tdStyle, color: 'var(--accent-primary)', fontWeight: 600 }}>{renderCell(row, { key: 'paid' })}</td>
+                                          <td style={tdStyle}>{renderCell(row, { key: 'manualPaid' })}</td>
+                                          <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, { key: 'paymentRef' })}</td>
+                                          <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, { key: 'paymentDates' })}</td>
+                                          <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, { key: 'paymentAmounts' })}</td>
+                                          <td style={{ ...tdStyle, color: '#8b5cf6', fontWeight: 600 }}>{renderCell(row, { key: 'tdsDeduction' })}</td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+
+                                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+                                  <div style={{ background: '#fefce8', padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Receipt size={16} color="#eab308" />
+                                    <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)' }}>Payment Reconciliation</span>
+                                  </div>
+                                  <div style={{ overflowX: 'auto' }}>
+                                    <table style={sheetStyle}>
+                                      <thead>
+                                        <tr>
+                                          <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
+                                          <th style={thStyle}>Payment Recd (Auto)</th>
+                                          <th style={thStyle}>Total Recd (Manual)</th>
+                                          <th style={{ ...thStyle, minWidth: '140px' }}>Cheque / Ref Details</th>
+                                          <th style={{ ...thStyle, minWidth: '120px' }}>Payment Dates</th>
+                                          <th style={{ ...thStyle, minWidth: '140px' }}>Amounts Received</th>
+                                          <th style={thStyle}>TDS Deduction</th>
+                                          <th style={thStyle}>Due Status</th>
+                                          <th style={thStyle}>Outstanding</th>
+                                          <th style={thStyle}>E-Way</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        <tr>
+                                          <td style={{ ...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, { key: 'tiNo' })}</td>
+                                          <td style={{ ...tdStyle, color: 'var(--accent-primary)', fontWeight: 600 }}>{renderCell(row, { key: 'paid' })}</td>
+                                          <td style={tdStyle}>{renderCell(row, { key: 'manualPaid' })}</td>
+                                          <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, { key: 'paymentRef' })}</td>
+                                          <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, { key: 'paymentDates' })}</td>
+                                          <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, { key: 'paymentAmounts' })}</td>
+                                          <td style={{ ...tdStyle, color: '#8b5cf6', fontWeight: 600 }}>{renderCell(row, { key: 'tdsDeduction' })}</td>
+                                          <td style={tdStyle}>{renderCell(row, { key: 'dueStatus' })}</td>
+                                          <td style={{ ...tdStyle, color: '#ef4444', fontWeight: 600 }}>{renderCell(row, { key: 'outstanding' })}</td>
+                                          <td style={tdStyle}>{renderCell(row, { key: 'ewayStatus' })}</td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', padding: '1rem', borderTop: '1px solid var(--border-color)' }}>
-              <StatMini title="Total Bill Amount" value={summaryTotals.totalBill} icon={FileText} color="#3b82f6" bg="#eff6ff" />
-              <StatMini title="Total Received" value={summaryTotals.totalReceived} icon={FileCheck} color="#9b62c4" bg="var(--table-header-bg)" />
-              <StatMini title="Outstanding Amount" value={summaryTotals.outstanding} icon={Percent} color="#ef4444" bg="#fee2e2" />
-              <StatMini title="TDS Deducted" value={summaryTotals.tds} icon={Receipt} color="#8b5cf6" bg="#f3e8ff" />
+
+            {/* Footer Metrics */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', padding: '1.25rem', background: 'var(--bg-card)', borderTop: '1px solid var(--border-color)' }}>
+               <StatMini title="Total Bill Amount" value={summaryTotals.totalBill} icon={FileText} color="#3b82f6" bg="#eff6ff" />
+               <StatMini title="Total Received" value={summaryTotals.totalReceived} icon={FileCheck} color="#9b62c4" bg="var(--table-header-bg)" />
+               <StatMini title="Outstanding Amount" value={summaryTotals.outstanding} icon={Percent} color="#ef4444" bg="#fee2e2" />
+               <StatMini title="TDS Deducted" value={summaryTotals.tds} icon={Receipt} color="#8b5cf6" bg="#f3e8ff" />
+               <StatMini title="Invoices" value={String(filteredRows.length)} icon={ShieldAlert} color="#eab308" bg="#fef9c3" />
             </div>
+
+          </div>
+        ) : (
+          /* ================= MODE 2: COLLAPSIBLE ACCORDION SECTIONS ================= */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+            {/* Section 1 — Receipt Details */}
+            <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+              <div 
+                onClick={() => toggleSection('receipt')}
+                style={{ background: '#f8fafc', padding: '1rem 1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: openSections.receipt ? '1px solid var(--border-color)' : 'none' }}
+              >
+                <FileText size={18} color="#3b82f6" />
+                <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem' }}>Receipt Details</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>({filteredRows.length} records)</span>
+                <button type="button" style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                  {openSections.receipt ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </button>
+              </div>
+
+              {openSections.receipt && (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={tableStyle}>
+                    <thead>
+                       <tr>
+                         <th style={thStyle}>Sr No</th>
+                         <th style={thStyle}>M.R. Date</th>
+                         <th style={{ ...thStyle, minWidth: '160px' }}>Party Name</th>
+                         <th style={{ ...thStyle, minWidth: '140px' }}>Product</th>
+                         <th style={thStyle}>Recd Qty</th>
+                         <th style={{ ...thStyle, minWidth: '170px' }}>P / I No</th>
+                         <th style={thStyle}>BPR Date</th>
+                         <th style={{ ...thStyle, minWidth: '150px' }}>DC No</th>
+                         <th style={thStyle}>DC Date</th>
+                         <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
+                       </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRows.map((row) => (
+                       <tr key={`receipt-${row.rowKey}`}>
+                         <td style={tdStyle}>{renderCell(row, {key: 'srNo'})}</td>
+                         <td style={tdStyle}>{renderCell(row, {key: 'date'})}</td>
+                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'partyName'})}</td>
+                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'productName'})}</td>
+                         <td style={tdStyle}>{renderCell(row, {key: 'receivedQty'})}</td>
+                         <td style={{...tdStyle, color: '#8b5cf6', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'piNo'})}</td>
+                         <td style={tdStyle}>{renderCell(row, {key: 'bprDate'})}</td>
+                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'dcNo'})}</td>
+                         <td style={tdStyle}>{renderCell(row, {key: 'dcDate'})}</td>
+                         <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'tiNo'})}</td>
+                       </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Section 2 — Invoice / Billing Details */}
+            <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+              <div 
+                onClick={() => toggleSection('billing')}
+                style={{ background: 'var(--table-header-bg)', padding: '1rem 1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: openSections.billing ? '1px solid var(--border-color)' : 'none' }}
+              >
+                <FileCheck size={18} color="#9b62c4" />
+                <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem' }}>Invoice / Billing Details</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>({filteredRows.length} invoices)</span>
+                <button type="button" style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                  {openSections.billing ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </button>
+              </div>
+
+              {openSections.billing && (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={tableStyle}>
+                    <thead>
+                       <tr>
+                         <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
+                         <th style={thStyle}>Invoice Date</th>
+                         <th style={thStyle}>Bill Amount</th>
+                         <th style={thStyle}>Payment Recd (Auto)</th>
+                         <th style={thStyle}>Total Recd (Manual)</th>
+                         <th style={{ ...thStyle, minWidth: '140px' }}>Cheque / Ref Details</th>
+                         <th style={{ ...thStyle, minWidth: '120px' }}>Payment Dates</th>
+                         <th style={{ ...thStyle, minWidth: '140px' }}>Amounts Received</th>
+                         <th style={thStyle}>TDS Deducted</th>
+                       </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRows.map((row) => (
+                       <tr key={`billing-${row.rowKey}`}>
+                         <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'tiNo'})}</td>
+                         <td style={tdStyle}>{renderCell(row, {key: 'invoiceDate'})}</td>
+                         <td style={tdStyle}>{renderCell(row, {key: 'totalBill'})}</td>
+                         <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600 }}>{renderCell(row, {key: 'paid'})}</td>
+                         <td style={tdStyle}>{renderCell(row, {key: 'manualPaid'})}</td>
+                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentRef'})}</td>
+                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentDates'})}</td>
+                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentAmounts'})}</td>
+                         <td style={{...tdStyle, color: '#8b5cf6', fontWeight: 600 }}>{renderCell(row, {key: 'tdsDeduction'})}</td>
+                       </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Section 3 — Payment Reconciliation */}
+            <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+              <div 
+                onClick={() => toggleSection('recon')}
+                style={{ background: '#fefce8', padding: '1rem 1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: openSections.recon ? '1px solid var(--border-color)' : 'none' }}
+              >
+                <Receipt size={18} color="#eab308" />
+                <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem' }}>Payment Reconciliation</span>
+                <button type="button" style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                  {openSections.recon ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </button>
+              </div>
+
+              {openSections.recon && (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={tableStyle}>
+                    <thead>
+                       <tr>
+                         <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
+                         <th style={thStyle}>Payment Recd (Auto)</th>
+                         <th style={thStyle}>Total Recd (Manual)</th>
+                         <th style={{ ...thStyle, minWidth: '140px' }}>Cheque / Ref Details</th>
+                         <th style={{ ...thStyle, minWidth: '120px' }}>Payment Dates</th>
+                         <th style={{ ...thStyle, minWidth: '140px' }}>Amounts Received</th>
+                         <th style={thStyle}>TDS Deduction</th>
+                         <th style={thStyle}>Due Status</th>
+                         <th style={thStyle}>Outstanding</th>
+                         <th style={thStyle}>E-Way</th>
+                       </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRows.map((row) => (
+                       <tr key={`recon-${row.rowKey}`}>
+                         <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'tiNo'})}</td>
+                         <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600 }}>{renderCell(row, {key: 'paid'})}</td>
+                         <td style={tdStyle}>{renderCell(row, {key: 'manualPaid'})}</td>
+                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentRef'})}</td>
+                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentDates'})}</td>
+                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'paymentAmounts'})}</td>
+                         <td style={{...tdStyle, color: '#8b5cf6', fontWeight: 600 }}>{renderCell(row, {key: 'tdsDeduction'})}</td>
+                         <td style={tdStyle}>{renderCell(row, {key: 'dueStatus'})}</td>
+                         <td style={{...tdStyle, color: '#ef4444', fontWeight: 600 }}>{renderCell(row, {key: 'outstanding'})}</td>
+                         <td style={tdStyle}>{renderCell(row, {key: 'ewayStatus'})}</td>
+                       </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Metrics */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+               <StatMini title="Total Bill Amount" value={summaryTotals.totalBill} icon={FileText} color="#3b82f6" bg="#eff6ff" />
+               <StatMini title="Total Received" value={summaryTotals.totalReceived} icon={FileCheck} color="#9b62c4" bg="var(--table-header-bg)" />
+               <StatMini title="Outstanding Amount" value={summaryTotals.outstanding} icon={Percent} color="#ef4444" bg="#fee2e2" />
+               <StatMini title="TDS Deducted" value={summaryTotals.tds} icon={Receipt} color="#8b5cf6" bg="#f3e8ff" />
+               <StatMini title="Invoices" value={String(filteredRows.length)} icon={ShieldAlert} color="#eab308" bg="#fef9c3" />
+            </div>
+
           </div>
         )}
+      </div>
+
+      <div style={{ marginTop: '1.5rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+        <div style={{ background: '#f8fafc', padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <Receipt size={18} color="#ef4444" />
+          <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem' }}>Party Wise Due</span>
+          <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+            {partyDueRows.length} part{partyDueRows.length === 1 ? 'y' : 'ies'}
+          </span>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={sheetStyle}>
+            <thead>
+              <tr>
+                <th style={{ ...thStyle, textAlign: 'left', minWidth: '180px' }}>Party Name</th>
+                {fyKeys.map((fy) => (
+                  <th key={fy} style={{ ...thStyle, textAlign: 'right' }}>Dues FY {fy}</th>
+                ))}
+                <th style={{ ...thStyle, textAlign: 'right' }}>Total Outstanding</th>
+              </tr>
+            </thead>
+            <tbody>
+              {partyDueRows.length === 0 ? (
+                <tr>
+                  <td colSpan={fyKeys.length + 2} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
+                    No party has an outstanding due.
+                  </td>
+                </tr>
+              ) : partyDueRows.map((party) => (
+                <tr key={party.name}>
+                  <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 700 }}>{party.name}</td>
+                  {fyKeys.map((fy) => {
+                    const typed = party.overrides && Object.prototype.hasOwnProperty.call(party.overrides, fy);
+                    return (
+                      <td key={fy} style={{ ...tdStyle, textAlign: 'right', color: party.byFy[fy] > 0.01 ? '#ef4444' : 'var(--text-muted)', fontWeight: party.byFy[fy] > 0.01 ? 600 : 400 }}>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          aria-label={`Due FY ${fy} for ${party.name}`}
+                          value={typed ? party.overrides[fy] : (party.byFy[fy] || '')}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => handlePartyDueChange(party.id, party.name, fy, e.target.value)}
+                          style={{
+                            width: '110px',
+                            textAlign: 'right',
+                            background: 'transparent',
+                            border: '1px solid transparent',
+                            color: 'inherit',
+                            fontWeight: 'inherit',
+                            fontSize: 'inherit',
+                            fontFamily: 'inherit',
+                            outline: 'none',
+                            padding: '2px 4px',
+                            borderRadius: '4px'
+                          }}
+                          onFocus={(e) => { e.target.style.background = 'var(--bg-input, #fff)'; e.target.style.border = '1px solid var(--accent-primary)'; }}
+                          onBlur={(e) => {
+                            if (String(e.target.value).trim() === '') handlePartyDueChange(party.id, party.name, fy, '', true);
+                            e.target.style.background = 'transparent';
+                            e.target.style.border = '1px solid transparent';
+                          }}
+                        />
+                      </td>
+                    );
+                  })}
+                  <td style={{ ...tdStyle, textAlign: 'right', color: '#ef4444', fontWeight: 700 }}>{formatInr(party.totalDue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

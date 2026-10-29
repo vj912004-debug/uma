@@ -688,11 +688,12 @@ export const enrichPIForPrint = (pi, appData = {}) => {
 export const enrichTIForPrint = (ti, appData = {}) => {
   if (!ti) return ti;
 
-  // Monthly consolidated invoices print from customCharges only — do not rebuild from a single MR.
+  // Monthly consolidated invoices: use the summary roll-up (charges/rates/qtys), not a single MR.
   if (ti.monthlyBilling) {
     const parties = appData.parties || [];
     const party = parties.find((p) => String(p.id) === String(ti.partyId))
       || parties.find((p) => String(p.name || '').trim().toLowerCase() === String(ti.partyName || '').trim().toLowerCase());
+    const hasSummaryCharges = ti.charges && Object.keys(ti.charges).some((key) => ti.charges[key]);
     const charges = (ti.customCharges || []).map((cc, idx) => {
       const name = String(cc.name || cc.description || '').trim();
       const qty = parseFloat(cc.qty) || 0;
@@ -715,8 +716,12 @@ export const enrichTIForPrint = (ti, appData = {}) => {
       shipAddress: String(ti.shipAddress || '').trim() || party?.shipAddress || party?.billAddress || '',
       gstinBill: ti.gstinBill || party?.gstinBill || party?.gstin || '',
       gstinShip: ti.gstinShip || party?.gstinShip || party?.gstinBill || '',
-      productCharges: [],
-      customCharges: charges
+      productCharges: ti.productCharges || {},
+      charges: ti.charges || {},
+      rates: ti.rates || {},
+      qtys: ti.qtys || {},
+      // Prefer summary charge keys; fall back to older per-DC custom lines.
+      customCharges: hasSummaryCharges ? [] : charges
     }, appData);
   }
 

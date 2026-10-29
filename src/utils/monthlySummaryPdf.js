@@ -2,7 +2,13 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { CHARGE_KEYS, getChargeLineQty, getMRProductChargeSettings } from './documentCharges';
 import { getProductBatches, getProductQty, getReceiptProductNames, receiptProductOptions } from './receiptProducts';
-import { GST_TYPE_IGST, formatGstPercent, normalizeGstType } from './taxInvoiceLayout';
+import {
+  GST_TYPE_IGST,
+  TI_CHARGES_LIST,
+  formatGstPercent,
+  normalizeGstType,
+  splitTaxableGstAmount
+} from './taxInvoiceLayout';
 
 const EXTRA_LABELS = {
   cleaning: 'Minimum Cleaning',
@@ -20,6 +26,10 @@ const EXTRA_LABELS = {
 const EXTRA_ORDER = CHARGE_KEYS.filter((key) => key !== 'processing');
 
 const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const EXTRA_LABEL_TO_KEY = Object.fromEntries(
+  Object.entries(EXTRA_LABELS).map(([key, label]) => [norm(label), key])
+);
 
 const num = (v) => {
   const n = parseFloat(v);
@@ -60,6 +70,14 @@ const inMonth = (raw, ym) => {
   return parts.y === y && parts.mo === m;
 };
 
+const inDateRange = (raw, from, to) => {
+  const stamp = dateKey(raw);
+  const start = dateKey(from);
+  const end = dateKey(to);
+  if (!stamp || !start || !end) return false;
+  return stamp >= start && stamp <= end;
+};
+
 export const summaryDateText = (raw, sep = '/') => {
   const parts = parseDateParts(raw);
   if (!parts) return '';
@@ -72,7 +90,7 @@ const dateKey = (raw) => {
   return parts.y * 10000 + parts.mo * 100 + parts.d;
 };
 
-const shortInvoiceNo = (invoiceNo) => {
+export const shortInvoiceNo = (invoiceNo) => {
   const raw = String(invoiceNo || '').trim();
   if (!raw) return '';
   const parts = raw.split(/[/\\]/).filter(Boolean);
@@ -234,14 +252,19 @@ export const buildSummaryTitle = ({ companyName, refNo, invoiceNo, summaryDate }
   return `${companyName} - ${rest}`;
 };
 
-export const summaryFileName = ({ refNo, companyName, month }) => {
-  const [y, m] = String(month || '').split('-').map(Number);
-  const mon = y && m
-    ? new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'short' })
-    : 'Month';
+export const summaryFileName = ({ refNo, companyName, month, dateFrom, dateTo }) => {
+  let label = 'Month';
+  if (dateFrom && dateTo) {
+    const fromText = summaryDateText(dateFrom, '-');
+    const toText = summaryDateText(dateTo, '-');
+    label = fromText && toText ? `${fromText}_to_${toText}` : 'Range';
+  } else {
+    const [y, m] = String(month || '').split('-').map(Number);
+    if (y && m) label = new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'short' });
+  }
   const ref = String(refNo || '').trim().replace(/[<>:"/\\|?*]+/g, '');
   const company = String(companyName || 'Company').replace(/[<>:"/\\|?*]+/g, ' ').trim();
-  return `${ref ? `${ref}-_` : `${company} `}${mon}_Summary.pdf`;
+  return `${ref ? `${ref}-_` : `${company} `}${label}_Summary.pdf`;
 };
 
 export const buildMonthlySummaryStatement = ({
@@ -249,15 +272,28 @@ export const buildMonthlySummaryStatement = ({
   companyId = '',
   companyName = '',
   month = '',
+  dateFrom = '',
+  dateTo = '',
   refNo = '',
   invoiceNo = '',
-  summaryDate = ''
+  summaryDate = '',
+  challans: challanList = null,
+  taxRate: taxRateOverride = null,
+  gstType: gstTypeOverride = null,
+  fileName = ''
 }) => {
   const receipts = data.materialReceipts || [];
   const invoices = data.invoices || [];
   const party = findParty(data.parties, companyId, companyName);
-  const challans = (data.deliveryChallans || [])
-    .filter((dc) => dc && !dc.isDeleted && belongsToCompany(dc, companyId, companyName) && inMonth(dc.date, month))
+  const forcedType = gstTypeOverride ? normalizeGstType(gstTypeOverride) : '';
+  const forcedRate = taxRateOverride != null && taxRateOverride !== '' ? num(taxRateOverride) : null;
+  const challans = (Array.isArray(challanList) ? challanList : (data.deliveryChallans || [])
+    .filter((dc) => {
+      if (!dc || dc.isDeleted || !belongsToCompany(dc, companyId, companyName)) return false;
+      if (dateFrom && dateTo) return inDateRange(dc.date, dateFrom, dateTo);
+      return inMonth(dc.date, month);
+    }))
+    .filter((dc) => dc && !dc.isDeleted)
     .slice()
     .sort((a, b) => dateKey(a.date) - dateKey(b.date) || String(a.dcNo || '').localeCompare(String(b.dcNo || ''), undefined, { numeric: true }));
 
@@ -273,8 +309,8 @@ export const buildMonthlySummaryStatement = ({
     const products = dcProducts(dc, mr, prodOpts);
     const invoice = invoiceForDc(invoices, dc, mr);
     if (invoice?.invoiceNo) invoiceNos.push(shortInvoiceNo(invoice.invoiceNo));
-    const taxRate = num(invoice?.taxRate) || 18;
-    const gstType = normalizeGstType(invoice?.gstType);
+    const taxRate = forcedRate != null ? forcedRate : (num(invoice?.taxRate) || 18);
+    const gstType = forcedType || normalizeGstType(invoice?.gstType);
     if (gstType === GST_TYPE_IGST) igstCount += 1;
 
     const identity = {
@@ -335,7 +371,9 @@ export const buildMonthlySummaryStatement = ({
 
   const suggestedInvoiceNo = [...new Set(invoiceNos.filter(Boolean))].join(', ');
   const printedInvoiceNo = String(invoiceNo || '').trim();
-  const igst = challans.length > 0 && igstCount === challans.length;
+  const igst = forcedType
+    ? forcedType === GST_TYPE_IGST
+    : (challans.length > 0 && igstCount === challans.length);
 
   return {
     title: buildSummaryTitle({
@@ -344,7 +382,7 @@ export const buildMonthlySummaryStatement = ({
       invoiceNo: printedInvoiceNo,
       summaryDate
     }),
-    fileName: summaryFileName({ refNo, companyName, month }),
+    fileName: fileName || summaryFileName({ refNo, companyName, month, dateFrom, dateTo }),
     suggestedInvoiceNo,
     igst,
     rows,
@@ -392,7 +430,7 @@ export const createMonthlySummaryPdf = (statement) => {
       money(row.rightAmt),
       money(row.total)
     ])
-    : [['', '', '', '', '', 'No delivery challans in this month', '', '', '', '', '', '', '', '']];
+    : [['', '', '', '', '', 'No delivery challans in this period', '', '', '', '', '', '', '', '']];
 
   autoTable(doc, {
     startY: 14,
@@ -480,7 +518,170 @@ export const createMonthlySummaryPdf = (statement) => {
   return doc;
 };
 
+const summaryLine = (statement, row, isTotal = false) => {
+  const base = {
+    'Sr.N': isTotal ? '' : row.sr,
+    'Delivery Challan No.': isTotal ? '' : row.dcNo,
+    'D.C. Date': isTotal ? '' : row.dcDate,
+    'PO. No/Challan No.': isTotal ? '' : row.poNo,
+    'PO Date': isTotal ? '' : row.poDate,
+    Description: isTotal ? '' : String(row.description || ''),
+    Qty: isTotal ? '' : cellQty(row.qty),
+    Rate: isTotal ? '' : cellRate(row.rate),
+    Amount: money(isTotal ? statement.totals.amount : row.amount)
+  };
+  if (statement.igst) {
+    base['IGST Rate'] = isTotal ? '' : cellPercent(row.leftRate);
+    base['IGST Amount'] = money(isTotal ? statement.totals.leftAmt : row.leftAmt);
+  } else {
+    base['SGST Rate'] = isTotal ? '' : cellPercent(row.leftRate);
+    base['SGST Amount'] = money(isTotal ? statement.totals.leftAmt : row.leftAmt);
+    base['CGST Rate'] = isTotal ? '' : cellPercent(row.rightRate);
+    base['CGST Amount'] = money(isTotal ? statement.totals.rightAmt : row.rightAmt);
+  }
+  base.Total = money(isTotal ? statement.totals.total : row.total);
+  return base;
+};
+
+export const summaryExportRows = (statement) => {
+  const rows = statement.rows.map((row) => summaryLine(statement, row));
+  if (rows.length) rows.push(summaryLine(statement, {}, true));
+  return rows;
+};
+
 export const downloadMonthlySummaryPdf = (statement) => {
   const doc = createMonthlySummaryPdf(statement);
   doc.save(statement.fileName);
+};
+
+export const openMonthlySummaryPdf = (statement) => {
+  const doc = createMonthlySummaryPdf(statement);
+  const url = doc.output('bloburl');
+  const win = window.open(url, '_blank');
+  if (!win) doc.save(statement.fileName);
+};
+
+const chargeKeyFromDescription = (description) => {
+  const parts = String(description || '').split(/\n+/).map((part) => part.trim()).filter(Boolean);
+  if (!parts.length) return '';
+  const last = norm(parts[parts.length - 1]);
+  if (EXTRA_LABEL_TO_KEY[last]) return EXTRA_LABEL_TO_KEY[last];
+  for (const [label, key] of Object.entries(EXTRA_LABEL_TO_KEY)) {
+    if (last.includes(label) || label.includes(last)) return key;
+  }
+  return '';
+};
+
+/**
+ * Roll the monthly summary rows into Tax Invoice charge lines
+ * (Processing / Minimum Cleaning / PSD / Filter Bag / …), matching the office TI.
+ */
+export const buildMonthlyInvoiceChargesFromStatement = (statement) => {
+  const buckets = {};
+  let processingAmount = 0;
+  let processingQty = 0;
+
+  (statement?.rows || []).forEach((row) => {
+    const amount = round2(num(row.amount));
+    const qty = num(row.qty);
+    const rate = num(row.rate);
+    const key = chargeKeyFromDescription(row.description);
+    if (key) {
+      if (!buckets[key]) buckets[key] = { qty: 0, amount: 0, rate: 0 };
+      buckets[key].qty = round2(buckets[key].qty + (qty || (amount > 0 && rate > 0 ? round2(amount / rate) : 0)));
+      buckets[key].amount = round2(buckets[key].amount + amount);
+      if (rate > 0) buckets[key].rate = rate;
+      else if (buckets[key].qty > 0) buckets[key].rate = round2(buckets[key].amount / buckets[key].qty);
+      return;
+    }
+    if (amount > 0.009 || qty > 0) {
+      processingAmount = round2(processingAmount + amount);
+      processingQty = round2(processingQty + qty);
+    }
+  });
+
+  const charges = {};
+  const rates = {};
+  const qtys = {};
+
+  if (processingAmount > 0.009) {
+    charges.processing = true;
+    // One processing line with the summary total (same as office TI 267).
+    qtys.processing = 1;
+    rates.processing = processingAmount;
+  }
+
+  EXTRA_ORDER.forEach((key) => {
+    const bucket = buckets[key];
+    if (!bucket || bucket.amount <= 0.009) return;
+    const qty = bucket.qty > 0 ? bucket.qty : 1;
+    const rate = bucket.rate > 0 ? bucket.rate : round2(bucket.amount / qty);
+    charges[key] = true;
+    qtys[key] = qty;
+    rates[key] = rate;
+  });
+
+  const order = TI_CHARGES_LIST.map((c) => c.key).filter((key) => charges[key]);
+  const subtotal = round2(
+    (charges.processing ? processingAmount : 0)
+    + EXTRA_ORDER.reduce((sum, key) => sum + (buckets[key]?.amount || 0), 0)
+  );
+
+  return {
+    charges,
+    rates,
+    qtys,
+    chargeOrder: order,
+    productCharges: {},
+    customCharges: [],
+    subtotal,
+    processingQty,
+    qty: Object.values(qtys).reduce((sum, q) => sum + (num(q) || 0), 0)
+  };
+};
+
+export const buildMonthlyBillingInvoicePayload = ({
+  data = {},
+  companyId = '',
+  companyName = '',
+  dateFrom = '',
+  dateTo = '',
+  month = '',
+  challans = null,
+  taxRate = 18,
+  gstType = '',
+  discount = 0,
+  invoiceNo = '',
+  summaryDate = ''
+}) => {
+  const statement = buildMonthlySummaryStatement({
+    data,
+    companyId,
+    companyName,
+    dateFrom,
+    dateTo,
+    month,
+    challans,
+    taxRate,
+    gstType,
+    invoiceNo: shortInvoiceNo(invoiceNo),
+    summaryDate
+  });
+  const built = buildMonthlyInvoiceChargesFromStatement(statement);
+  const taxable = Math.max(0, built.subtotal - (parseFloat(discount) || 0));
+  const split = splitTaxableGstAmount(taxable, taxRate, gstType);
+  return {
+    statement,
+    ...built,
+    discount: parseFloat(discount) || 0,
+    taxRate: parseFloat(taxRate) || 18,
+    gstType: normalizeGstType(gstType),
+    subtotal: built.subtotal,
+    taxAmount: split.taxAmount,
+    total: round2(taxable + split.taxAmount),
+    taxable,
+    cgst: split.cgst,
+    sgst: split.sgst,
+    igst: split.igst
+  };
 };
