@@ -126,8 +126,9 @@ export const createBaseState = () => ({
   settings: {
     userRole: 'Admin',
     theme: 'light',
-    serials: { MR: 1, BPR: 1, PL: 1, PI: 1, DC: 1, MI: 1, VC: 1, PSD: 1, TI: 1, EWDC: 1, EWTI: 1, QT: 1, DN: 1, CN: 1, PO: 1, INQ: 1 }
+    serials: { MR: 1, BPR: 1, PL: 1, PI: 1, DC: 1, MI: 1, VC: 1, PSD: 1, TI: 1, EWDC: 1, EWTI: 1, QT: 1, DN: 1, CN: 1, PO: 1, INQ: 1, MS: 1 }
   },
+  monthlySummaries: [],
   companyProfile: { ...DEFAULT_COMPANY_PROFILE }
 });
 
@@ -239,6 +240,7 @@ export const normalizeAppState = (parsed) => {
     utilityRecords: parsed.utilityRecords || [],
     utilityTempRecords: parsed.utilityTempRecords || [],
     pmAirCompressorRecords: parsed.pmAirCompressorRecords || [],
+    monthlySummaries: parsed.monthlySummaries || [],
     salaryRates: parsed.salaryRates || null,
     salaryReports: parsed.salaryReports || [],
     auditLogs: parsed.auditLogs || [],

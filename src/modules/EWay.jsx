@@ -2,7 +2,8 @@ import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { Edit2 } from 'lucide-react';
+import { Edit2, List } from 'lucide-react';
+import DocCreationLogModal from '../components/DocCreationLogModal';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import DateField from '../components/DateField';
@@ -22,6 +23,7 @@ const EWay = () => {
     return 'all';
   });
   const [statusTab, setStatusTab] = useState('pending');
+  const [showCreationLog, setShowCreationLog] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selected, setSelected] = useState(null);
 
@@ -94,6 +96,18 @@ const EWay = () => {
   const pendingCount = typedRows.filter((r) => !r.ewayBillNo).length;
   const completedCount = typedRows.filter((r) => !!r.ewayBillNo).length;
 
+  const ewayLogRows = useMemo(
+    () => rows
+      .filter((row) => row.ewayBillNo)
+      .map((row) => ({
+        ...row,
+        date: row.ewayBillDate || row.raw?.date,
+        doneBy: row.raw?.ewayDoneBy || row.raw?.doneBy || row.raw?.createdBy,
+        createdAt: row.raw?.ewayLinkedAt || row.raw?.updatedAt || row.raw?.createdAt
+      })),
+    [rows]
+  );
+
   const filteredRows = typedRows.filter((row) => {
     const isDone = !!row.ewayBillNo;
     if (statusTab === 'pending' && isDone) return false;
@@ -131,6 +145,8 @@ const EWay = () => {
     if (selected.type === 'DC') {
       patch.ewayBillPurpose = form.ewayBillPurpose;
     }
+    patch.ewayDoneBy = currentUser?.name || currentUser?.username || '';
+    patch.ewayLinkedAt = new Date().toISOString();
     updateItem(selected.collection, selected.sourceId, patch);
     setIsModalOpen(false);
     setSelected(null);
@@ -145,29 +161,56 @@ const EWay = () => {
             Log government E-Way Bill numbers for Delivery Challans and Tax Invoices in one place.
           </p>
         </div>
-        <ExportButton
-          data={filteredRows.map((row) => ({
-            type: row.type,
-            docNo: row.docNo,
-            partyName: row.partyName,
-            detail: row.detail,
-            status: row.ewayBillNo ? 'Done' : 'Pending',
-            ewayBillNo: row.ewayBillNo,
-            ewayBillDate: row.ewayBillDate
-          }))}
-          columns={[
-            { label: 'Type', key: 'type' },
-            { label: 'Doc No', key: 'docNo' },
-            { label: 'Customer', key: 'partyName' },
-            { label: 'Vehicle / Qty', key: 'detail' },
-            { label: 'E-Way Status', key: 'status' },
-            { label: 'E-Way No', key: 'ewayBillNo' },
-            { label: 'E-Way Date', key: 'ewayBillDate' }
-          ]}
-          filename="EWay_Bills"
-          title="E-Way Bills"
-        />
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ExportButton
+            data={filteredRows.map((row) => ({
+              type: row.type,
+              docNo: row.docNo,
+              partyName: row.partyName,
+              detail: row.detail,
+              status: row.ewayBillNo ? 'Done' : 'Pending',
+              ewayBillNo: row.ewayBillNo,
+              ewayBillDate: row.ewayBillDate
+            }))}
+            columns={[
+              { label: 'Type', key: 'type' },
+              { label: 'Doc No', key: 'docNo' },
+              { label: 'Customer', key: 'partyName' },
+              { label: 'Vehicle / Qty', key: 'detail' },
+              { label: 'E-Way Status', key: 'status' },
+              { label: 'E-Way No', key: 'ewayBillNo' },
+              { label: 'E-Way Date', key: 'ewayBillDate' }
+            ]}
+            filename="EWay_Bills"
+            title="E-Way Bills"
+          />
+          <button type="button" className="btn btn-primary" onClick={() => setShowCreationLog(true)}>
+            <List size={18} /> E-Way Bill Log ({ewayLogRows.length})
+          </button>
+        </div>
       </header>
+
+      <DocCreationLogModal
+        open={showCreationLog}
+        onClose={() => setShowCreationLog(false)}
+        title="E-Way Bill Log"
+        rows={ewayLogRows}
+        auditLogs={data.auditLogs}
+        searchPlaceholder="Search by doc no, E-Way no, party, or done by..."
+        getSearchText={(row) => `${row.type || ''} ${row.docNo || ''} ${row.partyName || ''} ${row.ewayBillNo || ''} ${row.detail || ''}`}
+        onEdit={(row) => {
+          setShowCreationLog(false);
+          handleEdit(row);
+        }}
+        columns={[
+          { key: 'type', label: 'Type' },
+          { key: 'docNo', label: 'Doc No' },
+          { key: 'partyName', label: 'Customer' },
+          { key: 'detail', label: 'Vehicle / Qty' },
+          { key: 'ewayBillNo', label: 'E-Way No' },
+          { key: 'date', label: 'E-Way Date', render: (r) => formatDate(r.ewayBillDate || r.date) }
+        ]}
+      />
 
       <div className="tab-bar">
         {[

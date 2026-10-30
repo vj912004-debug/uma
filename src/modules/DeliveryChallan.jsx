@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { Eye, Edit2, Trash2, Plus } from 'lucide-react';
+import { Eye, Edit2, Trash2, Plus, List } from 'lucide-react';
+import DocCreationLogModal from '../components/DocCreationLogModal';
 import { viewPDF } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
 import ExportButton from '../components/ExportButton';
@@ -9,7 +10,7 @@ import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
-import { newestFirst } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import DcPartyBoxes from '../components/DcPartyBoxes';
 import {
   buildDCFieldsFromProducts,
@@ -54,6 +55,7 @@ const DeliveryChallan = () => {
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
   const [statusTab, setStatusTab] = useState('pending');
+  const [showCreationLog, setShowCreationLog] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedPL, setSelectedPL] = useState(null);
@@ -270,11 +272,43 @@ const DeliveryChallan = () => {
             groupBy="partyName"
             docType="DC"
           />
+          <button type="button" className="btn btn-primary" onClick={() => setShowCreationLog(true)}>
+            <List size={18} /> Delivery Challan Log ({dcList.length})
+          </button>
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New DC
           </button>
         </div>
       </header>
+
+      <DocCreationLogModal
+        open={showCreationLog}
+        onClose={() => setShowCreationLog(false)}
+        title="Delivery Challan Log"
+        rows={dcList}
+        auditLogs={data.auditLogs}
+        module="deliveryChallans"
+        searchPlaceholder="Search by DC no, party, product, or done by..."
+        getSearchText={(row) => `${row.dcNo || ''} ${row.partyName || ''} ${row.productName || ''} ${row.vehicleNo || ''}`}
+        onEdit={(row) => {
+          setShowCreationLog(false);
+          handleEdit(row);
+        }}
+        onDelete={(row) => deleteDC(row.id)}
+        columns={[
+          { key: 'dcNo', label: 'DC No' },
+          { key: 'date', label: 'Date', render: (r) => formatDate(r.date) },
+          { key: 'partyName', label: 'Customer' },
+          { key: 'productName', label: 'Product' },
+          { key: 'qty', label: 'Qty (Kg)', render: (r) => `${r.qty ?? '—'} Kg` },
+          {
+            key: 'value',
+            label: 'Value (₹)',
+            render: (r) => Number(r.value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })
+          },
+          { key: 'vehicleNo', label: 'Vehicle No' }
+        ]}
+      />
 
       <ListFilterBar
         searchTerm={searchTerm}

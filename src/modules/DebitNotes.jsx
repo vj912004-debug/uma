@@ -1,7 +1,8 @@
 import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Eye, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Eye, Plus, Edit2, Trash2, List } from 'lucide-react';
+import DocCreationLogModal from '../components/DocCreationLogModal';
 import { generateDocNumber } from '../utils/numbering';
 import { viewPDF } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
@@ -69,6 +70,7 @@ const DebitNotes = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState('');
   const [statusTab, setStatusTab] = useState('pending');
+  const [showCreationLog, setShowCreationLog] = useState(false);
 
   const [form, setForm] = useState({
     noteNo: '',
@@ -263,11 +265,42 @@ const DebitNotes = () => {
             title="Debit Notes"
             docType="DN"
           />
+          <button type="button" className="btn btn-primary" onClick={() => setShowCreationLog(true)}>
+            <List size={18} /> Debit Note Log ({notesList.length})
+          </button>
           <button className="btn btn-primary" onClick={handleOpenModal}>
             <Plus size={18} /> Add Debit Note
           </button>
         </div>
       </header>
+
+      <DocCreationLogModal
+        open={showCreationLog}
+        onClose={() => setShowCreationLog(false)}
+        title="Debit Note Log"
+        rows={notesList}
+        auditLogs={data.auditLogs}
+        module="debitNotes"
+        searchPlaceholder="Search by note no, party, or done by..."
+        getSearchText={(row) => `${row.noteNo || ''} ${row.partyName || ''} ${row.refInvoice || ''} ${row.particulars || ''}`}
+        onEdit={(row) => {
+          setShowCreationLog(false);
+          handleEdit(row);
+        }}
+        onDelete={(row) => deleteItemSoftly('debitNotes', row.id)}
+        columns={[
+          { key: 'noteNo', label: 'Note No' },
+          { key: 'date', label: 'Date', render: (r) => formatDate(r.date) },
+          { key: 'partyName', label: 'Party' },
+          { key: 'refInvoice', label: 'Ref Invoice' },
+          { key: 'particulars', label: 'Particulars' },
+          {
+            key: 'amount',
+            label: 'Amount (₹)',
+            render: (r) => Number(r.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })
+          }
+        ]}
+      />
 
       <StatusTabBar
         value={statusTab}

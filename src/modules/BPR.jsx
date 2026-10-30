@@ -6,10 +6,11 @@ import DocDownloadButtons from '../components/DocDownloadButtons';
 import { buildBlankBprPayload } from '../utils/bprHtml';
 import { getStoredCompanyProfile } from '../utils/companyProfile';
 import ExportButton from '../components/ExportButton';
-import { newestFirst } from '../utils/dateUtils';
-import { Plus, Edit2, Trash2, Printer, FileText } from 'lucide-react';
+import { formatDate, newestFirst } from '../utils/dateUtils';
+import { Plus, Edit2, Trash2, Printer, FileText, List } from 'lucide-react';
 import { numberInputValue, parseOptionalNumber } from '../utils/numberInput';
 import SearchableSelect from '../components/SearchableSelect';
+import DocCreationLogModal from '../components/DocCreationLogModal';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
@@ -93,6 +94,7 @@ const BPR = () => {
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
   const [statusTab, setStatusTab] = useState('pending');
+  const [showCreationLog, setShowCreationLog] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBPR, setEditingBPR] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
@@ -604,6 +606,13 @@ const BPR = () => {
             <button
               type="button"
               className="btn btn-primary"
+              onClick={() => setShowCreationLog(true)}
+            >
+              <List size={18} /> BPR Log ({bprList.length})
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
               onClick={() => handleCreateNew(listView === 'page2' ? 'page2' : 'page1')}
             >
               <Plus size={18} /> Create New BPR
@@ -612,6 +621,33 @@ const BPR = () => {
           </div>
         </div>
       </header>
+
+      <DocCreationLogModal
+        open={showCreationLog}
+        onClose={() => setShowCreationLog(false)}
+        title="BPR Log"
+        rows={bprList}
+        auditLogs={data.auditLogs}
+        module="bprs"
+        searchPlaceholder="Search by BPR no, party, product, or done by..."
+        getSearchText={(row) => `${row.bprNo || ''} ${row.partyName || ''} ${row.productName || ''}`}
+        onEdit={(row) => {
+          setShowCreationLog(false);
+          handleEdit(row);
+        }}
+        onDelete={(row) => deleteBPR(row.id)}
+        columns={[
+          { key: 'bprNo', label: 'BPR No' },
+          { key: 'date', label: 'Date', render: (r) => formatDate(r.date) },
+          { key: 'partyName', label: 'Party' },
+          { key: 'productName', label: 'Product' },
+          {
+            key: 'totalDispatchedNet',
+            label: 'Dispatched (Kg)',
+            render: (r) => Number(r.totalDispatchedNet || 0).toFixed(2)
+          }
+        ]}
+      />
 
       {listView === 'page1' && (
       <>

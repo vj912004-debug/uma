@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { Eye, Edit2, Trash2, Plus, ArrowLeft } from 'lucide-react';
+import { Eye, Edit2, Trash2, Plus, ArrowLeft, List } from 'lucide-react';
 import { viewPDF } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
 import ExportButton from '../components/ExportButton';
+import DocCreationLogModal from '../components/DocCreationLogModal';
 import DocChargeRow from '../components/DocChargeRow';
 import DateField from '../components/DateField';
-import { newestFirst } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import GstTaxBlock from '../components/GstTaxBlock';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
@@ -50,6 +51,7 @@ const TaxInvoice = () => {
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
   const [statusTab, setStatusTab] = useState('pending');
+  const [showCreationLog, setShowCreationLog] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedPL, setSelectedPL] = useState(null);
@@ -624,11 +626,41 @@ const TaxInvoice = () => {
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <ExportButton data={filteredInvoices} columns={exportColumns} filename="Tax_Invoices" title="Tax Invoices" groupBy="partyName" docType="TI" />
+          <button type="button" className="btn btn-primary" onClick={() => setShowCreationLog(true)}>
+            <List size={18} /> Tax Invoice Log ({taxInvoices.length})
+          </button>
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New Tax Invoice
           </button>
         </div>
       </header>
+
+      <DocCreationLogModal
+        open={showCreationLog}
+        onClose={() => setShowCreationLog(false)}
+        title="Tax Invoice Log"
+        rows={taxInvoices}
+        auditLogs={data.auditLogs}
+        module="invoices"
+        searchPlaceholder="Search by invoice no, party, product, or done by..."
+        getSearchText={(row) => `${row.invoiceNo || ''} ${row.partyName || ''} ${row.productName || ''}`}
+        onEdit={(row) => {
+          setShowCreationLog(false);
+          handleEdit(row);
+        }}
+        onDelete={(row) => deleteTI(row.id)}
+        columns={[
+          { key: 'invoiceNo', label: 'Invoice No' },
+          { key: 'date', label: 'Date', render: (r) => formatDate(r.date) },
+          { key: 'partyName', label: 'Customer' },
+          { key: 'productName', label: 'Product' },
+          {
+            key: 'total',
+            label: 'Amount (₹)',
+            render: (r) => Number(r.total || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })
+          }
+        ]}
+      />
 
       <ListFilterBar
         searchTerm={searchTerm}

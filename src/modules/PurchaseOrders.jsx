@@ -2,7 +2,8 @@ import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { Eye, Edit2, Trash2, Plus, ArrowLeft } from 'lucide-react';
+import { Eye, Edit2, Trash2, Plus, ArrowLeft, List } from 'lucide-react';
+import DocCreationLogModal from '../components/DocCreationLogModal';
 import { viewPDF } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
 import ExportButton from '../components/ExportButton';
@@ -32,6 +33,7 @@ const PurchaseOrders = () => {
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
   const [statusTab, setStatusTab] = useState('pending');
+  const [showCreationLog, setShowCreationLog] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
@@ -474,11 +476,42 @@ const PurchaseOrders = () => {
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <ExportButton data={filtered} columns={exportColumns} filename="Purchase_Orders" title="Purchase Orders Log" groupBy="partyName" docType="PO" />
+          <button type="button" className="btn btn-primary" onClick={() => setShowCreationLog(true)}>
+            <List size={18} /> Purchase Order Log ({poList.length})
+          </button>
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New PO
           </button>
         </div>
       </header>
+
+      <DocCreationLogModal
+        open={showCreationLog}
+        onClose={() => setShowCreationLog(false)}
+        title="Purchase Order Log"
+        rows={poList}
+        auditLogs={data.auditLogs}
+        module="purchaseOrders"
+        searchPlaceholder="Search by PO no, party, product, or done by..."
+        getSearchText={(row) => `${row.poNo || ''} ${row.partyName || ''} ${row.productName || ''}`}
+        onEdit={(row) => {
+          setShowCreationLog(false);
+          handleEdit(row);
+        }}
+        onDelete={(row) => deleteItemSoftly('purchaseOrders', row.id)}
+        columns={[
+          { key: 'poNo', label: 'PO No' },
+          { key: 'date', label: 'Date', render: (r) => formatDate(r.date) },
+          { key: 'partyName', label: 'Party' },
+          { key: 'productName', label: 'Product' },
+          { key: 'qty', label: 'Qty (Kg)' },
+          {
+            key: 'total',
+            label: 'Amount (₹)',
+            render: (r) => Number(r.total || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })
+          }
+        ]}
+      />
 
       <ListFilterBar
         searchTerm={searchTerm}

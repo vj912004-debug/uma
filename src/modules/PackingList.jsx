@@ -2,15 +2,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { numberInputValue, parseOptionalNumber } from '../utils/numberInput';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
-import { Eye, Edit2, Trash2, Plus } from 'lucide-react';
+import { Eye, Edit2, Trash2, Plus, List } from 'lucide-react';
 import { viewPDF } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
 import ExportButton from '../components/ExportButton';
+import DocCreationLogModal from '../components/DocCreationLogModal';
 import SearchableSelect from '../components/SearchableSelect';
 import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
-import { newestFirst } from '../utils/dateUtils';
+import { formatDate, newestFirst } from '../utils/dateUtils';
 import {
   getReceiptProductLabel,
   getReceiptProductSummaries,
@@ -28,6 +29,7 @@ const PackingList = () => {
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
   const [statusTab, setStatusTab] = useState('pending');
+  const [showCreationLog, setShowCreationLog] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPL, setEditingPL] = useState(null);
   const [selectedBPR, setSelectedBPR] = useState(null);
@@ -378,11 +380,42 @@ const PackingList = () => {
             groupBy="partyName"
             docType="PL"
           />
+          <button type="button" className="btn btn-primary" onClick={() => setShowCreationLog(true)}>
+            <List size={18} /> Packing List Log ({plList.length})
+          </button>
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New PL
           </button>
         </div>
       </header>
+
+      <DocCreationLogModal
+        open={showCreationLog}
+        onClose={() => setShowCreationLog(false)}
+        title="Packing List Log"
+        rows={plList}
+        auditLogs={data.auditLogs}
+        module="packingLists"
+        searchPlaceholder="Search by PL no, party, product, or done by..."
+        getSearchText={(row) => `${row.plNo || ''} ${row.partyName || ''} ${row.productName || ''}`}
+        onEdit={(row) => {
+          setShowCreationLog(false);
+          handleEdit(row);
+        }}
+        onDelete={(row) => deletePL(row.id)}
+        columns={[
+          { key: 'plNo', label: 'PL No' },
+          { key: 'date', label: 'Date', render: (r) => formatDate(r.date) },
+          { key: 'partyName', label: 'Party' },
+          { key: 'productName', label: 'Product', render: (r) => getPLDisplayProductLabel(r, data) },
+          {
+            key: 'totalWeight',
+            label: 'Weight (Kg)',
+            render: (r) => Number(r.totalWeight || 0).toFixed(2)
+          },
+          { key: 'totalDrums', label: 'Drums' }
+        ]}
+      />
 
       <ListFilterBar
         searchTerm={searchTerm}

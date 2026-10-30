@@ -2,7 +2,8 @@ import { formatDate, newestFirst } from '../utils/dateUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber, nextAvailableDocNumber } from '../utils/numbering';
-import { Eye, Edit2, Trash2, Plus, ArrowLeft } from 'lucide-react';
+import { Eye, Edit2, Trash2, Plus, ArrowLeft, List } from 'lucide-react';
+import DocCreationLogModal from '../components/DocCreationLogModal';
 import { viewPDF } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
 import ExportButton from '../components/ExportButton';
@@ -48,6 +49,7 @@ const InvoicesPI = () => {
   const [partyFilter, setPartyFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
   const [statusTab, setStatusTab] = useState('pending');
+  const [showCreationLog, setShowCreationLog] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [selectedMR, setSelectedMR] = useState(null);
@@ -534,11 +536,42 @@ const InvoicesPI = () => {
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <ExportButton data={filtered} columns={exportColumns} filename="Proforma_Invoices" title="Proforma Invoices Log" groupBy="partyName" docType="PI" />
+          <button type="button" className="btn btn-primary" onClick={() => setShowCreationLog(true)}>
+            <List size={18} /> Proforma Invoice Log ({piList.length})
+          </button>
           <button className="btn btn-primary" onClick={handleCreateNew}>
             <Plus size={18} /> Create New PI
           </button>
         </div>
       </header>
+
+      <DocCreationLogModal
+        open={showCreationLog}
+        onClose={() => setShowCreationLog(false)}
+        title="Proforma Invoice Log"
+        rows={piList}
+        auditLogs={data.auditLogs}
+        module="invoices"
+        searchPlaceholder="Search by PI no, party, product, or done by..."
+        getSearchText={(row) => `${row.invoiceNo || ''} ${row.partyName || ''} ${row.productName || ''}`}
+        onEdit={(row) => {
+          setShowCreationLog(false);
+          handleEdit(row);
+        }}
+        onDelete={(row) => deleteItemSoftly('invoices', row.id)}
+        columns={[
+          { key: 'invoiceNo', label: 'PI No' },
+          { key: 'date', label: 'Date', render: (r) => formatDate(r.date) },
+          { key: 'partyName', label: 'Customer' },
+          { key: 'productName', label: 'Product' },
+          { key: 'qty', label: 'Qty (Kg)' },
+          {
+            key: 'total',
+            label: 'Amount (₹)',
+            render: (r) => Number(r.total || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })
+          }
+        ]}
+      />
 
       <ListFilterBar
         searchTerm={searchTerm}
