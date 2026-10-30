@@ -23,8 +23,6 @@ import {
 } from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 import {
-  getReceiptPaymentTotal,
-  getReceiptTdsTotal,
   getReceiptPayments,
   getReceiptBillAmount,
   getReceiptOutstanding,
@@ -38,7 +36,7 @@ import SearchableSelect from '../components/SearchableSelect';
 import StatusTabBar from '../components/StatusTabBar';
 import { getCurrentFYKey, getFYKeysThroughCurrent, getFYOfDate } from '../utils/financialYear';
 
-const DATE_COLUMNS = new Set(['date', 'bprDate', 'dcDate', 'invoiceDate', 'paymentDates']);
+const DATE_COLUMNS = new Set(['date', 'bprDate', 'dcDate', 'invoiceDate']);
 
 const toDateInputValue = (val) => {
   if (!val) return '';
@@ -130,8 +128,6 @@ const ProcessingSheet = () => {
     return docs.find((d) => matchProduct(d, productName)) || docs[0];
   };
 
-  const getPaymentsReceived = (mrId) => getReceiptPaymentTotal(data.payments, mrId);
-  const getTdsReceived = (mrId) => getReceiptTdsTotal(data.payments, mrId);
   const getPaymentHistory = (mrId) => getReceiptPayments(data.payments, mrId);
 
   const handleCellChange = (mrId, field, value, invoiceId = null) => {
@@ -145,10 +141,10 @@ const ProcessingSheet = () => {
     if (!mr) return;
     const currentOverrides = { ...(mr.sheetOverrides || {}) };
     const numericFields = new Set([
-      'receivedQty', 'bprNetQty', 'dcNetQty', 'totalBill', 'manualPaid', 'tdsDeduction', 'outstanding'
+      'receivedQty', 'bprNetQty', 'dcNetQty', 'totalBill', 'paid', 'manualPaid', 'tdsDeduction', 'outstanding'
     ]);
-    const paymentFields = new Set(['totalBill', 'manualPaid', 'tdsDeduction', 'outstanding', 'paymentAmounts']);
-    const recalcFields = new Set(['totalBill', 'tdsDeduction', 'paymentAmounts']);
+    const paymentFields = new Set(['totalBill', 'paid', 'manualPaid', 'tdsDeduction', 'outstanding', 'paymentAmounts']);
+    const recalcFields = new Set(['totalBill', 'paid', 'manualPaid', 'tdsDeduction', 'paymentAmounts']);
     const nextVal = numericFields.has(field) && field !== 'outstanding' && (value === '' || value === null || value === undefined)
       ? '0'
       : value;
@@ -205,15 +201,18 @@ const ProcessingSheet = () => {
     const pi = pickDoc(getPIs(mr.id), productHint);
     const bpr = pickDoc(getBPRs(mr.id), productHint);
     const dc = pickDoc(getDCs(mr.id), productHint);
-    const paid = getPaymentsReceived(mr.id);
-    const tdsTotal = getTdsReceived(mr.id);
     const paymentHistory = getPaymentHistory(mr.id);
     const o = getMergedSheetOverrides(mr, ti?.id);
 
     const finalTotalBill = getReceiptBillAmount(mr, ti);
     const compOutstanding = getReceiptOutstanding(mr, ti, data.payments);
     const overdue = compOutstanding > 0.01 && ti?.date && new Date(ti.date) < new Date();
-    const finalTds = hasSheetOverride(o, 'tdsDeduction') ? parseFloat(o.tdsDeduction) || 0 : tdsTotal;
+    const amountPaid = getReceiptEffectivePaid(mr, data.payments, ti?.id);
+    const finalTds = getReceiptEffectiveTds(mr, data.payments, ti?.id);
+    const dispatchDate = hasSheetOverride(o, 'dcDate') ? o.dcDate : (dc?.date || '');
+    const paymentDates = hasSheetOverride(o, 'paymentDates')
+      ? o.paymentDates
+      : paymentHistory.map((p) => p.date).filter(Boolean).join(', ');
 
     let ewayStatus = 'Pending';
     if (dc?.ewayBillNo || ti?.ewayBillNo) ewayStatus = 'Done';
@@ -233,19 +232,21 @@ const ProcessingSheet = () => {
         ? o.receivedQty
         : (parseFloat(ti?.qty) || parseFloat(mr.totalQty) || 0),
       piNo: hasSheetOverride(o, 'piNo') ? o.piNo : (pi?.invoiceNo || 'Pending'),
+      bprNo: hasSheetOverride(o, 'bprNo') ? o.bprNo : (bpr?.bprNo || 'Pending'),
       bprDate: hasSheetOverride(o, 'bprDate') ? o.bprDate : (bpr?.date || ''),
       bprNetQty: hasSheetOverride(o, 'bprNetQty') ? o.bprNetQty : (bpr?.totalDispatchedNet || 0),
       dcNo: hasSheetOverride(o, 'dcNo') ? o.dcNo : (dc?.dcNo || 'Pending'),
-      dcDate: hasSheetOverride(o, 'dcDate') ? o.dcDate : (dc?.date || ''),
+      dcDate: dispatchDate,
+      dispatchDate,
       dcNetQty: hasSheetOverride(o, 'dcNetQty') ? o.dcNetQty : (dc?.qty || 0),
       tiNo: hasSheetOverride(o, 'tiNo') ? o.tiNo : (ti?.invoiceNo || 'Pending'),
       invoiceDate: hasSheetOverride(o, 'invoiceDate') ? o.invoiceDate : (ti?.date || ''),
       totalBill: finalTotalBill,
-      paid,
+      paid: amountPaid,
+      amountPaid,
       manualPaid: hasSheetOverride(o, 'manualPaid') ? o.manualPaid : '',
       tdsDeduction: finalTds,
-      amountsReceivedTotal:
-        getReceiptEffectivePaid(mr, data.payments, ti?.id) + getReceiptEffectiveTds(mr, data.payments, ti?.id),
+      amountsReceivedTotal: amountPaid + finalTds,
       outstanding: compOutstanding,
       outstandingText: o.outstandingManual === true
         ? String(o.outstanding ?? '')
@@ -255,9 +256,8 @@ const ProcessingSheet = () => {
         : (hasSheetOverride(o, 'dueStatus') && o.dueStatus !== '0'
           ? o.dueStatus
           : (overdue ? 'Overdue' : 'Due')),
-      paymentDates: hasSheetOverride(o, 'paymentDates')
-        ? o.paymentDates
-        : paymentHistory.map(p => p.date).filter(Boolean).join(', '),
+      paymentDates,
+      totalRecdDate: paymentDates,
       paymentAmounts: hasSheetOverride(o, 'paymentAmounts')
         ? o.paymentAmounts
         : paymentHistory.map(p => `₹${(parseFloat(p.amount) || 0).toFixed(2)}${p.tds ? ` (TDS ₹${(parseFloat(p.tds) || 0).toFixed(2)})` : ''}`).join(' | '),
@@ -408,18 +408,19 @@ const ProcessingSheet = () => {
     { key: 'productName', label: 'Product' },
     { key: 'receivedQty', label: 'Recd Qty' },
     { key: 'piNo', label: 'PI No' },
-    { key: 'bprDate', label: 'BPR Date' },
+    { key: 'bprNo', label: 'BPR No' },
+    { key: 'bprDate', label: 'BPR Generation Date' },
     { key: 'dcNo', label: 'DC No' },
-    { key: 'dcDate', label: 'DC Date' },
+    { key: 'dcDate', label: 'Dispatch Date' },
     { key: 'tiNo', label: 'Tax Inv No' },
     { key: 'invoiceDate', label: 'Invoice Date' },
     { key: 'totalBill', label: 'Bill Amount' },
-    { key: 'paid', label: 'Payment Recd (Auto)' },
+    { key: 'paid', label: 'Amount Paid' },
     { key: 'manualPaid', label: 'Total Recd (Manual)' },
     { key: 'paymentRef', label: 'Cheque / Ref Details' },
-    { key: 'paymentDates', label: 'Payment Dates' },
+    { key: 'paymentDates', label: 'Total Recd Date' },
     { key: 'paymentAmounts', label: 'Amounts Received' },
-    { key: 'tdsDeduction', label: 'TDS Deduction' },
+    { key: 'tdsDeduction', label: 'TDS Amount' },
     { key: 'dueStatus', label: 'Due Status' },
     { key: 'outstanding', label: 'Outstanding' },
     { key: 'ewayStatus', label: 'E-Way' }
@@ -491,9 +492,19 @@ const ProcessingSheet = () => {
       case 'srNo':
         return <span style={{ fontWeight: 600 }}>{row.srNo}</span>;
       case 'paid':
-        return <span>₹{parseFloat(value || 0).toFixed(2)}</span>;
+        return renderInput(row, 'paid', value, {
+          ...fullTextStyle(value, 80),
+          textAlign: 'right',
+          fontWeight: 700,
+          color: 'var(--accent-primary)'
+        });
       case 'tdsDeduction':
-        return renderInput(row, 'tdsDeduction', value, fullTextStyle(value, 70));
+        return renderInput(row, 'tdsDeduction', value, {
+          ...fullTextStyle(value, 70),
+          textAlign: 'right',
+          fontWeight: 700,
+          color: '#8b5cf6'
+        });
       case 'dueStatus':
         return renderInput(row, 'dueStatus', value, {
           ...fullTextStyle(value, 70),
@@ -514,6 +525,8 @@ const ProcessingSheet = () => {
         return renderInput(row, 'tiNo', value, fullTextStyle(value, 170));
       case 'dcNo':
         return renderInput(row, 'dcNo', value, fullTextStyle(value, 150));
+      case 'bprNo':
+        return renderInput(row, 'bprNo', value, fullTextStyle(value, 150));
       case 'manualPaid':
         return renderInput(row, 'manualPaid', value, fullTextStyle(value, 80));
       case 'partyName':
@@ -600,7 +613,14 @@ const ProcessingSheet = () => {
             </button>
           </div>
 
-          <ExportButton data={filteredRows} columns={tableCols} filename="Master_Processing_Sheet" title="Master Processing Sheet" />
+          <ExportButton
+            data={filteredRows}
+            columns={tableCols}
+            filename="Master_Processing_Sheet"
+            title="Master Processing Sheet"
+            groupBy="partyName"
+            layout="table"
+          />
         </div>
       </header>
 
@@ -703,7 +723,15 @@ const ProcessingSheet = () => {
                     <th style={{ ...thStyle, textAlign: 'left', minWidth: '140px' }}>Product</th>
                     <th style={thStyle}>Recd Qty</th>
                     <th style={{ ...thStyle, textAlign: 'left', minWidth: '140px' }}>Inv / PI No</th>
+                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '130px' }}>BPR No</th>
+                    <th style={thStyle}>BPR Generation Date</th>
+                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '130px' }}>DC No</th>
+                    <th style={thStyle}>Dispatch Date</th>
+                    <th style={thStyle}>Invoice Date</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>Bill Amount</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Amount Paid</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>TDS Amount</th>
+                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '120px' }}>Total Recd Date</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>Total Recd</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>Outstanding</th>
                     <th style={thStyle}>Status</th>
@@ -738,18 +766,24 @@ const ProcessingSheet = () => {
                             </button>
                           </td>
                           <td style={tdStyle}>{row.srNo}</td>
-                          <td style={tdStyle}>{row.date ? new Date(row.date).toLocaleDateString('en-GB') : '-'}</td>
-                          <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 600, color: 'var(--text-main)' }}>{row.partyName || '-'}</td>
-                          <td style={{ ...tdStyle, textAlign: 'left', color: 'var(--text-muted)' }}>{row.productName || '-'}</td>
-                          <td style={{ ...tdStyle, fontWeight: 600 }}>{row.receivedQty}</td>
-                          <td style={{ ...tdStyle, textAlign: 'left', color: row.tiNo !== 'Pending' ? 'var(--accent-primary)' : '#8b5cf6', fontWeight: 600 }}>
-                            {row.tiNo !== 'Pending' ? row.tiNo : row.piNo}
+                          <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'date' })}</td>
+                          <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'partyName' })}</td>
+                          <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'productName' })}</td>
+                          <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'receivedQty' })}</td>
+                          <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
+                            {renderCell(row, { key: row.tiNo && row.tiNo !== 'Pending' ? 'tiNo' : 'piNo' })}
                           </td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>
-                            ₹{parseFloat(row.totalBill || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}
-                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'bprNo' })}</td>
+                          <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'bprDate' })}</td>
+                          <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'dcNo' })}</td>
+                          <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'dcDate' })}</td>
+                          <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'invoiceDate' })}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'totalBill' })}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'paid' })}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'tdsDeduction' })}</td>
+                          <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'paymentDates' })}</td>
                           <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                            ₹{parseFloat(row.amountsReceivedTotal || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}
+                            ₹{parseFloat(row.amountsReceivedTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </td>
                           <td
                             style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: isPaidOff ? '#10b981' : '#ef4444' }}
@@ -794,7 +828,7 @@ const ProcessingSheet = () => {
 
                         {isExpanded && (
                           <tr key={`expanded-panel-${row.rowKey}`} style={{ background: '#f8fafc' }}>
-                            <td colSpan={12} style={{ padding: '0.75rem', borderBottom: '2px solid var(--accent-primary)' }}>
+                            <td colSpan={20} style={{ padding: '0.75rem', borderBottom: '2px solid var(--accent-primary)' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
                                   <div style={{ background: '#f8fafc', padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -811,11 +845,13 @@ const ProcessingSheet = () => {
                                           <th style={{ ...thStyle, minWidth: '140px' }}>Product</th>
                                           <th style={thStyle}>Recd Qty</th>
                                           <th style={{ ...thStyle, minWidth: '170px' }}>P / I No</th>
-                                          <th style={thStyle}>BPR Date</th>
+                                          <th style={{ ...thStyle, minWidth: '150px' }}>BPR No</th>
+                                          <th style={thStyle}>BPR Generation Date</th>
                                           <th style={thStyle}>BPR Net Qty</th>
                                           <th style={{ ...thStyle, minWidth: '150px' }}>DC No</th>
-                                          <th style={thStyle}>DC Date</th>
+                                          <th style={thStyle}>Dispatch Date</th>
                                           <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
+                                          <th style={thStyle}>Invoice Date</th>
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -826,11 +862,13 @@ const ProcessingSheet = () => {
                                           <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, { key: 'productName' })}</td>
                                           <td style={tdStyle}>{renderCell(row, { key: 'receivedQty' })}</td>
                                           <td style={{ ...tdStyle, color: '#8b5cf6', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, { key: 'piNo' })}</td>
+                                          <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, { key: 'bprNo' })}</td>
                                           <td style={tdStyle}>{renderCell(row, { key: 'bprDate' })}</td>
                                           <td style={tdStyle}>{renderCell(row, { key: 'bprNetQty' })}</td>
                                           <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, { key: 'dcNo' })}</td>
                                           <td style={tdStyle}>{renderCell(row, { key: 'dcDate' })}</td>
                                           <td style={{ ...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, { key: 'tiNo' })}</td>
+                                          <td style={tdStyle}>{renderCell(row, { key: 'invoiceDate' })}</td>
                                         </tr>
                                       </tbody>
                                     </table>
@@ -849,12 +887,12 @@ const ProcessingSheet = () => {
                                           <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
                                           <th style={thStyle}>Invoice Date</th>
                                           <th style={thStyle}>Bill Amount</th>
-                                          <th style={thStyle}>Payment Recd (Auto)</th>
+                                          <th style={thStyle}>Amount Paid</th>
                                           <th style={thStyle}>Total Recd (Manual)</th>
                                           <th style={{ ...thStyle, minWidth: '140px' }}>Cheque / Ref Details</th>
-                                          <th style={{ ...thStyle, minWidth: '120px' }}>Payment Dates</th>
+                                          <th style={{ ...thStyle, minWidth: '120px' }}>Total Recd Date</th>
                                           <th style={{ ...thStyle, minWidth: '140px' }}>Amounts Received</th>
-                                          <th style={thStyle}>TDS Deducted</th>
+                                          <th style={thStyle}>TDS Amount</th>
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -884,12 +922,12 @@ const ProcessingSheet = () => {
                                       <thead>
                                         <tr>
                                           <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
-                                          <th style={thStyle}>Payment Recd (Auto)</th>
+                                          <th style={thStyle}>Amount Paid</th>
                                           <th style={thStyle}>Total Recd (Manual)</th>
                                           <th style={{ ...thStyle, minWidth: '140px' }}>Cheque / Ref Details</th>
-                                          <th style={{ ...thStyle, minWidth: '120px' }}>Payment Dates</th>
+                                          <th style={{ ...thStyle, minWidth: '120px' }}>Total Recd Date</th>
                                           <th style={{ ...thStyle, minWidth: '140px' }}>Amounts Received</th>
-                                          <th style={thStyle}>TDS Deduction</th>
+                                          <th style={thStyle}>TDS Amount</th>
                                           <th style={thStyle}>Due Status</th>
                                           <th style={thStyle}>Outstanding</th>
                                           <th style={thStyle}>E-Way</th>
@@ -962,10 +1000,12 @@ const ProcessingSheet = () => {
                          <th style={{ ...thStyle, minWidth: '140px' }}>Product</th>
                          <th style={thStyle}>Recd Qty</th>
                          <th style={{ ...thStyle, minWidth: '170px' }}>P / I No</th>
-                         <th style={thStyle}>BPR Date</th>
+                         <th style={{ ...thStyle, minWidth: '150px' }}>BPR No</th>
+                         <th style={thStyle}>BPR Generation Date</th>
                          <th style={{ ...thStyle, minWidth: '150px' }}>DC No</th>
-                         <th style={thStyle}>DC Date</th>
+                         <th style={thStyle}>Dispatch Date</th>
                          <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
+                         <th style={thStyle}>Invoice Date</th>
                        </tr>
                     </thead>
                     <tbody>
@@ -977,10 +1017,12 @@ const ProcessingSheet = () => {
                          <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'productName'})}</td>
                          <td style={tdStyle}>{renderCell(row, {key: 'receivedQty'})}</td>
                          <td style={{...tdStyle, color: '#8b5cf6', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'piNo'})}</td>
+                         <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'bprNo'})}</td>
                          <td style={tdStyle}>{renderCell(row, {key: 'bprDate'})}</td>
                          <td style={{ ...tdStyle, textAlign: 'left' }}>{renderCell(row, {key: 'dcNo'})}</td>
                          <td style={tdStyle}>{renderCell(row, {key: 'dcDate'})}</td>
                          <td style={{...tdStyle, color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'left' }}>{renderCell(row, {key: 'tiNo'})}</td>
+                         <td style={tdStyle}>{renderCell(row, {key: 'invoiceDate'})}</td>
                        </tr>
                       ))}
                     </tbody>
@@ -1011,12 +1053,12 @@ const ProcessingSheet = () => {
                          <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
                          <th style={thStyle}>Invoice Date</th>
                          <th style={thStyle}>Bill Amount</th>
-                         <th style={thStyle}>Payment Recd (Auto)</th>
+                         <th style={thStyle}>Amount Paid</th>
                          <th style={thStyle}>Total Recd (Manual)</th>
                          <th style={{ ...thStyle, minWidth: '140px' }}>Cheque / Ref Details</th>
-                         <th style={{ ...thStyle, minWidth: '120px' }}>Payment Dates</th>
+                         <th style={{ ...thStyle, minWidth: '120px' }}>Total Recd Date</th>
                          <th style={{ ...thStyle, minWidth: '140px' }}>Amounts Received</th>
-                         <th style={thStyle}>TDS Deducted</th>
+                         <th style={thStyle}>TDS Amount</th>
                        </tr>
                     </thead>
                     <tbody>
@@ -1058,12 +1100,12 @@ const ProcessingSheet = () => {
                     <thead>
                        <tr>
                          <th style={{ ...thStyle, minWidth: '170px' }}>Tax Inv No</th>
-                         <th style={thStyle}>Payment Recd (Auto)</th>
+                         <th style={thStyle}>Amount Paid</th>
                          <th style={thStyle}>Total Recd (Manual)</th>
                          <th style={{ ...thStyle, minWidth: '140px' }}>Cheque / Ref Details</th>
-                         <th style={{ ...thStyle, minWidth: '120px' }}>Payment Dates</th>
+                         <th style={{ ...thStyle, minWidth: '120px' }}>Total Recd Date</th>
                          <th style={{ ...thStyle, minWidth: '140px' }}>Amounts Received</th>
-                         <th style={thStyle}>TDS Deduction</th>
+                         <th style={thStyle}>TDS Amount</th>
                          <th style={thStyle}>Due Status</th>
                          <th style={thStyle}>Outstanding</th>
                          <th style={thStyle}>E-Way</th>

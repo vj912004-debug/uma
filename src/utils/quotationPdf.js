@@ -87,13 +87,41 @@ const savedRowFor = (data, key) =>
   [...(data.mainCharges || []), ...(data.optionalCharges || [])]
     .find((row) => row?.sourceKey === key) || null;
 
+const isNilRateText = (value) => {
+  const raw = String(value ?? '').trim();
+  return !raw || raw === '-' || /^nil$/i.test(raw);
+};
+
+const extractRateNumber = (rateStr) => {
+  const cleaned = String(rateStr || '')
+    .replace(/₹/g, '')
+    .replace(/rs\.?/ig, '')
+    .replace(/,/g, '')
+    .replace(/\s*per\s*process.*$/i, '')
+    .replace(/\/.*$/, '')
+    .replace(/\(.*?\)/g, '')
+    .trim();
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : NaN;
+};
+
 const catalogRowForPrint = (item, data) => {
   const saved = savedRowFor(data, item.key);
   const rateUnits = mergeRateUnits(data.rateUnits);
+  const unit = rateUnits[item.key] ?? defaultRateUnit(item.key);
   const rateNum = parseFloat(data.rates?.[item.key]);
-  const fallbackRate = Number.isFinite(rateNum) && rateNum > 0
-    ? formatQuotedRate(rateNum, rateUnits[item.key] ?? defaultRateUnit(item.key))
-    : 'NIL';
+  const fromRates = Number.isFinite(rateNum) && rateNum > 0
+    ? formatQuotedRate(rateNum, unit)
+    : '';
+  // Prefer a real typed/saved rate; ignore leftover "NIL" so rates[] can show through.
+  const savedRaw = [saved?.dryRate, saved?.rate, saved?.wetRate].find((v) => !isNilRateText(v)) || '';
+  const fromSavedNum = extractRateNumber(savedRaw);
+  const fromSaved = savedRaw
+    ? (Number.isFinite(fromSavedNum) && fromSavedNum > 0
+      ? formatQuotedRate(fromSavedNum, unit)
+      : String(savedRaw).replace(/₹\s*/g, 'Rs. ').trim())
+    : '';
+  const printed = fromSaved || fromRates || 'NIL';
   const qty = saved?.qty != null && saved.qty !== ''
     ? saved.qty
     : (item.isQtyRate ? data.qty : '');
@@ -103,9 +131,9 @@ const catalogRowForPrint = (item, data) => {
       ? (saved?.psdRequirement || data.psdRequirement || '')
       : (saved?.psdRequirement || ''),
     qty,
-    rate: saved?.dryRate || saved?.rate || fallbackRate,
-    dryRate: saved?.dryRate || saved?.rate || fallbackRate,
-    wetRate: saved?.wetRate || '',
+    rate: printed,
+    dryRate: printed,
+    wetRate: saved?.wetRate && !isNilRateText(saved.wetRate) ? saved.wetRate : '',
     sourceKey: item.key,
     note: saved?.note || data.chargeNotes?.[item.key] || ''
   };
@@ -205,6 +233,19 @@ export const enrichQuotationForPrint = (data = {}) => {
   }
 
   const psdFromLine = lines[0]?.psdReq || lines[0]?.psdRequirement || '';
+
+  // Resolve party contact number / email for KIND ATTENTION when quote fields are blank.
+  const appData = data.appData || loadUmaAppData();
+  const parties = appData.parties || [];
+  const party = parties.find((p) => String(p.id) === String(data.partyId))
+    || parties.find((p) => String(p.name || '').trim().toLowerCase() === String(data.partyName || '').trim().toLowerCase());
+  const contactNumber = String(
+    data.contactNumber || data.partyMobile || data.mobile || party?.phone1 || party?.mobile || ''
+  ).trim();
+  const emailId = String(
+    data.emailId || data.partyEmail || data.email || party?.email1 || party?.email || ''
+  ).trim();
+
   return {
     ...data,
     charges,
@@ -215,7 +256,11 @@ export const enrichQuotationForPrint = (data = {}) => {
     mainCharges,
     optionalCharges,
     qty: data.qty ?? saved.qty,
-    psdRequirement: psdFromLine || data.psdRequirement || saved.psdRequirement || ''
+    psdRequirement: psdFromLine || data.psdRequirement || saved.psdRequirement || '',
+    contactNumber,
+    emailId,
+    partyMobile: contactNumber,
+    partyEmail: emailId
   };
 };
 
@@ -269,12 +314,15 @@ export const buildQuotationHtml = (data, profileInput) => {
     optionalCharges.length > 0
       ? optionalCharges
           .map(
-            (c, i) => `
+            (c, i) => {
+              const rateSrc = c.dryRate || c.rate || c.wetRate || '';
+              return `
             <tr>
               <td>${i + 1}</td>
               <td class="left">${formatChargeDescriptionHtml(c)}</td>
-              <td class="rate">${rateDisplayHtml(c.rate, c.sourceKey, rateUnits)}</td>
-            </tr>`
+              <td class="rate">${rateDisplayHtml(rateSrc, c.sourceKey, rateUnits)}</td>
+            </tr>`;
+            }
           )
           .join('')
       : '';
@@ -313,13 +361,18 @@ export const buildQuotationHtml = (data, profileInput) => {
     titleCase(party.billState || party.state || ''),
     party.billStateCode || party.stateCode || ''
   );
-  const attentionRows = [
-    ['Contact Person', data.contactPerson],
-    ['Mobile', data.partyMobile || data.mobile],
-    ['Email', data.partyEmail || data.email]
-  ].filter(([, v]) => String(v || '').trim())
-    .map(([label, v]) => `<div class="frow"><span class="flabel">${label}</span><span class="fcolon">:</span><span>${escHtml(v)}</span></div>`)
-    .join('');
+  const attentionContact = String(data.contactPerson || '').trim();
+  const attentionMobile = String(data.contactNumber || data.partyMobile || data.mobile || '').trim();
+  const attentionEmail = String(data.emailId || data.partyEmail || data.email || '').trim();
+  // KIND ATTENTION: always print Contact Person + Contact Number + Email Id when any is present.
+  const attentionRows = (attentionContact || attentionMobile || attentionEmail)
+    ? [
+      ['Contact Person', attentionContact || '—'],
+      ['Contact Number', attentionMobile || '—'],
+      ['Email Id', attentionEmail || '—']
+    ].map(([label, v]) => `<div class="frow"><span class="flabel">${label}</span><span class="fcolon">:</span><span class="fval">${escHtml(v)}</span></div>`)
+      .join('')
+    : '';
 
   const companyStateName = titleCase(profile.state || 'Gujarat');
   const companyStateCode = String(profile.gstNumber || '24').replace(/\s/g, '').slice(0, 2) || '24';
@@ -331,10 +384,12 @@ export const buildQuotationHtml = (data, profileInput) => {
     buildOptionalMetaRowHtml('Quotation Date', formatPdfDateDmy(data.date) || 'N/A', { iconHtml: PRINT_ICON_CAL }),
     buildOptionalMetaRowHtml('Valid Till', formatPdfDateDmy(data.validityDate) || '', { iconHtml: PRINT_ICON_CAL })
   ].join('');
+  const contactMobile = String(data.contactNumber || data.partyMobile || data.mobile || phoneFmt || '').trim();
+  const contactEmail = String(data.emailId || data.partyEmail || data.email || profile.email || 'info@umamicron.com').trim();
   const contactMetaRows = [
-    buildOptionalMetaRowHtml('Contact Person', data.signatoryName || 'Amit Patel', { iconHtml: PRINT_ICON_DOC }),
-    buildOptionalMetaRowHtml('Mobile', phoneFmt, { iconHtml: PRINT_ICON_DOC }),
-    buildOptionalMetaRowHtml('Email', profile.email || 'info@umamicron.com', { iconHtml: PRINT_ICON_DOC })
+    buildOptionalMetaRowHtml('Contact Person', data.contactPerson || data.signatoryName || 'Amit Patel', { iconHtml: PRINT_ICON_DOC }),
+    buildOptionalMetaRowHtml('Mobile', contactMobile, { iconHtml: PRINT_ICON_DOC }),
+    buildOptionalMetaRowHtml('Email', contactEmail, { iconHtml: PRINT_ICON_DOC })
   ].join('');
 
   const subject = escHtml(data.subject || 'Quotation for Micronization Services');
@@ -491,16 +546,26 @@ export const buildQuotationHtml = (data, profileInput) => {
   .reg-details{font-size:10.5px;line-height:1.7;flex-shrink:0;}
   .reg-row{display:grid;grid-template-columns:44px 10px auto;column-gap:4px;align-items:center;white-space:nowrap;}
   .reg-row .label{font-weight:700;color:var(--purple);}
-  .invoice-meta{flex:1;min-width:280px;border:1px solid var(--purple);border-radius:6px;overflow:hidden;
+  .invoice-meta{flex:1;min-width:280px;border:1px solid var(--purple);border-radius:6px;overflow:visible;
     display:flex;flex-direction:column;justify-content:center;}
-  .invoice-meta .block{padding:7px 10px;}
+  .invoice-meta .block{padding:7px 10px;overflow:visible;}
   .invoice-meta .block + .block{border-top:1px solid var(--purple);}
-  .meta-row{display:grid;grid-template-columns:14px 118px 10px minmax(0,1fr);column-gap:4px;align-items:center;
-    margin-bottom:3px;font-size:10.5px;line-height:1.3;white-space:nowrap;color:#231f20;}
+  .meta-row{display:grid;grid-template-columns:14px 102px 8px minmax(0,1fr);column-gap:4px;align-items:start;
+    margin-bottom:3px;font-size:10.5px;line-height:1.3;white-space:normal;color:#231f20;}
   .meta-row:last-child{margin-bottom:0;}
   .meta-row .m-label,.meta-row .m-colon,.meta-row .m-value{font-weight:700;}
-  .meta-row .m-value{min-width:0;overflow:hidden;text-overflow:ellipsis;}
-  .meta-row .m-icon{display:flex;align-items:center;justify-content:center;}
+  .meta-row .m-label{white-space:nowrap;}
+  /* Keep Quotation No / Mobile / Email fully visible — do not ellipsis-clip */
+  .meta-row .m-value{
+    min-width:0;
+    overflow:visible;
+    text-overflow:clip;
+    white-space:normal;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+    line-height:1.25;
+  }
+  .meta-row .m-icon{display:flex;align-items:center;justify-content:center;padding-top:1px;}
   .parties{display:flex;gap:10px;margin-top:10px;width:100%;}
   .party{flex:1;min-width:0;border:1px solid var(--purple);border-radius:6px;overflow:hidden;
     display:flex;flex-direction:column;box-sizing:border-box;}
@@ -511,10 +576,18 @@ export const buildQuotationHtml = (data, profileInput) => {
   .party-body .addr{margin:0 0 3px;line-height:1.45;}
   .party-body .addr:last-child{margin-bottom:0;}
   .party-foot{border-top:1px solid var(--purple-border);padding:6px 12px;font-size:10.5px;}
-  .party-foot .frow,.qt-attention .frow{display:grid;grid-template-columns:max-content 10px minmax(0,1fr);column-gap:6px;margin-bottom:2px;}
+  .party-foot .frow,.qt-attention .frow{display:grid;grid-template-columns:max-content 10px minmax(0,1fr);column-gap:6px;margin-bottom:2px;align-items:start;}
   .party-foot .frow:last-child,.qt-attention .frow:last-child{margin-bottom:0;}
-  .party-foot .flabel,.qt-attention .flabel{font-weight:700;}
-  .qt-attention .frow{grid-template-columns:100px 10px minmax(0,1fr);margin-bottom:4px;}
+  .party-foot .flabel,.qt-attention .flabel{font-weight:700;white-space:nowrap;}
+  .qt-attention .frow{grid-template-columns:110px 10px minmax(0,1fr);margin-bottom:4px;}
+  .party-foot .fval,.qt-attention .fval{
+    min-width:0;
+    overflow:visible;
+    white-space:normal;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+    line-height:1.3;
+  }
   .sheet.quot-compact .info-row,.sheet.quot-compact .parties{margin-top:6px;gap:8px;}
   .sheet.quot-compact .company-info,.sheet.quot-compact .reg-details,.sheet.quot-compact .meta-row,
   .sheet.quot-compact .party-head,.sheet.quot-compact .party-body,.sheet.quot-compact .party-foot{font-size:9.5px;}

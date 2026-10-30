@@ -96,6 +96,14 @@ export const parseAmountsReceivedText = (text) => {
  */
 export const getReceiptEffectivePaid = (mr, payments, invoiceId) => {
   const o = getMergedSheetOverrides(mr, invoiceId);
+  if (hasSheetOverride(o, 'paid')) {
+    const v = parseFloat(String(o.paid).replace(/[₹,\s]/g, ''));
+    return Number.isFinite(v) ? v : 0;
+  }
+  if (hasSheetOverride(o, 'manualPaid')) {
+    const v = parseFloat(String(o.manualPaid).replace(/[₹,\s]/g, ''));
+    return Number.isFinite(v) ? v : 0;
+  }
   if (hasSheetOverride(o, 'paymentAmounts')) return parseAmountsReceivedText(o.paymentAmounts).cheque;
   return getReceiptChequeTotal(payments, mr?.id, invoiceId);
 };

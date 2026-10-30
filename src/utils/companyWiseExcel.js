@@ -142,7 +142,16 @@ export const flattenRowsForExcel = (rows) => {
 };
 
 /** Generate an Excel workbook where every document gets its own formatted bill worksheet tab. */
-export const downloadCompanyWiseExcel = async ({ filename, title, columns, rows, groupBy = 'partyName', docType }) => {
+export const downloadCompanyWiseExcel = async ({
+  filename,
+  title,
+  columns,
+  rows,
+  groupBy = 'partyName',
+  docType,
+  /** When 'table', always export the columns grid (e.g. Master Processing Sheet). */
+  layout = 'auto'
+}) => {
   const { default: ExcelJS } = await import('exceljs');
   const { appendInvoiceWorksheet } = await import('./invoiceExcel');
   const profile = getStoredCompanyProfile();
@@ -151,16 +160,18 @@ export const downloadCompanyWiseExcel = async ({ filename, title, columns, rows,
   wb.creator = profile.companyName || 'UMA MICRON';
   const used = new Set();
 
-  // Collect unique document objects for individual formatted bill sheets
+  // Collect unique document objects for individual formatted bill worksheets
   const uniqueDocs = [];
   const seenDocIds = new Set();
-  (rows || []).forEach((row) => {
-    const key = row?.invoiceNo || row?.poNo || row?.noteNo || row?.dcNo || row?.quotationNo || row?.id;
-    if (key && !seenDocIds.has(key)) {
-      seenDocIds.add(key);
-      uniqueDocs.push(row);
-    }
-  });
+  if (layout !== 'table') {
+    (rows || []).forEach((row) => {
+      const key = row?.invoiceNo || row?.poNo || row?.noteNo || row?.dcNo || row?.quotationNo || row?.id;
+      if (key && !seenDocIds.has(key)) {
+        seenDocIds.add(key);
+        uniqueDocs.push(row);
+      }
+    });
+  }
 
   if (uniqueDocs.length > 0) {
     uniqueDocs.forEach((docObj) => {

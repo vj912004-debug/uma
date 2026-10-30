@@ -185,6 +185,8 @@ const getDefaultForm = () => ({
   partyAddress: '',
   gstNumber: '',
   contactPerson: '',
+  contactNumber: '',
+  emailId: '',
   subject: 'Quotation for Micronization Services.',
   description: '',
   productName: '',
@@ -481,6 +483,9 @@ const Quotations = () => {
           partyName: party.name,
           partyAddress: party.billAddress || '',
           gstNumber: party.gstinBill || '',
+          contactPerson: prev.contactPerson || party.contactPerson || '',
+          contactNumber: party.phone1 || party.mobile || prev.contactNumber || '',
+          emailId: party.email1 || party.email || prev.emailId || '',
           productName: prev.companyQuoteMode
             ? (quoteLines || []).map((line) => line.name).filter(Boolean).join(', ')
             : '',
@@ -580,11 +585,27 @@ const Quotations = () => {
 
   const selectedParty = data.parties.find(p => p.id === formData.partyId);
   const partyProducts = selectedParty?.products || [];
+  /** Same as Material Receipt: only microns configured on that party product. */
+  const micronsForProduct = (productName) => {
+    const prod = (partyProducts || []).find(
+      (p) => String(p.name || '').trim().toLowerCase() === String(productName || '').trim().toLowerCase()
+    );
+    const saved = String(prod?.psdReq || prod?.psdRequirement || '').trim();
+    return saved ? [saved] : [];
+  };
   const quoteLines = formData.quoteLines || [];
   const quotePageSize = 6;
   const quotePageCount = Math.max(1, Math.ceil(quoteLines.length / quotePageSize));
   const safeQuotePage = Math.min(quotePage, quotePageCount - 1);
   const visibleQuoteLines = quoteLines.slice(safeQuotePage * quotePageSize, safeQuotePage * quotePageSize + quotePageSize);
+  const partyProductsAvailableForLine = (lineId) => {
+    const used = new Set(
+      (quoteLines || [])
+        .filter((line) => line.id !== lineId && String(line.name || '').trim())
+        .map((line) => String(line.name).trim().toLowerCase())
+    );
+    return partyProducts.filter((prod) => !used.has(String(prod.name || '').trim().toLowerCase()));
+  };
 
   const patchCompanyQuote = (updater) => {
     setFormData((prev) => {
@@ -871,10 +892,25 @@ const handleSameCompanyQuote = (q) => {
     setFormData(prev => {
       const newCharges = [...prev[type]];
       const row = { ...newCharges[index], [field]: value };
+      if (field === 'dryRate') row.rate = value;
       newCharges[index] = row;
       const next = { ...prev, [type]: newCharges };
       if (field === 'note' && row.sourceKey) {
         next.chargeNotes = { ...emptyChargeNotes(), ...(prev.chargeNotes || {}), [row.sourceKey]: value };
+      }
+      // Keep rates[] in sync so print can resolve amount when row text was previously NIL.
+      if ((field === 'rate' || field === 'dryRate') && row.sourceKey) {
+        const cleaned = String(value || '')
+          .replace(/₹/g, '')
+          .replace(/rs\.?/ig, '')
+          .replace(/,/g, '')
+          .replace(/\s*per\s*process.*$/i, '')
+          .replace(/\/.*$/, '')
+          .trim();
+        const n = parseFloat(cleaned);
+        if (Number.isFinite(n) && n >= 0) {
+          next.rates = { ...(prev.rates || {}), [row.sourceKey]: n };
+        }
       }
       return next;
     });
@@ -1101,8 +1137,16 @@ const handleSameCompanyQuote = (q) => {
               onChange={(e) => setDefaultCharge(card.field, e.target.value)}
             />
             {card.hint && <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{card.hint}</span>}
+            <div>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.15rem' }}>Print note</span>
+              <ChargeNoteInput
+                value={formData.chargeNotes?.[card.sectionKey] || ''}
+                onChange={(val) => handleChargeNoteChange(card.sectionKey, val)}
+              />
+            </div>
           </>
         ) : on && (
+          <>
           <div className="quote-charge-rate">
             <span className="quote-charge-rupee">₹</span>
             <input
@@ -1122,6 +1166,15 @@ const handleSameCompanyQuote = (q) => {
               />
             )}
           </div>
+          <div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.15rem' }}>Print note</span>
+            <ChargeNoteInput
+              value={formData.chargeNotes?.[card.key || card.sectionKey] || ''}
+              onChange={(val) => handleChargeNoteChange(card.key || card.sectionKey, val)}
+              placeholder="Note e.g. Nil if Qty is more than 500kg"
+            />
+          </div>
+          </>
         )}
       </div>
     );
@@ -1439,9 +1492,29 @@ const handleSameCompanyQuote = (q) => {
                     ))}
                   </SearchableSelect>
                 </div>
-                <div style={{ gridColumn: 'span 2' }}>
+                <div>
                   <label>Contact Person / Attn</label>
                   <input type="text" className="input-field" placeholder="e.g. Mr. Sharma" value={formData.contactPerson} onChange={e => setFormData({...formData, contactPerson: e.target.value})} />
+                </div>
+                <div>
+                  <label>Contact Number</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. 98765 43210"
+                    value={formData.contactNumber || ''}
+                    onChange={e => setFormData({ ...formData, contactNumber: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label>Email Id</label>
+                  <input
+                    type="email"
+                    className="input-field"
+                    placeholder="e.g. name@company.com"
+                    value={formData.emailId || ''}
+                    onChange={e => setFormData({ ...formData, emailId: e.target.value })}
+                  />
                 </div>
                 <div style={{ gridColumn: 'span 3' }}>
                   <label>Party Address</label>
@@ -1474,6 +1547,9 @@ const handleSameCompanyQuote = (q) => {
                   </p>
                   {renderCompanyChargeZone('main')}
                   {renderCompanyChargeZone('optional')}
+                  <p style={{ margin: '0 1rem 0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Choose a product first (party products only). Micron / PSD options open after that product is selected.
+                  </p>
                   <div style={{ overflowX: 'auto', padding: '0 1rem 0.75rem' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                       <thead>
@@ -1487,32 +1563,54 @@ const handleSameCompanyQuote = (q) => {
                         </tr>
                       </thead>
                       <tbody>
-                        {visibleQuoteLines.map((line, index) => (
+                        {visibleQuoteLines.map((line, index) => {
+                          const productOptions = partyProductsAvailableForLine(line.id);
+                          const micronOptions = micronsForProduct(line.name);
+                          const hasProduct = Boolean(String(line.name || '').trim());
+                          return (
                           <tr key={line.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                             <td style={{ padding: '0.35rem' }}>{safeQuotePage * quotePageSize + index + 1}</td>
                             <td style={{ padding: '0.35rem', minWidth: '160px' }}>
                               <SearchableSelect
-                                allowCustom
+                                allowCustom={false}
                                 className="input-field"
                                 style={{ width: '180px', padding: '0.3rem 0.4rem', fontSize: '0.78rem' }}
                                 value={line.name}
                                 onChange={(e) => {
                                   const name = e.target.value;
-                                  const match = partyProducts.find((prod) => prod.name === name);
-                                  setQuoteLineField(line.id, 'name', name);
-                                  if (match) {
-                                    setQuoteLineField(line.id, 'nickname', match.nickname || '');
-                                    setQuoteLineField(line.id, 'psdReq', match.psdReq || '');
-                                    setQuoteLineField(line.id, 'rate.processing', match.charges?.processing ?? '');
-                                  }
+                                  const match = partyProducts.find(
+                                    (prod) => String(prod.name || '').trim().toLowerCase() === String(name || '').trim().toLowerCase()
+                                  );
+                                  patchCompanyQuote((prev) => ({
+                                    quoteLines: (prev.quoteLines || []).map((row) => {
+                                      if (row.id !== line.id) return row;
+                                      if (!match) {
+                                        return { ...row, name: '', nickname: '', psdReq: '' };
+                                      }
+                                      return {
+                                        ...row,
+                                        name: match.name,
+                                        nickname: match.nickname || '',
+                                        psdReq: match.psdReq || '',
+                                        rates: {
+                                          ...(row.rates || {}),
+                                          processing: match.charges?.processing ?? row.rates?.processing ?? ''
+                                        }
+                                      };
+                                    })
+                                  }));
                                 }}
-                                placeholder="Product"
-                                memoryKey="quote-company-product"
+                                placeholder={formData.partyId ? 'Select party product' : 'Select party first'}
+                                remember={false}
+                                disabled={!formData.partyId}
                               >
-                                <option value="">Product</option>
-                                {partyProducts.map((prod) => (
+                                <option value="">{formData.partyId ? 'Select party product' : 'Select party first'}</option>
+                                {productOptions.map((prod) => (
                                   <option key={prod.name} value={prod.name}>{prod.name}</option>
                                 ))}
+                                {line.name && !productOptions.some((p) => p.name === line.name) && (
+                                  <option value={line.name}>{line.name}</option>
+                                )}
                               </SearchableSelect>
                             </td>
                             <td style={{ padding: '0.35rem' }}>
@@ -1523,16 +1621,17 @@ const handleSameCompanyQuote = (q) => {
                                 allowCustom
                                 className="input-field"
                                 style={{ width: '150px', padding: '0.3rem 0.4rem', fontSize: '0.78rem' }}
-                                value={line.psdReq || ''}
+                                value={hasProduct ? (line.psdReq || '') : ''}
                                 onChange={(e) => setQuoteLineField(line.id, 'psdReq', e.target.value)}
-                                placeholder="Type or select PSD"
-                                memoryKey="quote-psd-range"
+                                placeholder={hasProduct ? 'Type or select micron size' : 'Select product first'}
+                                remember={false}
+                                disabled={!hasProduct}
                               >
-                                <option value="">Type or select PSD</option>
-                                {(data.psdRequirements || []).map((req) => (
+                                <option value="">{hasProduct ? 'Type or select micron size' : 'Select product first'}</option>
+                                {micronOptions.map((req) => (
                                   <option key={req} value={req}>{req}</option>
                                 ))}
-                                {line.psdReq && !(data.psdRequirements || []).includes(line.psdReq) && (
+                                {hasProduct && line.psdReq && !micronOptions.includes(line.psdReq) && (
                                   <option value={line.psdReq}>{line.psdReq}</option>
                                 )}
                               </SearchableSelect>
@@ -1554,7 +1653,8 @@ const handleSameCompanyQuote = (q) => {
                               </button>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -1676,8 +1776,23 @@ const handleSameCompanyQuote = (q) => {
                   <input type="number" min="0" step="any" className="input-field" placeholder="NIL" value={qtyInputValue(formData.qty)} onChange={e => handleQtyChange(e.target.value)} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label>PSD Requirement</label>
-                  <input type="text" className="input-field" placeholder="e.g. d(0.9) < 10 Micron" value={formData.psdRequirement || ''} onChange={e => setFormData({ ...formData, psdRequirement: e.target.value })} />
+                  <label>PSD Requirement / Micron</label>
+                  <SearchableSelect
+                    allowCustom
+                    className="input-field"
+                    value={formData.psdRequirement || ''}
+                    onChange={(e) => setFormData({ ...formData, psdRequirement: e.target.value })}
+                    placeholder="Type or select micron size"
+                    remember={false}
+                  >
+                    <option value="">Type or select micron size</option>
+                    {micronsForProduct(formData.productName).map((req) => (
+                      <option key={req} value={req}>{req}</option>
+                    ))}
+                    {formData.psdRequirement && !micronsForProduct(formData.productName).includes(formData.psdRequirement) && (
+                      <option value={formData.psdRequirement}>{formData.psdRequirement}</option>
+                    )}
+                  </SearchableSelect>
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Signatory Name</label>
@@ -1692,15 +1807,31 @@ const handleSameCompanyQuote = (q) => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label>Product / Material *</label>
-                  <input type="text" className="input-field" placeholder="e.g. Calcium Carbonate" value={formData.productName} onChange={e => setFormData({ ...formData, productName: e.target.value })} />
+                  <input type="text" className="input-field" placeholder="e.g. Calcium Carbonate" value={formData.productName} onChange={e => setFormData({ ...formData, productName: e.target.value, psdRequirement: '' })} />
                 </div>
                 <div>
                   <label>Estimated Qty (Kg)</label>
                   <input type="number" min="0" step="any" className="input-field" placeholder="NIL" value={qtyInputValue(formData.qty)} onChange={e => handleQtyChange(e.target.value)} />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label>PSD Requirement</label>
-                  <input type="text" className="input-field" placeholder="e.g. d(0.9) < 10 Micron" value={formData.psdRequirement || ''} onChange={e => setFormData({ ...formData, psdRequirement: e.target.value })} />
+                  <label>PSD Requirement / Micron</label>
+                  <SearchableSelect
+                    allowCustom
+                    className="input-field"
+                    value={formData.productName ? (formData.psdRequirement || '') : ''}
+                    onChange={(e) => setFormData({ ...formData, psdRequirement: e.target.value })}
+                    placeholder={formData.productName ? 'Type or select micron size' : 'Enter product first'}
+                    remember={false}
+                    disabled={!formData.productName}
+                  >
+                    <option value="">{formData.productName ? 'Type or select micron size' : 'Enter product first'}</option>
+                    {micronsForProduct(formData.productName).map((req) => (
+                      <option key={req} value={req}>{req}</option>
+                    ))}
+                    {formData.productName && formData.psdRequirement && !micronsForProduct(formData.productName).includes(formData.psdRequirement) && (
+                      <option value={formData.psdRequirement}>{formData.psdRequirement}</option>
+                    )}
+                  </SearchableSelect>
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label>Signatory Name</label>
