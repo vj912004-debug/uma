@@ -1,5 +1,5 @@
 import { query } from '../db/pool.js';
-import { getDefaultErpState } from '../utils/defaultState.js';
+import { getDefaultErpState, getDefaultUsers } from '../utils/defaultState.js';
 
 function mapUserRow(row) {
   let permissions = row.permissions || [];
@@ -43,6 +43,21 @@ export async function findUserByUsername(username) {
     [username]
   );
   return rows[0] ? mapUserRow(rows[0]) : null;
+}
+
+/** Seed demo logins when the users table is empty (first boot / unseeded DB). */
+export async function ensureDefaultUsers() {
+  try {
+    const { rows } = await query(`SELECT COUNT(*)::int AS c FROM users`);
+    if ((rows[0]?.c || 0) > 0) return;
+    await syncUsers(getDefaultUsers());
+    await query(
+      `SELECT setval(pg_get_serial_sequence('users', 'id'), GREATEST((SELECT COALESCE(MAX(id), 1) FROM users), 1))`
+    );
+    console.log('Seeded default users (admin / admin123, staff1 / staff123).');
+  } catch (err) {
+    console.warn('ensureDefaultUsers skipped:', err.message);
+  }
 }
 
 export async function findUserById(id) {

@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import { verifyPassword } from '../utils/hash.js';
 import { signToken, requireAuth } from '../middleware/auth.js';
-import { findUserByUsername, findUserById, buildFullState } from '../services/stateService.js';
+import {
+  findUserByUsername,
+  findUserById,
+  buildFullState,
+  ensureDefaultUsers
+} from '../services/stateService.js';
 
 const router = Router();
 
@@ -13,6 +18,9 @@ router.post('/login', async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password are required.' });
     }
+
+    // First boot / empty DB: seed demo admin & staff so published credentials work.
+    await ensureDefaultUsers();
 
     const user = await findUserByUsername(username);
     if (!user || user.active === false) {

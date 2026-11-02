@@ -245,7 +245,11 @@ export const normalizeAppState = (parsed) => {
     salaryReports: parsed.salaryReports || [],
     auditLogs: parsed.auditLogs || [],
     users: (() => {
-      const mapped = (parsed.users || baseState.users).map((u, i) => {
+      // Empty array is truthy — treat it like missing so demo logins are not wiped.
+      const sourceUsers = Array.isArray(parsed.users) && parsed.users.length > 0
+        ? parsed.users
+        : baseState.users;
+      const mapped = sourceUsers.map((u, i) => {
       const username = u.username?.toLowerCase() === 'admin' ? 'admin' : u.username;
       const isAdminUser = u.role === 'Admin' && (username === 'admin' || u.id === 1);
       const isStaff = u.role === 'Staff' || (!isAdminUser && u.role !== 'Admin');
@@ -305,6 +309,21 @@ export const normalizeAppState = (parsed) => {
       };
     });
       const byName = new Map(mapped.map((u) => [String(u.username || '').toLowerCase(), u]));
+      // Always keep seed admin/staff accounts so demo credentials keep working.
+      baseState.users.forEach((seed) => {
+        const key = String(seed.username || '').toLowerCase();
+        if (!key) return;
+        const existing = byName.get(key);
+        if (!existing) {
+          mapped.push({ ...seed });
+          byName.set(key, mapped[mapped.length - 1]);
+          return;
+        }
+        if (!existing.passwordHash || String(existing.passwordHash).startsWith('000000000000')) {
+          existing.passwordHash = seed.passwordHash;
+        }
+        if (existing.active === false && key === 'admin') existing.active = true;
+      });
       NAMED_ADMINS.forEach((admin) => {
         const key = admin.username.toLowerCase();
         const existing = byName.get(key);

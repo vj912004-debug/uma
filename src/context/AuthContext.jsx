@@ -14,7 +14,7 @@ const AuthContext = createContext();
 const SESSION_KEY = 'uma_auth_session';
 
 export const AuthProvider = ({ children }) => {
-  const { data, setData, hydrateFromServer } = useAppContext();
+  const { data, setData, hydrateFromServer, isReady } = useAppContext();
   const [sessionUserId, setSessionUserId] = useState(() => {
     try {
       const saved = localStorage.getItem(SESSION_KEY);
@@ -50,14 +50,16 @@ export const AuthProvider = ({ children }) => {
   }, [setData]);
 
   useEffect(() => {
-    if (sessionUserId && !currentUser) {
+    if (!isReady) return;
+    // Don't wipe a session before users are available (empty list / mid-hydrate).
+    if (sessionUserId && !currentUser && (data.users || []).length > 0) {
       setSessionUserId(null);
       localStorage.removeItem(SESSION_KEY);
       clearAuthToken();
       disableApiMode();
     }
     setIsLoading(false);
-  }, [sessionUserId, currentUser]);
+  }, [sessionUserId, currentUser, isReady, data.users]);
 
   // Keep data.currentUser in sync when admin updates the logged-in user's permissions
   useEffect(() => {
@@ -66,7 +68,7 @@ export const AuthProvider = ({ children }) => {
     const perms = currentUser.permissions || [];
     const same =
       snap &&
-      snap.id === currentUser.id &&
+      String(snap.id) === String(currentUser.id) &&
       snap.role === currentUser.role &&
       snap.username === currentUser.username &&
       JSON.stringify(snap.permissions || []) === JSON.stringify(perms);
@@ -75,7 +77,8 @@ export const AuthProvider = ({ children }) => {
 
   const loginLocal = async (username, password) => {
     const normalized = username.trim().toLowerCase();
-    const user = data.users?.find(
+    const users = Array.isArray(data.users) ? data.users : [];
+    const user = users.find(
       (u) => u.username?.toLowerCase() === normalized && u.active !== false
     );
 
@@ -92,6 +95,8 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error: 'Invalid username or password.' };
     }
 
+    clearAuthToken();
+    disableApiMode();
     setSessionUserId(user.id);
     localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: user.id, loginAt: new Date().toISOString() }));
     syncUserToApp(user);
@@ -104,25 +109,43 @@ export const AuthProvider = ({ children }) => {
     if (apiAvailable) {
       try {
         const result = await apiLogin(username, password);
+        const loggedInUser = result.user;
+        const remoteUsers = Array.isArray(result.state?.users) ? result.state.users : [];
+        const hasUserInState = remoteUsers.some((u) => String(u.id) === String(loggedInUser.id));
+        const stateUsers = hasUserInState
+          ? remoteUsers
+          : [
+              ...remoteUsers,
+              {
+                ...loggedInUser,
+                active: loggedInUser.active !== false,
+                permissions: loggedInUser.permissions || []
+              }
+            ];
+
         setAuthToken(result.token);
         enableApiMode();
-        setSessionUserId(result.user.id);
-        localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: result.user.id, loginAt: new Date().toISOString() }));
         hydrateFromServer({
           ...result.state,
+          users: stateUsers,
           currentUser: {
-            id: result.user.id,
-            username: result.user.username,
-            role: result.user.role,
-            employeeId: result.user.employeeId,
-            department: result.user.department,
-            name: result.user.name,
-            permissions: result.user.permissions || []
+            id: loggedInUser.id,
+            username: loggedInUser.username,
+            role: loggedInUser.role,
+            employeeId: loggedInUser.employeeId,
+            department: loggedInUser.department,
+            name: loggedInUser.name,
+            permissions: loggedInUser.permissions || []
           },
-          settings: { ...result.state.settings, userRole: result.user.role }
+          settings: { ...result.state.settings, userRole: loggedInUser.role }
         });
+        setSessionUserId(loggedInUser.id);
+        localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: loggedInUser.id, loginAt: new Date().toISOString() }));
         return { success: true };
       } catch (err) {
+        // API may be up without seeded users — fall back to local demo credentials.
+        const local = await loginLocal(username, password);
+        if (local.success) return local;
         return { success: false, error: err.message || 'Login failed.' };
       }
     }
