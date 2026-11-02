@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { verifyPassword } from '../utils/hash.js';
+import { verifyPassword, seedPasswordHashForUsername } from '../utils/hash.js';
 import { signToken, requireAuth } from '../middleware/auth.js';
 import {
   findUserByUsername,
   findUserById,
   buildFullState,
-  ensureDefaultUsers
+  ensureDefaultUsers,
+  repairSeedUserPassword
 } from '../services/stateService.js';
 
 const router = Router();
@@ -22,22 +23,43 @@ router.post('/login', async (req, res) => {
     // First boot / empty DB: seed demo admin & staff so published credentials work.
     await ensureDefaultUsers();
 
-    const user = await findUserByUsername(username);
+    let user = await findUserByUsername(username);
+    const seedHash = seedPasswordHashForUsername(username);
+
+    // Inactive seed accounts can be revived with the published demo password.
+    if (user && user.active === false && seedHash && verifyPassword(password, seedHash)) {
+      await repairSeedUserPassword(user.id, seedHash);
+      user = { ...user, active: true, passwordHash: seedHash };
+    }
+
     if (!user || user.active === false) {
       return res.status(401).json({ error: 'Invalid username or password.' });
     }
 
-    if (!user.passwordHash || user.passwordHash.startsWith('000000000000')) {
-      return res.status(401).json({ error: 'No login credentials set. Contact your administrator.' });
+    let passwordHash = user.passwordHash;
+    if (seedHash) {
+      // Keep published demo credentials working even if DB hash drifted.
+      if (verifyPassword(password, seedHash)) {
+        if (passwordHash !== seedHash) {
+          await repairSeedUserPassword(user.id, seedHash);
+          passwordHash = seedHash;
+        }
+      } else if (!passwordHash || passwordHash.startsWith('000000000000') || !verifyPassword(password, passwordHash)) {
+        return res.status(401).json({ error: 'Invalid username or password.' });
+      }
+    } else {
+      if (!passwordHash || passwordHash.startsWith('000000000000')) {
+        return res.status(401).json({ error: 'No login credentials set. Contact your administrator.' });
+      }
+      if (!verifyPassword(password, passwordHash)) {
+        return res.status(401).json({ error: 'Invalid username or password.' });
+      }
     }
 
-    if (!verifyPassword(password, user.passwordHash)) {
-      return res.status(401).json({ error: 'Invalid username or password.' });
-    }
-
-    const token = signToken(user);
+    const authedUser = { ...user, passwordHash, active: true };
+    const token = signToken(authedUser);
     const state = await buildFullState();
-    const { passwordHash, ...safeUser } = user;
+    const { passwordHash: _omit, ...safeUser } = authedUser;
 
     res.json({
       token,

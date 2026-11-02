@@ -60,6 +60,16 @@ export async function ensureDefaultUsers() {
   }
 }
 
+/** Reset a seed account password hash and reactivate the user. */
+export async function repairSeedUserPassword(userId, passwordHash) {
+  await query(
+    `UPDATE users
+     SET password_hash = $1, active = TRUE, updated_at = NOW()
+     WHERE id = $2`,
+    [passwordHash, userId]
+  );
+}
+
 export async function findUserById(id) {
   const { rows } = await query(
     `SELECT id, employee_id, username, password_hash, name, department, role, permissions, active

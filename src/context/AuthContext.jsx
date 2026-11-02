@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAppContext } from './AppContext';
-import { verifyPassword } from '../utils/auth';
+import { verifyPassword, seedPasswordHashForUsername } from '../utils/auth';
+import { createBaseState } from '../utils/appState';
 import {
   apiLogin,
   setAuthToken,
@@ -77,35 +78,78 @@ export const AuthProvider = ({ children }) => {
 
   const loginLocal = async (username, password) => {
     const normalized = username.trim().toLowerCase();
-    const users = Array.isArray(data.users) ? data.users : [];
-    const user = users.find(
-      (u) => u.username?.toLowerCase() === normalized && u.active !== false
-    );
+    let users = Array.isArray(data.users) ? [...data.users] : [];
+
+    // If seed accounts are missing (corrupt localStorage), restore them.
+    const seedUsers = createBaseState().users || [];
+    seedUsers.forEach((seed) => {
+      const key = String(seed.username || '').toLowerCase();
+      if (!users.some((u) => String(u.username || '').toLowerCase() === key)) {
+        users.push({ ...seed });
+      }
+    });
+
+    let user = users.find((u) => u.username?.toLowerCase() === normalized);
+    if (!user && seedPasswordHashForUsername(normalized)) {
+      user = seedUsers.find((u) => String(u.username || '').toLowerCase() === normalized) || null;
+      if (user) users = [...users, { ...user }];
+    }
 
     if (!user) {
       return { success: false, error: 'Invalid username or password.' };
     }
 
-    if (!user.passwordHash || String(user.passwordHash).startsWith('000000000000')) {
+    const seedHash = seedPasswordHashForUsername(user.username);
+    let passwordHash = user.passwordHash;
+    if (seedHash) {
+      passwordHash = seedHash;
+    } else if (!passwordHash || String(passwordHash).startsWith('000000000000')) {
       return { success: false, error: 'No login credentials set. Contact your administrator.' };
     }
 
-    const valid = await verifyPassword(password, user.passwordHash);
+    const valid = await verifyPassword(password, passwordHash);
     if (!valid) {
       return { success: false, error: 'Invalid username or password.' };
     }
 
+    const repaired = {
+      ...user,
+      active: true,
+      passwordHash,
+      role: normalized === 'admin' ? 'Admin' : (user.role || 'Staff')
+    };
+
     clearAuthToken();
     disableApiMode();
-    setSessionUserId(user.id);
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: user.id, loginAt: new Date().toISOString() }));
-    syncUserToApp(user);
+    setData((prev) => {
+      const prevUsers = Array.isArray(prev.users) ? [...prev.users] : [];
+      users.forEach((u) => {
+        const key = String(u.username || '').toLowerCase();
+        if (!prevUsers.some((p) => String(p.username || '').toLowerCase() === key)) {
+          prevUsers.push(u);
+        }
+      });
+      const idx = prevUsers.findIndex(
+        (u) => String(u.id) === String(repaired.id) || String(u.username || '').toLowerCase() === normalized
+      );
+      if (idx >= 0) prevUsers[idx] = { ...prevUsers[idx], ...repaired };
+      else prevUsers.push(repaired);
+      return { ...prev, users: prevUsers };
+    });
+    setSessionUserId(repaired.id);
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: repaired.id, loginAt: new Date().toISOString() }));
+    syncUserToApp(repaired);
     return { success: true };
   };
 
   const login = async (username, password) => {
-    const apiAvailable = await checkApiHealth();
+    // Prefer local seed credentials first so admin/admin123 always works even if API DB drifted.
+    if (seedPasswordHashForUsername(username)) {
+      const local = await loginLocal(username, password);
+      if (local.success) return local;
+    }
 
+    const apiAvailable = await checkApiHealth();
     if (apiAvailable) {
       try {
         const result = await apiLogin(username, password);
@@ -143,7 +187,6 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: loggedInUser.id, loginAt: new Date().toISOString() }));
         return { success: true };
       } catch (err) {
-        // API may be up without seeded users — fall back to local demo credentials.
         const local = await loginLocal(username, password);
         if (local.success) return local;
         return { success: false, error: err.message || 'Login failed.' };

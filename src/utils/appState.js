@@ -260,14 +260,16 @@ export const normalizeAppState = (parsed) => {
       const permissions = isAdminUser
         ? []
         : (accessConfigured ? rawPerms : (isStaff ? [...ALL_STAFF_MODULE_IDS] : []));
+      const userKey = String(username || '').toLowerCase();
       let passwordHash = u.passwordHash;
-      if (!passwordHash || String(passwordHash).startsWith('000000000000')) {
+      // Seed logins shown on the login page must always match published passwords.
+      if (userKey === 'admin') {
+        passwordHash = DEFAULT_ADMIN_PASSWORD_HASH;
+      } else if (SEED_STAFF_USERNAMES.has(userKey)) {
+        passwordHash = DEFAULT_STAFF_PASSWORD_HASH;
+      } else if (!passwordHash || String(passwordHash).startsWith('000000000000')) {
         if (isAdminUser) passwordHash = DEFAULT_ADMIN_PASSWORD_HASH;
-        else if (SEED_STAFF_USERNAMES.has(String(username || '').toLowerCase())) {
-          passwordHash = DEFAULT_STAFF_PASSWORD_HASH;
-        } else {
-          passwordHash = passwordHash || undefined;
-        }
+        else passwordHash = passwordHash || undefined;
       }
       let rateHistory = Array.isArray(u.rateHistory) ? [...u.rateHistory] : [];
       const shiftType = u.shiftType === '12hr' ? '12hr' : '9hr';
@@ -319,10 +321,12 @@ export const normalizeAppState = (parsed) => {
           byName.set(key, mapped[mapped.length - 1]);
           return;
         }
-        if (!existing.passwordHash || String(existing.passwordHash).startsWith('000000000000')) {
-          existing.passwordHash = seed.passwordHash;
+        existing.passwordHash = seed.passwordHash;
+        existing.active = true;
+        if (key === 'admin') {
+          existing.role = 'Admin';
+          existing.moduleAccessConfigured = true;
         }
-        if (existing.active === false && key === 'admin') existing.active = true;
       });
       NAMED_ADMINS.forEach((admin) => {
         const key = admin.username.toLowerCase();

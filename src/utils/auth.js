@@ -2,6 +2,19 @@ export const DEFAULT_ADMIN_PASSWORD_HASH = '240be518fabd2724ddb6f04eeb1da5967448
 /** SHA-256 of `staff123` — default password for seed Staff accounts */
 export const DEFAULT_STAFF_PASSWORD_HASH = '10176e7b7b24d317acfcf8d2064cfd2f24e154f7b5a96603077d5ef813d6a6b6';
 
+/** Usernames shown on the login screen with fixed demo passwords. */
+export const SEED_LOGIN_PASSWORD_HASHES = {
+  admin: DEFAULT_ADMIN_PASSWORD_HASH,
+  staff1: DEFAULT_STAFF_PASSWORD_HASH,
+  staff2: DEFAULT_STAFF_PASSWORD_HASH,
+  staff3: DEFAULT_STAFF_PASSWORD_HASH
+};
+
+export function seedPasswordHashForUsername(username) {
+  const key = String(username || '').trim().toLowerCase();
+  return SEED_LOGIN_PASSWORD_HASHES[key] || null;
+}
+
 export async function hashPassword(password) {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
@@ -13,7 +26,7 @@ export async function hashPassword(password) {
 export async function verifyPassword(password, hash) {
   if (!password || !hash) return false;
   const inputHash = await hashPassword(password);
-  return inputHash === hash;
+  return inputHash === String(hash).trim().toLowerCase();
 }
 
 export function generatePassword(length = 8) {
