@@ -195,6 +195,7 @@ const PartyDue = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                <th style={{ padding: '1rem' }}>Sr. No</th>
                 {tableCols.map(col => (
                   <th key={col.key} style={{ padding: '1rem', textAlign: col.key === 'name' ? 'left' : 'right' }}>
                     {col.label}
@@ -203,6 +204,7 @@ const PartyDue = () => {
               </tr>
               {/* Filter Row */}
               <tr style={{ background: 'var(--glass-bg)' }}>
+                <th style={{ padding: '0.35rem 1rem' }} />
                 {tableCols.map(col => (
                   <th key={`filter-${col.key}`} style={{ padding: '0.35rem 1rem', textAlign: col.key === 'name' ? 'left' : 'right' }}>
                     <input 
@@ -219,11 +221,12 @@ const PartyDue = () => {
             <tbody>
               {filteredDues.length === 0 ? (
                 <tr>
-                  <td colSpan={tableCols.length} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No outstanding party balances.</td>
+                  <td colSpan={tableCols.length + 1} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No outstanding party balances.</td>
                 </tr>
               ) : (
-                filteredDues.map(party => (
+                filteredDues.map((party, idx) => (
                   <tr key={party.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '1rem' }}>{idx + 1}</td>
                     <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>
                       <button 
                         onClick={() => navigate('/processing-sheet', { state: { partyName: party.name } })}

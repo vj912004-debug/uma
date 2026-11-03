@@ -27,9 +27,26 @@ const padDrums = (n) => {
   return String(v).padStart(2, '0');
 };
 
-const isSievingLumpBatch = (batch = {}) => {
+const isLumpBatch = (batch = {}) => {
   const text = `${batch.batchNo || ''} ${batch.drumNo || ''} ${batch.productName || ''}`.toLowerCase();
-  return /sieving\s*lumps?/.test(text);
+  return /(?:sieving\s*)?lumps?/.test(text);
+};
+
+const lumpsForProductName = (data, productName, totalLumps, groupCount, groupIndex = 0) => {
+  const map = data.productSievingLumps && typeof data.productSievingLumps === 'object'
+    ? data.productSievingLumps
+    : null;
+  if (map && Object.keys(map).length > 0) {
+    const want = normKey(productName);
+    const hit = Object.entries(map).find(([k]) => normKey(k) === want);
+    if (hit) return parseWeight(hit[1]);
+    // Map exists but this product has no entry — don't invent a value.
+    return 0;
+  }
+  // No per-product map: use shared lumps on the sole product, or last product when multi.
+  if (groupCount <= 1) return totalLumps;
+  if (groupIndex === groupCount - 1) return totalLumps;
+  return 0;
 };
 
 const normKey = (s) => String(s || '').trim().toLowerCase();
@@ -117,9 +134,49 @@ const buildProductGroups = (batches, data, extraNames = []) => {
   }
 
   const filled = groups.filter((g) => g.rows.length);
-  return filled.length
+  const base = filled.length
     ? filled
     : [{ name: names[0] || String(data.productName || '').split(',')[0].trim() || 'Product', rows: [] }];
+
+  // One printed block per micron when a product has more than one PSD.
+  const split = [];
+  base.forEach((group, productIndex) => {
+    const blocks = [];
+    const seen = new Map();
+    group.rows.forEach((row) => {
+      const micron = String(row.psdReq || '').trim();
+      const id = micron.toLowerCase();
+      if (!seen.has(id)) {
+        const block = { ...group, micron, rows: [] };
+        seen.set(id, block);
+        blocks.push(block);
+      }
+      seen.get(id).rows.push(row);
+    });
+    const named = blocks.filter((block) => block.micron);
+    if (named.length > 1 || (named.length === 1 && blocks.length > 1)) {
+      blocks.forEach((block, index) => {
+        split.push({
+          ...block,
+          name: block.micron ? `${group.name} (${block.micron})` : group.name,
+          lumpName: group.name,
+          includeLumps: index === 0,
+          productIndex,
+          productCount: base.length
+        });
+      });
+    } else {
+      split.push({
+        ...group,
+        lumpName: group.name,
+        includeLumps: true,
+        micron: named[0]?.micron || '',
+        productIndex,
+        productCount: base.length
+      });
+    }
+  });
+  return split;
 };
 
 export const buildPackingListHtml = (data, profileInput) => {
@@ -143,7 +200,7 @@ export const buildPackingListHtml = (data, profileInput) => {
   }
   const batches = [];
   rawBatches.forEach((batch) => {
-    if (isSievingLumpBatch(batch)) {
+    if (isLumpBatch(batch)) {
       const net = rowNet(batch);
       if (net > 0 && sievingLumps <= 0) sievingLumps = net;
       return;
@@ -178,22 +235,61 @@ export const buildPackingListHtml = (data, profileInput) => {
             </tr>
           </thead>`;
 
-  const productBlocksHtml = productGroups.map((group) => {
+  const productBlocksHtml = productGroups.map((group, groupIndex) => {
     let productNet = 0;
-    const bodyRows = group.rows.map((batch, idx) => {
-      const gross = parseWeight(batch.gross);
-      const tare = parseWeight(batch.tare);
-      const net = rowNet(batch);
-      productNet += net;
-      return `
+    // Group drum rows by batch no. so lumps can print under each batch.
+    const byBatch = [];
+    const batchMap = {};
+    group.rows.forEach((batch) => {
+      const anchor = String(batch.anchorBatch || '').trim();
+      const key = (batch.umaNewDrum && anchor && anchor !== '—')
+        ? anchor
+        : (String(batch.batchNo ?? '').trim() || '—');
+      if (!batchMap[key]) {
+        batchMap[key] = { batchNo: key, rows: [] };
+        byBatch.push(batchMap[key]);
+      }
+      batchMap[key].rows.push(batch);
+    });
+    const batchList = byBatch.length ? byBatch : [{ batchNo: '—', rows: group.rows }];
+    const productLumps = group.includeLumps === false
+      ? 0
+      : lumpsForProductName(
+        data,
+        group.lumpName || group.name,
+        sievingLumps,
+        group.productCount || productGroups.length,
+        group.productIndex ?? groupIndex
+      );
+    if (productLumps > 0) productNet += productLumps;
+
+    const bodyRows = batchList.map((batchGroup, bIdx) => {
+      const drumRows = batchGroup.rows.map((batch, idx) => {
+        const gross = parseWeight(batch.gross);
+        const tare = parseWeight(batch.tare);
+        const net = rowNet(batch);
+        productNet += net;
+        const sr = batchList.slice(0, bIdx).reduce((n, g) => n + g.rows.length, 0) + idx + 1;
+        return `
             <tr>
-              <td>${idx + 1}</td>
+              <td>${sr}</td>
               <td class="batch">${escHtml(batch.batchNo || '')}</td>
               <td>${escHtml(batch.drumNo ?? '')}</td>
               <td class="num">${gross > 0 ? fmtMoney(gross) : ''}</td>
               <td class="num">${tare > 0 ? fmtMoney(tare) : ''}</td>
               <td class="num">${net > 0 ? fmtMoney(net) : ''}</td>
             </tr>`;
+      }).join('');
+
+      // Show Lumps under every batch so multi-batch prints don't only list it at the end.
+      // Product TOTAL still counts lumps once (added above).
+      const lumpsRow = productLumps > 0 ? `
+            <tr class="special-row">
+              <td colspan="5" class="special-label">Lumps${batchList.length > 1 ? ` — Batch ${escHtml(batchGroup.batchNo)}` : ''}</td>
+              <td class="num">${fmtMoney(productLumps)}</td>
+            </tr>` : '';
+
+      return `${drumRows}${lumpsRow}`;
     }).join('');
 
     const qtyText = `${fmtMoney(productNet)} KGS`;
@@ -202,7 +298,7 @@ export const buildPackingListHtml = (data, profileInput) => {
     return `
       <section class="product-block">
         <div class="pl-meta">
-          <div class="meta-field"><span class="lbl">Name of Product</span><span class="colon">:</span><span class="val">${escHtml(group.name) || '&nbsp;'}</span></div>
+          <div class="meta-field"><span class="lbl">Name of Product</span><span class="colon">:</span><span class="val">${escHtml(group.micron && !String(group.name).includes(group.micron) ? `${group.name} (${group.micron})` : group.name) || '&nbsp;'}</span></div>
           <div class="meta-field"><span class="lbl">Date</span><span class="colon">:</span><span class="val">${plDate || '&nbsp;'}</span></div>
           <div class="meta-field"><span class="lbl">Total Quantity</span><span class="colon">:</span><span class="val">${escHtml(qtyText) || '&nbsp;'}</span></div>
           <div class="meta-field"><span class="lbl">Total Drums</span><span class="colon">:</span><span class="val">${escHtml(drumsText)}</span></div>
@@ -231,38 +327,6 @@ export const buildPackingListHtml = (data, profileInput) => {
         </div>
       </section>`;
   }).join('');
-
-  let lumpRowsHtml = '';
-  if (data.productSievingLumps && typeof data.productSievingLumps === 'object') {
-    const entries = Object.entries(data.productSievingLumps).filter(([, v]) => parseWeight(v) > 0);
-    if (entries.length > 1) {
-      lumpRowsHtml = entries.map(([pName, v]) => `
-        <tr class="special-row">
-          <td colspan="5" class="special-label">Sieving Lumps — ${escHtml(pName)}</td>
-          <td class="num">${fmtMoney(parseWeight(v))}</td>
-        </tr>
-      `).join('');
-    }
-  }
-  if (!lumpRowsHtml && sievingLumps > 0) {
-    lumpRowsHtml = `
-      <tr class="special-row">
-        <td colspan="5" class="special-label">Sieving Lumps</td>
-        <td class="num">${fmtMoney(sievingLumps)}</td>
-      </tr>`;
-  }
-
-  const sievingLumpsHtml = lumpRowsHtml ? `
-      <section class="product-block lumps-block">
-        <div class="table-wrap">
-          <table class="items">
-            ${colgroup}
-            <tbody>
-              ${lumpRowsHtml}
-            </tbody>
-          </table>
-        </div>
-      </section>` : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -406,7 +470,6 @@ export const buildPackingListHtml = (data, profileInput) => {
 
       <div class="products">
         ${productBlocksHtml}
-        ${sievingLumpsHtml}
       </div>
 
       ${buildStatusBar('Page 1 of 1', PRINT_FOOTER_MESSAGES.PL)}

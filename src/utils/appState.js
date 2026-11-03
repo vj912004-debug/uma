@@ -44,6 +44,14 @@ const namedAdminRecord = (admin, id) => ({
   rateHistory: []
 });
 
+export const DEFAULT_STOCK_ITEMS = [
+  { id: 'stk-hdpe-drum', category: 'Drum & Liner', name: 'HDPE Drum', specification: '40 Ltr, Blue', uom: 'Nos', location: 'Main Store', openingStock: 0, rate: 0, lowStockLevel: 0, kind: 'drum', tracksUmaDrums: true },
+  { id: 'stk-liner', category: 'Drum & Liner', name: 'Drum Liner', specification: '40 Ltr, PE', uom: 'Nos', location: 'Main Store', openingStock: 0, rate: 0, lowStockLevel: 0, kind: 'liner', tracksUmaDrums: false },
+  { id: 'stk-hdpe-ring', category: 'Drum & Liner', name: 'HDPE Drum with Ring', specification: '40 Ltr, Blue', uom: 'Nos', location: 'Main Store', openingStock: 0, rate: 0, lowStockLevel: 0, kind: 'drum', tracksUmaDrums: false },
+  { id: 'stk-liner-plain', category: 'Drum & Liner', name: 'Drum Liner (Plain)', specification: '', uom: 'Nos', location: 'Main Store', openingStock: 0, rate: 0, lowStockLevel: 0, kind: 'liner', tracksUmaDrums: false },
+  { id: 'stk-ring', category: 'Drum & Liner', name: 'Drum Ring', specification: '', uom: 'Nos', location: 'Main Store', openingStock: 0, rate: 0, lowStockLevel: 0, kind: 'other', tracksUmaDrums: false }
+];
+
 export const createBaseState = () => ({
   parties: [],
   items: [],
@@ -63,12 +71,16 @@ export const createBaseState = () => ({
   materialIssues: [],
   bprs: [],
   packingLists: [],
+  umaDrumReceipts: [],
+  stockItems: DEFAULT_STOCK_ITEMS.map((item) => ({ ...item })),
+  stockMovements: [],
   invoices: [],
   deliveryChallans: [],
   payments: [],
   paymentFollowUps: [],
   paymentPromises: [],
   tasks: [],
+  tdRecords: [],
   attendance: [],
   salaryRates: null,
   salaryReports: [],
@@ -220,6 +232,11 @@ export const normalizeAppState = (parsed) => {
     paymentPromises: parsed.paymentPromises || [],
     bprs: parsed.bprs || [],
     packingLists: parsed.packingLists || [],
+    umaDrumReceipts: parsed.umaDrumReceipts || [],
+    stockItems: Array.isArray(parsed.stockItems) && parsed.stockItems.length
+      ? parsed.stockItems
+      : DEFAULT_STOCK_ITEMS.map((item) => ({ ...item })),
+    stockMovements: parsed.stockMovements || [],
     invoices: syncedInvoices,
     quotations: parsed.quotations || [],
     debitNotes: parsed.debitNotes || [],
@@ -241,6 +258,7 @@ export const normalizeAppState = (parsed) => {
     utilityTempRecords: parsed.utilityTempRecords || [],
     pmAirCompressorRecords: parsed.pmAirCompressorRecords || [],
     monthlySummaries: parsed.monthlySummaries || [],
+    tdRecords: parsed.tdRecords || [],
     salaryRates: parsed.salaryRates || null,
     salaryReports: parsed.salaryReports || [],
     auditLogs: parsed.auditLogs || [],

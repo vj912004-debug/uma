@@ -17,6 +17,7 @@ export const MODULE_OPTIONS = [
   { id: '/bpr', label: 'BPR', group: 'Dispatch & Delivery' },
   { id: '/psd', label: 'PSD Upload', group: 'Dispatch & Delivery' },
   { id: '/packing-list', label: 'Packing List', group: 'Dispatch & Delivery' },
+  { id: '/stock-register', label: 'Stock Register', group: 'Dispatch & Delivery' },
   { id: '/dc', label: 'Delivery Challan', group: 'Dispatch & Delivery' },
   { id: '/eway-dc', label: 'E-Way (DC)', group: 'Dispatch & Delivery', highlight: true },
   { id: '/eway-ti', label: 'E-Way (TI)', group: 'Dispatch & Delivery', highlight: true },
@@ -34,6 +35,7 @@ export const MODULE_OPTIONS = [
   { id: '/marketing-follow-up', label: 'Follow Up', group: 'Marketing' },
 
   { id: '/processing-sheet', label: 'Processing Sheet', group: 'Reports & Logs' },
+  { id: '/td-module', label: 'TD Module', group: 'Reports & Logs' },
   { id: '/tasks', label: 'Tasks', group: 'Reports & Logs' },
   { id: '/quotations', label: 'Quotations', group: 'Reports & Logs' },
   { id: '/employee-master', label: 'Employee Master', group: 'Reports & Logs' },

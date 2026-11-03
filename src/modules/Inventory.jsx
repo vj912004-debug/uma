@@ -108,14 +108,16 @@ const Inventory = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
+                  <th style={{ padding: '1rem' }}>Sr. No</th>
                   <th style={{ padding: '1rem' }}>Item Name</th>
                   <th style={{ padding: '1rem' }}>Current Stock</th>
                   <th style={{ padding: '1rem' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(currentStock).map(([item, qty]) => (
+                {Object.entries(currentStock).map(([item, qty], idx) => (
                   <tr key={item} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '1rem' }}>{idx + 1}</td>
                     <td style={{ padding: '1rem', fontWeight: 600 }}>{item}</td>
                     <td style={{ padding: '1rem', fontSize: '1.25rem', fontWeight: 700 }}>{qty}</td>
                     <td style={{ padding: '1rem' }}>
@@ -175,6 +177,7 @@ const Inventory = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
+                  <th style={{ padding: '1rem' }}>Sr. No</th>
                   <th style={{ padding: '1rem' }}>Date</th>
                   <th style={{ padding: '1rem' }}>Item</th>
                   <th style={{ padding: '1rem' }}>Type</th>
@@ -183,8 +186,9 @@ const Inventory = () => {
                 </tr>
               </thead>
               <tbody>
-                {newestFirst(data.stockAdjustments || []).map(adj => (
+                {newestFirst(data.stockAdjustments || []).map((adj, idx) => (
                   <tr key={adj.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '1rem' }}>{idx + 1}</td>
                     <td style={{ padding: '1rem' }}>{formatDate(adj.date)}</td>
                     <td style={{ padding: '1rem', fontWeight: 600 }}>{adj.item}</td>
                     <td style={{ padding: '1rem' }}>

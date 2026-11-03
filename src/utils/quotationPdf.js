@@ -45,8 +45,7 @@ const rateDisplayHtml = (rateStr, sourceKey = '', rateUnits = {}) => {
 
 const MAIN_PRINT_CHARGES = [
   { key: 'cleaning', label: 'Minimum Cleaning Charges (998842)', isQtyRate: true },
-  { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true },
-  { key: 'sieving', label: 'Sieving Charges (998842)', isQtyRate: true }
+  { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true }
 ];
 
 const OPTIONAL_PRINT_CHARGES = [
@@ -183,17 +182,16 @@ export const enrichQuotationForPrint = (data = {}) => {
 
   if (companyQuote) {
     const cleaning = firstPositiveRate(header.cleaning, header.minimum, rates.cleaning);
-    const sieving = firstPositiveRate(header.sieving, rates.sieving);
     const filterBag = firstPositiveRate(header.filterBag, rates.filterBag);
     const headerProcessing = firstPositiveRate(header.processing, rates.processing);
     rates.cleaning = cleaning || rates.cleaning || 0;
-    rates.sieving = sieving || rates.sieving || 0;
     rates.filterBag = filterBag || rates.filterBag || 0;
     rates.processing = firstPositiveRate(lines[0]?.rates?.processing, headerProcessing, rates.processing);
     charges.cleaning = true;
-    charges.sieving = true;
     charges.filterBag = true;
     charges.processing = lines.length <= 1;
+    // Sleeving Charges uses defaultRates.other — do not also print legacy sieving
+    charges.sieving = false;
 
     const rateUnits = mergeRateUnits({ ...(saved.rateUnits || {}), ...(data.rateUnits || {}) });
     const productRows = lines.slice(lines.length > 1 ? 0 : 1).map((line) => {
@@ -223,9 +221,9 @@ export const enrichQuotationForPrint = (data = {}) => {
     const other = firstPositiveRate(header.other);
     if (other > 0) {
       const printed = formatQuotedRate(other, '');
-      const isOther = (row) => /other charges/i.test(String(row?.description || ''));
+      const isOther = (row) => /other charges|sleeving charges/i.test(String(row?.description || ''));
       if (![...(mainCharges || []), ...(optionalCharges || [])].some(isOther)) {
-        const row = { description: 'Other Charges', rate: printed, dryRate: printed, sourceKey: '' };
+        const row = { description: 'Sleeving Charges', rate: printed, dryRate: printed, sourceKey: 'other' };
         if ((data.chargeSection?.other || 'optional') === 'main') mainCharges = [...(mainCharges || []), row];
         else optionalCharges = [...(optionalCharges || []), row];
       }
@@ -548,10 +546,12 @@ export const buildQuotationHtml = (data, profileInput) => {
   .reg-row .label{font-weight:700;color:var(--purple);}
   .invoice-meta{flex:1;min-width:280px;border:1px solid var(--purple);border-radius:6px;overflow:visible;
     display:flex;flex-direction:column;justify-content:center;}
-  .invoice-meta .block{padding:7px 10px;overflow:visible;}
+  /* Extra right padding so Quotation No / dates / email are not clipped by the border */
+  .invoice-meta .block{padding:7px 14px 7px 8px;overflow:visible;}
   .invoice-meta .block + .block{border-top:1px solid var(--purple);}
-  .meta-row{display:grid;grid-template-columns:14px 102px 8px minmax(0,1fr);column-gap:4px;align-items:start;
-    margin-bottom:3px;font-size:10.5px;line-height:1.3;white-space:normal;color:#231f20;}
+  .meta-row{display:grid;grid-template-columns:14px 96px 8px minmax(0,1fr);column-gap:4px;align-items:start;
+    margin-bottom:3px;font-size:10.5px;line-height:1.3;white-space:normal;color:#231f20;
+    padding-right:2px;box-sizing:border-box;}
   .meta-row:last-child{margin-bottom:0;}
   .meta-row .m-label,.meta-row .m-colon,.meta-row .m-value{font-weight:700;}
   .meta-row .m-label{white-space:nowrap;}
@@ -564,6 +564,7 @@ export const buildQuotationHtml = (data, profileInput) => {
     overflow-wrap:anywhere;
     word-break:break-word;
     line-height:1.25;
+    padding-right:4px;
   }
   .meta-row .m-icon{display:flex;align-items:center;justify-content:center;padding-top:1px;}
   .parties{display:flex;gap:10px;margin-top:10px;width:100%;}
@@ -591,7 +592,8 @@ export const buildQuotationHtml = (data, profileInput) => {
   .sheet.quot-compact .info-row,.sheet.quot-compact .parties{margin-top:6px;gap:8px;}
   .sheet.quot-compact .company-info,.sheet.quot-compact .reg-details,.sheet.quot-compact .meta-row,
   .sheet.quot-compact .party-head,.sheet.quot-compact .party-body,.sheet.quot-compact .party-foot{font-size:9.5px;}
-  .sheet.quot-compact .invoice-meta .block,.sheet.quot-compact .party-body,.sheet.quot-compact .party-foot{padding:5px 10px;}
+  .sheet.quot-compact .invoice-meta .block{padding:5px 14px 5px 8px;}
+  .sheet.quot-compact .party-body,.sheet.quot-compact .party-foot{padding:5px 10px;}
   .sheet.quot-ultra .company-info .line{margin-bottom:1px;}
   .sheet.quot-ultra .company-info,.sheet.quot-ultra .reg-details,.sheet.quot-ultra .meta-row,
   .sheet.quot-ultra .party-head,.sheet.quot-ultra .party-body,.sheet.quot-ultra .party-foot{font-size:8.5px;line-height:1.3;}
@@ -927,7 +929,7 @@ export const buildQuotationHtml = (data, profileInput) => {
     width:fit-content;align-self:flex-end;
   }
   .sign2 .seal-box{
-    width:68px;height:68px;border:1px dashed #9a8bb8;border-radius:4px;
+    width:100px;height:100px;border:1px dashed #9a8bb8;border-radius:4px;
     display:flex;align-items:center;justify-content:center;
     color:#9a8bb8;font-size:8px;font-weight:700;letter-spacing:.3px;
     background:#faf8fc;box-sizing:border-box;flex-shrink:0;
@@ -998,7 +1000,7 @@ export const buildQuotationHtml = (data, profileInput) => {
 <body>
 
 <!-- ============================================================ PAGE 1 ============================================================ -->
-<div class="sheet pdf-page print-host">
+<div class="sheet pdf-page print-host qt-page">
 
   <!-- HEADER (same layout as TI / PI / PO) -->
   ${buildPrintHeader(profile, 'QUOTATION', 'CONTRACT MICRONIZATION SERVICES')}
@@ -1203,7 +1205,7 @@ export const buildQuotationHtml = (data, profileInput) => {
       <span>SCAN TO VISIT OUR WEBSITE</span>
     </div>
     <div class="sign2">
-      ${getPrintStampSrc(profile) ? `<img src="${getPrintStampSrc(profile)}" alt="Stamp" style="max-height:54px;max-width:100px;object-fit:contain;display:block;margin:0 auto 4px auto;mix-blend-mode:multiply;" />` : '<div class="seal-box">SEAL</div>'}
+      ${getPrintStampSrc(profile) ? `<img src="${getPrintStampSrc(profile)}" alt="Stamp" style="max-height:88px;max-width:160px;object-fit:contain;display:block;margin:0 auto 4px auto;mix-blend-mode:multiply;" />` : '<div class="seal-box">SEAL</div>'}
       <p><b>For ${companyName}</b></p>
       <p><b>${sigName}</b><br><small>Authorised Signatory</small></p>
     </div>

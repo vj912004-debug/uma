@@ -1,8 +1,58 @@
 import { mergeCompanyProfile } from './companyProfile';
 import { formatPdfDateSlash } from './taxInvoiceLayout';
+import { formatTime } from './dateUtils';
 import { escHtml, buildPrintBrandHtml, applyPrintPrefsToHtml, layoutFillOtherPrintPages, buildStatusBar, PRINT_FOOTER_MESSAGES } from './printTheme';
 import { PRINT_ROOT_CLASS } from './printPrefs';
 import { buildPdfDownloadFileName } from './pdfFileName';
+
+const NOTE_UNIT = /^(kg|g|gm|mm|cm|m|sec|min|hr|hrs|nos|%)$/i;
+const isTitleWord = (word) => /^[A-Z][a-z]/.test(word) || /^[A-Z]{2,}$/.test(word);
+const hasDigit = (word) => /\d/.test(word);
+
+/** Turn a one-line note into one detail per row: Old mill / New jet / Fast ventury. */
+const splitNoteDetails = (text) => {
+  const raw = String(text || '').replace(/\r\n/g, '\n').trim();
+  if (!raw) return [];
+  if (raw.includes('\n')) return raw.split('\n').map((line) => line.trim()).filter(Boolean);
+  const words = raw
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/\s+/)
+    .filter(Boolean);
+  const lines = [];
+  let current = [];
+  const flush = () => {
+    if (current.length) lines.push(current.join(' '));
+    current = [];
+  };
+  words.forEach((word) => {
+    if (word.startsWith('/') && current.length) {
+      current[current.length - 1] += word;
+      return;
+    }
+    if (!current.length) {
+      current.push(word);
+      return;
+    }
+    const prev = current[current.length - 1];
+    const newTitle = isTitleWord(word) && !isTitleWord(prev);
+    const nextMeasure = hasDigit(word) && current.some(hasDigit);
+    const newPhrase = hasDigit(prev) && /^[a-z]/.test(word) && !NOTE_UNIT.test(word);
+    if (newTitle || nextMeasure || newPhrase) flush();
+    current.push(word);
+  });
+  flush();
+  return lines;
+};
+
+/** One ruled row per detail so PSD / Special notes print line by line. */
+const renderNoteLines = (text, minLines = 10) => {
+  const parts = splitNoteDetails(text);
+  const count = Math.max(minLines, parts.length);
+  return Array.from({ length: count }, (_, i) => {
+    const line = parts[i] || '';
+    return `<div class="psd-note-line">${line ? escHtml(line) : '&nbsp;'}</div>`;
+  }).join('');
+};
 
 const hasWeight = (row = {}) => {
   const vals = [row.gross, row.tare, row.net];
@@ -41,16 +91,6 @@ const METRIC_ROWS = [
   { key: 'bd', label: 'B.D.' },
   { key: 'td', label: 'T.D.' },
   { key: 'micron', label: 'Micron' }
-];
-
-const PREV_BD_COLS = [
-  { key: 'asSuch', label: 'As Such' },
-  { key: 'finalPass', label: 'Final pass' },
-  { key: 'ap', label: 'A P' },
-  { key: 'fp', label: 'F P' },
-  { key: 'fr', label: 'F R' },
-  { key: 'clearance', label: 'Clearance' },
-  { key: 'totalPassNeed', label: 'Total pass<br>need' }
 ];
 
 const BD_COLS = [
@@ -100,6 +140,7 @@ export const buildBlankBprPayload = ({ partyName = '', productName = '', company
     sizingReportRequired: '',
     particleSizeResult: '',
     psdNote: '',
+    specialNote: '',
     materialReceivedDate: '',
     materialReceivedTime: '',
     committedDate: '',
@@ -167,7 +208,10 @@ export const buildBprHtml = (data, profileInput) => {
     .join(', ');
   const primaryBatchNo = batchNos.join(', ') || fallbackBatchNo;
   const totalNoBatch = batchNos.length || data.totalNoBatch || '';
-  const psdNoteText = String(data.psdNote || '').trim();
+  const psdNoteText = String(data.psdNote || '').replace(/\r\n/g, '\n').trim();
+  const specialNoteText = String(
+    data.specialNote || data.specialNotes || data.remarks || data.specialInstructions || ''
+  ).trim();
   const pc = {
     ...(data.packingMaterials || {}),
     ...(data.packingConsumables || {})
@@ -180,7 +224,6 @@ export const buildBprHtml = (data, profileInput) => {
   pc.drumUsed = String(
     pc.drumUsed || pc.fiberDrumsUsed || pc.hdpeDrumsUsed || (drumCount ? drumCount : '') || ''
   ).trim();
-  const prevBd = data.previousBulkDensity || {};
   const bd = data.bulkDensity || {};
 
   const customerName = data.partyName || data.customerName || data.party || '';
@@ -439,12 +482,6 @@ export const buildBprHtml = (data, profileInput) => {
     summaryRowHtml('Irrecoverable loss', irrecoverablePrint)
   ].join('');
 
-  const prevBdRows = METRIC_ROWS.map((m) => `
-    <tr>
-      <td class="left-align">${m.label}</td>
-      ${PREV_BD_COLS.map((c) => `<td>${cell(prevBd, c.key, m.key)}</td>`).join('')}
-    </tr>`).join('');
-
   const bdRows = METRIC_ROWS.map((m) => `
     <tr>
       <td class="left-align">${m.label}</td>
@@ -511,9 +548,9 @@ export const buildBprHtml = (data, profileInput) => {
         </tr>
         <tr>
           <td class="left-align">Time</td>
-          <td>${escHtml(data.materialReceivedTime || '')}</td>
-          <td>${escHtml(data.committedTime || '')}</td>
-          <td>${escHtml(data.processingStartTime || '')}</td>
+          <td>${escHtml(formatTime(data.materialReceivedTime) || '')}</td>
+          <td>${escHtml(formatTime(data.committedTime) || '')}</td>
+          <td>${escHtml(formatTime(data.processingStartTime) || '')}</td>
         </tr>
       </table>
 
@@ -531,8 +568,16 @@ export const buildBprHtml = (data, profileInput) => {
       </table>
 
       <div class="psd-note-box">
-        <div class="psd-note-head">PSD Note</div>
-        <div class="psd-note-body">${escHtml(psdNoteText)}${psdNoteText ? '' : '&nbsp;'}</div>
+        <div class="psd-note-split">
+          <div class="psd-note-part">
+            <div class="psd-note-head">PSD Note</div>
+            <div class="psd-note-lines">${renderNoteLines(psdNoteText)}</div>
+          </div>
+          <div class="psd-note-part">
+            <div class="psd-note-head">Special Note</div>
+            <div class="psd-note-lines">${renderNoteLines(specialNoteText)}</div>
+          </div>
+        </div>
       </div>
 
       <table class="g">
@@ -548,15 +593,6 @@ export const buildBprHtml = (data, profileInput) => {
           <td class="left-align">Is the bag is clean and black spot free?</td>
           <td>${bprMark(data.cleaningChecklist?.bagClean)}</td>
         </tr>
-      </table>
-
-      <div class="section-badge"><span class="pill-badge">Previous Record Of Bulk Density for reference</span></div>
-      <table class="g">
-        <tr class="light-purple-header">
-          <td style="width:18%;"></td>
-          ${PREV_BD_COLS.map((c) => `<td>${c.label}</td>`).join('')}
-        </tr>
-        ${prevBdRows}
       </table>
 
       <table class="g">
@@ -607,7 +643,7 @@ export const buildBprHtml = (data, profileInput) => {
           <td style="width:8%;" class="left-align">Date</td>
           <td style="width:25%;">${escHtml(formatPdfDateSlash(data.processCompletionDate) || '')}</td>
           <td style="width:8%;" class="left-align">Time</td>
-          <td style="width:20%;">${escHtml(data.processCompletionTime || '')}</td>
+          <td style="width:20%;">${escHtml(formatTime(data.processCompletionTime) || '')}</td>
           <td style="width:19%;"></td>
         </tr>
         <tr>
@@ -710,8 +746,8 @@ export const buildBprHtml = (data, profileInput) => {
     z-index:1;
   }
   .psd-note-box{
-    flex:0 0 auto;
-    min-height:48px;
+    flex:1 1 auto;
+    min-height:150px;
     display:flex;
     flex-direction:column;
     border:1px solid #7c12bd;
@@ -728,10 +764,31 @@ export const buildBprHtml = (data, profileInput) => {
     border-bottom:1px solid #7c12bd;
     flex-shrink:0;
   }
+  .psd-note-split{
+    flex:1 1 auto;
+    min-height:120px;
+    display:flex;
+    flex-direction:row;
+    align-items:stretch;
+  }
+  .psd-note-part{
+    flex:1 1 50%;
+    width:50%;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    border-right:1px solid #7c12bd;
+  }
+  .psd-note-part:last-child{
+    border-right:none;
+  }
+  .psd-note-part .psd-note-head{
+    border-right:none;
+  }
   .psd-note-body{
     flex:0 0 auto;
-    min-height:28px;
-    padding:4px 8px;
+    min-height:18px;
+    padding:4px 8px 0;
     text-align:left;
     font-size:12px;
     font-weight:700;
@@ -739,8 +796,36 @@ export const buildBprHtml = (data, profileInput) => {
     -webkit-text-fill-color:#4a0080 !important;
     white-space:pre-wrap;
     word-break:break-word;
-    line-height:1.3;
+    line-height:1.25;
     overflow:visible;
+  }
+  .psd-note-lines{
+    flex:1 1 auto;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+    align-items:stretch;
+    padding:0;
+    margin:0;
+    gap:0;
+  }
+  .psd-note-line{
+    flex:0 0 auto;
+    min-height:18px;
+    height:auto;
+    margin:0;
+    padding:1px 6px;
+    border-bottom:1px solid #7c12bd;
+    box-sizing:border-box;
+    text-align:left;
+    font-size:11px;
+    font-weight:700;
+    line-height:1.25;
+    color:#4a0080 !important;
+    -webkit-text-fill-color:#4a0080 !important;
+    white-space:pre-wrap;
+    word-break:break-word;
   }
   .remark-box {
     flex: 0 0 auto;
@@ -1442,22 +1527,26 @@ const fitBprPage1ToA4 = (pageEl, pageHeightPx = 1123) => {
     remark.style.overflow = 'visible';
   }
   if (psdNote) {
-    psdNote.style.flex = '0 0 auto';
-    psdNote.style.minHeight = '48px';
+    // Grow into space freed by removing Previous Bulk Density table
+    psdNote.style.flex = '1 1 auto';
+    psdNote.style.minHeight = '150px';
     psdNote.style.maxHeight = 'none';
     psdNote.style.overflow = 'visible';
-    psdNote.style.flexShrink = '0';
-    const body = psdNote.querySelector('.psd-note-body');
-    if (body) {
-      body.style.flex = '0 0 auto';
-      body.style.minHeight = '28px';
-      body.style.maxHeight = 'none';
-      body.style.overflow = 'visible';
+    const split = psdNote.querySelector('.psd-note-split');
+    if (split) {
+      split.style.flex = '1 1 auto';
+      split.style.minHeight = '120px';
+    }
+    psdNote.querySelectorAll('.psd-note-lines').forEach((el) => {
+      el.style.flex = '1 1 auto';
+      el.style.minHeight = '90px';
+    });
+    psdNote.querySelectorAll('.psd-note-body').forEach((body) => {
       body.style.setProperty('color', '#4a0080', 'important');
       body.style.setProperty('-webkit-text-fill-color', '#4a0080', 'important');
       body.style.setProperty('visibility', 'visible', 'important');
       body.style.setProperty('opacity', '1', 'important');
-    }
+    });
   }
 
   pageEl.querySelectorAll('table.g, .header-table, .section-badge').forEach((el) => {
@@ -1484,7 +1573,14 @@ const fitBprPage1ToA4 = (pageEl, pageHeightPx = 1123) => {
         el.style.maxHeight = '44px';
         el.style.paddingBottom = '4px';
       });
-      if (psdNote) psdNote.style.minHeight = '0';
+      if (psdNote) {
+        psdNote.style.minHeight = '110px';
+        const split = psdNote.querySelector('.psd-note-split');
+        if (split) split.style.minHeight = '85px';
+        psdNote.querySelectorAll('.psd-note-lines').forEach((el) => {
+          el.style.minHeight = '60px';
+        });
+      }
     },
     () => {
       pageEl.querySelectorAll('.section-badge').forEach((el) => {
@@ -1499,6 +1595,14 @@ const fitBprPage1ToA4 = (pageEl, pageHeightPx = 1123) => {
         remark.querySelectorAll('div').forEach((el) => {
           el.style.padding = '4px';
           el.style.fontSize = '11px';
+        });
+      }
+      if (psdNote) {
+        psdNote.style.minHeight = '90px';
+        const split = psdNote.querySelector('.psd-note-split');
+        if (split) split.style.minHeight = '68px';
+        psdNote.querySelectorAll('.psd-note-lines').forEach((el) => {
+          el.style.minHeight = '48px';
         });
       }
     },
@@ -1536,21 +1640,22 @@ const fitBprPage1ToA4 = (pageEl, pageHeightPx = 1123) => {
       });
     },
     () => {
-      // Prefer slight scale over hiding PSD note text.
+      // Prefer slight scale over hiding PSD note text — keep a usable note area.
       if (psdNote) {
-        psdNote.style.flex = '0 0 auto';
-        psdNote.style.minHeight = '40px';
-        psdNote.style.maxHeight = '72px';
-        const body = psdNote.querySelector('.psd-note-body');
-        if (body) {
-          body.style.minHeight = '22px';
-          body.style.maxHeight = '48px';
-          body.style.overflow = 'hidden';
-          body.style.padding = '2px 6px';
+        psdNote.style.flex = '1 1 auto';
+        psdNote.style.minHeight = '72px';
+        psdNote.style.maxHeight = 'none';
+        const split = psdNote.querySelector('.psd-note-split');
+        if (split) split.style.minHeight = '52px';
+        psdNote.querySelectorAll('.psd-note-lines').forEach((el) => {
+          el.style.minHeight = '36px';
+        });
+        psdNote.querySelectorAll('.psd-note-body').forEach((body) => {
+          body.style.padding = '4px 6px';
           body.style.setProperty('color', '#4a0080', 'important');
           body.style.setProperty('-webkit-text-fill-color', '#4a0080', 'important');
           body.style.setProperty('visibility', 'visible', 'important');
-        }
+        });
       }
     }
   ];
@@ -1760,23 +1865,26 @@ export const renderBprPdf = async (data, { mode = 'save', printPrefs } = {}) => 
             el.style.boxSizing = 'border-box';
           });
           clonedDoc.querySelectorAll('.page-p1 .psd-note-box').forEach((el) => {
-            el.style.flex = '0 0 auto';
-            el.style.minHeight = '48px';
+            el.style.flex = '1 1 auto';
+            el.style.minHeight = '150px';
             el.style.maxHeight = 'none';
             el.style.overflow = 'visible';
-            el.style.flexShrink = '0';
             el.style.setProperty('visibility', 'visible', 'important');
-            const body = el.querySelector('.psd-note-body');
-            if (body) {
-              body.style.flex = '0 0 auto';
-              body.style.minHeight = '28px';
-              body.style.maxHeight = 'none';
-              body.style.overflow = 'visible';
+            const split = el.querySelector('.psd-note-split');
+            if (split) {
+              split.style.flex = '1 1 auto';
+              split.style.minHeight = '120px';
+            }
+            el.querySelectorAll('.psd-note-lines').forEach((lines) => {
+              lines.style.flex = '1 1 auto';
+              lines.style.minHeight = '90px';
+            });
+            el.querySelectorAll('.psd-note-body').forEach((body) => {
               body.style.setProperty('color', '#4a0080', 'important');
               body.style.setProperty('-webkit-text-fill-color', '#4a0080', 'important');
               body.style.setProperty('visibility', 'visible', 'important');
               body.style.setProperty('opacity', '1', 'important');
-            }
+            });
           });
           clonedDoc.querySelectorAll('.page.page-p2 .table-wrap').forEach((el) => {
             el.style.flex = '0 0 auto';

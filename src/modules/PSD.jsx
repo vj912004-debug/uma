@@ -197,6 +197,7 @@ const PSD = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>Sr. No</th>
                   <th style={{ padding: '0.75rem' }}>M.R. Number</th>
                   <th style={{ padding: '0.75rem' }}>Party</th>
                   <th style={{ padding: '0.75rem' }}>Product</th>
@@ -206,10 +207,11 @@ const PSD = () => {
               </thead>
               <tbody>
                 {pendingReceipts.length === 0 ? (
-                  <tr><td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No batches awaiting lab results.</td></tr>
+                  <tr><td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No batches awaiting lab results.</td></tr>
                 ) : (
-                  pendingReceipts.map((mr) => (
+                  pendingReceipts.map((mr, idx) => (
                     <tr key={mr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem' }}>{idx + 1}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{mr.receiptNo}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600 }}>{mr.partyName}</td>
                       <td style={{ padding: '0.75rem' }}>{mr.productName}</td>
@@ -234,6 +236,7 @@ const PSD = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>Sr. No</th>
                   <th style={{ padding: '0.75rem' }}>PSD No</th>
                   <th style={{ padding: '0.75rem' }}>Customer</th>
                   <th style={{ padding: '0.75rem' }}>Product</th>
@@ -245,10 +248,11 @@ const PSD = () => {
               </thead>
               <tbody>
                 {filteredPSDs.length === 0 ? (
-                  <tr><td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No PSD reports found.</td></tr>
+                  <tr><td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No PSD reports found.</td></tr>
                 ) : (
-                  filteredPSDs.map(psd => (
+                  filteredPSDs.map((psd, idx) => (
                     <tr key={psd.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem' }}>{idx + 1}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{psd.psdNo}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600 }}>{psd.partyName}</td>
                       <td style={{ padding: '0.75rem' }}>{psd.productName}</td>

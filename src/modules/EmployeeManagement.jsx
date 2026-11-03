@@ -259,6 +259,7 @@ const EmployeeManagement = () => {
           <table>
             <thead>
               <tr>
+                <th>Sr. No</th>
                 <th>System ID</th>
                 <th>Name</th>
                 <th>Username</th>
@@ -272,13 +273,14 @@ const EmployeeManagement = () => {
             <tbody>
               {(data.users || []).length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                     No employees found. Add your first employee.
                   </td>
                 </tr>
               ) : (
-                newestFirst(data.users || []).map((user) => (
+                newestFirst(data.users || []).map((user, idx) => (
                   <tr key={user.id}>
+                    <td>{idx + 1}</td>
                     <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{systemCodeFor(user)}</td>
                     <td>{user.name || user.username}</td>
                     <td>{user.username}</td>

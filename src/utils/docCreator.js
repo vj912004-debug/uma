@@ -14,9 +14,9 @@ const docRefNo = (doc) => String(
   || ''
 ).trim();
 
-/** Prefer saved doneBy/createdBy; fall back to audit log for older docs. */
-export const resolveCreatedBy = (doc, auditLogs = [], module = '') => {
-  const saved = String(doc?.doneBy || doc?.createdBy || doc?.updatedBy || '').trim();
+/** Prefer last updater; fall back to creator / audit log for older docs. */
+export const resolveUpdatedBy = (doc, auditLogs = [], module = '') => {
+  const saved = String(doc?.updatedBy || doc?.doneBy || doc?.createdBy || '').trim();
   if (saved) return saved;
 
   const id = String(doc?.id || '');
@@ -41,8 +41,17 @@ export const resolveCreatedBy = (doc, auditLogs = [], module = '') => {
     return false;
   });
 
-  return String(hit?.user || hit?.newValue?.doneBy || hit?.newValue?.createdBy || '').trim() || '—';
+  return String(
+    hit?.user
+    || hit?.newValue?.updatedBy
+    || hit?.newValue?.doneBy
+    || hit?.newValue?.createdBy
+    || ''
+  ).trim() || '—';
 };
+
+/** @deprecated Prefer resolveUpdatedBy — kept for older call sites. */
+export const resolveCreatedBy = resolveUpdatedBy;
 
 export const resolveCreatedAt = (doc, auditLogs = [], module = '') => {
   const saved = doc?.createdAt || doc?.updatedAt || '';
@@ -83,7 +92,8 @@ export const formatCreatedAt = (raw) => {
       month: 'short',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: true
     });
   } catch {
     return String(raw);

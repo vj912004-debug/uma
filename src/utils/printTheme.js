@@ -447,9 +447,9 @@ export const FIT_FOOTER_CSS = `
   }
   table.footer3 .sig-space {
     display: block;
-    height: 56px;
-    min-height: 56px;
-    max-height: 56px;
+    height: 88px;
+    min-height: 88px;
+    max-height: 88px;
   }
 `;
 
@@ -1165,9 +1165,9 @@ export const getSharedPrintStyles = () => `
   }
   .sig-col .sig-space {
     display: block;
-    height: 56px;
-    min-height: 56px;
-    max-height: 56px;
+    height: 88px;
+    min-height: 88px;
+    max-height: 88px;
   }
   .sig-col .sig-line, .signature-space {
     margin: 0;
@@ -1458,7 +1458,7 @@ export const buildFooterTerms = (companyName, termsHtml, declarationHtml, notesH
     : '';
   const activeStampUrl = String(stampUrl || '').trim();
   const stampImg = activeStampUrl
-    ? `<img src="${activeStampUrl}" alt="Stamp" style="max-height:52px;max-width:110px;object-fit:contain;display:block;margin:0 auto;mix-blend-mode:multiply;" />`
+    ? `<img src="${activeStampUrl}" alt="Stamp" style="max-height:88px;max-width:160px;object-fit:contain;display:block;margin:0 auto;mix-blend-mode:multiply;" />`
     : '';
   return `
   <table class="footer3${notesCell ? ' has-notes' : ''}">
@@ -1493,7 +1493,9 @@ export const PRINT_FOOTER_MESSAGES = {
   BPR: 'This document is a controlled record of the batch processing activity.',
   PL: 'Prepared for packing and dispatch reference purposes.',
   DC: 'Goods delivered as per the details mentioned above.',
-  PFU: 'This statement is issued for payment follow-up and account reconciliation purposes.'
+  PFU: 'This statement is issued for payment follow-up and account reconciliation purposes.',
+  PS: 'Prepared for salary disbursement reference.',
+  MS: 'This monthly summary is issued for billing and account reconciliation purposes.'
 };
 
 /** Purple status bar: optional Thank you + E.&O.E. | doc message | Page X of Y.
@@ -1679,7 +1681,8 @@ export const renderHtmlToPdf = async (html, {
   printPrefs,
   skipPrintPrefs = false,
   prepareDoc = null,
-  splitOverflowPages = false
+  splitOverflowPages = false,
+  orientation = 'portrait'
 } = {}) => {
   const { jsPDF } = await import('jspdf');
   const html2canvas = (await import('html2canvas')).default;
@@ -1691,6 +1694,7 @@ export const renderHtmlToPdf = async (html, {
     : applyPrintPrefsToHtml(html, resolvedPrefs);
   const minFitScale = resolvedPrefs ? getPrintMinFitScale(resolvedPrefs) : 0.82;
   let density = resolvedPrefs ? getPrintDensity(resolvedPrefs) : 'base';
+  const isLandscape = String(orientation || '').toLowerCase() === 'landscape';
 
   // Render inside an iframe so document <style> (e.g. * { font-size })
   // cannot leak into the live ERP UI and shrink app fonts on Preview.
@@ -1723,7 +1727,8 @@ export const renderHtmlToPdf = async (html, {
     await new Promise((r) => setTimeout(r, 80));
     bakePrintSvgPaints(idoc.body || idoc.documentElement);
 
-    const a4Ratio = 297 / 210;
+    // Portrait A4 = 210×297; landscape flips the ratio for page-height math.
+    const a4Ratio = isLandscape ? (210 / 297) : (297 / 210);
     const singlePageHeight = Math.round(width * a4Ratio);
     if (typeof prepareDoc === 'function') {
       prepareDoc(idoc, { width, singlePageHeight, printPrefs: resolvedPrefs, density });
@@ -1768,7 +1773,11 @@ export const renderHtmlToPdf = async (html, {
       }
     }
 
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pdf = new jsPDF({
+      orientation: isLandscape ? 'landscape' : 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
     const margin = 0;
@@ -2072,9 +2081,9 @@ export const renderHtmlToPdf = async (html, {
           clonedDoc.querySelectorAll('table.footer3 .sig-space').forEach((el) => {
             el.style.display = 'block';
             el.style.flex = 'none';
-            el.style.height = '56px';
-            el.style.minHeight = '56px';
-            el.style.maxHeight = '56px';
+            el.style.height = '88px';
+            el.style.minHeight = '88px';
+            el.style.maxHeight = '88px';
           });
           clonedDoc.querySelectorAll('.sig-col .sig-line, .sig-line').forEach((el) => {
             el.style.margin = '0';

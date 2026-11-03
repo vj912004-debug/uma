@@ -18,7 +18,7 @@ import TimeField from '../components/TimeField';
 import SearchableSelect from '../components/SearchableSelect';
 import ExportButton from '../components/ExportButton';
 import StatusTabBar from '../components/StatusTabBar';
-import { formatDate, getDefaultFiscalYearRange, newestFirst } from '../utils/dateUtils';
+import { formatDate, formatTime, getDefaultFiscalYearRange, newestFirst } from '../utils/dateUtils';
 
 const YES_NO = ['Yes', 'No'];
 const MAKE_OPTIONS = ['Gardner Denver', 'Atlas Copco', 'Ingersoll Rand', 'Kaeser', 'Other'];
@@ -363,7 +363,7 @@ const UtilityRecord = () => {
                   <tr key={r.id} className="pm-click-row" title="Click to open record" onClick={() => openEdit(r)}>
                     <td>{(pageSafe - 1) * PAGE_SIZE + idx + 1}</td>
                     <td>{formatDate(r.date)}</td>
-                    <td>{r.time || '—'}</td>
+                    <td>{r.time ? formatTime(r.time) : '—'}</td>
                     <td>{r.make || '—'}</td>
                     <td>{r.voltage1}</td>
                     <td>{r.voltage3}</td>

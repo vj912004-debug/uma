@@ -14,7 +14,8 @@ import { formatDate, newestFirst } from '../utils/dateUtils';
 import DcPartyBoxes from '../components/DcPartyBoxes';
 import {
   buildDCFieldsFromProducts,
-  getReceiptProductNames,
+  getDCDefaultSelectedProducts,
+  getProductsNeedingDC,
   getReceiptProductSummaries,
   receiptProductOptions
 } from '../utils/receiptProducts';
@@ -101,8 +102,11 @@ const DeliveryChallan = () => {
     if (selectedPL && activeMR) {
       const dcSerial = data.settings?.serials?.DC || 1;
       const docNo = generateDocNumber('DC', dcSerial, new Date());
-      const allNames = getReceiptProductNames(activeMR, prodOpts);
-      const computed = buildDCFieldsFromProducts(activeMR, selectedPL, prodOpts, allNames);
+      const stillNeeded = getProductsNeedingDC(activeMR, selectedPL, data.deliveryChallans || [], prodOpts);
+      const selected = stillNeeded.length
+        ? stillNeeded
+        : getDCDefaultSelectedProducts(activeMR, selectedPL, prodOpts);
+      const computed = buildDCFieldsFromProducts(activeMR, selectedPL, prodOpts, selected);
 
       setForm({
         ...emptyDCForm(docNo),
@@ -115,7 +119,7 @@ const DeliveryChallan = () => {
         shipAddress: activeMR.shipAddress,
         gstinBill: activeMR.gstinBill,
         gstinShip: activeMR.gstinShip,
-        selectedProducts: allNames,
+        selectedProducts: selected,
         productDeliveryNotes: activeMR.productDeliveryNotes || {},
         vehicleNo: activeMR.vehicleNo || '',
         termsAndConditions: (activeMR.deliveryNotes || '').trim(),
@@ -229,9 +233,14 @@ const DeliveryChallan = () => {
     setIsModalOpen(false);
   };
 
-  const pendingPLs = newestFirst((data.packingLists || []).filter(pl =>
-    !(data.deliveryChallans || []).some(dc => dc.receiptId === pl.receiptId)
-  ));
+  const pendingPLs = newestFirst((data.packingLists || []).filter((pl) => {
+    const mr = (data.materialReceipts || []).find((r) => r.id === pl.receiptId);
+    if (!mr) {
+      return !(data.deliveryChallans || []).some((dc) => dc.receiptId === pl.receiptId);
+    }
+    const opts = receiptProductOptions(mr, data);
+    return getProductsNeedingDC(mr, pl, data.deliveryChallans || [], opts).length > 0;
+  }));
 
   const dcList = newestFirst(data.deliveryChallans || []);
   const partyOptions = useMemo(() => uniqueSortedOptions(dcList.map((dc) => dc.partyName)), [dcList]);
@@ -337,6 +346,7 @@ const DeliveryChallan = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>Sr. No</th>
                   <th style={{ padding: '0.75rem' }}>PL No</th>
                   <th style={{ padding: '0.75rem' }}>Product</th>
                   <th style={{ padding: '0.75rem' }}>Weight / Drums</th>
@@ -345,10 +355,11 @@ const DeliveryChallan = () => {
               </thead>
               <tbody>
                 {pendingPLs.length === 0 ? (
-                  <tr><td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No packing lists awaiting dispatch.</td></tr>
+                  <tr><td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No packing lists awaiting dispatch.</td></tr>
                 ) : (
-                  pendingPLs.map((pl) => (
+                  pendingPLs.map((pl, idx) => (
                     <tr key={pl.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem' }}>{idx + 1}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{pl.plNo}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600 }}>{pl.productName}</td>
                       <td style={{ padding: '0.75rem' }}>{pl.totalWeight?.toFixed(1) || 0} Kg ({pl.totalDrums} Drums)</td>
@@ -372,6 +383,7 @@ const DeliveryChallan = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>Sr. No</th>
                   <th style={{ padding: '0.75rem' }}>DC No</th>
                   <th style={{ padding: '0.75rem' }}>Customer</th>
                   <th style={{ padding: '0.75rem' }}>Product</th>
@@ -383,10 +395,11 @@ const DeliveryChallan = () => {
               </thead>
               <tbody>
                 {filteredDCs.length === 0 ? (
-                  <tr><td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No DC records found.</td></tr>
+                  <tr><td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No DC records found.</td></tr>
                 ) : (
-                  filteredDCs.map(dc => (
+                  filteredDCs.map((dc, idx) => (
                     <tr key={dc.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem' }}>{idx + 1}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{dc.dcNo}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600 }}>{dc.partyName}</td>
                       <td style={{ padding: '0.75rem' }}>{dc.productName}</td>

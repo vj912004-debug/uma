@@ -16,6 +16,7 @@ import {
 } from '../utils/printPrefs';
 import SearchableSelect from '../components/SearchableSelect';
 import ExportButton from '../components/ExportButton';
+import { formatDateTime } from '../utils/dateUtils';
 
 const Section = ({ title, children }) => (
   <div className="premium-card" style={{ marginBottom: '1.5rem' }}>
@@ -382,7 +383,7 @@ const CompanyProfileSettings = () => {
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', alignItems: 'center' }}>
           {form.updatedAt && (
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Last updated: {new Date(form.updatedAt).toLocaleString()}
+              Last updated: {formatDateTime(form.updatedAt)}
             </span>
           )}
           {saved && <span style={{ color: 'var(--accent-primary)', fontSize: '0.85rem', fontWeight: 600 }}>Saved successfully!</span>}

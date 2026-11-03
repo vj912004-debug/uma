@@ -1,5 +1,5 @@
-import { formatDate, newestFirst } from '../utils/dateUtils';
-import React, { useState, useEffect, useMemo } from 'react';
+import { currentLocalDateTime, formatDate, newestFirst } from '../utils/dateUtils';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber, nextAvailableDocNumber } from '../utils/numbering';
 import DateField from '../components/DateField';
@@ -13,7 +13,28 @@ import {
 import { viewPDF, padBPRBatchRows } from '../utils/pdfExport';
 import DocDownloadButtons from '../components/DocDownloadButtons';
 import ExportButton from '../components/ExportButton';
-import { enrichPIForPrint, enrichTIForPrint, findAnyProformaInvoice, findAnyTaxInvoice, getLinkedPITermsForTI, resolveReceiptChargesForDoc, resolveTIProductChargesForDoc, sanitizeProductCharges, qtyInputValue, rateInputValue } from '../utils/documentCharges';
+import {
+  enrichPIForPrint,
+  enrichTIForPrint,
+  findAnyProformaInvoice,
+  findAnyTaxInvoice,
+  getFreshMaterialReceipt,
+  getLinkedPITermsForTI,
+  getMRProductChargeSettings,
+  getChargeSlotQty,
+  formatChargeSlotLabel,
+  initProductChargesFromMR as initProductChargesFromMRShared,
+  normalizeProductChargesFromDoc,
+  resolveReceiptChargesForDoc,
+  resolveTIProductChargesForDoc,
+  sanitizeProductCharges,
+  applyUmaNewDrumCharge,
+  resolveProductChargeKey,
+  sumHdpeDrumQty,
+  calcProductChargesSubtotal as calcProductChargesSubtotalShared,
+  qtyInputValue,
+  rateInputValue
+} from '../utils/documentCharges';
 import { DEFAULT_INVOICE_TERMS_TEXT, DEFAULT_PI_TERMS_TEXT } from '../utils/printTheme';
 import {
   getReceiptProductNames,
@@ -35,12 +56,29 @@ import {
   buildPLBatchesFromMR,
   buildUnderProcessRows,
   buildDCFieldsFromProducts,
+  getDCDefaultSelectedProducts,
+  getPLDefaultSelectedProducts,
+  getProductsNeedingPL,
+  plRowMicron,
+  buildPLFieldsFromProducts,
   getPartyProductForMR,
-  enrichBPRForPrint
+  resolveDocNickAndPsd,
+  enrichBPRForPrint,
+  getProductMicronSlots,
+  findBprForProductMicron
 } from '../utils/receiptProducts';
 import SearchableSelect from '../components/SearchableSelect';
 import GstTaxBlock from '../components/GstTaxBlock';
 import { GST_TYPE_CGST_SGST, normalizeGstType } from '../utils/taxInvoiceLayout';
+
+const isUmaDrumName = (value) => /^(new uma drum|uma new drum)$/i.test(String(value || '').trim());
+
+const rowAnchorBatch = (row) => {
+  const anchor = String(row?.anchorBatch || '').trim();
+  if (anchor && anchor !== '—') return anchor;
+  if (row?.umaNewDrum || isUmaDrumName(row?.batchNo)) return '';
+  return String(row?.batchNo || '').trim();
+};
 
 const CHARGE_KEYS = [
   'cleaning', 'filterBag', 'processing', 'sieving', 'psdReport',
@@ -101,91 +139,31 @@ const getChargeLineQty = (pc, key, materialQty) => {
   return parseChargeNumber(q, 0);
 };
 
-const normalizeProductCharges = (productCharges, legacyDoc, mr, prodOpts, fallbackProductName) => {
-  if (productCharges && Object.keys(productCharges).length > 0) {
-    return Object.fromEntries(
-      Object.entries(productCharges).map(([prodName, pc]) => {
-        const materialQty = getProductQty(mr, prodName, prodOpts);
-        return [prodName, {
-          charges: { ...emptyChargeFlags(), ...(pc.charges || {}) },
-          rates: { ...emptyChargeRates(), ...(pc.rates || {}) },
-          qtys: buildChargeQtys({ qtys: { ...(legacyDoc?.qtys || {}), ...(pc.qtys || {}) } }, materialQty)
-        }];
-      })
-    );
-  }
-  const prodName = fallbackProductName || mr.productName;
-  const materialQty = getProductQty(mr, prodName, prodOpts);
-  return {
-    [prodName]: {
-      charges: { ...emptyChargeFlags(), ...(legacyDoc?.charges || {}) },
-      rates: { ...emptyChargeRates(), ...(legacyDoc?.rates || {}) },
-      qtys: buildChargeQtys({ qtys: legacyDoc?.qtys }, materialQty)
-    }
-  };
-};
-
-const buildProductSettingsFromParty = (prodConfig) => {
-  if (!prodConfig) {
-    return { nickName: '', rates: emptyChargeRates(), charges: emptyChargeFlags() };
-  }
-  const c = prodConfig.charges || {};
-  const psdRate = prodConfig.psdMethodDefault === 'Wet'
-    ? (c.psdReportWet ?? c.psdReport ?? 0)
-    : (c.psdReportDry ?? c.psdReport ?? 0);
-  return {
-    nickName: prodConfig.nickname || '',
-    rates: {
-      cleaning: c.cleaning || 0,
-      filterBag: c.filterBag || 0,
-      processing: c.processing || 0,
-      sieving: c.sieving || 0,
-      psdReport: psdRate,
-      liner: c.liner || 0,
-      courier: c.courier || 0,
-      fiberDrum: c.fiberDrum || 0,
-      transportation: c.transportation || 0,
-      hdpeDrum: c.hdpeDrum || 0,
-      batchChangeover: c.batchChangeover || 0
-    },
-    charges: emptyChargeFlags()
-  };
-};
-
-const getMRProductSettings = (mr, party, prodName) => {
-  const settings = mr.productSettings || {};
-  const direct = settings[prodName];
-  if (direct) return direct;
-  const matchedKey = Object.keys(settings).find(k => (k || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase());
-  if (matchedKey) return settings[matchedKey];
-  const prodConfig = (party?.products || []).find(
-    p => (p.name || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase()
-  );
-  return buildProductSettingsFromParty(prodConfig);
-};
-
-const initProductChargesFromMR = (mr, party, productOptions = {}) => {
-  const productNames = getReceiptProductNames(mr, { party, ...productOptions });
-  const result = {};
-  productNames.forEach(prodName => {
-    const settings = getMRProductSettings(mr, party, prodName);
-    const materialQty = getProductQty(mr, prodName, productOptions);
-    result[prodName] = {
-      charges: { ...(settings.charges || emptyChargeFlags()) },
-      rates: { ...(settings.rates || emptyChargeRates()) },
-      qtys: buildChargeQtys(settings, materialQty)
+const normalizeProductCharges = (productCharges, legacyDoc, mr, prodOpts, fallbackProductName) =>
+  normalizeProductChargesFromDoc(
+    productCharges,
+    legacyDoc,
+    mr,
+    prodOpts,
+    prodOpts?.party
+  ) || (() => {
+    const prodName = fallbackProductName || mr?.productName || 'Product';
+    const materialQty = getProductQty(mr, prodName, prodOpts);
+    return {
+      [prodName]: {
+        charges: { ...emptyChargeFlags(), ...(legacyDoc?.charges || {}) },
+        rates: { ...emptyChargeRates(), ...(legacyDoc?.rates || {}) },
+        qtys: buildChargeQtys({ qtys: legacyDoc?.qtys }, materialQty)
+      }
     };
-  });
-  if (!productNames.length && mr.productName) {
-    const materialQty = mr.totalQty || mr.receivedQty || 0;
-    result[mr.productName] = {
-      charges: { ...(mr.charges || emptyChargeFlags()) },
-      rates: { ...(mr.rates || emptyChargeRates()) },
-      qtys: buildChargeQtys({ qtys: mr.qtys }, materialQty)
-    };
-  }
-  return result;
-};
+  })();
+
+/** Same charge resolution as direct PI (handles productSettings name|||psd keys). */
+const getMRProductSettings = (mr, party, prodName) =>
+  getMRProductChargeSettings(mr, party, prodName);
+
+const initProductChargesFromMR = (mr, party, productOptions = {}) =>
+  initProductChargesFromMRShared(mr, party, { party, ...productOptions });
 
 const calcProductChargesSubtotal = (productCharges, mr, qtyResolver, productOptions = {}) => {
   const names = Object.keys(productCharges || {});
@@ -193,25 +171,28 @@ const calcProductChargesSubtotal = (productCharges, mr, qtyResolver, productOpti
     const pc = productCharges[prodName] || {};
     const qty = qtyResolver
       ? qtyResolver(prodName)
-      : getProductQty(mr, prodName, productOptions);
+      : getChargeSlotQty(mr, prodName, productOptions);
     return sum + CHARGE_KEYS.reduce((s, key) => {
       if (!pc.charges?.[key]) return s;
       const rate = parseChargeNumber(pc.rates?.[key], 0);
-      const lineQty = getChargeLineQty(pc, key, qty);
+      const lineQty = key === 'processing'
+        ? (qty || getChargeLineQty(pc, key, qty))
+        : getChargeLineQty(pc, key, qty);
       return s + lineQty * rate;
     }, 0);
   }, 0);
 };
 
 const findPI = (data, mrId) => findAnyProformaInvoice(data.invoices, mrId);
-const findBPR = (data, mrId, productName = '') =>
-  findDedicatedReceiptDoc((data.bprs || []).filter((d) => !d.isDeleted), mrId, productName);
+const findBPR = (data, mrId, productName = '', psdReq = '') =>
+  findBprForProductMicron(data.bprs || [], mrId, productName, psdReq);
 const findPSD = (data, mrId, productName = '') =>
   findReceiptDoc(data.psds, mrId, productName);
 const findPL = (data, mrId, productName = '') => {
-  const any = findAnyPackingList(data.packingLists, mrId);
-  if (any) return any;
-  return findReceiptDoc(data.packingLists, mrId, productName);
+  if (productName) {
+    return findReceiptDoc(data.packingLists, mrId, productName);
+  }
+  return findAnyPackingList(data.packingLists, mrId);
 };
 const findDC = (data, mrId, productName = '') =>
   findReceiptDoc(data.deliveryChallans, mrId, productName);
@@ -264,7 +245,8 @@ const isEwayBillDone = (data, mr, productName = '') => {
 
 const isUnderProcessRowComplete = (data, mr, productName = '') => {
   const pi = findPI(data, mr.id);
-  const bpr = findBPR(data, mr.id, productName);
+  const microns = productName ? getProductMicronSlots(mr, productName, receiptProductOptions(mr, data)) : [''];
+  const bpr = microns.every((m) => findBPR(data, mr.id, productName, m));
   const psd = findPSD(data, mr.id, productName);
   const pl = findPL(data, mr.id, productName);
   const dc = findDC(data, mr.id, productName);
@@ -288,8 +270,8 @@ const initProductChargesForScope = (mr, party, prodOpts, activeProductName) => {
   const materialQty = getProductQty(mr, canonical, prodOpts);
   return {
     [canonical]: {
-      charges: { ...(settings.charges || emptyChargeFlags()) },
-      rates: { ...(settings.rates || emptyChargeRates()) },
+      charges: { ...emptyChargeFlags(), ...(settings.charges || {}) },
+      rates: { ...emptyChargeRates(), ...(settings.rates || {}) },
       qtys: buildChargeQtys(settings, materialQty)
     }
   };
@@ -421,14 +403,14 @@ const UnderProcess = () => {
   // Document Search & Helper Helpers
   // ----------------------------------------------------
   const getPI = (mrId) => findPI(data, mrId);
-  const getBPR = (mrId, productName = '') => findBPR(data, mrId, productName);
+  const getBPR = (mrId, productName = '', psdReq = '') => findBPR(data, mrId, productName, psdReq);
   const getPSD = (mrId, productName = '') => findPSD(data, mrId, productName);
   const getPL = (mrId, productName = '') => findPL(data, mrId, productName);
   const getDC = (mrId, productName = '') => findDC(data, mrId, productName);
   const getTI = (mrId, productName = '') => findTI(data, mrId, productName);
 
   const filteredProcessRows = useMemo(() => (
-    processRows.filter(({ mr, productName }) => {
+    processRows.filter(({ mr, productName, prodOpts }) => {
       const partyName = mr.partyName || '';
       const prodName = productName || mr.productName || '';
       if (partyFilter && partyName !== partyFilter) return false;
@@ -449,7 +431,10 @@ const UnderProcess = () => {
       if (activeTab === 'Done') return isComplete;
       if (activeTab === 'Pending') return !isComplete;
       if (activeTab === 'PI') return !(pi || passed('PI'));
-      if (activeTab === 'BPR') return !(bpr || passed('BPR'));
+      if (activeTab === 'BPR') {
+        const slots = getProductMicronSlots(mr, productName, prodOpts);
+        return !slots.every((m) => findBPR(data, mr.id, productName, m) || passed('BPR'));
+      }
       if (activeTab === 'PSD') return !(psd || passed('PSD'));
       if (activeTab === 'PL') return !(pl || passed('PL'));
       if (activeTab === 'DC') return !(dc || passed('DC'));
@@ -476,7 +461,7 @@ const UnderProcess = () => {
     openDocGenerator(mr, type, productName);
   };
 
-  const openDocGenerator = (mr, type, productName = '') => {
+  const openDocGenerator = (mr, type, productName = '', psdReq = '') => {
     if (type === 'PI') {
       const existing = findPI(data, mr.id);
       if (existing) {
@@ -487,9 +472,9 @@ const UnderProcess = () => {
       }
     }
     if (type === 'PL') {
-      const existing = findPL(data, mr.id);
+      const existing = findPL(data, mr.id, productName);
       if (existing) {
-        setModalContext({ mr, productName: '' });
+        setModalContext({ mr, productName });
         setEditingDoc(existing);
         setActiveModal(type);
         return;
@@ -504,7 +489,15 @@ const UnderProcess = () => {
         return;
       }
     }
-    setModalContext({ mr, productName });
+    if (type === 'BPR' && productName) {
+      const micron = String(psdReq || '').trim();
+      const existing = findBPR(data, mr.id, productName, micron);
+      setModalContext({ mr, productName, psdReq: micron });
+      setEditingDoc(existing || null);
+      setActiveModal(type);
+      return;
+    }
+    setModalContext({ mr, productName, psdReq: psdReq || '' });
     setEditingDoc(null);
     setActiveModal(type);
   };
@@ -817,6 +810,7 @@ const UnderProcess = () => {
         <div className="under-process-table-scroll">
         <table className="workflow-table">
           <colgroup>
+            <col className="up-col-sr" />
             <col className="up-col-date" />
             <col className="up-col-party" />
             <col className="up-col-product" />
@@ -832,6 +826,7 @@ const UnderProcess = () => {
           </colgroup>
           <thead>
             <tr>
+              <th>Sr. No</th>
               <th>Material Received Date</th>
               <th>Party Name</th>
               <th>Product</th>
@@ -849,18 +844,18 @@ const UnderProcess = () => {
           <tbody>
             {(data.materialReceipts || []).length === 0 ? (
               <tr>
-                <td colSpan="12" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan="13" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                   No material receipts yet. Add one from Material Receipt.
                 </td>
               </tr>
             ) : filteredProcessRows.length === 0 ? (
               <tr>
-                <td colSpan="12" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan="13" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                   No materials match this search or filter.
                 </td>
               </tr>
             ) : (
-              filteredProcessRows.map(({ mr, productName, prodOpts }) => {
+              filteredProcessRows.map(({ mr, productName, prodOpts }, idx) => {
                 const party = data.parties.find(p => p.id === mr.partyId);
                 const settings = productName ? getMRProductSettings(mr, party, productName) : null;
                 const pi = getPI(mr.id);
@@ -879,6 +874,7 @@ const UnderProcess = () => {
 
                 return (
                   <tr key={`${mr.id}_${productName || 'default'}`}>
+                    <td>{idx + 1}</td>
                     <td style={{ fontWeight: 500 }}>{formatDate(mr.date)}</td>
                     <td style={{ fontWeight: 600 }}>{mr.partyName}</td>
                     <td>
@@ -894,15 +890,67 @@ const UnderProcess = () => {
                     {renderDocCell(mr, productName, 'PI', pi, {
                       printDoc: () => viewPDF('PI', enrichPIForPrint(pi, data))
                     })}
-                    {renderDocCell(mr, productName, 'BPR', bpr, {
-                      printDoc: () => viewPDF('BPR', enrichBPRForPrint(bpr, data))
-                    })}
+                    {(() => {
+                      const micronSlots = productName
+                        ? getProductMicronSlots(mr, productName, prodOpts).filter(Boolean)
+                        : [];
+                      if (micronSlots.length > 1) {
+                        return (
+                          <td className="center" style={{ minWidth: 140 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'stretch' }}>
+                              {micronSlots.map((micron) => {
+                                const slotBpr = getBPR(mr.id, productName, micron);
+                                if (slotBpr) {
+                                  return (
+                                    <div key={micron} className="doc-done-group" style={{ justifyContent: 'center' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => viewPDF('BPR', enrichBPRForPrint(slotBpr, data))}
+                                        className="doc-icon-btn"
+                                        title={`View BPR ${micron}`}
+                                      >
+                                        <FileText size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => openDocGenerator(mr, 'BPR', productName, micron)}
+                                        className="doc-done"
+                                        title={micron}
+                                      >
+                                        <CheckCircle size={12} /> {micron}
+                                      </button>
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <button
+                                    key={micron}
+                                    type="button"
+                                    onClick={() => openDocGenerator(mr, 'BPR', productName, micron)}
+                                    className="doc-pending"
+                                    title={`Create BPR for ${micron}`}
+                                  >
+                                    <Clock size={12} /> {micron}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        );
+                      }
+                      return renderDocCell(mr, productName, 'BPR', bpr, {
+                        printDoc: () => viewPDF('BPR', enrichBPRForPrint(bpr, data))
+                      });
+                    })()}
                     {renderDocCell(mr, productName, 'PSD', psd, {
                       printDoc: () => viewPDF('PSD', psd)
                     })}
                     {renderDocCell(mr, productName, 'PL', pl, {
                       printDoc: () => viewPDF('PL', pl),
-                      disabled: !(bpr || isProcessStepPassed(mr, productName, 'BPR'))
+                      disabled: !(
+                        getProductMicronSlots(mr, productName, prodOpts).every((m) => getBPR(mr.id, productName, m))
+                        || isProcessStepPassed(mr, productName, 'BPR')
+                      )
                     })}
                     {renderDocCell(mr, productName, 'DC', dc, {
                       printDoc: () => viewPDF('DC', dc),
@@ -1083,9 +1131,10 @@ const UnderProcess = () => {
           )}
           {activeModal === 'BPR' && (
             <BPRGenerator 
-              key={`BPR-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}`}
+              key={`BPR-${modalContext?.mr?.id || modalContext?.id}-${modalContext?.productName || 'all'}-${modalContext?.psdReq || ''}`}
               mr={modalContext?.mr ?? modalContext} 
               activeProductName={modalContext?.productName || ''}
+              activePsdReq={modalContext?.psdReq || ''}
               editing={editingDoc}
               onClose={() => setActiveModal(null)} 
             />
@@ -1157,19 +1206,31 @@ const ModalWrapper = ({ title, children, onClose }) => (
 // ----------------------------------------------------
 // 1. PERFORMA INVOICE GENERATOR FORM (Slide 7 Set A)
 // ----------------------------------------------------
-const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
+const PerformaInvoiceGenerator = ({ mr: mrProp, activeProductName = '', editing, onClose }) => {
   const { data, updateData, updateItem, ensureSerialAtLeast } = useAppContext();
+  const mr = getFreshMaterialReceipt(data.materialReceipts, mrProp) || mrProp;
   const party = data.parties.find(p => p.id === mr.partyId);
   const prodOpts = useMemo(() => receiptProductOptions(mr, data), [mr, data]);
   const productNames = getReceiptProductNames(mr, prodOpts);
-  const formInitKey = `${mr.id}-combined-${editing?.id || 'new'}`;
+  const formInitKey = `${mr.id}-combined-${editing?.id || 'new'}-${Object.keys(mr.productSettings || {}).join('|')}`;
+
+  const defaultPiHsn = (() => {
+    const want = String(productNames[0] || mr.productName || '').split(',')[0].trim().toLowerCase();
+    const prod = (party?.products || []).find((p) => String(p.name || '').trim().toLowerCase() === want);
+    return String(prod?.hsn || '').trim();
+  })();
+  const defaultNickPsd = resolveDocNickAndPsd(mr, party, productNames[0] || mr.productName);
 
   const [form, setForm] = useState({
     invoiceNo: '',
     date: new Date().toISOString().split('T')[0],
     partyDocNo: mr.partyDocNo || '',
     partyDocDate: mr.partyDocDate || '',
+    productName: getReceiptProductLabel(mr, prodOpts),
+    nickName: defaultNickPsd.nickName,
+    psdReq: defaultNickPsd.psdReq,
     productCharges: initProductChargesFromMR(mr, party, prodOpts),
+    hsnCode: defaultPiHsn,
     discount: 0,
     taxRate: 18,
     gstType: GST_TYPE_CGST_SGST,
@@ -1178,31 +1239,44 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
 
   useEffect(() => {
     if (editing) {
+      const nickPsd = resolveDocNickAndPsd(mr, party, productNames[0] || mr.productName, editing);
       setForm({
         ...editing,
         partyDocNo: editing.partyDocNo || editing.poNo || mr.partyDocNo || '',
         partyDocDate: editing.partyDocDate || editing.poDate || mr.partyDocDate || '',
-        productCharges: normalizeProductCharges(
+        productName: editing.productName || getReceiptProductLabel(mr, prodOpts),
+        nickName: nickPsd.nickName,
+        psdReq: nickPsd.psdReq,
+        productCharges: normalizeProductChargesFromDoc(
           editing.productCharges,
           editing,
           mr,
           prodOpts,
-          productNames[0] || mr.productName
+          party
         ),
+        hsnCode: editing.hsnCode || editing.hsn || defaultPiHsn,
         discount: editing.discount || 0,
         taxRate: editing.taxRate ?? 18,
         gstType: normalizeGstType(editing.gstType),
         terms: editing.terms || DEFAULT_PI_TERMS_TEXT
       });
     } else {
+      const nickPsd = resolveDocNickAndPsd(mr, party, productNames[0] || mr.productName);
+      const scopedCharges = activeProductName
+        ? initProductChargesForScope(mr, party, prodOpts, activeProductName)
+        : initProductChargesFromMR(mr, party, prodOpts);
       setForm(prev => ({
         ...prev,
         partyDocNo: mr.partyDocNo || '',
         partyDocDate: mr.partyDocDate || '',
-        productCharges: initProductChargesFromMR(mr, party, prodOpts)
+        productName: getReceiptProductLabel(mr, prodOpts),
+        nickName: nickPsd.nickName,
+        psdReq: nickPsd.psdReq,
+        productCharges: scopedCharges,
+        hsnCode: prev.hsnCode || defaultPiHsn
       }));
     }
-  }, [formInitKey]);
+  }, [formInitKey, activeProductName]);
 
   useEffect(() => {
     if (editing) return;
@@ -1264,7 +1338,7 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
     }));
   };
 
-  const getSubtotal = () => calcProductChargesSubtotal(form.productCharges, mr, null, prodOpts);
+  const getSubtotal = () => calcProductChargesSubtotalShared(form.productCharges, mr, prodOpts);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1357,6 +1431,49 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
           <label>Total Material Quantity</label>
           <input type="text" className="input-field" readOnly value={`${totalMaterialQty} Kg`} />
         </div>
+        <div>
+          <label>HSN Code</label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="e.g. 29262000"
+            value={form.hsnCode || ''}
+            onChange={e => setForm({ ...form, hsnCode: e.target.value })}
+          />
+        </div>
+        <div>
+          <label>Product Name</label>
+          <input type="text" className="input-field" readOnly value={form.productName || ''} />
+        </div>
+        <div>
+          <label>Nick Name</label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="From party product master"
+            value={form.nickName || ''}
+            onChange={(e) => setForm({ ...form, nickName: e.target.value })}
+          />
+        </div>
+        <div>
+          <label>PSD Req</label>
+          <SearchableSelect
+            allowCustom
+            className="input-field"
+            placeholder="Type or select PSD requirement"
+            value={form.psdReq || ''}
+            onChange={(e) => setForm({ ...form, psdReq: e.target.value })}
+            remember={false}
+          >
+            <option value="">Select PSD Req…</option>
+            {(data.psdRequirements || []).map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+            {form.psdReq && !(data.psdRequirements || []).includes(form.psdReq) && (
+              <option value={form.psdReq}>{form.psdReq}</option>
+            )}
+          </SearchableSelect>
+        </div>
       </div>
 
       <MRProductSummary mr={mr} party={party} productOptions={prodOpts} />
@@ -1366,9 +1483,15 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
         <div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Configure charges per product. Toggle standard charges to add them as line items with HSN codes.</p>
-          {productNames.map((prodName) => {
-            const displayIdx = getProductDisplayIndex(mr, prodName, prodOpts);
-            const materialQty = getProductQty(mr, prodName, prodOpts);
+          {(Object.keys(form.productCharges || {}).length
+            ? Object.keys(form.productCharges)
+            : productNames
+          ).map((prodName, pIdx) => {
+            const baseName = String(prodName).includes('|||')
+              ? String(prodName).split('|||')[0]
+              : prodName;
+            const displayIdx = getProductDisplayIndex(mr, baseName, prodOpts) || (pIdx + 1);
+            const materialQty = getChargeSlotQty(mr, prodName, prodOpts);
             const pc = form.productCharges[prodName] || form.productCharges[Object.keys(form.productCharges || {}).find(k =>
               (k || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase()
             )] || {
@@ -1379,7 +1502,7 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
             return (
               <div key={prodName} style={{ marginBottom: '1rem', padding: '1rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                 <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                  Product {displayIdx}: {prodName} ({materialQty} Kg)
+                  Product {displayIdx}: {formatChargeSlotLabel(prodName)} ({materialQty} Kg)
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {CHARGES_LIST.map(item => renderChargeRow(
@@ -1430,7 +1553,7 @@ const PerformaInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose
 // ----------------------------------------------------
 // 2. BPR WEIGHTStwin TABLES FORM (Slide 8 Set A)
 // ----------------------------------------------------
-const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
+const BPRGenerator = ({ mr, activeProductName = '', activePsdReq = '', editing, onClose }) => {
   const { data, updateData, updateItem, incrementSerial } = useAppContext();
   const party = (data.parties || []).find(p => p.id === mr.partyId);
   const prodOpts = receiptProductOptions(mr, data);
@@ -1448,9 +1571,16 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     return pending || allProductNames[0] || mr.productName || '';
   })();
   const primaryProduct = resolveReceiptProductName(mr, defaultProduct, prodOpts) || defaultProduct;
-  const firstProdConfig = getPartyProductForMR(mr, data, primaryProduct);
-  const scopedQty = getProductQty(mr, primaryProduct, prodOpts);
-  const scopedDrums = getProductDrums(mr, primaryProduct, prodOpts);
+  const micronSlots = getProductMicronSlots(mr, primaryProduct, prodOpts);
+  const lockedPsd = String(
+    activePsdReq
+    || editing?.psdRequirement
+    || (micronSlots.length === 1 ? micronSlots[0] : '')
+  ).trim();
+  const firstProdConfig = getPartyProductForMR(mr, data, primaryProduct, lockedPsd);
+  const scopedBuilt = buildBprRowsForProduct(mr, primaryProduct, { ...prodOpts, psdReq: lockedPsd });
+  const scopedQty = scopedBuilt.qty || getProductQty(mr, primaryProduct, prodOpts);
+  const scopedDrums = scopedBuilt.drums || getProductDrums(mr, primaryProduct, prodOpts);
 
   const bprSectionStyle = {
     marginBottom: '1.5rem',
@@ -1468,15 +1598,16 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     totalInputQty: scopedQty,
     batchNo: '',
     totalNoBatch: 0,
-    psdRequirement: firstProdConfig?.psdReq || '90% < 10M',
+    psdRequirement: lockedPsd || firstProdConfig?.psdReq || '90% < 10M',
     psdNote: firstProdConfig?.psdNote || '',
+    specialNote: firstProdConfig?.specialNote || '',
     totalDrums: scopedDrums,
     doubleDispatch: false,
     receivedBatches: [], // Array of { batchNo, drumNo, gross, tare, net }
     dispatchedBatches: [], // Array of { batchNo, drumNo, gross, tare, net }
     committedBy: '',
-    processingStartDate: new Date().toISOString().split('T')[0],
-    processingStartTime: '09:00',
+    processingStartDate: currentLocalDateTime().date,
+    processingStartTime: currentLocalDateTime().time,
     processingSupervisor: '',
     sizingReportRequired: 'Yes',
     particleSizeResult: '',
@@ -1499,10 +1630,11 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     plantSupervisorSignature: ''
   });
 
-  const scopeBprToProduct = (prev, prodName, extraWeightRows = []) => {
+  const scopeBprToProduct = (prev, prodName, extraWeightRows = [], psdReq = lockedPsd) => {
     const name = resolveReceiptProductName(mr, prodName, prodOpts) || prodName;
-    const prodConfig = getPartyProductForMR(mr, data, name);
-    const built = buildBprRowsForProduct(mr, name, prodOpts, extraWeightRows);
+    const micron = String(psdReq || '').trim();
+    const prodConfig = getPartyProductForMR(mr, data, name, micron);
+    const built = buildBprRowsForProduct(mr, name, { ...prodOpts, psdReq: micron }, extraWeightRows);
     const drumTotal = built.drums || 0;
     return {
       ...prev,
@@ -1511,8 +1643,9 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
       totalDrums: drumTotal,
       batchNo: built.batchNo,
       totalNoBatch: built.totalNoBatch,
-      psdRequirement: prodConfig?.psdReq || prev.psdRequirement || '90% < 10M',
+      psdRequirement: micron || built.psdReq || prodConfig?.psdReq || prev.psdRequirement || '90% < 10M',
       psdNote: prodConfig?.psdNote || '',
+      specialNote: prodConfig?.specialNote || prev.specialNote || '',
       receivedBatches: padBPRBatchRows(built.receivedRows),
       dispatchedBatches: padBPRBatchRows(built.dispatchedRows),
       packingMaterials: {
@@ -1525,14 +1658,15 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   useEffect(() => {
     if (editing) {
       const name = primaryProduct || resolveReceiptProductName(mr, editing.productName, prodOpts) || editing.productName;
-      const prodConfig = getPartyProductForMR(mr, data, name);
+      const micron = lockedPsd || editing.psdRequirement || '';
+      const prodConfig = getPartyProductForMR(mr, data, name, micron);
       const extraReceived = editing.receivedBatches || [];
       const extraDispatched = editing.dispatchedBatches || [];
-      const builtReceived = buildBprRowsForProduct(mr, name, prodOpts, extraReceived);
+      const builtReceived = buildBprRowsForProduct(mr, name, { ...prodOpts, psdReq: micron }, extraReceived);
       const builtDispatched = buildBprRowsForProduct(
         mr,
         name,
-        prodOpts,
+        { ...prodOpts, psdReq: micron },
         extraDispatched.length ? extraDispatched : extraReceived
       );
       const receivedBatches = padBPRBatchRows(builtReceived.receivedRows);
@@ -1552,7 +1686,8 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         batchNo: builtReceived.batchNo || editing.batchNo,
         totalNoBatch: builtReceived.totalNoBatch || editing.totalNoBatch,
         psdNote: editing.psdNote || prodConfig?.psdNote || '',
-        psdRequirement: editing.psdRequirement || prodConfig?.psdReq || '90% < 10M',
+        specialNote: editing.specialNote || prodConfig?.specialNote || editing.remarks || '',
+        psdRequirement: micron || editing.psdRequirement || prodConfig?.psdReq || '90% < 10M',
         totalDrums: drumTotal,
         receivedBatches,
         dispatchedBatches,
@@ -1579,7 +1714,7 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
         customerName: mr.partyName
       }));
     }
-  }, [editing, mr, activeProductName, primaryProduct, data.settings?.serials?.BPR]);
+  }, [editing, mr, activeProductName, activePsdReq, primaryProduct, lockedPsd, data.settings?.serials?.BPR]);
 
   // Handle double dispatch drums expansion
   const toggleDoubleDispatch = () => {
@@ -1801,6 +1936,11 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     if (editing) {
       updateItem('bprs', editing.id, finalDoc);
     } else {
+      const duplicate = findBPR(data, mr.id, finalDoc.productName, finalDoc.psdRequirement);
+      if (duplicate) {
+        alert(`A BPR already exists for ${finalDoc.productName}${finalDoc.psdRequirement ? ` (${finalDoc.psdRequirement})` : ''}.`);
+        return;
+      }
       updateData('bprs', { ...finalDoc, id: Date.now().toString() });
       incrementSerial('BPR');
     }
@@ -1884,9 +2024,13 @@ const BPRGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
             <label>PSD Requirement *</label>
             <input type="text" className="input-field" required value={form.psdRequirement} onChange={e => setForm({...form, psdRequirement: e.target.value})} />
           </div>
-          <div style={{ gridColumn: 'span 2' }}>
+          <div>
             <label>PSD Note</label>
-            <input type="text" className="input-field" value={form.psdNote || ''} onChange={e => setForm({...form, psdNote: e.target.value})} placeholder="From party product master" />
+            <textarea className="input-field" rows={5} value={form.psdNote || ''} onChange={e => setForm({...form, psdNote: e.target.value})} placeholder={'One detail per line'} />
+          </div>
+          <div>
+            <label>Special Note</label>
+            <textarea className="input-field" rows={5} value={form.specialNote || ''} onChange={e => setForm({...form, specialNote: e.target.value})} placeholder={'One detail per line'} />
           </div>
         </div>
 
@@ -2339,12 +2483,15 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const party = data.parties.find(p => p.id === mr.partyId);
   const prodOpts = receiptProductOptions(mr, data);
   const productNames = getReceiptProductNames(mr, prodOpts);
-  const plFormInitKey = `${mr.id}-${editing?.id || 'new'}`;
+  const availableProducts = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
+  const plFormInitKey = `${mr.id}-${editing?.id || 'new'}-${activeProductName || 'all'}`;
+  const allBatchPoolRef = useRef([]);
 
   const [form, setForm] = useState({
     plNo: '',
     date: new Date().toISOString().split('T')[0],
-    productName: getReceiptProductLabel(mr, prodOpts),
+    selectedProducts: getPLDefaultSelectedProducts(mr, data.packingLists, prodOpts, activeProductName),
+    productName: '',
     productSummaries: [],
     totalWeight: 0,
     totalDrums: 0,
@@ -2356,17 +2503,15 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const parseWt = (v) => (v === '' || v === undefined || v === null ? 0 : parseFloat(v) || 0);
   const normProd = (s) => (s || '').trim().toLowerCase();
 
+  // Always show a separate batch block (+ Add Row) for every MR product
   const displayProducts = useMemo(() => {
+    if (availableProducts.length) return availableProducts.map((p) => p.prodName);
+    if (productNames.length) return productNames;
     const fromRows = [...new Set((form.batches || []).map(r => r.productName).filter(Boolean))];
-    if (productNames.length) {
-      const merged = [...productNames];
-      fromRows.forEach((name) => {
-        if (!merged.some(p => normProd(p) === normProd(name))) merged.push(name);
-      });
-      return merged;
-    }
-    return fromRows.length ? fromRows : [mr.productName].filter(Boolean);
-  }, [form.batches, productNames, mr.productName]);
+    if (fromRows.length) return fromRows;
+    if ((form.selectedProducts || []).length) return form.selectedProducts;
+    return [mr.productName].filter(Boolean);
+  }, [availableProducts, productNames, form.batches, form.selectedProducts, mr.productName]);
 
   const getProductSievingLumps = (prodName) => {
     if (form.productSievingLumps?.[prodName] !== undefined) {
@@ -2411,43 +2556,91 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   }, [form.batches, form.sievingLumps, form.productSievingLumps]);
 
   useEffect(() => {
+    // Full MR drum pool so product marks can be changed while editing
+    const allRows = buildPLBatchesFromMR(data, mr, prodOpts, null);
+    allBatchPoolRef.current = allRows;
+
     if (editing) {
-      const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
-      const mergedBatches = buildPLBatchesFromMR(data, mr, prodOpts, editing.batches || []);
+      const selected = editing.selectedProducts?.length
+        ? editing.selectedProducts
+        : (editing.productName
+          ? editing.productName.split(',').map((s) => s.trim()).filter(Boolean)
+          : getPLDefaultSelectedProducts(mr, data.packingLists, prodOpts, activeProductName));
+      const fields = buildPLFieldsFromProducts(
+        mr,
+        allRows,
+        selected,
+        prodOpts,
+        editing.batches || [],
+        editing.productSievingLumps || {}
+      );
       setForm({
         ...editing,
         partyName: editing.partyName || mr.partyName || '',
         receiptNo: editing.receiptNo || mr.receiptNo || '',
-        productName: editing.productName?.includes(',')
-          ? editing.productName
-          : getReceiptProductLabel(mr, prodOpts),
-        productSummaries: editing.productSummaries?.length ? editing.productSummaries : summaries,
-        sievingLumps: editing.sievingLumps ?? editing.sievingLumpsNet ?? '',
-        productSievingLumps: editing.productSievingLumps || {},
-        batches: mergedBatches
+        sievingLumps: editing.sievingLumps ?? editing.sievingLumpsNet ?? fields.sievingLumps,
+        ...fields,
+        productSievingLumps: Object.keys(fields.productSievingLumps || {}).length
+          ? fields.productSievingLumps
+          : (editing.productSievingLumps || {})
       });
-    } else {
-      const plSerial = data.settings?.serials?.PL || 1;
-      const docNo = generateDocNumber('PL', plSerial, new Date());
-      const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
-      const plRows = buildPLBatchesFromMR(data, mr, prodOpts);
-      const linkedBpr = findBPR(data, mr.id, activeProductName);
-
-      setForm({
-        plNo: docNo,
-        date: new Date().toISOString().split('T')[0],
-        partyName: mr.partyName || '',
-        receiptNo: mr.receiptNo || '',
-        productName: getReceiptProductLabel(mr, prodOpts),
-        productSummaries: summaries,
-        totalWeight: 0,
-        totalDrums: plRows.length,
-        sievingLumps: linkedBpr?.lumpsNetWeight || linkedBpr?.lumpsNet || '',
-        productSievingLumps: linkedBpr?.productSievingLumps || {},
-        batches: plRows
-      });
+      return;
     }
+
+    const plSerial = data.settings?.serials?.PL || 1;
+    const docNo = generateDocNumber('PL', plSerial, new Date());
+    const selected = getPLDefaultSelectedProducts(mr, data.packingLists, prodOpts, activeProductName);
+    const linkedBpr = findBPR(data, mr.id, activeProductName || selected[0] || '');
+    const lumpMap = { ...(linkedBpr?.productSievingLumps || {}) };
+    if (!Object.keys(lumpMap).length && selected.length === 1 && (linkedBpr?.lumpsNetWeight || linkedBpr?.lumpsNet)) {
+      lumpMap[selected[0]] = linkedBpr.lumpsNetWeight || linkedBpr.lumpsNet;
+    }
+    const fields = buildPLFieldsFromProducts(mr, allRows, selected, prodOpts, [], lumpMap);
+    setForm({
+      plNo: docNo,
+      date: new Date().toISOString().split('T')[0],
+      partyName: mr.partyName || '',
+      receiptNo: mr.receiptNo || '',
+      totalWeight: 0,
+      ...fields
+    });
   }, [plFormInitKey]);
+
+  const applyProductSelection = (nextSelected, prevForm) => {
+    const fields = buildPLFieldsFromProducts(
+      mr,
+      allBatchPoolRef.current.length ? allBatchPoolRef.current : buildPLBatchesFromMR(data, mr, prodOpts),
+      nextSelected,
+      prodOpts,
+      prevForm.batches || [],
+      prevForm.productSievingLumps || {}
+    );
+    return { ...prevForm, ...fields };
+  };
+
+  const selectAllProducts = () => {
+    const allNames = availableProducts.map((p) => p.prodName);
+    setForm((prev) => applyProductSelection(allNames, prev));
+  };
+
+  const selectSingleProduct = (prodName) => {
+    setForm((prev) => applyProductSelection([prodName], prev));
+  };
+
+  const toggleProductSelection = (prodName) => {
+    setForm((prev) => {
+      const current = prev.selectedProducts || [];
+      const isSelected = current.some((p) => normProd(p) === normProd(prodName));
+      let next;
+      if (isSelected) {
+        next = current.filter((p) => normProd(p) !== normProd(prodName));
+        if (next.length === 0) next = [prodName];
+      } else {
+        next = [...current, prodName];
+      }
+      return applyProductSelection(next, prev);
+    });
+  };
 
   useEffect(() => {
     const drumsNet = form.batches.reduce((s, r) => {
@@ -2484,22 +2677,120 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     });
   };
 
-  const addCustomRow = (productName = '') => {
+  const addCustomRow = (productName = '', batchNo = '', psdReq = '') => {
     const prod = productName || productNames[0] || mr.productName || '';
     setForm(prev => {
       const prodRows = prev.batches.filter(b => normProd(b.productName || prod) === normProd(prod));
-      const mrBatchNo = getProductBatches(mr, prod, prodOpts)[0]?.batchNo || '';
-      const batchNo = prodRows.find(b => b.batchNo)?.batchNo || mrBatchNo || '';
+      const requested = String(batchNo || '').trim();
+      const requestedPsd = String(psdReq || '').trim();
+      const scoped = requestedPsd
+        ? prodRows.filter((b) => {
+          const rowPsd = plRowMicron(b, mr);
+          return !rowPsd || normProd(rowPsd) === normProd(requestedPsd);
+        })
+        : prodRows;
+      const lastBatch = [...scoped].reverse().find((b) => String(b.batchNo || '').trim())?.batchNo || '';
+      const mrBatchNo = getProductBatches(mr, prod, prodOpts).find((b) => !requestedPsd || normProd(b.psdReq) === normProd(requestedPsd))?.batchNo || '';
+      const batch = requested && requested !== '—' ? requested : (lastBatch || mrBatchNo || '');
+      const psd = requestedPsd || plRowMicron([...scoped].reverse().find((b) => String(b.batchNo || '').trim() === batch) || {}, mr);
+      const batchRows = scoped.filter((b) => String(b.batchNo || '').trim() === batch);
+      const nextDrum = batchRows.reduce((max, b) => {
+        const n = parseInt(b.drumNo, 10);
+        return Number.isFinite(n) ? Math.max(max, n) : max;
+      }, 0) + 1;
+      const selected = prev.selectedProducts || [];
+      const nextSelected = selected.some((p) => normProd(p) === normProd(prod))
+        ? selected
+        : [...selected, prod];
+      const row = {
+        batchNo: batch,
+        drumNo: String(nextDrum),
+        productName: prod,
+        psdReq: psd,
+        gross: '',
+        tare: '',
+        net: ''
+      };
+      const lastIdx = prev.batches.reduce((found, b, i) => (
+        normProd(b.productName || prod) === normProd(prod)
+          && String(b.batchNo || '').trim() === batch
+          && (!psd || !plRowMicron(b, mr) || normProd(plRowMicron(b, mr)) === normProd(psd))
+          ? i
+          : found
+      ), -1);
+      const batches = [...prev.batches];
+      if (lastIdx >= 0) batches.splice(lastIdx + 1, 0, row);
+      else batches.push(row);
       return {
         ...prev,
-        batches: [...prev.batches, {
-          batchNo,
-          drumNo: (prodRows.length + 1).toString(),
-          productName: prod,
-          gross: '',
-          tare: '',
-          net: ''
-        }]
+        selectedProducts: nextSelected,
+        productName: nextSelected.join(', '),
+        batches
+      };
+    });
+  };
+
+  const addUmaNewDrum = (productName = '', batchNo = '', psdReq = '') => {
+    const prod = productName || productNames[0] || mr.productName || '';
+    setForm(prev => {
+      const prodRows = prev.batches.filter((b) => normProd(b.productName || prod) === normProd(prod));
+      const requested = String(batchNo || '').trim();
+      const requestedPsd = String(psdReq || '').trim();
+      const scoped = requestedPsd
+        ? prodRows.filter((b) => {
+          const rowPsd = plRowMicron(b, mr);
+          return !rowPsd || normProd(rowPsd) === normProd(requestedPsd);
+        })
+        : prodRows;
+      const anchor = requested && requested !== '—' && !isUmaDrumName(requested)
+        ? requested
+        : ([...scoped].reverse().map(rowAnchorBatch).find(Boolean) || '');
+      const psd = requestedPsd || plRowMicron(
+        scoped.find((b) => rowAnchorBatch(b) === anchor) || {},
+        mr
+      );
+      const inPlace = (b) => {
+        const place = anchor
+          ? rowAnchorBatch(b) === anchor
+          : !!(b.umaNewDrum || isUmaDrumName(b.batchNo));
+        if (!place) return false;
+        if (!psd) return true;
+        const rowPsd = plRowMicron(b, mr);
+        return !rowPsd || normProd(rowPsd) === normProd(psd);
+      };
+      const batchRows = prodRows.filter(inPlace);
+      const nextDrum = batchRows.reduce((max, b) => {
+        const n = parseInt(b.drumNo, 10);
+        return Number.isFinite(n) ? Math.max(max, n) : max;
+      }, 0) + 1;
+      const selected = prev.selectedProducts || [];
+      const nextSelected = selected.some((p) => normProd(p) === normProd(prod))
+        ? selected
+        : [...selected, prod];
+      const row = {
+        batchNo: 'New Uma Drum',
+        drumNo: String(nextDrum),
+        productName: prod,
+        psdReq: psd,
+        umaNewDrum: true,
+        ...(anchor ? { anchorBatch: anchor } : {}),
+        gross: '',
+        tare: '',
+        net: ''
+      };
+      const lastIdx = prev.batches.reduce((found, b, i) => (
+        normProd(b.productName || prod) === normProd(prod) && inPlace(b)
+          ? i
+          : found
+      ), -1);
+      const batches = [...prev.batches];
+      if (lastIdx >= 0) batches.splice(lastIdx + 1, 0, row);
+      else batches.push(row);
+      return {
+        ...prev,
+        selectedProducts: nextSelected,
+        productName: nextSelected.join(', '),
+        batches
       };
     });
   };
@@ -2520,26 +2811,46 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const summaries = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
-    const totalLumps = form.productSievingLumps && Object.keys(form.productSievingLumps).length > 0
-      ? Object.values(form.productSievingLumps).reduce((sum, v) => sum + parseWt(v), 0)
+    const selected = (form.selectedProducts || []).length
+      ? form.selectedProducts
+      : productNames;
+    if (!selected.length) {
+      alert('Select at least one product for this Packing List.');
+      return;
+    }
+    const fields = buildPLFieldsFromProducts(
+      mr,
+      allBatchPoolRef.current.length ? allBatchPoolRef.current : (form.batches || []),
+      selected,
+      prodOpts,
+      form.batches || [],
+      form.productSievingLumps || {}
+    );
+    const totalLumps = fields.productSievingLumps && Object.keys(fields.productSievingLumps).length > 0
+      ? Object.values(fields.productSievingLumps).reduce((sum, v) => sum + parseWt(v), 0)
       : parseWt(form.sievingLumps);
     const finalDoc = {
       ...form,
+      ...fields,
       receiptId: mr.id,
       partyName: form.partyName || mr.partyName || '',
       receiptNo: form.receiptNo || mr.receiptNo || '',
-      productName: getReceiptProductLabel(mr, prodOpts),
-      productSummaries: summaries.length ? summaries : (form.productSummaries || []),
       sievingLumps: totalLumps || '',
-      productSievingLumps: form.productSievingLumps || {}
+      productSievingLumps: fields.productSievingLumps || {}
     };
 
     if (editing) {
       updateItem('packingLists', editing.id, finalDoc);
     } else {
-      if (findAnyPackingList(data.packingLists, mr.id)) {
-        alert('A Packing List already exists for this Material Receipt. Please edit the existing PL.');
+      const alreadyCovered = selected.filter((name) =>
+        findReceiptDoc(data.packingLists, mr.id, name)
+      );
+      if (alreadyCovered.length === selected.length) {
+        alert(`A Packing List already exists for ${alreadyCovered.join(', ')}. Please edit the existing PL.`);
+        return;
+      }
+      if (alreadyCovered.length) {
+        alert(`A Packing List already exists for ${alreadyCovered.join(', ')}. Unmark those products or edit the existing PL.`);
         return;
       }
       updateData('packingLists', { ...finalDoc, id: Date.now().toString() });
@@ -2571,10 +2882,96 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           <label>Product(s)</label>
           <input type="text" className="input-field" readOnly value={form.productName} />
         </div>
+
+        {availableProducts.length > 1 && (
+          <div style={{ gridColumn: 'span 3', marginBottom: '0.25rem', background: 'rgba(155, 98, 196, 0.04)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(155, 98, 196, 0.15)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.9rem', color: 'var(--accent-primary)', margin: 0 }}>
+                  Pack Selection ({form.selectedProducts?.length || 0} of {availableProducts.length} Product{(form.selectedProducts?.length || 0) !== 1 ? 's' : ''} Selected)
+                </label>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Mark which product(s) this Packing List should include
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.78rem',
+                    background: (form.selectedProducts || []).length === availableProducts.length ? 'var(--accent-primary)' : '#fff',
+                    color: (form.selectedProducts || []).length === availableProducts.length ? '#fff' : 'var(--accent-primary)',
+                    border: '1px solid var(--accent-primary)',
+                    fontWeight: 600
+                  }}
+                  onClick={selectAllProducts}
+                >
+                  Pack All ({availableProducts.length} Products)
+                </button>
+                {availableProducts.map((p, pIdx) => {
+                  const isOnlyThis = (form.selectedProducts || []).length === 1 && normProd((form.selectedProducts || [])[0]) === normProd(p.prodName);
+                  return (
+                    <button
+                      key={p.prodName}
+                      type="button"
+                      className="btn"
+                      style={{
+                        padding: '0.3rem 0.65rem',
+                        fontSize: '0.78rem',
+                        background: isOnlyThis ? 'var(--accent-primary)' : '#fff',
+                        color: isOnlyThis ? '#fff' : 'var(--text-main)',
+                        border: '1px solid var(--border-color)',
+                        fontWeight: 600
+                      }}
+                      onClick={() => selectSingleProduct(p.prodName)}
+                    >
+                      Product {pIdx + 1} Only
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.65rem' }}>
+              {availableProducts.map((p, idx) => {
+                const checked = (form.selectedProducts || []).some((n) => normProd(n) === normProd(p.prodName));
+                return (
+                  <label
+                    key={p.prodName}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 0.9rem',
+                      background: checked ? '#fff' : 'var(--input-bg)',
+                      border: `2px solid ${checked ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+                      borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem',
+                      boxShadow: checked ? '0 2px 6px rgba(155, 98, 196, 0.12)' : 'none'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleProductSelection(p.prodName)}
+                      style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--accent-primary)' }}>Product {idx + 1}</span>
+                        <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.prodName}</span>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                        {parseFloat(p.qty || 0).toFixed(2)} Kg · {p.drums || 0} drum{(p.drums || 0) !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {displayProducts.length > 1 ? (
           displayProducts.map((pName, pIdx) => (
             <div key={`lump-top-gen-${pName}-${pIdx}`}>
-              <label>Product {pIdx + 1} ({pName}) Sieving Lumps (Kg)</label>
+              <label>Product {pIdx + 1} ({pName}) Lumps (Kg)</label>
               <input
                 type="number"
                 step="0.01"
@@ -2587,7 +2984,7 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           ))
         ) : (
           <div>
-            <label>Sieving Lumps (Kg)</label>
+            <label>Lumps (Kg)</label>
             <input
               type="number"
               step="0.01"
@@ -2628,16 +3025,21 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
           const sectionLabel = prodName || form.productName || `Product ${pIdx + 1}`;
           const batchGroups = [];
           const map = {};
-          prodRows.forEach(({ r, idx }) => {
-            const key = String(r.batchNo ?? '').trim() || '—';
+          prodRows.forEach(({ r, idx }, localIdx) => {
+            const micron = plRowMicron(r, mr);
+            const anchor = String(r.anchorBatch || '').trim();
+            const batchKey = (r.umaNewDrum && anchor && anchor !== '—')
+              ? anchor
+              : (String(r.batchNo ?? '').trim() || '—');
+            const key = `${micron.toLowerCase()}|||${batchKey}`;
             if (!map[key]) {
-              map[key] = { batchNo: key, rows: [], gross: 0, tare: 0, net: 0 };
+              map[key] = { batchNo: batchKey, micron, rows: [], gross: 0, tare: 0, net: 0 };
               batchGroups.push(map[key]);
             }
             const net = r.net !== '' && r.net !== undefined && r.net !== null
               ? parseWt(r.net)
               : Math.max(0, parseWt(r.gross) - parseWt(r.tare));
-            map[key].rows.push({ ...r, idx, netVal: net });
+            map[key].rows.push({ ...r, idx, netVal: net, srNo: localIdx + 1 });
             map[key].gross += parseWt(r.gross);
             map[key].tare += parseWt(r.tare);
             map[key].net += net;
@@ -2647,7 +3049,7 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)' }}>Product {pIdx + 1}: {sectionLabel}</h4>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>Sieving Lumps (Kg):</label>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>Lumps (Kg):</label>
                   <input
                     type="number"
                     step="0.01"
@@ -2657,7 +3059,39 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                     value={getProductSievingLumps(prodName) === 0 || getProductSievingLumps(prodName) === '' || getProductSievingLumps(prodName) == null ? '' : getProductSievingLumps(prodName)}
                     onChange={e => handleProductSievingLumpsChange(prodName, e.target.value === '' ? '' : (parseFloat(e.target.value) || ''))}
                   />
-                  <button type="button" className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => addCustomRow(prodName)}>+ Add Row</button>
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{
+                      padding: '0.3rem 0.75rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      borderRadius: '999px',
+                      border: '1px solid var(--accent-primary)',
+                      color: 'var(--accent-primary)',
+                      background: '#fff'
+                    }}
+                    onClick={() => addCustomRow(prodName)}
+                  >
+                    + Add Row
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{
+                      padding: '0.3rem 0.75rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      borderRadius: '999px',
+                      border: '1px solid var(--accent-primary)',
+                      color: 'var(--accent-primary)',
+                      background: '#fff',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onClick={() => addUmaNewDrum(prodName)}
+                  >
+                    + Add Uma New Drum
+                  </button>
                 </div>
               </div>
               <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
@@ -2680,11 +3114,32 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                           No rows yet — click &quot;+ Add Row&quot; to add drum weights for this product.
                         </td>
                       </tr>
-                    ) : batchGroups.map(group => (
-                      <React.Fragment key={`${sectionLabel}-batch-${group.batchNo}`}>
+                    ) : (() => {
+                      const micronBlocks = [];
+                      const micronMap = {};
+                      batchGroups.forEach((group) => {
+                        const id = String(group.micron || '').trim().toLowerCase();
+                        if (!micronMap[id]) {
+                          micronMap[id] = { micron: group.micron || '', groups: [] };
+                          micronBlocks.push(micronMap[id]);
+                        }
+                        micronMap[id].groups.push(group);
+                      });
+                      const showMicron = micronBlocks.some((block) => block.micron);
+                      return micronBlocks.map((block) => (
+                      <React.Fragment key={`${sectionLabel}-micron-${block.micron || 'none'}`}>
+                        {showMicron && (
+                          <tr>
+                            <td colSpan={7} style={{ padding: '0.45rem 0.35rem', fontWeight: 800, color: 'var(--accent-primary)', background: 'rgba(155, 98, 196, 0.08)' }}>
+                              Micron: {block.micron || '—'}
+                            </td>
+                          </tr>
+                        )}
+                        {block.groups.map(group => (
+                      <React.Fragment key={`${sectionLabel}-batch-${block.micron}-${group.batchNo}`}>
                         {group.rows.map((r) => (
                           <tr key={r.idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                            <td style={{ padding: '0.25rem', fontWeight: 600 }}>{r.idx + 1}</td>
+                            <td style={{ padding: '0.25rem', fontWeight: 600 }}>{r.srNo}</td>
                             <td style={{ padding: '0.25rem' }}>
                               <input type="text" className="input-field" style={{ padding: '0.25rem', fontSize: '0.8rem' }} value={r.batchNo || ''} onChange={e => handleCellChange(r.idx, 'batchNo', e.target.value)} />
                             </td>
@@ -2712,6 +3167,44 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                             </td>
                           </tr>
                         ))}
+                        <tr>
+                          <td colSpan={7} style={{ padding: '0.35rem 0.35rem 0.2rem', textAlign: 'right' }}>
+                            <span style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                              <button
+                                type="button"
+                                className="btn"
+                                style={{
+                                  padding: '0.25rem 0.7rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  borderRadius: '999px',
+                                  border: '1px solid var(--accent-primary)',
+                                  color: 'var(--accent-primary)',
+                                  background: '#fff'
+                                }}
+                                onClick={() => addCustomRow(prodName, group.batchNo, group.micron)}
+                              >
+                                + Add Row
+                              </button>
+                              <button
+                                type="button"
+                                className="btn"
+                                style={{
+                                  padding: '0.25rem 0.7rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  borderRadius: '999px',
+                                  border: '1px solid var(--accent-primary)',
+                                  color: 'var(--accent-primary)',
+                                  background: '#fff'
+                                }}
+                                onClick={() => addUmaNewDrum(prodName, group.batchNo, group.micron)}
+                              >
+                                + Add Uma New Drum
+                              </button>
+                            </span>
+                          </td>
+                        </tr>
                         <tr style={{ background: 'rgba(155, 98, 196, 0.1)', borderBottom: '2px solid var(--accent-primary)' }}>
                           <td colSpan={3} style={{ padding: '0.45rem 0.35rem', textAlign: 'right', fontWeight: 800, color: 'var(--accent-primary)', fontSize: '0.8rem' }}>
                             TOTAL — Batch {group.batchNo}
@@ -2728,7 +3221,10 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
                           <td />
                         </tr>
                       </React.Fragment>
-                    ))}
+                        ))}
+                      </React.Fragment>
+                      ));
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -2742,7 +3238,7 @@ const PLGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
               {grandTotal.lumps > 0 && (
                 <tr style={{ borderTop: '1px solid var(--border-color)' }}>
                   <td colSpan={3} style={{ padding: '0.5rem' }} />
-                  <td style={{ padding: '0.5rem', fontWeight: 700, textAlign: 'center' }}>Sieving Lumps</td>
+                  <td style={{ padding: '0.5rem', fontWeight: 700, textAlign: 'center' }}>Lumps</td>
                   <td style={{ padding: '0.5rem' }} />
                   <td style={{ padding: '0.5rem', fontWeight: 700, textAlign: 'center' }}>{grandTotal.lumps.toFixed(2)}</td>
                 </tr>
@@ -2784,9 +3280,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
   const availableProducts = getReceiptProductSummaries(mr, prodOpts).filter(p => p.batchCount > 0 || p.qty > 0);
   const dcFormInitKey = `${mr.id}-${editing?.id || 'new'}-${activeProductName || 'all'}`;
 
-  const initialSelected = activeProductName
-    ? [resolveReceiptProductName(mr, activeProductName, prodOpts)]
-    : getReceiptProductNames(mr, prodOpts);
+  const initialSelected = getDCDefaultSelectedProducts(mr, pl, prodOpts, activeProductName);
   const initialComputed = buildDCFieldsFromProducts(mr, pl, prodOpts, initialSelected);
 
   const [form, setForm] = useState({
@@ -2837,9 +3331,7 @@ const DCGenerator = ({ mr, activeProductName = '', editing, onClose }) => {
     }
     const dcSerial = data.settings?.serials?.DC || 1;
     const docNo = generateDocNumber('DC', dcSerial, new Date());
-    const selected = activeProductName
-      ? [resolveReceiptProductName(mr, activeProductName, prodOpts)]
-      : getReceiptProductNames(mr, prodOpts);
+    const selected = getDCDefaultSelectedProducts(mr, pl, prodOpts, activeProductName);
     const computed = buildDCFieldsFromProducts(mr, pl, prodOpts, selected);
     setForm(prev => ({
       ...prev,
@@ -3381,6 +3873,8 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
 
   const resolveProductQty = (prodName) => getProductQty(mr, prodName, prodOpts);
 
+  const defaultTiNickPsd = resolveDocNickAndPsd(mr, party, productNames[0] || mr.productName);
+
   const [form, setForm] = useState({
     invoiceNo: '',
     date: new Date().toISOString().split('T')[0],
@@ -3389,12 +3883,22 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
     partyDocNo: mr.partyDocNo || '',
     partyDocDate: mr.partyDocDate || '',
     productName: getReceiptProductLabel(mr, prodOpts),
+    nickName: defaultTiNickPsd.nickName,
+    psdReq: defaultTiNickPsd.psdReq,
     productSummaries: [],
-    productCharges: normalizeProductCharges(
-      resolveTIProductChargesForDoc(mr, party, data.invoices, prodOpts),
-      null,
-      mr,
-      prodOpts
+    productCharges: applyUmaNewDrumCharge(
+      normalizeProductCharges(
+        resolveTIProductChargesForDoc(mr, party, data.invoices, prodOpts),
+        null,
+        mr,
+        prodOpts
+      ),
+      {
+        batches: pl?.batches || [],
+        party,
+        stockItems: data.stockItems,
+        fallbackName: productNames[0] || mr.productName
+      }
     ),
     customCharges: getLinkedPITermsForTI(data.invoices, mr.id)?.customCharges || [],
     discount: getLinkedPITermsForTI(data.invoices, mr.id)?.discount ?? 0,
@@ -3406,22 +3910,36 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
   useEffect(() => {
     if (editing) {
       const summaries = buildPLProductSummaries(pl, mr, prodOpts);
+      const productLabel = editing.productName?.includes(',')
+        ? editing.productName
+        : getReceiptProductLabel(mr, prodOpts);
+      const nickPsd = resolveDocNickAndPsd(mr, party, productNames[0] || productLabel, editing);
       // Prefer saved TI values so direct edits stick (do not re-pull from PI)
       setForm({
         ...editing,
-        productName: editing.productName?.includes(',')
-          ? editing.productName
-          : getReceiptProductLabel(mr, prodOpts),
+        productName: productLabel,
+        nickName: nickPsd.nickName,
+        psdReq: nickPsd.psdReq,
         productSummaries: editing.productSummaries?.length ? editing.productSummaries : summaries,
-        productCharges: editing.productCharges && Object.keys(editing.productCharges).length
-          ? sanitizeProductCharges(editing.productCharges)
-          : normalizeProductCharges(
-            editing.productCharges,
-            editing,
-            mr,
-            prodOpts,
-            party
-          ),
+        productCharges: (() => {
+          const saved = editing.productCharges && Object.keys(editing.productCharges).length
+            ? sanitizeProductCharges(editing.productCharges)
+            : normalizeProductCharges(
+              editing.productCharges,
+              editing,
+              mr,
+              prodOpts,
+              party
+            );
+          return sumHdpeDrumQty(saved) > 0
+            ? saved
+            : applyUmaNewDrumCharge(saved, {
+              batches: pl?.batches || [],
+              party,
+              stockItems: data.stockItems,
+              fallbackName: productNames[0] || productLabel
+            });
+        })(),
         customCharges: editing.customCharges || [],
         discount: editing.discount || 0,
         taxRate: editing.taxRate ?? 18,
@@ -3430,16 +3948,28 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
       });
     } else {
       const summaries = buildPLProductSummaries(pl, mr, prodOpts);
+      const productLabel = getReceiptProductLabel(mr, prodOpts);
+      const nickPsd = resolveDocNickAndPsd(mr, party, productNames[0] || productLabel);
       const piTerms = getLinkedPITermsForTI(data.invoices, mr.id);
       setForm(prev => ({
         ...prev,
-        productName: getReceiptProductLabel(mr, prodOpts),
+        productName: productLabel,
+        nickName: nickPsd.nickName,
+        psdReq: nickPsd.psdReq,
         productSummaries: summaries,
-        productCharges: normalizeProductCharges(
-          piTerms?.productCharges || resolveTIProductChargesForDoc(mr, party, data.invoices, prodOpts),
-          piTerms,
-          mr,
-          prodOpts
+        productCharges: applyUmaNewDrumCharge(
+          normalizeProductCharges(
+            piTerms?.productCharges || resolveTIProductChargesForDoc(mr, party, data.invoices, prodOpts),
+            piTerms,
+            mr,
+            prodOpts
+          ),
+          {
+            batches: pl?.batches || [],
+            party,
+            stockItems: data.stockItems,
+            fallbackName: productNames[0] || productLabel
+          }
         ),
         customCharges: piTerms?.customCharges || [],
         discount: piTerms?.discount ?? 0,
@@ -3460,7 +3990,8 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
 
   const toggleCharge = (prodName, key) => {
     setForm(prev => {
-      const pc = prev.productCharges[prodName] || {
+      const chargeKey = resolveProductChargeKey(prev.productCharges, prodName);
+      const pc = prev.productCharges[chargeKey] || {
         charges: emptyChargeFlags(),
         rates: emptyChargeRates(),
         qtys: emptyChargeQtys()
@@ -3475,7 +4006,7 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
         ...prev,
         productCharges: {
           ...prev.productCharges,
-          [prodName]: {
+          [chargeKey]: {
             ...pc,
             charges: { ...pc.charges, [key]: turningOn },
             qtys
@@ -3486,29 +4017,45 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
   };
 
   const handleRateChange = (prodName, key, val) => {
-    setForm(prev => ({
-      ...prev,
-      productCharges: {
-        ...prev.productCharges,
-        [prodName]: {
-          ...prev.productCharges[prodName],
-          rates: { ...prev.productCharges[prodName].rates, [key]: parseChargeFieldValue(val) }
+    setForm(prev => {
+      const chargeKey = resolveProductChargeKey(prev.productCharges, prodName);
+      const pc = prev.productCharges[chargeKey] || {
+        charges: emptyChargeFlags(),
+        rates: emptyChargeRates(),
+        qtys: emptyChargeQtys()
+      };
+      return {
+        ...prev,
+        productCharges: {
+          ...prev.productCharges,
+          [chargeKey]: {
+            ...pc,
+            rates: { ...pc.rates, [key]: parseChargeFieldValue(val) }
+          }
         }
-      }
-    }));
+      };
+    });
   };
 
   const handleQtyChange = (prodName, key, val) => {
-    setForm(prev => ({
-      ...prev,
-      productCharges: {
-        ...prev.productCharges,
-        [prodName]: {
-          ...prev.productCharges[prodName],
-          qtys: { ...(prev.productCharges[prodName].qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) }
+    setForm(prev => {
+      const chargeKey = resolveProductChargeKey(prev.productCharges, prodName);
+      const pc = prev.productCharges[chargeKey] || {
+        charges: emptyChargeFlags(),
+        rates: emptyChargeRates(),
+        qtys: emptyChargeQtys()
+      };
+      return {
+        ...prev,
+        productCharges: {
+          ...prev.productCharges,
+          [chargeKey]: {
+            ...pc,
+            qtys: { ...(pc.qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) }
+          }
         }
-      }
-    }));
+      };
+    });
   };
 
   const getSubtotal = () => {
@@ -3610,6 +4157,35 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
           <label>Product(s)</label>
           <input type="text" className="input-field" readOnly value={form.productName} />
         </div>
+        <div>
+          <label>Nick Name</label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="From party product master"
+            value={form.nickName || ''}
+            onChange={(e) => setForm({ ...form, nickName: e.target.value })}
+          />
+        </div>
+        <div>
+          <label>PSD Req</label>
+          <SearchableSelect
+            allowCustom
+            className="input-field"
+            placeholder="Type or select PSD requirement"
+            value={form.psdReq || ''}
+            onChange={(e) => setForm({ ...form, psdReq: e.target.value })}
+            remember={false}
+          >
+            <option value="">Select PSD Req…</option>
+            {(data.psdRequirements || []).map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+            {form.psdReq && !(data.psdRequirements || []).includes(form.psdReq) && (
+              <option value={form.psdReq}>{form.psdReq}</option>
+            )}
+          </SearchableSelect>
+        </div>
       </div>
 
       <MRProductSummary mr={mr} party={party} productOptions={prodOpts} />
@@ -3621,9 +4197,8 @@ const TaxInvoiceGenerator = ({ mr, activeProductName = '', editing, onClose }) =
           {chargeProductNames.map((prodName) => {
             const displayIdx = getProductDisplayIndex(mr, prodName, prodOpts);
             const materialQty = resolveProductQty(prodName);
-            const pc = form.productCharges[prodName] || form.productCharges[Object.keys(form.productCharges || {}).find(k =>
-              (k || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase()
-            )] || {
+            const chargeKey = resolveProductChargeKey(form.productCharges, prodName);
+            const pc = form.productCharges[chargeKey] || {
               charges: emptyChargeFlags(),
               rates: emptyChargeRates(),
               qtys: buildChargeQtys({}, materialQty)

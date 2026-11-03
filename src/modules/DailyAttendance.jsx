@@ -31,7 +31,7 @@ import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import SearchableSelect from '../components/SearchableSelect';
 import ExportButton from '../components/ExportButton';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, formatTime } from '../utils/dateUtils';
 import {
   getBiometricDevices,
   applyEsslSyncToState,
@@ -48,16 +48,6 @@ import { DEPARTMENTS } from './EmployeeManagement';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
-const formatTime12 = (t) => {
-  if (!t || t === '-') return '-';
-  const [hStr, mStr] = String(t).split(':');
-  let h = parseInt(hStr, 10);
-  const m = mStr || '00';
-  if (isNaN(h)) return '-';
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
-};
 
 const formatTotalHours = (hrs) => {
   if (!hrs || isNaN(hrs) || Number(hrs) <= 0) return '0h 00m';
@@ -446,8 +436,8 @@ const DailyAttendance = () => {
     name: r.name,
     department: r.department,
     shift: r.shift,
-    punchIn: formatTime12(r.inTime),
-    punchOut: formatTime12(r.outTime),
+    punchIn: formatTime(r.inTime),
+    punchOut: formatTime(r.outTime),
     totalHours: formatTotalHours(r.totalHours),
     attendance: r.status,
     approval: r.approvalStatus,
@@ -748,6 +738,7 @@ const DailyAttendance = () => {
                       checked={pageRows.length > 0 && pageRows.every((r) => selectedIds.includes(r.id))}
                     />
                   </th>
+                  <th style={{ padding: '10px 8px' }}>Sr. No</th>
                   <th style={{ padding: '10px 8px' }}>Emp ID</th>
                   <th style={{ padding: '10px 8px' }}>Name</th>
                   <th style={{ padding: '10px 8px' }}>Department</th>
@@ -764,12 +755,12 @@ const DailyAttendance = () => {
               <tbody>
                 {pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="pm-empty" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                    <td colSpan={13} className="pm-empty" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                       No attendance records found matching filters for {formatDate(selectedDate)}.
                     </td>
                   </tr>
                 ) : (
-                  pageRows.map((r) => {
+                  pageRows.map((r, idx) => {
                     const isSelected = selectedIds.includes(r.id);
                     return (
                       <tr key={r.id} style={{ borderBottom: '1px solid var(--border-color)', background: isSelected ? 'rgba(155, 98, 196, 0.04)' : 'transparent' }}>
@@ -780,6 +771,7 @@ const DailyAttendance = () => {
                             onChange={() => handleToggleRow(r.id)}
                           />
                         </td>
+                        <td style={{ padding: '10px 8px' }}>{(page - 1) * pageSize + idx + 1}</td>
                         <td style={{ padding: '10px 8px', fontWeight: 700, color: 'var(--text-main)' }}>
                           {r.empId}
                         </td>
@@ -793,10 +785,10 @@ const DailyAttendance = () => {
                           <span className="esm-chip">{r.shift}</span>
                         </td>
                         <td style={{ padding: '10px 8px', fontWeight: 600, color: r.inTime ? '#047857' : 'var(--text-muted)' }}>
-                          {formatTime12(r.inTime)}
+                          {formatTime(r.inTime)}
                         </td>
                         <td style={{ padding: '10px 8px', fontWeight: 600, color: r.outTime ? '#047857' : 'var(--text-muted)' }}>
-                          {formatTime12(r.outTime)}
+                          {formatTime(r.outTime)}
                         </td>
                         <td style={{ padding: '10px 8px', fontWeight: 700 }}>
                           {formatTotalHours(r.totalHours)}
@@ -882,7 +874,7 @@ const DailyAttendance = () => {
                 {officeRows.slice(0, 3).map((off) => (
                   <div key={off.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px border-dash #e2e8f0' }}>
                     <span><strong>{off.empId}</strong> {off.name} ({off.department})</span>
-                    <span>In: {formatTime12(off.inTime)} | Out: {formatTime12(off.outTime)} | {off.status}</span>
+                    <span>In: {formatTime(off.inTime)} | Out: {formatTime(off.outTime)} | {off.status}</span>
                   </div>
                 ))}
               </div>
@@ -1131,11 +1123,11 @@ const DailyAttendance = () => {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Punch In Time:</span>
-                <strong>{formatTime12(viewingRow.inTime)}</strong>
+                <strong>{formatTime(viewingRow.inTime)}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Punch Out Time:</span>
-                <strong>{formatTime12(viewingRow.outTime)}</strong>
+                <strong>{formatTime(viewingRow.outTime)}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Total Calculated Hours:</span>

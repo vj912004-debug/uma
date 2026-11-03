@@ -43,6 +43,39 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
   const rows = [];
   let sr = 1;
 
+  const withHsn = (name, hsn) => {
+    const label = String(name || '').trim();
+    const code = String(hsn || '').trim();
+    if (!code) return label;
+    if (new RegExp(`\\(\\s*${code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\)\\s*$`).test(label)) {
+      return label;
+    }
+    return label ? `${label} (${code})` : `HSN CODE : ${code}`;
+  };
+
+  const emptyAmtCells = `
+        <td class="center"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>`;
+
+  const pushHsnNote = (hsn) => {
+    const code = String(hsn || '').trim();
+    if (!code) return;
+    rows.push(`
+      <tr>
+        <td class="center"></td>
+        <td class="left">HSN CODE : ${escHtml(code)}</td>
+        ${emptyAmtCells}
+      </tr>`);
+  };
+
   const pushRow = (desc, qty, rate, amt) => {
     const lineAmt = parseFloat(amt) || 0;
     const lineQty = Number.isFinite(parseFloat(qty)) ? parseFloat(qty) : 0;
@@ -62,12 +95,6 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
     totalAll += rowTotal;
     totalQty += parseFloat(qty) || 0;
 
-    let cleanDesc = desc;
-    const match = desc.match(/(.*?)\(\d+\)$/);
-    if (match) {
-      cleanDesc = match[1].trim();
-    }
-
     const sgstRateCell = lineAmt > 0 ? sgstPct : '';
     const cgstRateCell = lineAmt > 0 ? cgstPct : '';
     const igstRateCell = lineAmt > 0 ? igstPct : '';
@@ -79,7 +106,7 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
     rows.push(`
       <tr>
         <td class="center">${sr++}</td>
-        <td class="left">${escHtml(cleanDesc)}</td>
+        <td class="left">${escHtml(desc)}</td>
         <td class="center">${fmtQty(qty)}</td>
         <td class="num">${rateEntered ? escHtml(parseFloat(rate).toFixed(2)) : ''}</td>
         <td class="num">${money(lineAmt)}</td>
@@ -98,18 +125,25 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
   });
 
   (data.customCharges || []).forEach((cc) => {
-    if (!cc.checked) return;
+    if (cc.checked === false) return;
     const rawQty = cc.qty;
     const ccQty = parseFloat(rawQty);
     const qty = (rawQty === '' || rawQty == null || !Number.isFinite(ccQty) || ccQty === 0) ? '' : ccQty;
     const qtyNum = qty === '' ? 0 : ccQty;
     const rate = parseFloat(cc.rate) || 0;
-    const amt = qtyNum * rate;
-    const name = String(cc.name || '').trim();
+    const amt = qtyNum * rate || parseFloat(cc.amount) || 0;
+    const name = String(cc.name || cc.description || '').trim();
     if (!name && amt <= 0 && qtyNum === 0 && rate === 0) return;
     if (!name) return;
-    pushRow(name, qty, rate, amt);
+    pushRow(
+      withHsn(name, cc.hsn),
+      qty || (amt > 0 && rate > 0 ? amt / rate : qty),
+      rate || (qtyNum > 0 ? amt / qtyNum : rate),
+      amt
+    );
   });
+
+  pushHsnNote(data.hsnCode || data.hsn);
 
   // Apply discount the same way as the form (taxable = subtotal - discount)
   const discount = parseFloat(data.discount) || 0;
@@ -601,9 +635,9 @@ export const buildPerformaInvoiceHtml = (raw, profileInput) => {
   }
   .sig-col .sig-space{
     display:block;
-    height:56px;
-    min-height:56px;
-    max-height:56px;
+    height:88px;
+    min-height:88px;
+    max-height:88px;
   }
   .sig-col .sig-line{
     margin:0;

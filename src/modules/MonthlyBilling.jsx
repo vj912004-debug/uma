@@ -1006,6 +1006,7 @@ const MonthlyBilling = () => {
                         onChange={toggleAll}
                       />
                     </th>
+                    <th>Sr. No</th>
                     <th>DC No.</th>
                     <th>Dispatch Date</th>
                     <th>Product</th>
@@ -1020,18 +1021,18 @@ const MonthlyBilling = () => {
                 <tbody>
                   {!loaded ? (
                     <tr>
-                      <td colSpan={10} className="mb-empty">
+                      <td colSpan={11} className="mb-empty">
                         Select party and a From / To date, then click Load Data.
                       </td>
                     </tr>
                   ) : filteredRows.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="mb-empty">
+                      <td colSpan={11} className="mb-empty">
                         {loadMessage || `No delivery challans found for this party from ${period}.`}
                       </td>
                     </tr>
                   ) : (
-                    filteredRows.map((row) => (
+                    filteredRows.map((row, idx) => (
                       <tr key={row.id}>
                         <td>
                           <input
@@ -1041,6 +1042,7 @@ const MonthlyBilling = () => {
                             onChange={() => toggleOne(row.id)}
                           />
                         </td>
+                        <td>{idx + 1}</td>
                         <td className="mb-dc-cell">
                           <div className="mb-dc-main">{row.dcNo}</div>
                           {row.partyDocNo ? <div className="mb-dc-sub">{row.partyDocNo}</div> : null}
@@ -1229,6 +1231,7 @@ const MonthlyBilling = () => {
                     <table className="mb-table">
                       <thead>
                         <tr>
+                          <th>Sr. No</th>
                           <th>Party Name</th>
                           <th>DC Date Range</th>
                           <th>Total Qty (Kg)</th>
@@ -1247,6 +1250,7 @@ const MonthlyBilling = () => {
                       </thead>
                       <tbody>
                         <tr>
+                          <td>1</td>
                           <td>{partyName || generatedInvoice?.partyName || '—'}</td>
                           <td>{dateRange}</td>
                           <td>{Number(invoiceTotals.qty).toLocaleString('en-IN')}</td>

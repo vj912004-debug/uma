@@ -834,13 +834,14 @@ const PurchaseManagement = () => {
       <div className="pm-mini-wrap">
         <table className="pm-mini">
           <thead>
-            <tr><th>Supplier</th><th>Quote No</th><th>Date</th><th>Rate</th><th>GST %</th><th>Qty</th><th>Freight</th><th>Landed Cost</th><th>Status</th><th></th></tr>
+            <tr><th>Sr. No</th><th>Supplier</th><th>Quote No</th><th>Date</th><th>Rate</th><th>GST %</th><th>Qty</th><th>Freight</th><th>Landed Cost</th><th>Status</th><th></th></tr>
           </thead>
           <tbody>
             {inquiryQuotes.length === 0 ? (
-              <tr><td colSpan={10} className="pm-empty">No quotes for this inquiry. Click Add Quote.</td></tr>
-            ) : inquiryQuotes.map((r) => (
+              <tr><td colSpan={11} className="pm-empty">No quotes for this inquiry. Click Add Quote.</td></tr>
+            ) : inquiryQuotes.map((r, idx) => (
               <tr key={r.id}>
+                <td>{idx + 1}</td>
                 <td>{r.supplierName}</td>
                 <td>{r.quoteNo || '—'}</td>
                 <td>{formatDate(r.quoteDate) || '—'}</td>
@@ -945,13 +946,14 @@ const PurchaseManagement = () => {
       <div className="pm-mini-wrap">
         <table className="pm-mini">
           <thead>
-            <tr><th>Date</th><th>Person</th><th>Remark</th><th>Next</th><th>Status</th><th></th></tr>
+            <tr><th>Sr. No</th><th>Date</th><th>Person</th><th>Remark</th><th>Next</th><th>Status</th><th></th></tr>
           </thead>
           <tbody>
             {inquiryFollows.length === 0 ? (
-              <tr><td colSpan={6} className="pm-empty">No follow-ups yet. Click Add Follow Up.</td></tr>
-            ) : inquiryFollows.map((r) => (
+              <tr><td colSpan={7} className="pm-empty">No follow-ups yet. Click Add Follow Up.</td></tr>
+            ) : inquiryFollows.map((r, idx) => (
               <tr key={r.id}>
+                <td>{idx + 1}</td>
                 <td>{formatDate(r.followDate) || '—'}</td>
                 <td>{r.contactedPerson || '—'}</td>
                 <td>{r.remark || '—'}</td>
@@ -1131,20 +1133,20 @@ const PurchaseManagement = () => {
         <button type="button" className="btn pm-btn-outline" onClick={() => openItem()}><Package size={14} /> Add Item</button>
         <button type="button" className="btn pm-btn-outline" onClick={() => openReceipt()}><ArrowDownToLine size={14} /> Stock Entry</button>
         <button type="button" className="btn pm-btn-outline" onClick={openIssue}><ArrowUpFromLine size={14} /> Stock Issue</button>
-      </div>
+              </div>
 
       <div className="esm-tabs">
         {TABS.map((t) => {
           const Icon = t.icon;
-          return (
+            return (
             <button key={t.id} type="button" className={`esm-tab ${activeTab === t.id ? 'is-active' : ''}`} onClick={() => setActiveTab(t.id)}>
               <Icon size={15} />
               {t.label}
               <span className="pm-tab-count">{tabCounts[t.id]}</span>
-            </button>
-          );
-        })}
-      </div>
+              </button>
+            );
+          })}
+        </div>
 
       {activeTab === 'inquiries' && (
         <Panel id="pm-status" className="pm-tab-panel" title="Inquiry Status Dashboard" extra="Click an inquiry to open quotes, follow-ups and PO">
@@ -1161,18 +1163,18 @@ const PurchaseManagement = () => {
               <button type="button" key={key} className={`pm-chip tone-${key}${statusChip === key ? ' is-on' : ''}`} onClick={() => setStatusChip(key)}>
                 <strong>{value}</strong>
                 <span>{label}</span>
-              </button>
+            </button>
             ))}
           </div>
           <div className="pm-mini-wrap">
             <table className="pm-mini">
-              <thead>
-                <tr>
+            <thead>
+              <tr>
                   <th>Sr</th><th>Inquiry No</th><th>Item / Description</th><th>Category</th><th>Date</th><th>Sent Through</th>
                   <th>Quotes</th><th>Lowest</th><th>Approved Supplier</th><th>Status</th><th></th>
-                </tr>
-              </thead>
-              <tbody>
+              </tr>
+            </thead>
+            <tbody>
                 {statusRows.length === 0 ? (
                   <tr><td colSpan={11} className="pm-empty">No inquiries in this range. Click New Inquiry to add one.</td></tr>
                 ) : statusRows.map((r, idx) => (
@@ -1180,21 +1182,21 @@ const PurchaseManagement = () => {
                     <td>{idx + 1}</td>
                     <td>{r.inquiryNo}</td>
                     <td>{r.itemDescription}</td>
-                    <td>{r.category || '—'}</td>
+                  <td>{r.category || '—'}</td>
                     <td>{formatDate(r.date)}</td>
                     <td>{r.contactVia || '—'}</td>
                     <td>{r.quotesReceived || 0}</td>
-                    <td>{money(r.lowestQuote)}</td>
-                    <td>{r.approvedSupplier || '—'}</td>
+                  <td>{money(r.lowestQuote)}</td>
+                  <td>{r.approvedSupplier || '—'}</td>
                     <td><span className={`pm-pill ${pillFor(r.status)}`}>{r.status || 'Quote Pending'}</span></td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <RowActions onEdit={() => openInquiryForm(r)} onDelete={() => removeRow('purchaseManagement', r.id)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         </Panel>
       )}
 
@@ -1207,13 +1209,14 @@ const PurchaseManagement = () => {
           <div className="pm-mini-wrap">
             <table className="pm-mini">
               <thead>
-                <tr><th>Supplier Name</th><th>Contact Person</th><th>Mobile</th><th>Email</th><th>GSTIN</th><th>Items Supplied</th><th>Status</th><th></th></tr>
+                <tr><th>Sr. No</th><th>Supplier Name</th><th>Contact Person</th><th>Mobile</th><th>Email</th><th>GSTIN</th><th>Items Supplied</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
                 {visibleSuppliers.length === 0 ? (
-                  <tr><td colSpan={8} className="pm-empty">No suppliers yet. Click Add Supplier.</td></tr>
-                ) : visibleSuppliers.map((s) => (
+                  <tr><td colSpan={9} className="pm-empty">No suppliers yet. Click Add Supplier.</td></tr>
+                ) : visibleSuppliers.map((s, idx) => (
                   <tr key={s.id} className="pm-click-row" title="Click to open supplier" onClick={() => openSupplier(s)}>
+                    <td>{idx + 1}</td>
                     <td>{s.supplierName}</td>
                     <td>{s.contactPerson || '—'}</td>
                     <td>{s.mobile || '—'}</td>
@@ -1240,34 +1243,35 @@ const PurchaseManagement = () => {
           </div>
           <div className="pm-mini-wrap">
             <table className="pm-mini">
-              <thead>
-                <tr><th>Item Name</th><th>Category</th><th>Specification</th><th>Unit</th><th>Stock</th><th>Min</th><th>Preferred Supplier</th><th>Last Rate</th><th>Status</th><th></th></tr>
-              </thead>
-              <tbody>
+            <thead>
+                <tr><th>Sr. No</th><th>Item Name</th><th>Category</th><th>Specification</th><th>Unit</th><th>Stock</th><th>Min</th><th>Preferred Supplier</th><th>Last Rate</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
                 {visibleItems.length === 0 ? (
-                  <tr><td colSpan={10} className="pm-empty">No items yet. Click Add Item.</td></tr>
-                ) : visibleItems.map((s) => {
+                  <tr><td colSpan={11} className="pm-empty">No items yet. Click Add Item.</td></tr>
+                ) : visibleItems.map((s, idx) => {
                   const low = num(s.currentStock) <= num(s.minimumStock);
-                  return (
+                return (
                     <tr key={s.id} className="pm-click-row" title="Click to open item" onClick={() => openItem(s)}>
-                      <td>{s.itemName}</td>
+                    <td>{idx + 1}</td>
+                    <td>{s.itemName}</td>
                       <td>{s.category || '—'}</td>
                       <td>{s.specification || '—'}</td>
                       <td>{s.unit || '—'}</td>
                       <td>{s.currentStock || 0}</td>
-                      <td>{s.minimumStock || 0}</td>
+                    <td>{s.minimumStock || 0}</td>
                       <td>{s.preferredSupplier || '—'}</td>
-                      <td>{money(s.lastPurchaseRate)}</td>
+                    <td>{money(s.lastPurchaseRate)}</td>
                       <td><span className={`pm-pill ${low ? 'is-low' : 'is-approved'}`}>{low ? 'Low Stock' : 'In Stock'}</span></td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <RowActions onEdit={() => openItem(s)} onDelete={() => removeRow('purchaseStock', s.id)} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
         </Panel>
       )}
 
@@ -1278,9 +1282,9 @@ const PurchaseManagement = () => {
               <SearchableSelect className="input-field" value={selectedItem} onChange={(e) => pickItem(e.target.value)} memoryKey="pm-working-item">
                 <option value="">All items</option>
                 {itemNames.map((name) => <option key={name} value={name}>{name}</option>)}
-              </SearchableSelect>
-            </Field>
-          </div>
+                  </SearchableSelect>
+                </Field>
+              </div>
           <div className="pm-tab-grid">
             <Panel id="pm-alert" title="Minimum Stock Alert">
               <div className="pm-alert-banner">
@@ -1293,15 +1297,16 @@ const PurchaseManagement = () => {
               <div className="pm-mini-wrap">
                 <table className="pm-mini">
                   <thead>
-                    <tr><th>Item</th><th>Current</th><th>Minimum</th><th>Status</th></tr>
+                    <tr><th>Sr. No</th><th>Item</th><th>Current</th><th>Minimum</th><th>Status</th></tr>
                   </thead>
                   <tbody>
                     {alertRows.length === 0 ? (
-                      <tr><td colSpan={4} className="pm-empty">No low-stock items.</td></tr>
-                    ) : alertRows.map((s) => {
+                      <tr><td colSpan={5} className="pm-empty">No low-stock items.</td></tr>
+                    ) : alertRows.map((s, idx) => {
                       const low = num(s.currentStock) <= num(s.minimumStock);
                       return (
                         <tr key={s.id} className="pm-click-row" onClick={() => pickItem(s.itemName)}>
+                          <td>{idx + 1}</td>
                           <td>{s.itemName}</td>
                           <td>{s.currentStock || 0}</td>
                           <td>{s.minimumStock || 0}</td>
@@ -1314,20 +1319,21 @@ const PurchaseManagement = () => {
               </div>
               <button type="button" className="btn pm-btn-outline" onClick={() => setShowAllAlerts((v) => !v)}>
                 {showAllAlerts ? 'Show low stock only' : 'View All Items'}
-              </button>
+                </button>
             </Panel>
 
             <Panel id="pm-history" title="Item Purchase History" extra={selectedItem || 'All items'}>
               <div className="pm-mini-wrap">
                 <table className="pm-mini">
                   <thead>
-                    <tr><th>Date</th><th>Item</th><th>Supplier</th><th>Qty</th><th>Rate</th><th>Invoice</th></tr>
+                    <tr><th>Sr. No</th><th>Date</th><th>Item</th><th>Supplier</th><th>Qty</th><th>Rate</th><th>Invoice</th></tr>
                   </thead>
                   <tbody>
                     {shownHistory.length === 0 ? (
-                      <tr><td colSpan={6} className="pm-empty">No purchases yet.</td></tr>
-                    ) : shownHistory.map((r) => (
+                      <tr><td colSpan={7} className="pm-empty">No purchases yet.</td></tr>
+                    ) : shownHistory.map((r, idx) => (
                       <tr key={r.id}>
+                        <td>{idx + 1}</td>
                         <td>{formatDate(r.date) || '—'}</td>
                         <td>{r.itemName}</td>
                         <td>{r.supplierName || '—'}</td>
@@ -1349,13 +1355,14 @@ const PurchaseManagement = () => {
               <div className="pm-mini-wrap">
                 <table className="pm-mini">
                   <thead>
-                    <tr><th>Date</th><th>Supplier</th><th>Rate (₹)</th><th>Remarks</th></tr>
+                    <tr><th>Sr. No</th><th>Date</th><th>Supplier</th><th>Rate (₹)</th><th>Remarks</th></tr>
                   </thead>
                   <tbody>
                     {priceRows.length === 0 ? (
-                      <tr><td colSpan={4} className="pm-empty">No price history.</td></tr>
-                    ) : priceRows.map((r) => (
+                      <tr><td colSpan={5} className="pm-empty">No price history.</td></tr>
+                    ) : priceRows.map((r, idx) => (
                       <tr key={r.id}>
+                        <td>{idx + 1}</td>
                         <td>{formatDate(r.quoteDate) || '—'}</td>
                         <td>{r.supplierName}</td>
                         <td>{money(r.rate)}</td>
@@ -1364,20 +1371,21 @@ const PurchaseManagement = () => {
                     ))}
                   </tbody>
                 </table>
-              </div>
+          </div>
             </Panel>
 
             <Panel id="pm-approved" title="Approved Supplier for Item" extra={selectedItem || 'All items'}>
               <div className="pm-mini-wrap">
                 <table className="pm-mini">
                   <thead>
-                    <tr><th>Item Name</th><th>Approved Supplier</th><th>Status</th></tr>
+                    <tr><th>Sr. No</th><th>Item Name</th><th>Approved Supplier</th><th>Status</th></tr>
                   </thead>
                   <tbody>
                     {approvedForItem.length === 0 ? (
-                      <tr><td colSpan={3} className="pm-empty">No approved supplier for this item.</td></tr>
-                    ) : approvedForItem.map((s) => (
+                      <tr><td colSpan={4} className="pm-empty">No approved supplier for this item.</td></tr>
+                    ) : approvedForItem.map((s, idx) => (
                       <tr key={s.id}>
+                        <td>{idx + 1}</td>
                         <td>{selectedItem || s.itemsSupplied || '—'}</td>
                         <td>{s.supplierName}</td>
                         <td><span className="pm-pill is-approved">Approved</span></td>
@@ -1385,7 +1393,7 @@ const PurchaseManagement = () => {
                     ))}
                   </tbody>
                 </table>
-              </div>
+        </div>
             </Panel>
           </div>
         </>

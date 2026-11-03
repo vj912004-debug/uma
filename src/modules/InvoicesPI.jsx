@@ -30,7 +30,9 @@ import {
   normalizeProductChargesFromDoc,
   sanitizeProductCharges,
   calcProductChargesSubtotal,
-  enrichPIForPrint
+  enrichPIForPrint,
+  getChargeSlotQty,
+  formatChargeSlotLabel
 } from '../utils/documentCharges';
 import {
   getReceiptProductLabel,
@@ -39,7 +41,8 @@ import {
   getProductQty,
   getProductDisplayIndex,
   getMRReceivedQty,
-  receiptProductOptions
+  receiptProductOptions,
+  resolveDocNickAndPsd
 } from '../utils/receiptProducts';
 import SearchableSelect from '../components/SearchableSelect';
 
@@ -62,7 +65,10 @@ const InvoicesPI = () => {
     partyDocDate: '',
     partyName: '',
     productName: '',
+    nickName: '',
+    psdReq: '',
     productSummaries: [],
+    hsnCode: '',
     billAddress: '',
     shipAddress: '',
     gstinBill: '',
@@ -99,6 +105,10 @@ const InvoicesPI = () => {
       || productSummaries.reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0)
       || 0;
     const productCharges = initProductChargesFromMR(freshMR, mrParty, prodOpts);
+    const firstProd = (mrParty?.products || []).find(
+      (p) => String(p.name || '').trim().toLowerCase() === String(productSummaries[0]?.prodName || productLabel || '').split(',')[0].trim().toLowerCase()
+    );
+    const nickPsd = resolveDocNickAndPsd(freshMR, mrParty, productSummaries[0]?.prodName || productLabel);
     const piSerial = data.settings?.serials?.PI || 1;
     return {
       invoiceNo: generateDocNumber('PI', piSerial, new Date(docDate)),
@@ -107,7 +117,10 @@ const InvoicesPI = () => {
       partyDocDate: freshMR.partyDocDate,
       partyName: freshMR.partyName,
       productName: productLabel,
+      nickName: nickPsd.nickName,
+      psdReq: nickPsd.psdReq,
       productSummaries,
+      hsnCode: firstProd?.hsn || '',
       billAddress: freshMR.billAddress || mrParty?.billAddress || '',
       shipAddress: freshMR.shipAddress || mrParty?.shipAddress || '',
       gstinBill: freshMR.gstinBill || mrParty?.gstinBill || '',
@@ -140,10 +153,19 @@ const InvoicesPI = () => {
       const productCharges = mr
         ? normalizeProductChargesFromDoc(editingDoc.productCharges, editingDoc, mr, prodOpts, prodOpts.party)
         : (editingDoc.productCharges || {});
+      const productLabel = mr ? getReceiptProductLabel(mr, prodOpts) : (editingDoc.productName || '');
+      const nickPsd = resolveDocNickAndPsd(
+        mr,
+        prodOpts.party || data.parties.find((p) => p.id === mr?.partyId),
+        productSummaries[0]?.prodName || productLabel,
+        editingDoc
+      );
       setForm(prev => ({
         ...editingDoc,
         ...merged,
-        productName: mr ? getReceiptProductLabel(mr, prodOpts) : (editingDoc.productName || ''),
+        productName: productLabel,
+        nickName: nickPsd.nickName,
+        psdReq: nickPsd.psdReq,
         productSummaries: productSummaries.length ? productSummaries : (editingDoc.productSummaries || []),
         productCharges,
         gstType: normalizeGstType(editingDoc.gstType),
@@ -164,6 +186,7 @@ const InvoicesPI = () => {
         || parseFloat(freshMR.totalQty)
         || 0;
       const productCharges = initProductChargesFromMR(freshMR, mrParty, prodOpts);
+      const nickPsd = resolveDocNickAndPsd(freshMR, mrParty, productSummaries[0]?.prodName || productLabel);
       setForm(prev => ({
         ...prev,
         partyDocNo: freshMR.partyDocNo || '',
@@ -174,6 +197,8 @@ const InvoicesPI = () => {
         gstinBill: freshMR.gstinBill || mrParty?.gstinBill || '',
         gstinShip: freshMR.gstinShip || mrParty?.gstinShip || '',
         productName: productLabel,
+        nickName: nickPsd.nickName,
+        psdReq: nickPsd.psdReq,
         productSummaries,
         qty: materialQty,
         productCharges
@@ -213,9 +238,9 @@ const InvoicesPI = () => {
   };
 
   const prodOpts = activeMR ? receiptProductOptions(activeMR, data) : {};
-  const chargeProductNames = activeMR
-    ? getReceiptProductNames(activeMR, prodOpts)
-    : Object.keys(form.productCharges || {});
+  const chargeProductNames = Object.keys(form.productCharges || {}).length
+    ? Object.keys(form.productCharges)
+    : (activeMR ? getReceiptProductNames(activeMR, prodOpts) : []);
 
   const getProductChargeBlock = (prodName) =>
     form.productCharges?.[prodName]
@@ -370,6 +395,7 @@ const InvoicesPI = () => {
       partyName: '',
       productName: '',
     productSummaries: [],
+      hsnCode: '',
       billAddress: '',
       shipAddress: '',
       gstinBill: '',
@@ -402,6 +428,7 @@ const InvoicesPI = () => {
       partyName: '',
       productName: '',
     productSummaries: [],
+      hsnCode: '',
       billAddress: '',
       shipAddress: '',
       gstinBill: '',
@@ -600,6 +627,7 @@ const InvoicesPI = () => {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th>Sr. No</th>
                   <th>M.R. Number</th>
                   <th>Party Name</th>
                   <th>Product</th>
@@ -609,13 +637,14 @@ const InvoicesPI = () => {
               </thead>
               <tbody>
                 {pendingMRs.length === 0 ? (
-                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>No receipts awaiting PI.</td></tr>
+                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>No receipts awaiting PI.</td></tr>
                 ) : (
-                  pendingMRs.map((mr) => {
+                  pendingMRs.map((mr, idx) => {
                     const prodOpts = receiptProductOptions(mr, data);
                     const productLabel = getReceiptProductLabel(mr, prodOpts);
                     return (
                       <tr key={mr.id}>
+                        <td>{idx + 1}</td>
                         <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{mr.receiptNo}</td>
                         <td style={{ fontWeight: 600 }}>{mr.partyName}</td>
                         <td>{productLabel || mr.productName || '—'}</td>
@@ -641,6 +670,7 @@ const InvoicesPI = () => {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th>Sr. No</th>
                   <th>PI Date</th>
                   <th>PI Number</th>
                   <th>Party Name</th>
@@ -652,10 +682,11 @@ const InvoicesPI = () => {
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>No Proforma Invoices found.</td></tr>
+                  <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>No Proforma Invoices found.</td></tr>
                 ) : (
-                  filtered.map(pi => (
+                  filtered.map((pi, idx) => (
                     <tr key={pi.id}>
+                      <td>{idx + 1}</td>
                       <td>{formatDate(pi.date)}</td>
                       <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{pi.invoiceNo}</td>
                       <td style={{ fontWeight: 600 }}>{pi.partyName}</td>
@@ -748,8 +779,47 @@ const InvoicesPI = () => {
                   )}
                 </div>
                 <div>
+                  <label>Nick Name</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="From party product master"
+                    value={form.nickName || ''}
+                    onChange={(e) => setForm({ ...form, nickName: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label>PSD Req</label>
+                  <SearchableSelect
+                    allowCustom
+                    className="input-field"
+                    placeholder="Type or select PSD requirement"
+                    value={form.psdReq || ''}
+                    onChange={(e) => setForm({ ...form, psdReq: e.target.value })}
+                    remember={false}
+                  >
+                    <option value="">Select PSD Req…</option>
+                    {(data.psdRequirements || []).map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                    {form.psdReq && !(data.psdRequirements || []).includes(form.psdReq) && (
+                      <option value={form.psdReq}>{form.psdReq}</option>
+                    )}
+                  </SearchableSelect>
+                </div>
+                <div>
                   <label>Material Qty (Kg)</label>
                   <input type="number" step="any" className="input-field" value={form.qty} onChange={e => handleMaterialQtyChange(e.target.value)} />
+                </div>
+                <div>
+                  <label>HSN Code</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. 29262000"
+                    value={form.hsnCode || ''}
+                    onChange={e => setForm({ ...form, hsnCode: e.target.value })}
+                  />
                 </div>
                 <div>
                   <label>Delivery Challan No.</label>
@@ -782,14 +852,21 @@ const InvoicesPI = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
                 <div>
                   {activeMR && chargeProductNames.length > 0 ? (
-                    chargeProductNames.map(prodName => {
+                    chargeProductNames.map((prodName, pIdx) => {
                       const pc = getProductChargeBlock(prodName);
-                      const prodQty = getProductQty(activeMR, prodName, prodOpts);
-                      const displayIdx = getProductDisplayIndex(activeMR, prodName, prodOpts);
+                      const baseName = String(prodName).includes('|||')
+                        ? String(prodName).split('|||')[0]
+                        : prodName;
+                      const prodQty = activeMR
+                        ? getChargeSlotQty(activeMR, prodName, prodOpts)
+                        : (parseFloat(form.qty) || 0);
+                      const displayIdx = activeMR
+                        ? (getProductDisplayIndex(activeMR, baseName, prodOpts) || (pIdx + 1))
+                        : (pIdx + 1);
                       return (
                         <div key={prodName} style={{ marginBottom: '1.25rem', padding: '1rem', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                           <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                            Product {displayIdx}: {prodName} ({prodQty.toFixed(2)} Kg)
+                            Product {displayIdx}: {formatChargeSlotLabel(prodName)} ({Number(prodQty || 0).toFixed(2)} Kg)
                           </h4>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {chargesList.map(item => (

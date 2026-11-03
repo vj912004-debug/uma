@@ -628,9 +628,9 @@ const getCommonStyle = () => `
   }
   .sig-col .sig-space{
     display:block;
-    height:56px;
-    min-height:56px;
-    max-height:56px;
+    height:88px;
+    min-height:88px;
+    max-height:88px;
   }
   .sig-col .sig-line{
     margin:0;

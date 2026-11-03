@@ -1,13 +1,79 @@
-import { formatDate, newestFirst } from '../utils/dateUtils';
+import { formatDateAndTime } from '../utils/dateUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Plus, Edit2, Trash2, Calendar, Clock } from 'lucide-react';
+import {
+  Plus, Edit2, Trash2, Clock, Search, RotateCcw, Eye, Layers,
+  PlayCircle, CheckCircle2, PauseCircle, AlertTriangle, ChevronDown, ChevronUp
+} from 'lucide-react';
 import ExportButton from '../components/ExportButton';
 import SearchableSelect from '../components/SearchableSelect';
-import ListFilterBar, { uniqueSortedOptions } from '../components/ListFilterBar';
+import { uniqueSortedOptions } from '../components/ListFilterBar';
 import StatusTabBar from '../components/StatusTabBar';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
+
+const PAGE_SIZE = 10;
+
+const normalizeStatus = (status) => {
+  const s = String(status || '').trim();
+  if (!s) return 'Pending';
+  if (s === 'Done') return 'Completed';
+  return s;
+};
+
+const statusPillStyle = (status) => {
+  const s = normalizeStatus(status);
+  if (s === 'Completed' || s === 'Done') {
+    return { background: 'rgba(16, 185, 129, 0.12)', color: '#059669' };
+  }
+  if (s === 'In Progress') {
+    return { background: 'rgba(59, 130, 246, 0.12)', color: '#2563eb' };
+  }
+  if (s === 'On Hold' || s === 'Cancel') {
+    return { background: 'rgba(249, 115, 22, 0.14)', color: '#ea580c' };
+  }
+  return { background: 'rgba(234, 179, 8, 0.16)', color: '#a16207' };
+};
+
+const priorityPillStyle = (priority) => {
+  const p = String(priority || '').trim();
+  if (p === 'Super Urgent' || p === 'Urgent') {
+    return { background: 'rgba(220, 38, 38, 0.12)', color: '#dc2626' };
+  }
+  if (p === 'High') {
+    return { background: 'rgba(236, 72, 153, 0.12)', color: '#db2777' };
+  }
+  if (p === 'Normal') {
+    return { background: 'rgba(16, 185, 129, 0.12)', color: '#059669' };
+  }
+  return { background: 'rgba(148, 163, 184, 0.16)', color: '#64748b' };
+};
+
+const StatCard = ({ label, value, icon: Icon, color, bg }) => (
+  <div style={{
+    flex: '1 1 140px',
+    minWidth: 140,
+    background: '#fff',
+    border: '1px solid var(--border-color)',
+    borderRadius: 12,
+    padding: '1rem 1.1rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.85rem',
+    boxShadow: '0 1px 2px rgba(91, 28, 133, 0.04)'
+  }}>
+    <div style={{
+      width: 42, height: 42, borderRadius: 10, background: bg,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+    }}>
+      <Icon size={20} color={color} />
+    </div>
+    <div>
+      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-main)', lineHeight: 1.2 }}>{value}</div>
+    </div>
+  </div>
+);
 
 const buildPlansFromReceipt = (receipt, parties) => {
   const party = parties.find(p => p.id === receipt.partyId);
@@ -94,17 +160,58 @@ const resolvePlan = (plan, materialReceipts = [], parties = []) => {
 
 const normProduct = (s) => String(s || '').trim().toLowerCase();
 
-const parsePlanDateTime = (dateStr, timeStr) => {
-  if (!dateStr) return null;
-  const t = timeStr || '00:00';
-  const d = new Date(`${dateStr}T${t}`);
-  return isNaN(d.getTime()) ? null : d;
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/** Normalize stored time to 24h "HH:MM" (never invent a new clock value). */
+const normalizePlanTime = (timeStr) => {
+  if (timeStr == null || String(timeStr).trim() === '') return '';
+  const str = String(timeStr).trim();
+  // Prefer local parse without Date()/UTC so "09:00" stays 09:00
+  const m = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
+  if (m) {
+    let h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    const ap = (m[3] || '').toUpperCase();
+    if (!Number.isFinite(h) || !Number.isFinite(min)) return '';
+    if (ap === 'AM') h = h % 12;
+    else if (ap === 'PM') h = (h % 12) + 12;
+    if (h < 0 || h > 23 || min < 0 || min > 59) return '';
+    return `${pad2(h)}:${pad2(min)}`;
+  }
+  return '';
 };
 
-const formatPlanDate = (d) => d.toISOString().slice(0, 10);
-const formatPlanTime = (d) => d.toTimeString().slice(0, 5);
+/** Normalize date to local "YYYY-MM-DD" without UTC day-shift. */
+const normalizePlanDate = (dateStr) => {
+  if (dateStr == null || String(dateStr).trim() === '') return '';
+  const str = String(dateStr).trim();
+  const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const dmy = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (dmy) return `${dmy[3]}-${pad2(dmy[2])}-${pad2(dmy[1])}`;
+  const d = new Date(str);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+};
 
-export const performCarryForward = (anchorPlan, allPlans) => {
+/** Build a local Date from plan date + time (no UTC conversion). */
+const parsePlanDateTime = (dateStr, timeStr) => {
+  const datePart = normalizePlanDate(dateStr);
+  if (!datePart) return null;
+  const [y, mo, da] = datePart.split('-').map((x) => parseInt(x, 10));
+  const timePart = normalizePlanTime(timeStr || '00:00') || '00:00';
+  const [hh, mm] = timePart.split(':').map((x) => parseInt(x, 10));
+  const d = new Date(y, mo - 1, da, hh || 0, mm || 0, 0, 0);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+/** Local calendar date — never use toISOString() (UTC shifts the day in IST). */
+const formatPlanDate = (d) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+const formatPlanTime = (d) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+
+export const performCarryForward = (anchorPlan, allPlans, deliveryChallans = []) => {
   if (!anchorPlan?.endDate || !anchorPlan?.endTime) {
     return { nextPlans: allPlans, shiftedCount: 0 };
   }
@@ -116,7 +223,8 @@ export const performCarryForward = (anchorPlan, allPlans) => {
     !p.isDeleted &&
     p.id !== anchorPlan.id &&
     p.status !== 'Done' &&
-    p.status !== 'Cancel'
+    p.status !== 'Cancel' &&
+    !isPlanDispatched(p, deliveryChallans)
   );
 
   if (otherPlans.length === 0) return { nextPlans: allPlans, shiftedCount: 0 };
@@ -194,12 +302,22 @@ const ProductionPlanning = () => {
   const { data, updateData, updateItem, deleteItemSoftly, setData } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [partyFilter, setPartyFilter] = useState('');
-  const [productFilter, setProductFilter] = useState('');
-  const [statusTab, setStatusTab] = useState('pending');
+  const [viewPlan, setViewPlan] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [page, setPage] = useState(1);
+  const [draftFilters, setDraftFilters] = useState({
+    customer: '',
+    product: '',
+    batchNo: '',
+    status: '',
+    priority: '',
+    dateFrom: '',
+    dateTo: ''
+  });
+  const [filters, setFilters] = useState(draftFilters);
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
   const [autoCarryForward, setAutoCarryForward] = useState(true);
+  const [statusTab, setStatusTab] = useState('pending');
 
   const userRole = data.settings?.userRole || 'Admin';
   const staffVisibleColumns = data.settings?.productionPlanningVisibleColumnsForStaff;
@@ -227,27 +345,31 @@ const ProductionPlanning = () => {
   });
 
   useEffect(() => {
-    if (!formData.startDate || !formData.startTime || !formData.endDate || !formData.endTime) {
-      if (formData.hours) setFormData(prev => ({ ...prev, hours: '' }));
+    const startDate = normalizePlanDate(formData.startDate);
+    const endDate = normalizePlanDate(formData.endDate);
+    const startTime = normalizePlanTime(formData.startTime);
+    const endTime = normalizePlanTime(formData.endTime);
+    if (!startDate || !startTime || !endDate || !endTime) {
+      if (formData.hours) setFormData(prev => (prev.hours ? { ...prev, hours: '' } : prev));
       return;
     }
-    try {
-      const startDateTime = new Date(`${formData.startDate}T${formData.startTime}`);
-      const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
-      const diffMs = endDateTime - startDateTime;
-      if (diffMs > 0) {
-        const diffHours = diffMs / (1000 * 60 * 60);
-        setFormData(prev => ({ ...prev, hours: diffHours.toFixed(2) }));
-      } else {
-        setFormData(prev => ({ ...prev, hours: '0.00' }));
-      }
-    } catch (err) {
-      console.error(err);
-    }
+    const startDateTime = parsePlanDateTime(startDate, startTime);
+    const endDateTime = parsePlanDateTime(endDate, endTime);
+    if (!startDateTime || !endDateTime) return;
+    const diffMs = endDateTime - startDateTime;
+    const nextHours = diffMs > 0 ? (diffMs / (1000 * 60 * 60)).toFixed(2) : '0.00';
+    setFormData(prev => (prev.hours === nextHours ? prev : { ...prev, hours: nextHours }));
   }, [formData.startDate, formData.startTime, formData.endDate, formData.endTime]);
 
   const handleEdit = (plan) => {
-    setFormData(resolvePlan(plan, data.materialReceipts, data.parties));
+    const resolved = resolvePlan(plan, data.materialReceipts, data.parties);
+    setFormData({
+      ...resolved,
+      startDate: normalizePlanDate(resolved.startDate),
+      endDate: normalizePlanDate(resolved.endDate),
+      startTime: normalizePlanTime(resolved.startTime),
+      endTime: normalizePlanTime(resolved.endTime)
+    });
     setIsEditing(plan.id);
     setIsModalOpen(true);
   };
@@ -342,12 +464,26 @@ const ProductionPlanning = () => {
     try {
       let savedPlan;
       let allPlans = data.productionPlans || [];
+      const normalizedTimes = {
+        startDate: normalizePlanDate(formData.startDate),
+        endDate: normalizePlanDate(formData.endDate),
+        startTime: normalizePlanTime(formData.startTime),
+        endTime: normalizePlanTime(formData.endTime)
+      };
       if (isEditing) {
-        savedPlan = { ...formData, id: isEditing };
+        const existing = allPlans.find((p) => p.id === isEditing);
+        // Keep original createdAt so edits do not jump to the top of the list
+        savedPlan = {
+          ...formData,
+          ...normalizedTimes,
+          id: isEditing,
+          createdAt: existing?.createdAt || formData.createdAt || new Date().toISOString()
+        };
         allPlans = allPlans.map(p => p.id === isEditing ? savedPlan : p);
       } else {
         savedPlan = {
           ...formData,
+          ...normalizedTimes,
           id: Date.now().toString(),
           createdAt: new Date().toISOString()
         };
@@ -357,7 +493,7 @@ const ProductionPlanning = () => {
       const hasDelay = Boolean(formData.delayReason && formData.delayReason.trim());
 
       if ((autoCarryForward || hasDelay) && savedPlan.endDate && savedPlan.endTime) {
-        const { nextPlans, shiftedCount } = performCarryForward(savedPlan, allPlans);
+        const { nextPlans, shiftedCount } = performCarryForward(savedPlan, allPlans, data.deliveryChallans || []);
         setData(prev => ({ ...prev, productionPlans: nextPlans }));
         if (shiftedCount > 0) {
           alert(`Plan saved. ${hasDelay ? 'Delay reason updated and ' : ''}${shiftedCount} subsequent pending plan(s) were carried forward automatically.`);
@@ -375,10 +511,10 @@ const ProductionPlanning = () => {
 
   const handleCarryForwardForPlan = (plan) => {
     const resolved = resolvePlan(plan, data.materialReceipts, data.parties);
-    const { nextPlans, shiftedCount } = performCarryForward(resolved, data.productionPlans || []);
+    const { nextPlans, shiftedCount } = performCarryForward(resolved, data.productionPlans || [], data.deliveryChallans || []);
     if (shiftedCount > 0) {
       setData(prev => ({ ...prev, productionPlans: nextPlans }));
-      alert(`Carried forward ${shiftedCount} subsequent pending plan(s) starting after ${resolved.batchNo || resolved.productName || 'selected plan'} (${resolved.endDate} ${resolved.endTime}).`);
+      alert(`Carried forward ${shiftedCount} subsequent pending plan(s) starting after ${resolved.batchNo || resolved.productName || 'selected plan'} (${formatDateAndTime(resolved.endDate, resolved.endTime)}).`);
     } else {
       alert('All pending plans are already scheduled after this plan. No shifting needed.');
     }
@@ -405,10 +541,10 @@ const ProductionPlanning = () => {
       return;
     }
 
-    const { nextPlans, shiftedCount } = performCarryForward(anchor, plans);
+    const { nextPlans, shiftedCount } = performCarryForward(anchor, plans, data.deliveryChallans || []);
     if (shiftedCount > 0) {
       setData(prev => ({ ...prev, productionPlans: nextPlans }));
-      alert(`Queue updated! Shifted ${shiftedCount} pending plan(s) based on ${anchor.batchNo || anchor.productName || 'latest plan'} (${anchor.endDate} ${anchor.endTime}).`);
+      alert(`Queue updated! Shifted ${shiftedCount} pending plan(s) based on ${anchor.batchNo || anchor.productName || 'latest plan'} (${formatDateAndTime(anchor.endDate, anchor.endTime)}).`);
     } else {
       alert("All pending plans are already scheduled after the latest completion date.");
     }
@@ -416,13 +552,26 @@ const ProductionPlanning = () => {
 
   const productNicknames = Array.from(new Set((data.parties || []).flatMap(p => p.products || []).map(prod => prod?.nickname).filter(Boolean)));
 
-  const plansList = newestFirst((data.productionPlans || []).filter(p => !p.isDeleted));
+  // Newest *created* first — edits must not reshuffle the list
+  const plansList = useMemo(() => {
+    const list = (data.productionPlans || []).filter((p) => !p.isDeleted);
+    const createdMillis = (item, index) => {
+      const fromCreated = Date.parse(item?.createdAt);
+      if (!Number.isNaN(fromCreated) && fromCreated > 0) return fromCreated;
+      const idNum = Number(String(item?.id || '').match(/\d{12,}/)?.[0]);
+      if (Number.isFinite(idNum) && idNum > 1e11) return idNum;
+      return index;
+    };
+    return list
+      .map((item, index) => ({ item, index, time: createdMillis(item, index) }))
+      .sort((a, b) => (b.time - a.time) || (b.index - a.index))
+      .map(({ item }) => item);
+  }, [data.productionPlans]);
   const resolvedPlans = useMemo(
-    () => plansList
-      .map(p => resolvePlan(p, data.materialReceipts, data.parties))
-      .filter((p) => !isPlanDispatched(p, data.deliveryChallans)),
-    [plansList, data.materialReceipts, data.parties, data.deliveryChallans]
+    () => plansList.map(p => resolvePlan(p, data.materialReceipts, data.parties)),
+    [plansList, data.materialReceipts, data.parties]
   );
+  const deliveryChallans = data.deliveryChallans || [];
   const partyOptions = useMemo(() => uniqueSortedOptions([
     ...resolvedPlans.map((p) => p.customer),
     ...(data.parties || []).map((p) => p.name)
@@ -432,29 +581,88 @@ const ProductionPlanning = () => {
     ...(data.parties || []).flatMap((p) => (p.products || []).map((prod) => prod.name))
   ]), [resolvedPlans, data.parties]);
 
-  const isPlanPending = (p) => p.status !== 'Done' && p.status !== 'Cancel';
+  const isPlanPending = (p) => {
+    if (isPlanDispatched(p, deliveryChallans)) return false;
+    const s = normalizeStatus(p.status);
+    return s !== 'Completed' && s !== 'Done' && s !== 'Cancel';
+  };
   const isPlanDelayed = (p) => Boolean(p.delayReason && String(p.delayReason).trim());
+  const isInProgress = (p) => {
+    if (isPlanDispatched(p, deliveryChallans)) return false;
+    return normalizeStatus(p.status) === 'In Progress';
+  };
+  const isCompleted = (p) => {
+    if (isPlanDispatched(p, deliveryChallans)) return true;
+    const s = normalizeStatus(p.status);
+    return s === 'Completed' || s === 'Done';
+  };
+  const isOnHold = (p) => {
+    const s = normalizeStatus(p.status);
+    return s === 'On Hold' || s === 'Cancel';
+  };
 
-  const pendingCount = resolvedPlans.filter(isPlanPending).length;
-  const delayedCount = resolvedPlans.filter(isPlanDelayed).length;
-  const completedCount = resolvedPlans.filter((p) => p.status === 'Done').length;
+  const pendingPlans = useMemo(
+    () => resolvedPlans.filter((p) => !isCompleted(p)),
+    [resolvedPlans, deliveryChallans]
+  );
+  const completedPlans = useMemo(
+    () => resolvedPlans.filter((p) => isCompleted(p)),
+    [resolvedPlans, deliveryChallans]
+  );
+  const tabPlans = statusTab === 'completed'
+    ? completedPlans
+    : statusTab === 'all'
+      ? resolvedPlans
+      : pendingPlans;
 
-  const filteredPlans = resolvedPlans.filter((p) => {
-    if (statusTab === 'pending' && !isPlanPending(p)) return false;
-    if (statusTab === 'delayed' && !isPlanDelayed(p)) return false;
-    if (statusTab === 'completed' && p.status !== 'Done') return false;
-    if (partyFilter && (p.customer || '') !== partyFilter) return false;
-    if (productFilter && (p.productName || '') !== productFilter) return false;
-    if (!searchTerm) return true;
-    const q = searchTerm.toLowerCase();
-    return (
-      (p.productNickName || '').toLowerCase().includes(q) ||
-      (p.customer || '').toLowerCase().includes(q) ||
-      (p.productName || '').toLowerCase().includes(q) ||
-      (p.batchNo || '').toLowerCase().includes(q) ||
-      (p.delayReason || '').toLowerCase().includes(q)
-    );
-  });
+  const summary = useMemo(() => ({
+    total: resolvedPlans.length,
+    inProgress: resolvedPlans.filter(isInProgress).length,
+    completed: completedPlans.length,
+    onHold: resolvedPlans.filter(isOnHold).length,
+    delayed: resolvedPlans.filter(isPlanDelayed).length
+  }), [resolvedPlans, completedPlans]);
+
+  const filteredPlans = useMemo(() => tabPlans.filter((p) => {
+    if (filters.customer && (p.customer || '') !== filters.customer) return false;
+    if (filters.product && (p.productName || '') !== filters.product) return false;
+    if (filters.batchNo) {
+      const q = filters.batchNo.trim().toLowerCase();
+      if (!(p.batchNo || '').toLowerCase().includes(q)) return false;
+    }
+    if (filters.status) {
+      if (filters.status === 'Delayed') {
+        if (!isPlanDelayed(p)) return false;
+      } else if (filters.status === 'Completed' || filters.status === 'Done') {
+        if (!isCompleted(p)) return false;
+      } else if (normalizeStatus(p.status) !== filters.status && p.status !== filters.status) {
+        return false;
+      }
+    }
+    if (filters.priority && (p.priorityLevel || '') !== filters.priority) return false;
+    if (filters.dateFrom && p.startDate && p.startDate < filters.dateFrom) return false;
+    if (filters.dateTo && p.startDate && p.startDate > filters.dateTo) return false;
+    return true;
+  }), [tabPlans, filters, deliveryChallans]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPlans.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const pagedPlans = filteredPlans.slice(pageStart, pageStart + PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters, statusTab]);
+
+  const applySearch = () => setFilters({ ...draftFilters });
+  const resetFilters = () => {
+    const blank = {
+      customer: '', product: '', batchNo: '', status: '', priority: '', dateFrom: '', dateTo: ''
+    };
+    setDraftFilters(blank);
+    setFilters(blank);
+    setPage(1);
+  };
 
   const exportColumns = [
     { label: 'Customer Name', key: 'customer' },
@@ -481,6 +689,28 @@ const ProductionPlanning = () => {
 
   const visibleExportColumns = exportColumns.filter(c => effectiveVisibleColumns.includes(c.key));
 
+  const showCol = (key) => effectiveVisibleColumns.includes(key);
+  const colCount = 2
+    + (showCol('customer') ? 1 : 0)
+    + (showCol('productName') ? 1 : 0)
+    + (showCol('productNickName') ? 1 : 0)
+    + (showCol('batchNo') ? 1 : 0)
+    + (showCol('qty') ? 1 : 0)
+    + (showCol('psdReq') ? 1 : 0)
+    + (showCol('psdNote') ? 1 : 0)
+    + (showCol('specialInstructions') ? 1 : 0)
+    + (showCol('startDate') ? 1 : 0)
+    + (showCol('endDate') ? 1 : 0)
+    + (showCol('status') ? 1 : 0)
+    + (showCol('priorityLevel') ? 1 : 0)
+    + 1;
+
+  const trunc = (text, n = 42) => {
+    const t = String(text || '').trim();
+    if (!t) return '—';
+    return t.length > n ? `${t.slice(0, n)}…` : t;
+  };
+
   return (
     <div>
       <header className="page-header">
@@ -489,7 +719,16 @@ const ProductionPlanning = () => {
           <p className="page-subtitle">Schedule milling batches and track processing. Dispatched jobs leave this list automatically.</p>
         </div>
         <div className="page-toolbar" style={{ flex: '1 1 520px', justifyContent: 'flex-end', minWidth: 0 }}>
-          <ExportButton data={filteredPlans} columns={visibleExportColumns} filename="Production_Plan" title="Production Plan Report" />
+          <ExportButton
+            data={filteredPlans.map((p) => ({
+              ...p,
+              startDate: formatDateAndTime(p.startDate, p.startTime) || p.startDate || '',
+              endDate: formatDateAndTime(p.endDate, p.endTime) || p.endDate || ''
+            }))}
+            columns={visibleExportColumns}
+            filename="Production_Plan"
+            title="Production Plan Report"
+          />
           {userRole === 'Admin' && (
             <button className="btn" onClick={handleCarryForwardAll} title="Shift all pending plans forward chronologically">
               <Clock size={16} /> Carry Forward Queue
@@ -508,168 +747,302 @@ const ProductionPlanning = () => {
         </div>
       </header>
 
-      <div className="tab-bar status-tab-bar" style={{ marginBottom: '1.5rem' }}>
-        <button type="button" className={`tab-btn${statusTab === 'pending' ? ' active' : ''}`} onClick={() => setStatusTab('pending')}>
-          Pending ({pendingCount})
-        </button>
-        <button type="button" className={`tab-btn${statusTab === 'delayed' ? ' active' : ''}`} onClick={() => setStatusTab('delayed')}>
-          ⚠️ Delayed ({delayedCount})
-        </button>
-        <button type="button" className={`tab-btn${statusTab === 'completed' ? ' active' : ''}`} onClick={() => setStatusTab('completed')}>
-          Completed ({completedCount})
-        </button>
-        <button type="button" className={`tab-btn${statusTab === 'all' ? ' active' : ''}`} onClick={() => setStatusTab('all')}>
-          All ({resolvedPlans.length})
-        </button>
+      <div className="premium-card" style={{ marginBottom: '1rem', padding: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
+          <div>
+            <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Customer</label>
+            <SearchableSelect className="input-field" value={draftFilters.customer} onChange={(e) => setDraftFilters((f) => ({ ...f, customer: e.target.value }))}>
+              <option value="">All Customers</option>
+              {partyOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+            </SearchableSelect>
+          </div>
+          <div>
+            <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Product</label>
+            <SearchableSelect className="input-field" value={draftFilters.product} onChange={(e) => setDraftFilters((f) => ({ ...f, product: e.target.value }))}>
+              <option value="">All Products</option>
+              {productOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+            </SearchableSelect>
+          </div>
+          <div>
+            <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Batch Number</label>
+            <input className="input-field" placeholder="Batch no." value={draftFilters.batchNo} onChange={(e) => setDraftFilters((f) => ({ ...f, batchNo: e.target.value }))} />
+          </div>
+          <div>
+            <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Status</label>
+            <SearchableSelect className="input-field" value={draftFilters.status} onChange={(e) => setDraftFilters((f) => ({ ...f, status: e.target.value }))}>
+              <option value="">All Status</option>
+              <option value="Pending">Pending</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="On Hold">On Hold</option>
+              <option value="Delayed">Delayed</option>
+              <option value="Cancel">Cancel</option>
+            </SearchableSelect>
+          </div>
+          <div>
+            <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Priority</label>
+            <SearchableSelect className="input-field" value={draftFilters.priority} onChange={(e) => setDraftFilters((f) => ({ ...f, priority: e.target.value }))}>
+              <option value="">All</option>
+              <option value="Normal">Normal</option>
+              <option value="High">High</option>
+              <option value="Urgent">Urgent</option>
+              <option value="Super Urgent">Super Urgent</option>
+            </SearchableSelect>
+          </div>
+          <div>
+            <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>From Date</label>
+            <DateField className="input-field" value={draftFilters.dateFrom} onChange={(e) => setDraftFilters((f) => ({ ...f, dateFrom: e.target.value }))} />
+          </div>
+          <div>
+            <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>To Date</label>
+            <DateField className="input-field" value={draftFilters.dateTo} onChange={(e) => setDraftFilters((f) => ({ ...f, dateTo: e.target.value }))} />
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-primary" onClick={applySearch} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Search size={15} /> Search
+            </button>
+            <button type="button" className="btn" onClick={resetFilters} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <RotateCcw size={15} /> Reset
+            </button>
+          </div>
+        </div>
       </div>
 
-      <ListFilterBar
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        placeholder="Search by customer, batch no, or nickname..."
-        partyFilter={partyFilter}
-        onPartyChange={setPartyFilter}
-        partyOptions={partyOptions}
-        productFilter={productFilter}
-        onProductChange={setProductFilter}
-        productOptions={productOptions}
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <StatCard label="Total Batches" value={summary.total} icon={Layers} color="#7c3aed" bg="rgba(124, 58, 237, 0.12)" />
+        <StatCard label="In Progress" value={summary.inProgress} icon={PlayCircle} color="#2563eb" bg="rgba(37, 99, 235, 0.12)" />
+        <StatCard label="Completed" value={summary.completed} icon={CheckCircle2} color="#059669" bg="rgba(5, 150, 105, 0.12)" />
+        <StatCard label="On Hold" value={summary.onHold} icon={PauseCircle} color="#ea580c" bg="rgba(234, 88, 12, 0.12)" />
+        <StatCard label="Delayed" value={summary.delayed} icon={AlertTriangle} color="#dc2626" bg="rgba(220, 38, 38, 0.12)" />
+      </div>
+
+      <StatusTabBar
+        value={statusTab}
+        onChange={setStatusTab}
+        allCount={resolvedPlans.length}
+        pendingCount={pendingPlans.length}
+        completedCount={completedPlans.length}
       />
 
       <div className="premium-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <h3 style={{ margin: 0, fontSize: '1rem' }}>
+            {statusTab === 'completed' ? 'Completed Plans' : statusTab === 'all' ? 'All Plans' : 'Pending Plans'}
+          </h3>
+        </div>
         <div className="data-table-container">
           <table className="data-table">
             <thead>
               <tr>
-                {effectiveVisibleColumns.includes('customer') && <th>Customer Name</th>}
-                {effectiveVisibleColumns.includes('productName') && <th>Product name</th>}
-                {effectiveVisibleColumns.includes('productNickName') && <th>Product Nickname</th>}
-                {effectiveVisibleColumns.includes('psdReq') && <th>PSD Req.</th>}
-                {effectiveVisibleColumns.includes('psdNote') && <th>PSD Note</th>}
-                {effectiveVisibleColumns.includes('batchNo') && <th>Batch Number</th>}
-                {effectiveVisibleColumns.includes('qty') && <th>Qty</th>}
-                {effectiveVisibleColumns.includes('startDate') && <th>Processing Start</th>}
-                {effectiveVisibleColumns.includes('endDate') && <th>Complete Date</th>}
-                {effectiveVisibleColumns.includes('hours') && <th>Processing Hours</th>}
-                {effectiveVisibleColumns.includes('delayReason') && <th>Delay Reason</th>}
-                {effectiveVisibleColumns.includes('supervisor') && <th>Supervisor Name</th>}
-                {effectiveVisibleColumns.includes('priorityLevel') && <th>Priority Level</th>}
-                {effectiveVisibleColumns.includes('specialInstructions') && <th>Special Notes</th>}
-                {effectiveVisibleColumns.includes('status') && <th>Status</th>}
-                {userRole === 'Admin' && <th>Actions</th>}
+                <th style={{ width: 36 }} />
+                <th>Sr.</th>
+                {showCol('customer') && <th>Customer</th>}
+                {showCol('productName') && <th>Product Name</th>}
+                {showCol('productNickName') && <th>Product Nickname</th>}
+                {showCol('batchNo') && <th>Batch Number</th>}
+                {showCol('qty') && <th>Qty</th>}
+                {showCol('psdReq') && <th>PSD Requirement</th>}
+                {showCol('psdNote') && <th>PSD Note</th>}
+                {showCol('specialInstructions') && <th>Special Notes</th>}
+                {showCol('startDate') && <th>Processing Start</th>}
+                {showCol('endDate') && <th>Completion Date</th>}
+                {showCol('status') && <th>Status</th>}
+                {showCol('priorityLevel') && <th>Priority</th>}
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredPlans.length === 0 ? (
+              {pagedPlans.length === 0 ? (
                 <tr>
-                  <td colSpan={userRole === 'Admin' ? 9 : 8} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No production plans recorded.</td>
+                  <td colSpan={colCount} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {statusTab === 'completed'
+                      ? 'No completed plans yet. Generate a DC or mark a plan as Done / Completed to move it here.'
+                      : 'No production plans match these filters.'}
+                  </td>
                 </tr>
-              ) : (
-                filteredPlans.map(plan => (
-                  <tr key={plan.id}>
-                    {effectiveVisibleColumns.includes('customer') && <td style={{ fontWeight: 600 }}>{plan.customer || 'N/A'}</td>}
-                    {effectiveVisibleColumns.includes('productName') && <td>{plan.productName || 'N/A'}</td>}
-                    {effectiveVisibleColumns.includes('productNickName') && <td>{plan.productNickName || '-'}</td>}
-                    {effectiveVisibleColumns.includes('psdReq') && <td>{plan.psdReq || '-'}</td>}
-                    {effectiveVisibleColumns.includes('psdNote') && <td><div style={{ fontSize: '0.75rem', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.psdNote || 'None'}</div></td>}
-                    {effectiveVisibleColumns.includes('batchNo') && <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{plan.batchNo || 'N/A'}</td>}
-                    {effectiveVisibleColumns.includes('qty') && <td>{plan.qty}</td>}
-                    {effectiveVisibleColumns.includes('startDate') && <td style={{ fontSize: '0.85rem' }}>{plan.startDate ? `${formatDate(plan.startDate)} ${plan.startTime || ''}`.trim() : '-'}</td>}
-                    {effectiveVisibleColumns.includes('endDate') && <td style={{ fontSize: '0.85rem' }}>{plan.endDate ? `${formatDate(plan.endDate)} ${plan.endTime || ''}`.trim() : '-'}</td>}
-                    {effectiveVisibleColumns.includes('hours') && <td>{plan.hours || '-'}</td>}
-                    {effectiveVisibleColumns.includes('delayReason') && (
+              ) : pagedPlans.map((plan, idx) => {
+                const open = expandedId === plan.id;
+                const displayStatus = isPlanDispatched(plan, deliveryChallans)
+                  ? 'Completed'
+                  : (isPlanDelayed(plan) && !isCompleted(plan)
+                    ? (normalizeStatus(plan.status) === 'Pending' ? 'Pending' : normalizeStatus(plan.status))
+                    : normalizeStatus(plan.status));
+                return (
+                  <React.Fragment key={plan.id}>
+                    <tr style={{ background: open ? 'rgba(155, 98, 196, 0.04)' : undefined }}>
                       <td>
-                        {plan.delayReason && plan.delayReason.trim() ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: '130px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedId(open ? null : plan.id)}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: 2 }}
+                          title={open ? 'Hide details' : 'Show details'}
+                        >
+                          {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                      </td>
+                      <td>{pageStart + idx + 1}</td>
+                      {showCol('customer') && <td style={{ fontWeight: 600 }}>{plan.customer || '—'}</td>}
+                      {showCol('productName') && <td>{plan.productName || '—'}</td>}
+                      {showCol('productNickName') && <td>{plan.productNickName || '—'}</td>}
+                      {showCol('batchNo') && (
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => setViewPlan(plan)}
+                            style={{ background: 'none', border: 'none', padding: 0, color: '#2563eb', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            {plan.batchNo || '—'}
+                          </button>
+                        </td>
+                      )}
+                      {showCol('qty') && <td>{plan.qty || '—'}</td>}
+                      {showCol('psdReq') && <td>{plan.psdReq || '—'}</td>}
+                      {showCol('psdNote') && <td title={plan.psdNote || ''}>{trunc(plan.psdNote)}</td>}
+                      {showCol('specialInstructions') && <td title={plan.specialInstructions || ''}>{trunc(plan.specialInstructions)}</td>}
+                      {showCol('startDate') && (
+                        <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
+                          {plan.startDate ? formatDateAndTime(plan.startDate, plan.startTime) : '—'}
+                        </td>
+                      )}
+                      {showCol('endDate') && (
+                        <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
+                          {plan.endDate ? formatDateAndTime(plan.endDate, plan.endTime) : '—'}
+                        </td>
+                      )}
+                      {showCol('status') && (
+                        <td>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '0.2rem 0.65rem',
+                            borderRadius: 999,
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            ...statusPillStyle(displayStatus)
+                          }}>
+                            {displayStatus}
+                          </span>
+                          {isPlanDelayed(plan) && (
                             <span style={{
+                              display: 'inline-block',
+                              marginLeft: 6,
+                              padding: '0.15rem 0.45rem',
+                              borderRadius: 999,
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              background: 'rgba(220, 38, 38, 0.12)',
+                              color: '#dc2626'
+                            }}>
+                              Delayed
+                            </span>
+                          )}
+                        </td>
+                      )}
+                      {showCol('priorityLevel') && (
+                        <td>
+                          {plan.priorityLevel ? (
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '0.2rem 0.65rem',
+                              borderRadius: 999,
                               fontSize: '0.72rem',
                               fontWeight: 700,
-                              padding: '0.15rem 0.5rem',
-                              borderRadius: '4px',
-                              background: 'rgba(239, 68, 68, 0.15)',
-                              color: '#ef4444',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              width: 'fit-content'
+                              ...priorityPillStyle(plan.priorityLevel)
                             }}>
-                              ⚠️ Delay Updated
+                              {plan.priorityLevel}
                             </span>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-primary)', fontWeight: 500 }} title={plan.delayReason}>
-                              {plan.delayReason}
-                            </span>
-                            {userRole === 'Admin' && isPlanPending(plan) && (
-                              <button
-                                type="button"
-                                className="btn"
-                                style={{
-                                  padding: '0.2rem 0.45rem',
-                                  fontSize: '0.7rem',
-                                  marginTop: '0.2rem',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.25rem',
-                                  background: 'var(--glass-bg)',
-                                  border: '1px solid var(--border-color)',
-                                  color: 'var(--accent-primary)',
-                                  cursor: 'pointer'
-                                }}
-                                onClick={() => handleCarryForwardForPlan(plan)}
-                                title="Carry forward start & complete dates for all subsequent pending plans"
-                              >
-                                <Clock size={12} /> Carry Forward Queue
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-                            No Delay
-                          </span>
-                        )}
-                      </td>
-                    )}
-                    {effectiveVisibleColumns.includes('supervisor') && <td>{plan.supervisor || '-'}</td>}
-                    {effectiveVisibleColumns.includes('priorityLevel') && (
+                          ) : '—'}
+                        </td>
+                      )}
                       <td>
-                      {plan.priorityLevel ? (
-                        <span style={{
-                          padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
-                          background: plan.priorityLevel === 'Super Urgent' ? 'rgba(153, 27, 27, 0.2)' : plan.priorityLevel === 'High' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                          color: plan.priorityLevel === 'Super Urgent' ? '#f87171' : plan.priorityLevel === 'High' ? '#ef4444' : '#10b981'
-                        }}>
-                          {plan.priorityLevel}
-                        </span>
-                      ) : '-'}
-                      </td>
-                    )}
-                    {effectiveVisibleColumns.includes('specialInstructions') && <td><div style={{ fontSize: '0.75rem', maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.specialInstructions || '-'}</div></td>}
-                    {effectiveVisibleColumns.includes('status') && (
-                      <td>
-                      {plan.status ? (
-                        <span style={{ 
-                          padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600,
-                          background: plan.status === 'Done' ? 'rgba(16, 185, 129, 0.1)' : plan.status === 'Cancel' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                          color: plan.status === 'Done' ? '#10b981' : plan.status === 'Cancel' ? '#ef4444' : '#f59e0b'
-                        }}>
-                          {plan.status}
-                        </span>
-                      ) : '-'}
-                      </td>
-                    )}
-                    {userRole === 'Admin' && (
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => handleEdit(plan)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit2 size={16} /></button>
-                          <button onClick={() => deletePlan(plan.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.6)', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 72 }}>
+                          <button type="button" className="btn" style={{ padding: '0.2rem 0.45rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => setViewPlan(plan)}>
+                            <Eye size={12} /> View
+                          </button>
+                          {userRole === 'Admin' && (
+                            <button type="button" className="btn" style={{ padding: '0.2rem 0.45rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => handleEdit(plan)}>
+                              <Edit2 size={12} /> Edit
+                            </button>
+                          )}
                         </div>
                       </td>
+                    </tr>
+                    {open && (
+                      <tr>
+                        <td colSpan={colCount} style={{ background: 'rgba(155, 98, 196, 0.06)', padding: '0.85rem 1rem' }}>
+                          <div style={{ fontWeight: 700, color: '#5b1c85', marginBottom: '0.55rem', fontSize: '0.82rem' }}>Additional Details</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem 1.25rem', fontSize: '0.82rem' }}>
+                            <div><span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>PSD Requirement: </span>{plan.psdReq || '—'}</div>
+                            <div><span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>PSD Note: </span>{plan.psdNote || '—'}</div>
+                            <div><span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Special Notes: </span>{plan.specialInstructions || '—'}</div>
+                            {plan.delayReason?.trim() && (
+                              <div><span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Delay Reason: </span>{plan.delayReason}</div>
+                            )}
+                            {plan.supervisor && (
+                              <div><span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Supervisor: </span>{plan.supervisor}</div>
+                            )}
+                            {plan.hours && (
+                              <div><span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Hours: </span>{plan.hours}</div>
+                            )}
+                          </div>
+                          {userRole === 'Admin' && isPlanPending(plan) && plan.delayReason?.trim() && (
+                            <button type="button" className="btn" style={{ marginTop: '0.75rem', padding: '0.3rem 0.65rem', fontSize: '0.75rem' }} onClick={() => handleCarryForwardForPlan(plan)}>
+                              <Clock size={12} /> Carry Forward Queue
+                            </button>
+                          )}
+                        </td>
+                      </tr>
                     )}
-                  </tr>
-                ))
-              )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', padding: '0.85rem 0.25rem 0.15rem' }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            {filteredPlans.length === 0
+              ? 'Showing 0 records'
+              : `Showing ${pageStart + 1} to ${Math.min(pageStart + PAGE_SIZE, filteredPlans.length)} of ${filteredPlans.length} records`}
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button type="button" className="btn" disabled={safePage <= 1} onClick={() => setPage(1)} style={{ padding: '0.3rem 0.55rem', fontSize: '0.75rem' }}>First</button>
+            <button type="button" className="btn" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} style={{ padding: '0.3rem 0.55rem', fontSize: '0.75rem' }}>Prev</button>
+            <span style={{ padding: '0.3rem 0.7rem', borderRadius: 6, background: '#5b1c85', color: '#fff', fontSize: '0.75rem', fontWeight: 700 }}>{safePage}</span>
+            <button type="button" className="btn" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} style={{ padding: '0.3rem 0.55rem', fontSize: '0.75rem' }}>Next</button>
+            <button type="button" className="btn" disabled={safePage >= totalPages} onClick={() => setPage(totalPages)} style={{ padding: '0.3rem 0.55rem', fontSize: '0.75rem' }}>Last</button>
+          </div>
+        </div>
       </div>
+
+      {viewPlan && (
+        <div className="page-form-overlay" onClick={() => setViewPlan(null)}>
+          <div className="premium-card" style={{ width: 560, maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ marginTop: 0 }}>Plan Details — {viewPlan.batchNo || viewPlan.productName || 'Batch'}</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem 1rem', fontSize: '0.88rem' }}>
+              <div><strong>Customer</strong><div>{viewPlan.customer || '—'}</div></div>
+              <div><strong>Product</strong><div>{viewPlan.productName || '—'}</div></div>
+              <div><strong>Nickname</strong><div>{viewPlan.productNickName || '—'}</div></div>
+              <div><strong>Qty</strong><div>{viewPlan.qty || '—'}</div></div>
+              <div><strong>Status</strong><div>{isPlanDispatched(viewPlan, deliveryChallans) ? 'Completed' : normalizeStatus(viewPlan.status)}</div></div>
+              <div><strong>Priority</strong><div>{viewPlan.priorityLevel || '—'}</div></div>
+              <div style={{ gridColumn: 'span 2' }}><strong>PSD Requirement</strong><div>{viewPlan.psdReq || '—'}</div></div>
+              <div style={{ gridColumn: 'span 2' }}><strong>PSD Note</strong><div>{viewPlan.psdNote || '—'}</div></div>
+              <div style={{ gridColumn: 'span 2' }}><strong>Special Notes</strong><div>{viewPlan.specialInstructions || '—'}</div></div>
+              <div><strong>Processing Start</strong><div>{viewPlan.startDate ? formatDateAndTime(viewPlan.startDate, viewPlan.startTime) : '—'}</div></div>
+              <div><strong>Completion</strong><div>{viewPlan.endDate ? formatDateAndTime(viewPlan.endDate, viewPlan.endTime) : '—'}</div></div>
+              {viewPlan.delayReason?.trim() && (
+                <div style={{ gridColumn: 'span 2' }}><strong>Delay Reason</strong><div>{viewPlan.delayReason}</div></div>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
+              <button type="button" className="btn" onClick={() => setViewPlan(null)}>Close</button>
+              {userRole === 'Admin' && (
+                <button type="button" className="btn btn-primary" onClick={() => { setViewPlan(null); handleEdit(viewPlan); }}>Edit</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {isColumnModalOpen && userRole === 'Admin' && (
         <div className="page-form-overlay">
@@ -815,7 +1188,8 @@ const ProductionPlanning = () => {
                     <option value="">-- Select --</option>
                     <option value="Pending">Pending</option>
                     <option value="In Progress">In Progress</option>
-                    <option value="Done">Done</option>
+                    <option value="On Hold">On Hold</option>
+                    <option value="Done">Done / Completed</option>
                     <option value="Cancel">Cancel</option>
                   </SearchableSelect>
                 </div>

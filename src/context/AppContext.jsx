@@ -115,8 +115,8 @@ export const AppProvider = ({ children }) => {
 
     const message =
       action === 'UPDATE' && changes.length
-        ? `${details} by ${user} at ${now.toLocaleTimeString()}`
-        : `${action}${refNo ? ` ${refNo}` : ''} by ${user} at ${now.toLocaleString()}`;
+        ? `${details} by ${user} at ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}`
+        : `${action}${refNo ? ` ${refNo}` : ''} by ${user} at ${now.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}`;
 
     const newLog = {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 5),

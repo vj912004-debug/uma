@@ -89,6 +89,45 @@ export const getProductBatches = (mr, prodName, options = {}) =>
     !isEmptyDrumsBatch(b) && batchMatchesProduct(b, idx, mr, prodName, options)
   );
 
+/** Distinct micron / PSD values for one product on a receipt. */
+export const getProductMicronSlots = (mr, prodName, options = {}) => {
+  if (!prodName) return [''];
+  const seen = new Set();
+  const list = [];
+  const push = (value) => {
+    const m = String(value || '').trim();
+    const key = m.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    list.push(m);
+  };
+  getProductBatches(mr, prodName, options).forEach((b) => push(b.psdReq));
+  Object.entries(mr?.productSettings || {}).forEach(([key, block]) => {
+    const raw = String(key || '');
+    const base = raw.includes('|||') ? raw.split('|||')[0] : raw;
+    if (norm(base) !== norm(prodName) && norm(raw) !== norm(prodName)) return;
+    const fromKey = raw.includes('|||') ? raw.split('|||').slice(1).join('|||') : '';
+    push(fromKey || block?.micronSize || '');
+  });
+  const filled = list.filter(Boolean);
+  return filled.length ? filled : [''];
+};
+
+/** Match a BPR to one product + micron (same product name can have several BPRs). */
+export const findBprForProductMicron = (bprs, mrId, productName, psdReq = '') => {
+  const pool = (bprs || []).filter(
+    (d) => !d?.isDeleted && String(d.receiptId) === String(mrId)
+  );
+  const named = pool.filter(
+    (d) => d.productName && !String(d.productName).includes(',') && norm(d.productName) === norm(productName)
+  );
+  const want = norm(psdReq);
+  if (want) {
+    return named.find((d) => norm(d.psdRequirement || d.psdReq) === want) || null;
+  }
+  return named.find((d) => !String(d.psdRequirement || d.psdReq || '').trim()) || named[0] || null;
+};
+
 export const getReceiptProductNames = (mr, options = {}) => {
   const { party = null, productionPlans = [] } = options;
   const seen = new Set();
@@ -206,15 +245,15 @@ export const getReceiptProductLabel = (mr, options = {}) =>
 
 /** Display label for saved PI/TI docs (uses productSummaries when present). */
 export const getDocProductLabel = (doc, mr = null, options = {}) => {
-  if (doc?.productSummaries?.length > 1) {
-    return doc.productSummaries.map(p => p.prodName).filter(Boolean).join(', ');
+  if (doc?.selectedProducts?.length) {
+    return doc.selectedProducts.filter(Boolean).join(', ');
   }
-  if (doc?.productName?.includes(',')) return doc.productName;
-  if (mr) {
-    const label = getReceiptProductLabel(mr, options);
-    if (label.includes(',')) return label;
+  if (doc?.productSummaries?.length) {
+    const names = doc.productSummaries.map((p) => p.prodName).filter(Boolean);
+    if (names.length) return names.join(', ');
   }
-  return doc?.productName || (mr ? getReceiptProductLabel(mr, options) : '');
+  if (doc?.productName) return doc.productName;
+  return mr ? getReceiptProductLabel(mr, options) : '';
 };
 
 /** One PL per Material Receipt — ignores per-product duplicate records. */
@@ -238,7 +277,8 @@ export const buildMRDrumSlots = (mr, prodOpts = {}) => {
         slots.push({
           batchNo: b.batchNo || '',
           drumNo: String(d),
-          productName: prodName
+          productName: prodName,
+          psdReq: String(b.psdReq || '').trim()
         });
       }
     });
@@ -252,7 +292,8 @@ export const buildMRDrumSlots = (mr, prodOpts = {}) => {
         slots.push({
           batchNo: b.batchNo || '',
           drumNo: String(d),
-          productName: pName
+          productName: pName,
+          psdReq: String(b.psdReq || '').trim()
         });
       }
     });
@@ -271,13 +312,32 @@ const formatPlDrumRow = (row, slot = {}) => {
       ? String(row.drumNo)
       : (slot.drumNo != null ? String(slot.drumNo) : '');
   return {
+    ...(row || {}),
     batchNo,
     drumNo,
     productName,
+    psdReq: String(slot.psdReq || row?.psdReq || '').trim(),
     gross: numberInputValue(row?.gross ?? ''),
     tare: numberInputValue(row?.tare ?? ''),
     net: numberInputValue(row?.net ?? '')
   };
+};
+
+/** Micron / PSD for a packing-list drum. Saved value wins, otherwise the MR batch. */
+export const plRowMicron = (row, mr) => {
+  const saved = String(row?.psdReq || '').trim();
+  if (saved) return saved;
+  if (!mr) return '';
+  const batchNo = String((row?.umaNewDrum && row?.anchorBatch) ? row.anchorBatch : (row?.batchNo || '')).trim();
+  if (!batchNo) return '';
+  const wantProd = norm(row?.productName);
+  const hit = (mr.batches || []).find((b) => {
+    if (isEmptyDrumsBatch(b)) return false;
+    if (String(b.batchNo || '').trim() !== batchNo) return false;
+    if (wantProd && b.productName && norm(b.productName) !== wantProd) return false;
+    return true;
+  });
+  return String(hit?.psdReq || '').trim();
 };
 
 const isMeaningfulPlRow = (r) => {
@@ -379,7 +439,13 @@ export const getBPRDispatchedRowsForPL = (data, mr, prodOpts = {}) =>
 /** One received/dispatch slot per drum for a single MR product. */
 export const buildProductDrumSlots = (mr, prodName, options = {}) => {
   const name = resolveReceiptProductName(mr, prodName, options) || String(prodName || '').trim();
-  const batches = name ? getProductBatches(mr, name, options) : [];
+  const wantPsd = String(options.psdReq || '').trim();
+  const batches = (name ? getProductBatches(mr, name, options) : []).filter((b) => {
+    if (!wantPsd) return true;
+    const batchPsd = String(b.psdReq || '').trim();
+    if (!batchPsd) return false;
+    return norm(batchPsd) === norm(wantPsd);
+  });
   const rows = [];
   batches.forEach((b) => {
     const count = Math.max(1, parseInt(b.drums, 10) || 1);
@@ -388,6 +454,7 @@ export const buildProductDrumSlots = (mr, prodName, options = {}) => {
         batchNo: b.batchNo || '',
         drumNo: String(d),
         productName: name,
+        psdReq: String(b.psdReq || '').trim(),
         gross: '',
         tare: '',
         net: ''
@@ -430,6 +497,7 @@ export const overlayWeightsOnDrumSlots = (slots, weightRows = [], productName = 
       batchNo: slot.batchNo || src.batchNo || '',
       drumNo: slot.drumNo || (src.drumNo != null && src.drumNo !== '' ? String(src.drumNo) : ''),
       productName: slot.productName || productName || src.productName || '',
+      psdReq: String(slot.psdReq || src.psdReq || '').trim(),
       gross: src.gross ?? '',
       tare: src.tare ?? '',
       net: src.net ?? ''
@@ -439,6 +507,7 @@ export const overlayWeightsOnDrumSlots = (slots, weightRows = [], productName = 
     batchNo: src.batchNo || '',
     drumNo: src.drumNo != null && src.drumNo !== '' ? String(src.drumNo) : '',
     productName: src.productName || productName || '',
+    psdReq: String(src.psdReq || '').trim(),
     gross: src.gross ?? '',
     tare: src.tare ?? '',
     net: src.net ?? ''
@@ -477,16 +546,24 @@ export const buildBprRowsForProduct = (mr, prodName, options = {}, weightRows = 
     }
   }
 
+  const scopedQty = String(options.psdReq || '').trim()
+    ? batches.reduce((sum, b) => sum + (parseFloat(b.qty) || 0), 0)
+    : getProductQty(mr, name, options);
+  const scopedDrums = String(options.psdReq || '').trim()
+    ? withEmpty.length
+    : (withEmpty.length || getProductDrums(mr, name, options));
+
   return {
     productName: name,
     batches,
     receivedRows: withEmpty,
     dispatchedRows: withEmpty.map((r) => ({ ...r })),
-    qty: getProductQty(mr, name, options),
-    drums: withEmpty.length || getProductDrums(mr, name, options),
+    qty: scopedQty,
+    drums: scopedDrums,
     batchNo: batches.map((b) => b.batchNo).filter((no) => no && !isEmptyDrumsLabel(no)).join(', '),
     totalNoBatch: batches.length,
-    emptyDrums: getEmptyDrumsCount(mr)
+    emptyDrums: getEmptyDrumsCount(mr),
+    psdReq: String(options.psdReq || batches[0]?.psdReq || '').trim()
   };
 };
 
@@ -552,8 +629,41 @@ export const getPLBatchDrumCounts = (pl, prodName, mr = null, prodOpts = {}) => 
   return map;
 };
 
-/** Material value entered on the Material Receipt (₹). */
-export const getMRMaterialValue = (mr) => {
+/** Material declared value from MR (₹). Prefers per-product settings; optional product filter for DC. */
+export const getMRMaterialValue = (mr, selectedProductNames = null) => {
+  const settings = mr?.productSettings || {};
+  const settingsEntries = Object.entries(settings);
+  const wanted = (selectedProductNames || [])
+    .map((n) => String(n || '').trim())
+    .filter(Boolean);
+
+  let fromProducts = 0;
+  let sawProductValue = false;
+
+  const addValue = (block) => {
+    const v = parseFloat(block?.value);
+    if (Number.isFinite(v) && v > 0) {
+      fromProducts += v;
+      sawProductValue = true;
+    }
+  };
+
+  if (wanted.length) {
+    wanted.forEach((name) => {
+      const exact = settings[name];
+      if (exact) {
+        addValue(exact);
+        return;
+      }
+      const match = settingsEntries.find(([k]) => norm(k) === norm(name));
+      if (match) addValue(match[1]);
+    });
+  } else {
+    settingsEntries.forEach(([, block]) => addValue(block));
+  }
+
+  if (sawProductValue) return fromProducts;
+
   const v = parseFloat(mr?.value);
   return Number.isFinite(v) && v > 0 ? v : 0;
 };
@@ -609,7 +719,7 @@ export const buildDCFieldsFromProducts = (mr, pl, prodOpts, selectedProductNames
     totalDrums,
     emptyDrums,
     value: (() => {
-      const v = getMRMaterialValue(mr);
+      const v = getMRMaterialValue(mr, selectedProductNames);
       return v > 0 ? v : '';
     })()
   };
@@ -694,14 +804,48 @@ export const receiptProductOptions = (mr, data) => {
 
 export const normProduct = (s) => norm(s);
 
-/** Find party product config by name or nickname (case-insensitive). */
-export const findPartyProduct = (party, productName) => {
+/** Find party product config by name or nickname (case-insensitive). Prefer name + PSD when psdReq given. */
+export const findPartyProduct = (party, productName, psdReq = '') => {
   if (!party || !productName) return null;
   const n = norm(productName);
+  const psd = norm(psdReq);
   const products = party.products || [];
-  return products.find(p => norm(p.name) === n)
-    || products.find(p => p.nickname && norm(p.nickname) === n)
+  if (psd) {
+    const byNamePsd = products.find((p) => norm(p.name) === n && norm(p.psdReq) === psd);
+    if (byNamePsd) return byNamePsd;
+    const byNickPsd = products.find(
+      (p) => p.nickname && norm(p.nickname) === n && norm(p.psdReq) === psd
+    );
+    if (byNickPsd) return byNickPsd;
+  }
+  return products.find((p) => norm(p.name) === n)
+    || products.find((p) => p.nickname && norm(p.nickname) === n)
     || null;
+};
+
+/** Nick Name + PSD Req for PI/TI forms (from saved doc, MR settings, or party product). */
+export const resolveDocNickAndPsd = (mr, party, productName = '', saved = {}) => {
+  const first = String(productName || '').split(',')[0].trim();
+  const settingsMap = mr?.productSettings && typeof mr.productSettings === 'object'
+    ? mr.productSettings
+    : {};
+  const settingsKey = Object.keys(settingsMap).find((k) => norm(k) === norm(first)) || first;
+  const settings = settingsMap[settingsKey] || {};
+  const psdHint = String(
+    saved.psdReq ?? saved.psdRequirement ?? settings.micronSize ?? ''
+  ).trim();
+  const prod = findPartyProduct(party, first, psdHint)
+    || findPartyProduct(party, settingsKey, psdHint)
+    || (party?.products || [])[0]
+    || null;
+  return {
+    nickName: String(
+      saved.nickName ?? settings.nickName ?? prod?.nickname ?? mr?.nickName ?? ''
+    ).trim(),
+    psdReq: String(
+      saved.psdReq ?? saved.psdRequirement ?? settings.micronSize ?? prod?.psdReq ?? ''
+    ).trim()
+  };
 };
 
 /** Match a product name to the canonical name from the receipt's product list. */
@@ -716,11 +860,12 @@ export const resolveReceiptProductName = (mr, name, options = {}) => {
 };
 
 /** Resolve party product from MR using receipt product names, batches, and settings. */
-export const getPartyProductForMR = (mr, data, productNameHint = '') => {
+export const getPartyProductForMR = (mr, data, productNameHint = '', psdReq = '') => {
   if (!mr) return null;
   const prodOpts = receiptProductOptions(mr, data);
   const { party } = prodOpts;
   if (!party) return null;
+  const forcedPsd = String(psdReq || '').trim();
 
   const names = getReceiptProductNames(mr, prodOpts);
   const candidates = [];
@@ -738,12 +883,30 @@ export const getPartyProductForMR = (mr, data, productNameHint = '') => {
   });
   Object.keys(mr.productSettings || {}).forEach((k) => candidates.push(k));
 
+  const settingsMicron = (() => {
+    if (forcedPsd) return forcedPsd;
+    const hint = String(productNameHint || '').split(',')[0].trim();
+    if (hint && mr.productSettings) {
+      const keyed = Object.entries(mr.productSettings).find(([k, v]) => {
+        const base = String(k).includes('|||') ? String(k).split('|||')[0] : k;
+        return norm(base) === norm(hint) || norm(k) === norm(hint);
+      });
+      if (keyed) return String(keyed[1]?.micronSize || '').trim();
+      const plain = mr.productSettings[hint];
+      if (plain?.micronSize) return String(plain.micronSize).trim();
+    }
+    const firstBatch = (mr.batches || []).find(
+      (b) => !b.isEmptyDrums && (!hint || norm(b.productName) === norm(hint)) && b.psdReq
+    );
+    return String(firstBatch?.psdReq || '').trim();
+  })();
+
   const seen = new Set();
   for (const cand of candidates) {
     const key = norm(cand);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    const prod = findPartyProduct(party, cand);
+    const prod = findPartyProduct(party, cand, settingsMicron);
     if (prod) return prod;
   }
   return null;
@@ -763,7 +926,9 @@ export const enrichBPRForPrint = (bpr, appData = {}) => {
     const party = (appData.parties || []).find((p) =>
       String(p.name || '').trim().toLowerCase() === String(bpr.partyName || bpr.customerName || '').trim().toLowerCase()
     );
-    if (party) prod = findPartyProduct(party, bpr.productName);
+    if (party) {
+      prod = findPartyProduct(party, bpr.productName, bpr.psdRequirement || bpr.psdReq || '');
+    }
   }
   const pl = findAnyPackingList(appData.packingLists, bpr.receiptId || mr?.id);
 
@@ -850,6 +1015,14 @@ export const enrichBPRForPrint = (bpr, appData = {}) => {
   const resolvedPsdNote = String(
     bpr.psdNote || prod?.psdNote || mrProductNote || planNote || ''
   ).trim();
+  const mrSpecialNote = prodNameKey
+    ? (mr?.productSettings?.[bpr.productName]?.specialNote
+      || Object.entries(mr?.productSettings || {}).find(([k]) => norm(k) === prodNameKey)?.[1]?.specialNote
+      || '')
+    : '';
+  const resolvedSpecialNote = String(
+    bpr.specialNote || prod?.specialNote || mrSpecialNote || bpr.remarks || ''
+  ).trim();
   const resolvedPsdReq = String(
     bpr.psdRequirement || prod?.psdReq || ''
   ).trim();
@@ -860,6 +1033,7 @@ export const enrichBPRForPrint = (bpr, appData = {}) => {
     customerName: bpr.customerName || bpr.partyName || mr?.partyName || '',
     productName: bpr.productName || mr?.productName || '',
     psdNote: resolvedPsdNote,
+    specialNote: resolvedSpecialNote,
     psdRequirement: resolvedPsdReq || bpr.psdRequirement || prod?.psdReq || '',
     totalDrums: filledDrums || bpr.totalDrums || '',
     receivedBatches,
@@ -899,11 +1073,167 @@ export const docMatchesProduct = (docProductName, targetProductName) => {
   return false;
 };
 
+/** True when a saved doc covers the given product (selectedProducts or productName). */
+export const docCoversProduct = (doc, productName) => {
+  if (!productName) return true;
+  const selected = (doc?.selectedProducts || []).filter(Boolean);
+  if (selected.length) {
+    return selected.some((p) => norm(p) === norm(productName));
+  }
+  const summaries = (doc?.productSummaries || []).map((p) => p?.prodName).filter(Boolean);
+  if (summaries.length) {
+    return summaries.some((p) => norm(p) === norm(productName));
+  }
+  return docMatchesProduct(doc?.productName, productName);
+};
+
+/**
+ * Default product list when creating a Delivery Challan.
+ * Prefer the active Under Process product; otherwise only products that already
+ * have packing-list drums (so one ready product does not force both onto the DC).
+ */
+export const getDCDefaultSelectedProducts = (mr, pl, prodOpts = {}, preferredProductName = '') => {
+  if (!mr) return [];
+  const allNames = getReceiptProductNames(mr, prodOpts);
+  if (!allNames.length) return [];
+
+  if (preferredProductName) {
+    const resolved = resolveReceiptProductName(mr, preferredProductName, prodOpts) || preferredProductName;
+    return [resolved];
+  }
+
+  const readyFromPl = allNames.filter(
+    (name) => getPLProductDrums(pl, name, mr, prodOpts) > 0
+  );
+  if (readyFromPl.length) return readyFromPl;
+
+  const plLabel = String(pl?.productName || '').trim();
+  if (plLabel && !plLabel.includes(',')) {
+    return [resolveReceiptProductName(mr, plLabel, prodOpts) || plLabel];
+  }
+  if (plLabel.includes(',')) {
+    return plLabel
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((n) => resolveReceiptProductName(mr, n, prodOpts) || n);
+  }
+
+  // Multi-product MR with no PL product signal: start with first product only
+  if (allNames.length > 1) return [allNames[0]];
+  return allNames;
+};
+
+/** Products on a packing list that still need a Delivery Challan. */
+export const getProductsNeedingDC = (mr, pl, deliveryChallans = [], prodOpts = {}) => {
+  if (!mr) return [];
+  const allNames = getReceiptProductNames(mr, prodOpts);
+  const onPl = allNames.filter((name) => getPLProductDrums(pl, name, mr, prodOpts) > 0);
+  const candidates = onPl.length ? onPl : allNames;
+  return candidates.filter(
+    (name) => !findReceiptDoc(deliveryChallans, mr.id, name)
+  );
+};
+
+/**
+ * Default products when creating a Packing List.
+ * Prefer the active Under Process / BPR product; otherwise products that do not
+ * already have a packing list (so one ready product does not force both onto one PL).
+ */
+export const getPLDefaultSelectedProducts = (mr, packingLists = [], prodOpts = {}, preferredProductName = '') => {
+  if (!mr) return [];
+  const allNames = getReceiptProductNames(mr, prodOpts);
+  if (!allNames.length) return [];
+
+  if (preferredProductName) {
+    const resolved = resolveReceiptProductName(mr, preferredProductName, prodOpts) || preferredProductName;
+    return [resolved];
+  }
+
+  const stillNeeded = allNames.filter((name) => !findReceiptDoc(packingLists, mr.id, name));
+  if (stillNeeded.length) return stillNeeded;
+
+  if (allNames.length > 1) return [allNames[0]];
+  return allNames;
+};
+
+/** Receipt products that still need a Packing List. */
+export const getProductsNeedingPL = (mr, packingLists = [], prodOpts = {}) => {
+  if (!mr) return [];
+  return getReceiptProductNames(mr, prodOpts).filter(
+    (name) => !findReceiptDoc(packingLists, mr.id, name)
+  );
+};
+
+/** Keep only drum rows belonging to the selected PL products. */
+export const filterPLBatchesForProducts = (batches, selectedProducts) => {
+  if (!selectedProducts?.length) return batches || [];
+  const keys = new Set(selectedProducts.map((n) => norm(n)));
+  return (batches || []).filter((r) => keys.has(norm(r.productName)));
+};
+
+/**
+ * Derive PL form fields (label, summaries, batches, lumps) from a product mark set.
+ * Merges previously typed weights when the same drum row is still selected.
+ */
+export const buildPLFieldsFromProducts = (
+  mr,
+  allBatches,
+  selectedProducts,
+  prodOpts = {},
+  prevBatches = [],
+  lumpMap = {}
+) => {
+  const allNames = getReceiptProductNames(mr, prodOpts);
+  const selected = (selectedProducts?.length ? selectedProducts : allNames).filter(Boolean);
+  const base = filterPLBatchesForProducts(allBatches, selected);
+  const batches = base.map((row) => {
+    const prev = (prevBatches || []).find(
+      (r) =>
+        norm(r.productName) === norm(row.productName) &&
+        String(r.batchNo || '').trim() === String(row.batchNo || '').trim() &&
+        String(r.drumNo ?? '').trim() === String(row.drumNo ?? '').trim()
+    );
+    if (!prev) return row;
+    return {
+      ...row,
+      gross: prev.gross !== undefined ? prev.gross : row.gross,
+      tare: prev.tare !== undefined ? prev.tare : row.tare,
+      net: prev.net !== undefined ? prev.net : row.net
+    };
+  });
+  const summaries = getReceiptProductSummaries(mr, prodOpts).filter((p) =>
+    selected.some((s) => norm(s) === norm(p.prodName))
+  );
+  const productSievingLumps = {};
+  selected.forEach((name) => {
+    if (lumpMap?.[name] !== undefined && lumpMap[name] !== null) {
+      productSievingLumps[name] = lumpMap[name];
+    }
+  });
+  const totalLumps = Object.values(productSievingLumps).reduce(
+    (sum, v) => sum + (parseFloat(v) || 0),
+    0
+  );
+  return {
+    selectedProducts: selected,
+    productName: selected.join(', '),
+    productSummaries: summaries,
+    batches,
+    productSievingLumps,
+    sievingLumps: totalLumps || '',
+    totalDrums: batches.length
+  };
+};
+
 export const findReceiptDoc = (docs, mrId, productName, extraMatch = () => true) => {
   const pool = (docs || []).filter(d => d.receiptId === mrId && extraMatch(d));
   if (!productName) return pool[0];
   const exact = pool.find(d => norm(d.productName) === norm(productName));
   if (exact) return exact;
+  const bySelected = pool.find((d) => docCoversProduct(d, productName)
+    && ((d.selectedProducts || []).length > 0 || (d.productSummaries || []).length > 0));
+  if (bySelected) return bySelected;
   return pool.find(d =>
     d.productName?.includes(',') &&
     d.productName.split(',').some(p => norm(p) === norm(productName))

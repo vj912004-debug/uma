@@ -48,6 +48,7 @@ const RecycleBin = () => {
         <table className="data-table">
           <thead>
             <tr>
+              <th>Sr. No</th>
               <th>Deleted At</th>
               <th>Module</th>
               <th>Record ID / Name</th>
@@ -56,10 +57,11 @@ const RecycleBin = () => {
           </thead>
           <tbody>
             {deletedItems.length === 0 ? (
-              <tr><td colSpan="4" style={{textAlign:'center'}}>Recycle bin is empty.</td></tr>
+              <tr><td colSpan="5" style={{textAlign:'center'}}>Recycle bin is empty.</td></tr>
             ) : (
-              deletedItems.map(item => (
+              deletedItems.map((item, idx) => (
                 <tr key={item.id}>
+                  <td>{idx + 1}</td>
                   <td>{item.deletedAt ? new Date(item.deletedAt).toLocaleString() : 'N/A'}</td>
                   <td style={{textTransform:'capitalize'}}>{item._module}</td>
                   <td>{item.name || item.partyName || item.productName || item.batchNo || item.id}</td>

@@ -3,6 +3,7 @@ import { Search, Bell, Calendar } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import DateField from './DateField';
+import { formatTime } from '../utils/dateUtils';
 
 const TopHeader = () => {
   const { data } = useAppContext();
@@ -25,7 +26,7 @@ const TopHeader = () => {
       .map((task) => ({
         id: `task-${task.id}`,
         title: task.title || 'Task',
-        detail: task.date ? `Due ${task.date}${task.time ? ` ${task.time}` : ''}` : 'Pending task',
+        detail: task.date ? `Due ${task.date}${task.time ? ` ${formatTime(task.time)}` : ''}` : 'Pending task',
         path: '/tasks'
       }));
     const pendingStaff = (data?.users || [])

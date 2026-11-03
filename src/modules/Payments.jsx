@@ -142,6 +142,7 @@ const Payments = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
+                  <th style={{ padding: '1rem', color: 'var(--text-muted)' }}>Sr. No</th>
                   <th style={{ padding: '1rem', color: 'var(--text-muted)' }}>Party Name</th>
                   <th style={{ padding: '1rem', color: 'var(--text-muted)' }}>Total Due</th>
                   <th style={{ padding: '1rem', color: 'var(--text-muted)' }}>Breakdown by FY</th>
@@ -150,10 +151,11 @@ const Payments = () => {
               </thead>
               <tbody>
                 {partyDues.length === 0 ? (
-                  <tr><td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Great! No outstanding dues.</td></tr>
+                  <tr><td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Great! No outstanding dues.</td></tr>
                 ) : (
-                  partyDues.map(({ party, totalDue, dueByFY }) => (
+                  partyDues.map(({ party, totalDue, dueByFY }, idx) => (
                     <tr key={party.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '1rem' }}>{idx + 1}</td>
                       <td style={{ padding: '1rem', fontWeight: 600 }}>{party.name}</td>
                       <td style={{ padding: '1rem', color: '#ef4444', fontWeight: 700 }}>₹{totalDue.toLocaleString()}</td>
                       <td style={{ padding: '1rem' }}>

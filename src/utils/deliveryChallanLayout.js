@@ -165,7 +165,8 @@ export const buildDcPrintLines = (dc, appData = {}) => {
     if (printedName) lines.push({ kind: 'product', text: printedName, drums: '', qty: '' });
   }
 
-  const mrValue = getMRMaterialValue(mr);
+  const selectedNames = (dc?.selectedProducts || []).filter(Boolean);
+  const mrValue = getMRMaterialValue(mr, selectedNames.length ? selectedNames : null);
   const dcValue = parseFloat(dc.value);
   const value = mrValue > 0
     ? mrValue

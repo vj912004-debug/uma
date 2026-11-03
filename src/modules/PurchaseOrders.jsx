@@ -540,6 +540,7 @@ const PurchaseOrders = () => {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th>Sr. No</th>
                   <th>M.R. Number</th>
                   <th>Party Name</th>
                   <th>Weight (Kg)</th>
@@ -548,10 +549,11 @@ const PurchaseOrders = () => {
               </thead>
               <tbody>
                 {pendingMRs.length === 0 ? (
-                  <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>No receipts awaiting PO.</td></tr>
+                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>No receipts awaiting PO.</td></tr>
                 ) : (
-                  pendingMRs.map((mr) => (
+                  pendingMRs.map((mr, idx) => (
                     <tr key={mr.id}>
+                      <td>{idx + 1}</td>
                       <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{mr.receiptNo}</td>
                       <td style={{ fontWeight: 600 }}>{mr.partyName}</td>
                       <td>{mr.totalQty?.toFixed(1) || 0}</td>
@@ -575,6 +577,7 @@ const PurchaseOrders = () => {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th>Sr. No</th>
                   <th>PO Date</th>
                   <th>PO Number</th>
                   <th>Party Name</th>
@@ -586,10 +589,11 @@ const PurchaseOrders = () => {
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>No Purchase Orders found.</td></tr>
+                  <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>No Purchase Orders found.</td></tr>
                 ) : (
-                  filtered.map(po => (
+                  filtered.map((po, idx) => (
                     <tr key={po.id}>
+                      <td>{idx + 1}</td>
                       <td>{formatDate(po.date)}</td>
                       <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{po.poNo}</td>
                       <td style={{ fontWeight: 600 }}>{po.partyName}</td>

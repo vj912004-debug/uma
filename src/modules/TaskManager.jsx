@@ -1,4 +1,4 @@
-import { formatDate, newestFirst } from '../utils/dateUtils';
+import { formatDate, formatTime, newestFirst } from '../utils/dateUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Bell, Calendar, Clock, RotateCw, CheckCircle, Trash2, Edit2 } from 'lucide-react';
@@ -208,7 +208,7 @@ const TaskManager = () => {
                     <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem', color: 'var(--text-main)' }}>{task.title}</h4>
                     <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Calendar size={12} /> {formatDate(task.date)}</span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Clock size={12} /> {task.time}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Clock size={12} /> {formatTime(task.time) || task.time}</span>
                       {task.repeat !== 'None' && (
                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--accent-primary)' }}><RotateCw size={12} /> {task.repeat}</span>
                       )}
@@ -244,7 +244,7 @@ const TaskManager = () => {
                 <div key={task.id} className="glass-panel" style={{ padding: '1rem', border: '1px solid rgba(255,255,255,0.02)', opacity: 0.6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.9rem', color: 'var(--text-muted)', textDecoration: 'line-through' }}>{task.title}</h4>
-                    <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)' }}>Completed on {formatDate(task.date)} at {task.time}</p>
+                    <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)' }}>Completed on {formatDate(task.date)} at {formatTime(task.time) || task.time}</p>
                   </div>
                   <button onClick={() => deleteTask(task.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.4)', cursor: 'pointer' }}>
                     <Trash2 size={16} />

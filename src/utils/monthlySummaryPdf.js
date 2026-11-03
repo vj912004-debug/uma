@@ -1,5 +1,3 @@
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { CHARGE_KEYS, getChargeLineQty, getMRProductChargeSettings } from './documentCharges';
 import { getProductBatches, getProductQty, getReceiptProductNames, receiptProductOptions } from './receiptProducts';
 import {
@@ -9,6 +7,15 @@ import {
   normalizeGstType,
   splitTaxableGstAmount
 } from './taxInvoiceLayout';
+import { mergeCompanyProfile, getStoredCompanyProfile } from './companyProfile';
+import {
+  escHtml,
+  buildPrintBrandHtml,
+  renderHtmlToPdf,
+  buildStatusBar,
+  PRINT_FOOTER_MESSAGES
+} from './printTheme';
+import { applyPrintPrefsToHtml, getStoredPrintPrefs } from './printPrefs';
 
 const EXTRA_LABELS = {
   cleaning: 'Minimum Cleaning',
@@ -241,12 +248,10 @@ const customChargeRows = (mr) => (mr?.customCharges || [])
   })
   .filter((row) => row.label && row.amount > 0);
 
-export const buildSummaryTitle = ({ companyName, refNo, invoiceNo, summaryDate }) => {
+export const buildSummaryTitle = ({ companyName, refNo, summaryDate }) => {
   const ref = String(refNo || '').trim();
-  const inv = String(invoiceNo || '').trim();
   let rest = ref ? `Ref No. ${ref}. ` : '';
   rest += 'Summary';
-  if (inv) rest += ` for Invoice No. ${inv}`;
   const dated = summaryDateText(summaryDate, '/');
   if (dated) rest += ` Date: ${dated}`;
   return `${companyName} - ${rest}`;
@@ -297,7 +302,6 @@ export const buildMonthlySummaryStatement = ({
     .slice()
     .sort((a, b) => dateKey(a.date) - dateKey(b.date) || String(a.dcNo || '').localeCompare(String(b.dcNo || ''), undefined, { numeric: true }));
 
-  const invoiceNos = [];
   let igstCount = 0;
   const rows = [];
 
@@ -308,7 +312,6 @@ export const buildMonthlySummaryStatement = ({
     const blocks = mr ? buildChargeBlocks(mr, prodOpts.party || party, prodOpts) : {};
     const products = dcProducts(dc, mr, prodOpts);
     const invoice = invoiceForDc(invoices, dc, mr);
-    if (invoice?.invoiceNo) invoiceNos.push(shortInvoiceNo(invoice.invoiceNo));
     const taxRate = forcedRate != null ? forcedRate : (num(invoice?.taxRate) || 18);
     const gstType = forcedType || normalizeGstType(invoice?.gstType);
     if (gstType === GST_TYPE_IGST) igstCount += 1;
@@ -369,9 +372,7 @@ export const buildMonthlySummaryStatement = ({
     total: round2(sum.total + num(row.total))
   }), { amount: 0, leftAmt: 0, rightAmt: 0, total: 0 });
 
-  const suggestedInvoiceNo = [...new Set(invoiceNos.filter(Boolean))].join(', ');
-  const printedInvoiceNo = String(invoiceNo || '').trim();
-  const igst = forcedType
+const igst = forcedType
     ? forcedType === GST_TYPE_IGST
     : (challans.length > 0 && igstCount === challans.length);
 
@@ -379,11 +380,10 @@ export const buildMonthlySummaryStatement = ({
     title: buildSummaryTitle({
       companyName,
       refNo,
-      invoiceNo: printedInvoiceNo,
       summaryDate
     }),
     fileName: fileName || summaryFileName({ refNo, companyName, month, dateFrom, dateTo }),
-    suggestedInvoiceNo,
+    suggestedInvoiceNo: '',
     igst,
     rows,
     totals
@@ -409,114 +409,245 @@ const cellQty = (value) => (value === '' || value == null ? '' : money(value));
 const cellRate = (value) => (value === '' || value == null ? '' : money(value));
 const cellPercent = (value) => (value === '' || value == null ? '' : formatGstPercent(value));
 
-export const createMonthlySummaryPdf = (statement) => {
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+const nlHtml = (text) => escHtml(String(text || '')).replace(/\n/g, '<br>');
+
+/** Landscape monthly summary with Uma brand header + purple footer (same family as TI/PI/PFU). */
+export const buildMonthlySummaryHtml = (statement, profileInput) => {
+  const profile = mergeCompanyProfile(profileInput || getStoredCompanyProfile());
+  const companyName = profile.companyName || 'UMA MICRON';
   const leftLabel = statement.igst ? 'IGST' : 'SGST';
-  const rightLabel = statement.igst ? '' : 'CGST';
-  const body = statement.rows.length
-    ? statement.rows.map((row) => [
-      row.sr,
-      row.dcNo,
-      row.dcDate,
-      row.poNo,
-      row.poDate,
-      row.description,
-      cellQty(row.qty),
-      cellRate(row.rate),
-      money(row.amount),
-      cellPercent(row.leftRate),
-      money(row.leftAmt),
-      cellPercent(row.rightRate),
-      money(row.rightAmt),
-      money(row.total)
-    ])
-    : [['', '', '', '', '', 'No delivery challans in this period', '', '', '', '', '', '', '', '']];
+  const rightLabel = statement.igst ? 'CGST' : '';
+  const gstHead = statement.igst
+    ? `<th colspan="2">${leftLabel}</th><th rowspan="2">Total</th>`
+    : `<th colspan="2">${leftLabel}</th><th colspan="2">${rightLabel}</th><th rowspan="2">Total</th>`;
+  const gstSub = statement.igst
+    ? `<th>Rate</th><th>Amount</th>`
+    : `<th>Rate</th><th>Amount</th><th>Rate</th><th>Amount</th>`;
 
-  autoTable(doc, {
-    startY: 14,
-    margin: { top: 14, right: 6, bottom: 12, left: 6 },
-    head: [[
-      { content: 'Sr.N', rowSpan: 2, styles: { valign: 'middle' } },
-      { content: 'Delivery Challan No.', rowSpan: 2, styles: { valign: 'middle' } },
-      { content: 'D.C. Date', rowSpan: 2, styles: { valign: 'middle' } },
-      { content: 'PO. No/Challan No.', rowSpan: 2, styles: { valign: 'middle' } },
-      { content: 'PO Date', rowSpan: 2, styles: { valign: 'middle' } },
-      { content: 'Description', rowSpan: 2, styles: { valign: 'middle' } },
-      { content: 'Qty', rowSpan: 2, styles: { valign: 'middle' } },
-      { content: 'Rate', rowSpan: 2, styles: { valign: 'middle' } },
-      { content: 'Amount', rowSpan: 2, styles: { valign: 'middle' } },
-      { content: leftLabel, colSpan: 2 },
-      { content: rightLabel, colSpan: 2 },
-      { content: 'Total', rowSpan: 2, styles: { valign: 'middle' } }
-    ], ['Rate', 'Amount', 'Rate', 'Amount']],
-    body,
-    foot: [[
-      { content: '', colSpan: 8 },
-      money(statement.totals.amount),
-      '',
-      money(statement.totals.leftAmt),
-      '',
-      money(statement.totals.rightAmt),
-      money(statement.totals.total)
-    ]],
-    theme: 'grid',
-    styles: {
-      font: 'helvetica',
-      fontSize: 7,
-      textColor: [0, 0, 0],
-      lineColor: [0, 0, 0],
-      lineWidth: 0.1,
-      cellPadding: 0.7,
-      valign: 'middle',
-      overflow: 'linebreak'
-    },
-    headStyles: {
-      fillColor: [255, 255, 255],
-      textColor: [0, 0, 0],
-      fontStyle: 'bold',
-      halign: 'center'
-    },
-    footStyles: {
-      fillColor: [255, 255, 255],
-      textColor: [0, 0, 0],
-      fontStyle: 'bold',
-      halign: 'right'
-    },
-    columnStyles: {
-      0: { cellWidth: 10, halign: 'center' },
-      1: { cellWidth: 31 },
-      2: { cellWidth: 18, halign: 'center' },
-      3: { cellWidth: 31 },
-      4: { cellWidth: 18, halign: 'center' },
-      5: { halign: 'left' },
-      6: { cellWidth: 16, halign: 'right' },
-      7: { cellWidth: 14, halign: 'right' },
-      8: { cellWidth: 20, halign: 'right' },
-      9: { cellWidth: 12, halign: 'center' },
-      10: { cellWidth: 18, halign: 'right' },
-      11: { cellWidth: 12, halign: 'center' },
-      12: { cellWidth: 18, halign: 'right' },
-      13: { cellWidth: 22, halign: 'right' }
-    },
-    didDrawPage: () => {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(0, 0, 0);
-      doc.text(statement.title, 6, 8);
-    }
-  });
+  const bodyRows = (statement.rows || []).length
+    ? statement.rows.map((row) => `
+      <tr>
+        <td class="c">${escHtml(row.sr || '')}</td>
+        <td class="left">${escHtml(row.dcNo || '')}</td>
+        <td class="c">${escHtml(row.dcDate || '')}</td>
+        <td class="left">${escHtml(row.poNo || '')}</td>
+        <td class="c">${escHtml(row.poDate || '')}</td>
+        <td class="left desc">${nlHtml(row.description)}</td>
+        <td class="num">${escHtml(cellQty(row.qty))}</td>
+        <td class="num">${escHtml(cellRate(row.rate))}</td>
+        <td class="num">${money(row.amount)}</td>
+        <td class="c">${escHtml(cellPercent(row.leftRate))}</td>
+        <td class="num">${money(row.leftAmt)}</td>
+        ${statement.igst ? '' : `
+        <td class="c">${escHtml(cellPercent(row.rightRate))}</td>
+        <td class="num">${money(row.rightAmt)}</td>`}
+        <td class="num">${money(row.total)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="${statement.igst ? 12 : 14}" class="c">No delivery challans in this period</td></tr>`;
 
-  const pages = doc.internal.getNumberOfPages();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  for (let page = 1; page <= pages; page += 1) {
-    doc.setPage(page);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.text(`-- ${page} of ${pages} --`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+  const footCells = statement.igst
+    ? `
+      <td colspan="8" class="num">TOTAL</td>
+      <td class="num">${money(statement.totals?.amount)}</td>
+      <td></td>
+      <td class="num">${money(statement.totals?.leftAmt)}</td>
+      <td class="num">${money(statement.totals?.total)}</td>`
+    : `
+      <td colspan="8" class="num">TOTAL</td>
+      <td class="num">${money(statement.totals?.amount)}</td>
+      <td></td>
+      <td class="num">${money(statement.totals?.leftAmt)}</td>
+      <td></td>
+      <td class="num">${money(statement.totals?.rightAmt)}</td>
+      <td class="num">${money(statement.totals?.total)}</td>`;
+
+  const titleBits = String(statement.title || 'Monthly Summary').split(' - ');
+  const subTitle = titleBits.length > 1 ? titleBits.slice(1).join(' - ') : 'MONTHLY SUMMARY';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UMA MICRON - Monthly Summary</title>
+<style>
+  :root{
+    --purple:#3D2B7D;
+    --purple-dark:#3D2B7D;
+    --lav-bg:#EFEAF7;
+    --lav-border:#CFC4EA;
+    --green:#2fa84f;
+    --text:#231f20;
   }
-  return doc;
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{margin:0;padding:0;background:#fff;color:var(--text);}
+  .page{
+    width:1123px;min-height:0;height:auto;padding:8px;margin:0;background:#fff;
+    display:flex;flex-direction:column;box-sizing:border-box;overflow:visible;
+  }
+  .sheet{
+    flex:0 0 auto;border:2px solid var(--purple);padding:12px 14px 0;
+    display:flex;flex-direction:column;box-sizing:border-box;min-height:0;height:auto;
+  }
+  .header{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+    margin:0 0 10px;padding:0 0 8px;flex:0 0 auto;min-width:0;
+  }
+  .brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 auto;}
+  .logo{width:64px;height:64px;flex-shrink:0;}
+  .logo img,.logo svg{width:100%;height:100%;object-fit:contain;display:block;}
+  .brand-lockup{width:280px;height:70px;flex-shrink:0;display:flex;align-items:center;}
+  .brand-lockup img{width:100%;height:100%;object-fit:contain;object-position:left center;display:block;}
+  .brand-text h1{
+    margin:0;font-size:28px;letter-spacing:.4px;color:var(--purple);
+    line-height:1.1;text-transform:uppercase;
+  }
+  .brand-text .tagline{
+    color:var(--green);font-weight:700;font-size:12px;margin-top:2px;line-height:1.2;
+  }
+  .tax-invoice-box{
+    background:var(--purple);color:#fff;text-align:center;padding:10px 18px 12px;
+    flex:0 0 auto;min-width:210px;border-radius:8px;box-sizing:border-box;
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+  }
+  .tax-invoice-box .ti-title{
+    font-size:18px;font-weight:800;margin:0;padding:0;line-height:1.15;
+    letter-spacing:.4px;white-space:nowrap;
+  }
+  .tax-invoice-box .ti-sub{
+    margin:0;background:#fff;color:#111;font-size:10px;font-weight:700;
+    padding:3px 10px;border-radius:999px;line-height:1.3;max-width:280px;
+    border:1px solid #111;overflow-wrap:anywhere;
+  }
+  .meta{
+    display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin:0 0 10px;
+    font-size:12px;line-height:1.4;
+  }
+  .meta-field{display:flex;align-items:baseline;min-width:0;}
+  .meta-field .lbl{font-weight:700;color:var(--purple);flex:0 0 110px;white-space:nowrap;}
+  .meta-field .colon{font-weight:700;color:var(--purple);padding:0 8px 0 0;}
+  .meta-field .val{font-weight:600;min-width:0;overflow-wrap:anywhere;}
+  .table-wrap{flex:0 0 auto;margin:0 0 8px;overflow:visible;}
+  table.items{
+    width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px;background:#fff;
+  }
+  table.items thead th{
+    background:var(--purple);color:#fff;font-weight:700;padding:5px 4px;
+    text-align:center;vertical-align:middle;border:1px solid rgba(255,255,255,.55);
+    line-height:1.2;
+  }
+  table.items tbody td,table.items tfoot td{
+    border:1px solid var(--lav-border);padding:3px 4px;text-align:center;
+    vertical-align:middle;background:#fff;color:var(--text);font-weight:600;line-height:1.25;
+  }
+  table.items tbody td.left,table.items tbody td.desc{text-align:left;}
+  table.items tbody td.desc{white-space:pre-wrap;overflow-wrap:anywhere;}
+  table.items tbody td.num,table.items tfoot td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  table.items tbody td.c,table.items tfoot td.c{text-align:center;}
+  table.items tbody tr:nth-child(even) td{background:#EFEAF7;}
+  table.items tfoot td{
+    background:var(--lav-bg);color:var(--purple-dark);font-weight:800;border-color:var(--purple);
+  }
+  .barfoot{
+    background:var(--purple);color:#fff;margin:auto -14px 0 -14px;padding:8px 14px;
+    display:flex;justify-content:space-between;align-items:center;gap:8px;
+    font-size:11px;flex-shrink:0;min-width:0;
+  }
+  .barfoot span{min-width:0;overflow-wrap:anywhere;}
+</style>
+</head>
+<body>
+  <div class="page pdf-page ms-page">
+    <div class="sheet">
+      <div class="header">
+        <div class="brand">
+          ${buildPrintBrandHtml(profile, {
+            companyName,
+            tagline: profile.tagline || "Micronization of API's"
+          })}
+        </div>
+        <div class="tax-invoice-box">
+          <div class="ti-title">MONTHLY SUMMARY</div>
+          <div class="ti-sub">${escHtml(subTitle)}</div>
+        </div>
+      </div>
+
+      <div class="meta">
+        <div class="meta-field"><span class="lbl">Company</span><span class="colon">:</span><span class="val">${escHtml(companyName)}</span></div>
+        <div class="meta-field"><span class="lbl">Title</span><span class="colon">:</span><span class="val">${escHtml(statement.title || '')}</span></div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="items">
+          <colgroup>
+            <col style="width:3.5%"><col style="width:11%"><col style="width:7%"><col style="width:11%"><col style="width:7%">
+            <col style="width:16%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:7%">
+            <col style="width:4.5%"><col style="width:6.5%">${statement.igst ? '' : '<col style="width:4.5%"><col style="width:6.5%">'}
+            <col style="width:7%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th rowspan="2">Sr.N</th>
+              <th rowspan="2">Delivery Challan No.</th>
+              <th rowspan="2">D.C. Date</th>
+              <th rowspan="2">PO. No/Challan No.</th>
+              <th rowspan="2">PO Date</th>
+              <th rowspan="2">Description</th>
+              <th rowspan="2">Qty</th>
+              <th rowspan="2">Rate</th>
+              <th rowspan="2">Amount</th>
+              ${gstHead}
+            </tr>
+            <tr>${gstSub}</tr>
+          </thead>
+          <tbody>
+            ${bodyRows}
+          </tbody>
+          <tfoot>
+            <tr>${footCells}</tr>
+          </tfoot>
+        </table>
+      </div>
+
+      ${buildStatusBar('Page 1 of 1', PRINT_FOOTER_MESSAGES.MS)}
+    </div>
+  </div>
+</body>
+</html>`;
 };
+
+/** Landscape A4 HTML → PDF (same header/footer family as other Uma docs). */
+export const renderMonthlySummaryPdf = async (statement, {
+  mode = 'save',
+  companyProfile,
+  printPrefs
+} = {}) => {
+  const profile = companyProfile || getStoredCompanyProfile();
+  const prefs = printPrefs || getStoredPrintPrefs();
+  const html = applyPrintPrefsToHtml(
+    buildMonthlySummaryHtml(statement, profile),
+    prefs
+  );
+  // Landscape A4 at ~96dpi ≈ 1123 × 794
+  await renderHtmlToPdf(html, {
+    mode,
+    filePrefix: 'MS',
+    docNo: statement.fileName?.replace(/\.pdf$/i, '') || 'Monthly-Summary',
+    partyName: String(statement.title || '').split(' - ')[0] || '',
+    data: {
+      partyName: String(statement.title || '').split(' - ')[0] || '',
+      invoiceNo: '01',
+      fileName: statement.fileName
+    },
+    width: 1123,
+    fitPage: false,
+    splitOverflowPages: true,
+    orientation: 'landscape',
+    printPrefs: prefs
+  });
+};
+
+export const createMonthlySummaryPdf = async (statement, options = {}) =>
+  renderMonthlySummaryPdf(statement, { mode: 'save', ...options });
 
 const summaryLine = (statement, row, isTotal = false) => {
   const base = {
@@ -549,17 +680,11 @@ export const summaryExportRows = (statement) => {
   return rows;
 };
 
-export const downloadMonthlySummaryPdf = (statement) => {
-  const doc = createMonthlySummaryPdf(statement);
-  doc.save(statement.fileName);
-};
+export const downloadMonthlySummaryPdf = async (statement, options = {}) =>
+  renderMonthlySummaryPdf(statement, { mode: 'save', ...options });
 
-export const openMonthlySummaryPdf = (statement) => {
-  const doc = createMonthlySummaryPdf(statement);
-  const url = doc.output('bloburl');
-  const win = window.open(url, '_blank');
-  if (!win) doc.save(statement.fileName);
-};
+export const openMonthlySummaryPdf = async (statement, options = {}) =>
+  renderMonthlySummaryPdf(statement, { mode: 'preview', ...options });
 
 const chargeKeyFromDescription = (description) => {
   const parts = String(description || '').split(/\n+/).map((part) => part.trim()).filter(Boolean);

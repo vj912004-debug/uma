@@ -325,6 +325,7 @@ const CreditNotes = () => {
           <table className="data-table">
             <thead>
               <tr>
+                <th>Sr. No</th>
                 <th>Date</th>
                 <th>Note Number</th>
                 <th>Party Name</th>
@@ -336,10 +337,11 @@ const CreditNotes = () => {
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>No Credit Notes logged.</td></tr>
+                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>No Credit Notes logged.</td></tr>
               ) : (
-                filtered.map(note => (
+                filtered.map((note, idx) => (
                   <tr key={note.id}>
+                    <td>{idx + 1}</td>
                     <td>{formatDate(note.date)}</td>
                     <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{note.noteNo}</td>
                     <td style={{ fontWeight: 600 }}>{note.partyName}</td>

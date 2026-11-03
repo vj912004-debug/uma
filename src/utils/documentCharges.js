@@ -107,7 +107,12 @@ const normProduct = (s) => (s || '').trim().toLowerCase();
 const pickSettingsEntry = (map, name) => {
   if (!name || !map) return null;
   if (map[name]) return map[name];
-  const key = Object.keys(map).find(k => normProduct(k) === normProduct(name));
+  const want = normProduct(name);
+  const key = Object.keys(map).find((k) => {
+    if (normProduct(k) === want) return true;
+    const base = String(k).includes('|||') ? String(k).split('|||')[0] : k;
+    return normProduct(base) === want;
+  });
   return key ? map[key] : null;
 };
 
@@ -142,7 +147,12 @@ export const readMRProductChargeBlock = (mr, party, hintName = '') => {
   let best = null;
   let bestScore = -1;
   for (const [key, block] of Object.entries(map)) {
-    if (activeNorms.size && !activeNorms.has(normProduct(key))) continue;
+    const base = String(key).includes('|||') ? String(key).split('|||')[0] : key;
+    if (
+      activeNorms.size
+      && !activeNorms.has(normProduct(key))
+      && !activeNorms.has(normProduct(base))
+    ) continue;
     const score = CHARGE_KEYS.filter(k => block?.charges?.[k]).length;
     if (score > bestScore) {
       bestScore = score;
@@ -219,12 +229,124 @@ export const buildProductChargeSettingsFromParty = (prodConfig) => {
   };
 };
 
-/** Read saved charge settings for one product on a Material Receipt. */
-export const getMRProductChargeSettings = (mr, party, prodName) => {
-  const block = readMRProductChargeBlock(mr, party, prodName);
-  if (block) return block;
+const parseChargeSlotKey = (key) => {
+  const raw = String(key || '');
+  if (raw.includes('|||')) {
+    const [name, ...rest] = raw.split('|||');
+    return { name: String(name || '').trim(), micron: rest.join('|||').trim() };
+  }
+  return { name: raw.trim(), micron: '' };
+};
 
-  const hasProductSettings = Object.keys(mr?.productSettings || {}).length > 0;
+export const formatChargeSlotLabel = (key) => {
+  const { name, micron } = parseChargeSlotKey(key);
+  if (!name) return key || 'Product';
+  return micron ? `${name} (${micron})` : name;
+};
+
+/** Qty for a PI charge slot (supports name|||psd keys). */
+export const getChargeSlotQty = (mr, slotKey, options = {}) => {
+  const { name, micron } = parseChargeSlotKey(slotKey);
+  if (!name) return 0;
+  const productBatches = (mr?.batches || []).filter(
+    (b) => !b.isEmptyDrums && normProduct(b.productName) === normProduct(name)
+  );
+  if (micron) {
+    const matchedQty = productBatches
+      .filter((b) => normProduct(b.psdReq) === normProduct(micron))
+      .reduce((sum, b) => sum + (parseFloat(b.qty) || 0), 0);
+    if (matchedQty > 0) return matchedQty;
+
+    // Legacy batches without psdReq: use unlabeled qty only for the first micron slot of this product
+    const unlabeledQty = productBatches
+      .filter((b) => !String(b.psdReq || '').trim())
+      .reduce((sum, b) => sum + (parseFloat(b.qty) || 0), 0);
+    if (unlabeledQty > 0) {
+      const micronKeys = Object.keys(mr?.productSettings || {})
+        .map(parseChargeSlotKey)
+        .filter((p) => normProduct(p.name) === normProduct(name) && p.micron);
+      const firstMicron = micronKeys[0]?.micron || '';
+      if (!micronKeys.length || normProduct(firstMicron) === normProduct(micron)) {
+        return unlabeledQty;
+      }
+    }
+    return 0;
+  }
+  return getProductQty(mr, name, options);
+};
+
+/**
+ * Distinct charge slots on an MR — same product name with different PSD/rates
+ * become separate slots so each processing rate is counted.
+ */
+export const getMRChargeSlots = (mr, party, productOptions = {}) => {
+  const prodOpts = { party, ...productOptions };
+  const productNames = getReceiptProductNames(mr, prodOpts);
+  const slots = [];
+  const seen = new Set();
+
+  const pushSlot = (name, micron = '') => {
+    const n = String(name || '').trim();
+    if (!n) return;
+    const m = String(micron || '').trim();
+    const key = m ? `${n}|||${m}` : n;
+    const id = key.toLowerCase();
+    if (seen.has(id)) return;
+    seen.add(id);
+    slots.push({ key, name: n, micron: m });
+  };
+
+  Object.entries(mr?.productSettings || {}).forEach(([key, block]) => {
+    const parsed = parseChargeSlotKey(key);
+    const micron = parsed.micron || String(block?.micronSize || '').trim();
+    const base = parsed.name || key;
+    if (
+      productNames.some((n) => normProduct(n) === normProduct(base))
+      || (mr?.batches || []).some((b) => !b.isEmptyDrums && normProduct(b.productName) === normProduct(base))
+    ) {
+      pushSlot(base, micron);
+    }
+  });
+
+  (mr?.batches || []).forEach((b) => {
+    if (b.isEmptyDrums) return;
+    pushSlot(b.productName, b.psdReq || '');
+  });
+
+  if (!slots.length) {
+    productNames.forEach((n) => pushSlot(n, ''));
+  }
+
+  // Drop plain-name slot when micron-specific slots exist for that name
+  const hasMicronFor = (name) =>
+    slots.some((s) => normProduct(s.name) === normProduct(name) && s.micron);
+  return slots.filter((s) => s.micron || !hasMicronFor(s.name));
+};
+
+/** Read saved charge settings for one product on a Material Receipt. */
+export const getMRProductChargeSettings = (mr, party, prodName, micronHint = '') => {
+  const parsed = parseChargeSlotKey(prodName);
+  const baseName = parsed.name || prodName;
+  const micron = String(micronHint || parsed.micron || '').trim();
+  const map = mr?.productSettings || {};
+
+  if (micron) {
+    const slotKey = `${baseName}|||${micron}`;
+    if (map[slotKey]) return map[slotKey];
+    const byMicron = Object.entries(map).find(([k, v]) => {
+      const p = parseChargeSlotKey(k);
+      return normProduct(p.name || k) === normProduct(baseName)
+        && (normProduct(p.micron) === normProduct(micron) || normProduct(v?.micronSize) === normProduct(micron));
+    });
+    if (byMicron) return byMicron[1];
+  }
+
+  const block = readMRProductChargeBlock(mr, party, baseName);
+  if (block && (!micron || !block.micronSize || normProduct(block.micronSize) === normProduct(micron))) {
+    return block;
+  }
+
+  const hasProductSettings = Object.keys(map).length > 0;
   if (!hasProductSettings && (mr?.charges || mr?.rates || mr?.qtys)) {
     return {
       rates: { ...emptyChargeRates(), ...(mr.rates || {}) },
@@ -234,9 +356,23 @@ export const getMRProductChargeSettings = (mr, party, prodName) => {
     };
   }
 
-  const prodConfig = (party?.products || []).find(p => normProduct(p.name) === normProduct(prodName));
+  const products = party?.products || [];
+  const want = normProduct(baseName);
+  const psd = micron.toLowerCase()
+    || String(
+      block?.micronSize
+      || (mr?.batches || []).find((b) => !b.isEmptyDrums && normProduct(b.productName) === want)?.psdReq
+      || ''
+    ).trim().toLowerCase();
+  const prodConfig = (psd
+    ? products.find((p) => normProduct(p.name) === want && String(p.psdReq || '').trim().toLowerCase() === psd)
+    : null)
+    || products.find((p) => normProduct(p.name) === want);
   return buildProductChargeSettingsFromParty(prodConfig);
 };
+
+/** Qty keys that are per-product (sum across products). Others are receipt-level common charges. */
+const PER_PRODUCT_QTY_KEYS = new Set(['processing', 'sieving']);
 
 const mergeProductChargeSettings = (mr, party, productNames) => {
   const prodOpts = { party };
@@ -247,25 +383,38 @@ const mergeProductChargeSettings = (mr, party, productNames) => {
     customCharges: []
   };
 
-  productNames.forEach(prodName => {
+  // Prefer top-level MR qtys for common charges (user-entered once on the receipt)
+  const topQtys = mr?.qtys || {};
+
+  productNames.forEach((prodName) => {
     const s = getMRProductChargeSettings(mr, party, prodName);
-    const prodQty = getProductQty(mr, prodName, prodOpts);
-    CHARGE_KEYS.forEach(key => {
+    CHARGE_KEYS.forEach((key) => {
       if (s.charges?.[key]) {
         merged.charges[key] = true;
-        merged.rates[key] = parseChargeNumber(s.rates?.[key], merged.rates[key] || 0);
+        if (PER_PRODUCT_QTY_KEYS.has(key) || !parseChargeNumber(merged.rates[key], 0)) {
+          merged.rates[key] = parseChargeNumber(s.rates?.[key], merged.rates[key] || 0);
+        }
       }
-      if (isMaterialQtyCharge(key)) {
-        const saved = s.qtys?.[key];
-        const lineQty = saved != null && saved !== ''
-          ? parseChargeNumber(saved, 0)
-          : 0;
-        merged.qtys[key] = parseChargeNumber(merged.qtys[key], 0) + lineQty;
-      } else if (s.charges?.[key]) {
-        merged.qtys[key] = parseChargeNumber(s.qtys?.[key], merged.qtys[key] || 0);
+      const saved = s.qtys?.[key];
+      const lineQty = saved != null && saved !== ''
+        ? parseChargeNumber(saved, 0)
+        : 0;
+      if (PER_PRODUCT_QTY_KEYS.has(key)) {
+        // Processing / sieving: sum each product's qty
+        if (s.charges?.[key] || lineQty) {
+          merged.qtys[key] = parseChargeNumber(merged.qtys[key], 0) + lineQty;
+        }
+      } else if (isMaterialQtyCharge(key) || s.charges?.[key]) {
+        // Common charges (cleaning, etc.): same value is copied onto every product — keep once
+        const top = topQtys[key];
+        if (top !== '' && top != null && Number.isFinite(parseFloat(top))) {
+          merged.qtys[key] = parseChargeNumber(top, 0);
+        } else if (!parseChargeNumber(merged.qtys[key], 0) && lineQty) {
+          merged.qtys[key] = lineQty;
+        }
       }
     });
-    (s.customCharges || []).forEach(cc => merged.customCharges.push({ ...cc }));
+    (s.customCharges || []).forEach((cc) => merged.customCharges.push({ ...cc }));
   });
 
   return merged;
@@ -346,11 +495,22 @@ export const findDedicatedProformaInvoice = (invoices, receiptId, productName = 
     productName
   );
 
+const preferTopLevelCommonQtys = (block, mr) => {
+  if (!block) return block;
+  const qtys = { ...emptyChargeQtys(), ...(block.qtys || {}) };
+  CHARGE_KEYS.forEach((key) => {
+    if (PER_PRODUCT_QTY_KEYS.has(key)) return;
+    const top = mr?.qtys?.[key];
+    if (top !== '' && top != null) qtys[key] = top;
+  });
+  return { ...block, qtys };
+};
+
 /** Flatten MR productSettings (or legacy top-level fields) for downstream PI/TI/PO. */
 export const flattenMRChargeSnapshot = (mr, party) => {
   const productNames = getActiveReceiptProductNames(mr, party);
   if (productNames.length > 1) {
-    return mergeProductChargeSettings(mr, party, productNames);
+    return preferTopLevelCommonQtys(mergeProductChargeSettings(mr, party, productNames), mr);
   }
 
   const block = readMRProductChargeBlock(
@@ -358,7 +518,7 @@ export const flattenMRChargeSnapshot = (mr, party) => {
     party,
     productNames[0] || mr?.productName || ''
   );
-  if (block) return block;
+  if (block) return preferTopLevelCommonQtys(block, mr);
 
   const hasProductSettings = Object.keys(mr?.productSettings || {}).length > 0;
   if (!hasProductSettings && (mr?.charges || mr?.rates || mr?.qtys)) {
@@ -549,18 +709,54 @@ export const getFreshMaterialReceipt = (materialReceipts, mrOrId) => {
 /** Per-product charge blocks from MR productSettings (for multi-product PI). */
 export const initProductChargesFromMR = (mr, party, productOptions = {}) => {
   const prodOpts = { party, ...productOptions };
-  const productNames = getReceiptProductNames(mr, prodOpts);
+  const slots = getMRChargeSlots(mr, party, prodOpts);
   const result = {};
-  productNames.forEach(prodName => {
-    const settings = getMRProductChargeSettings(mr, party, prodName);
-    const materialQty = getProductQty(mr, prodName, prodOpts);
-    result[prodName] = {
+  const baseSeen = new Set();
+
+  slots.forEach((slot, index) => {
+    const settings = getMRProductChargeSettings(mr, party, slot.name, slot.micron);
+    const materialQty = getChargeSlotQty(mr, slot.key, prodOpts);
+    const baseId = normProduct(slot.name);
+    baseSeen.add(baseId);
+
+    // First slot keeps receipt-level common charges; every later slot is processing-only
+    // so cleaning qty is not counted once per product (e.g. 2 → 4).
+    if (index > 0) {
+      const processingOn = !!settings.charges?.processing
+        || (parseChargeNumber(settings.rates?.processing, 0) > 0);
+      result[slot.key] = {
+        charges: {
+          ...emptyChargeFlagsOnly(),
+          processing: processingOn
+        },
+        rates: {
+          ...emptyChargeRates(),
+          processing: parseChargeNumber(settings.rates?.processing, 0)
+        },
+        qtys: {
+          ...emptyChargeQtys(),
+          processing: materialQty || ''
+        }
+      };
+      return;
+    }
+
+    const qtys = buildChargeQtys(settings, materialQty);
+    // Prefer top-level MR common qtys when present (single source of truth)
+    CHARGE_KEYS.forEach((key) => {
+      if (PER_PRODUCT_QTY_KEYS.has(key)) return;
+      const top = mr?.qtys?.[key];
+      if (top !== '' && top != null) qtys[key] = top;
+    });
+
+    result[slot.key] = {
       charges: { ...emptyChargeFlagsOnly(), ...(settings.charges || {}) },
       rates: { ...emptyChargeRates(), ...(settings.rates || {}) },
-      qtys: buildChargeQtys(settings, materialQty)
+      qtys
     };
   });
-  if (!productNames.length && mr?.productName) {
+
+  if (!slots.length && mr?.productName) {
     const settings = getMRProductChargeSettings(mr, party, mr.productName);
     const materialQty = parseFloat(mr.totalQty) || parseFloat(mr.receivedQty) || 0;
     result[mr.productName] = {
@@ -602,6 +798,108 @@ export const normalizeProductChargesFromDoc = (productCharges, legacyDoc, mr, pr
   return fromMR;
 };
 
+const chargeSlotBaseName = (key) => {
+  const raw = String(key || '');
+  return (raw.includes('|||') ? raw.split('|||')[0] : raw).trim();
+};
+
+export const isUmaNewDrumRow = (row) => {
+  if (!row) return false;
+  if (row.umaNewDrum) return true;
+  const name = String(row.batchNo || '').trim().toLowerCase();
+  return name === 'new uma drum' || name === 'uma new drum';
+};
+
+/** Charge block the TI form should read for a product (plain name or name|||PSD). */
+export const resolveProductChargeKey = (productCharges, prodName) => {
+  const keys = Object.keys(productCharges || {});
+  if (!prodName) return keys[0] || '';
+  const exact = keys.find((k) => normProduct(k) === normProduct(prodName));
+  if (exact) return exact;
+  const base = keys.find((k) => normProduct(chargeSlotBaseName(k)) === normProduct(chargeSlotBaseName(prodName)));
+  return base || prodName;
+};
+
+const umaDrumBillRate = (party, productName, stockItems) => {
+  const want = normProduct(chargeSlotBaseName(productName));
+  const products = (party?.products || []).filter((p) => normProduct(p.name) === want);
+  const priced = products.find((p) => parseChargeNumber(p?.charges?.hdpeDrum, 0) > 0);
+  const partyRate = parseChargeNumber((priced || products[0])?.charges?.hdpeDrum, 0);
+  if (partyRate > 0) return partyRate;
+  const stock = (stockItems || []).find((item) => item && !item.isDeleted && (
+    item.tracksUmaDrums || /^hdpe drum$/i.test(String(item.name || '').trim())
+  ));
+  return parseChargeNumber(stock?.rate, 0);
+};
+
+export const sumHdpeDrumQty = (productCharges) =>
+  Object.values(productCharges || {}).reduce(
+    (sum, pc) => sum + parseChargeNumber(pc?.qtys?.hdpeDrum, 0),
+    0
+  );
+
+/**
+ * Put each packing-list New Uma Drum on the TI as an HDPE Drum line.
+ * Qty is the drum count. Rate stays if already set, otherwise the party HDPE rate
+ * (then the stock HDPE rate).
+ */
+export const applyUmaNewDrumCharge = (productCharges, options = {}) => {
+  const source = productCharges && typeof productCharges === 'object' ? productCharges : {};
+  const next = { ...source };
+  const batches = options.batches || options.packingList?.batches || [];
+  const counts = new Map();
+  let loose = 0;
+  batches.forEach((row) => {
+    if (!isUmaNewDrumRow(row)) return;
+    const name = String(row.productName || '').trim();
+    if (!name) {
+      loose += 1;
+      return;
+    }
+    const id = normProduct(name);
+    counts.set(id, (counts.get(id) || 0) + 1);
+  });
+  const total = [...counts.values()].reduce((sum, n) => sum + n, 0) + loose;
+  if (!total) return next;
+
+  const write = (key, count, rateName) => {
+    if (!key || count <= 0) return;
+    const pc = next[key] || {
+      charges: emptyChargeFlagsOnly(),
+      rates: emptyChargeRates(),
+      qtys: emptyChargeQtys()
+    };
+    const currentRate = parseChargeNumber(pc.rates?.hdpeDrum, 0);
+    const rate = currentRate > 0 ? currentRate : umaDrumBillRate(options.party, rateName, options.stockItems);
+    next[key] = {
+      ...pc,
+      charges: { ...emptyChargeFlagsOnly(), ...(pc.charges || {}), hdpeDrum: true },
+      rates: { ...emptyChargeRates(), ...(pc.rates || {}), hdpeDrum: rate },
+      qtys: { ...emptyChargeQtys(), ...(pc.qtys || {}), hdpeDrum: count }
+    };
+  };
+
+  const keys = Object.keys(next);
+  const claimed = new Set();
+  keys.forEach((key) => {
+    const id = normProduct(chargeSlotBaseName(key));
+    if (!counts.has(id) || claimed.has(id)) return;
+    claimed.add(id);
+    write(key, counts.get(id), chargeSlotBaseName(key));
+  });
+
+  let extra = loose;
+  counts.forEach((count, id) => {
+    if (!claimed.has(id)) extra += count;
+  });
+  if (extra > 0) {
+    const target = keys[0] || options.fallbackName || 'Product';
+    const already = parseChargeNumber(next[target]?.qtys?.hdpeDrum, 0);
+    write(target, already + extra, chargeSlotBaseName(target));
+  }
+  return next;
+};
+
 export const sanitizeProductCharges = (productCharges) => {
   if (!productCharges) return {};
   return Object.fromEntries(
@@ -615,12 +913,12 @@ export const sanitizeProductCharges = (productCharges) => {
 
 export const calcProductChargesSubtotal = (productCharges, mr, prodOpts) =>
   Object.entries(productCharges || {}).reduce((sum, [prodName, pc]) => {
-    const materialQty = getProductQty(mr, prodName, prodOpts);
+    const slotQty = getChargeSlotQty(mr, prodName, prodOpts);
     return sum + CHARGE_KEYS.reduce((lineSum, key) => {
       if (!pc.charges?.[key]) return lineSum;
       const rate = parseChargeNumber(pc.rates?.[key], 0);
       const lineQty = key === 'processing'
-        ? materialQty
+        ? (slotQty || getChargeLineQty(pc.qtys, key))
         : getChargeLineQty(pc.qtys, key);
       return lineSum + lineQty * rate;
     }, 0);
@@ -668,6 +966,23 @@ export const enrichPIForPrint = (pi, appData = {}) => {
       const savedQty = parseFloat(pi.qty) || 0;
       const liveQty = getMRReceivedQty(mr, prodOpts);
 
+      let hsnCode = String(pi.hsnCode || pi.hsn || '').trim();
+      if (!hsnCode) {
+        const names = [
+          ...(summaries.length ? summaries : (pi.productSummaries || [])).map((p) => p.prodName),
+          pi.productName
+        ].filter(Boolean);
+        for (const name of names) {
+          const prod = (prodOpts.party?.products || []).find(
+            (p) => String(p.name || '').trim().toLowerCase() === String(name).trim().toLowerCase()
+          );
+          if (prod?.hsn) {
+            hsnCode = String(prod.hsn).trim();
+            break;
+          }
+        }
+      }
+
       next = {
         ...pi,
         partyDocNo: pi.partyDocNo || mr.partyDocNo || '',
@@ -679,6 +994,7 @@ export const enrichPIForPrint = (pi, appData = {}) => {
         productName: summaries.length ? getReceiptProductLabel(mr, prodOpts) : pi.productName,
         productSummaries: summaries.length ? summaries : (pi.productSummaries || []),
         productCharges: mergedCharges,
+        hsnCode,
         qty: savedQty > 0 ? savedQty : (liveQty || pi.qty)
       };
     }
@@ -740,7 +1056,15 @@ export const enrichTIForPrint = (ti, appData = {}) => {
       const baseCharges = hasTiCharges
         ? sanitizeProductCharges(ti.productCharges)
         : (piTerms?.productCharges || initProductChargesFromMR(mr, prodOpts.party, prodOpts));
-      const mergedCharges = mergeSavedChargesPreferDoc(ti.productCharges, baseCharges);
+      const savedCharges = mergeSavedChargesPreferDoc(ti.productCharges, baseCharges);
+      const mergedCharges = sumHdpeDrumQty(savedCharges) > 0
+        ? savedCharges
+        : applyUmaNewDrumCharge(savedCharges, {
+          batches: pl?.batches || [],
+          party: prodOpts.party,
+          stockItems: appData.stockItems,
+          fallbackName: summaries[0]?.prodName || ti.productName || ''
+        });
       const savedQty = parseFloat(ti.qty) || 0;
       const liveQty = getMRReceivedQty(mr, prodOpts);
 

@@ -592,6 +592,7 @@ const PaymentFollowUp = () => {
           <table className="data-table">
             <thead>
               <tr>
+                <th>Sr. No</th>
                 <th>Customer Name</th>
                 <th>Pending Invoices</th>
                 <th>Outstanding Amount</th>
@@ -601,8 +602,9 @@ const PaymentFollowUp = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredCustomers.map((c) => (
+              {filteredCustomers.map((c, idx) => (
                 <tr key={c.partyId || c.partyName}>
+                  <td>{idx + 1}</td>
                   <td style={{ fontWeight: 600 }}>{c.partyName}</td>
                   <td>{c.pendingInvoices || c.invoices?.length || 0}</td>
                   <td style={{ fontWeight: 700, color: '#ef4444' }}>{moneyINR(c.outstandingAmount)}</td>
@@ -616,7 +618,7 @@ const PaymentFollowUp = () => {
                 </tr>
               ))}
               {filteredCustomers.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '1.75rem', color: 'var(--text-muted)' }}>No pending amounts found. Check Tax Invoices / Processing Sheet outstanding.</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '1.75rem', color: 'var(--text-muted)' }}>No pending amounts found. Check Tax Invoices / Processing Sheet outstanding.</td></tr>
               )}
             </tbody>
           </table>
@@ -646,6 +648,7 @@ const PaymentFollowUp = () => {
         <table className="data-table" style={{ minWidth: 980 }}>
           <thead>
             <tr>
+              <th>Sr. No</th>
               <th>Customer Name</th>
               <th>Pending Invoices</th>
               <th>Outstanding Amount</th>
@@ -656,8 +659,9 @@ const PaymentFollowUp = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredCustomers.map((c) => (
+            {filteredCustomers.map((c, idx) => (
               <tr key={c.partyId}>
+                <td>{idx + 1}</td>
                 <td>
                   <div style={{ fontWeight: 600 }}>{c.partyName}</div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
@@ -678,11 +682,12 @@ const PaymentFollowUp = () => {
               </tr>
             ))}
             {filteredCustomers.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No customers matched.</td></tr>
+              <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No customers matched.</td></tr>
             )}
           </tbody>
           <tfoot>
             <tr>
+              <td />
               <td style={{ fontWeight: 700 }}>TOTAL</td>
               <td style={{ fontWeight: 700 }}>{filteredCustomers.reduce((s, c) => s + c.pendingInvoices, 0)}</td>
               <td style={{ fontWeight: 700 }}>{moneyINR(filteredCustomers.reduce((s, c) => s + c.outstandingAmount, 0))}</td>
@@ -733,6 +738,7 @@ const PaymentFollowUp = () => {
                   <th>
                     <input type="checkbox" checked={selectedInvoiceIds.length === customerInvoices.length && customerInvoices.length > 0} onChange={toggleAllInvoices} />
                   </th>
+                  <th>Sr. No</th>
                   <th>Invoice No.</th>
                   <th>Invoice Date</th>
                   <th>Invoice Amount</th>
@@ -744,9 +750,10 @@ const PaymentFollowUp = () => {
                 </tr>
               </thead>
               <tbody>
-                {customerInvoices.map((inv) => (
+                {customerInvoices.map((inv, idx) => (
                   <tr key={inv.id}>
                     <td><input type="checkbox" checked={selectedInvoiceIds.includes(inv.id)} onChange={() => toggleInvoice(inv.id)} /></td>
+                    <td>{idx + 1}</td>
                     <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{inv.invoiceNo}</td>
                     <td>{formatDate(inv.invoiceDate)}</td>
                     <td>{moneyINR(inv.invoiceAmount)}</td>
@@ -796,6 +803,7 @@ const PaymentFollowUp = () => {
         <table className="data-table">
           <thead>
             <tr>
+              <th>Sr. No</th>
               <th>Follow-Up Date</th>
               <th>Method</th>
               <th>Invoices</th>
@@ -806,8 +814,9 @@ const PaymentFollowUp = () => {
             </tr>
           </thead>
           <tbody>
-            {customerHistory.map((f) => (
+            {customerHistory.map((f, idx) => (
               <tr key={f.id}>
+                <td>{idx + 1}</td>
                 <td>{formatDate(f.date)}</td>
                 <td>{f.method || '—'}</td>
                 <td style={{ maxWidth: 220 }}>{f.invoiceNos || '—'}</td>
@@ -818,7 +827,7 @@ const PaymentFollowUp = () => {
               </tr>
             ))}
             {customerHistory.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No follow-up history yet.</td></tr>
+              <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No follow-up history yet.</td></tr>
             )}
           </tbody>
         </table>

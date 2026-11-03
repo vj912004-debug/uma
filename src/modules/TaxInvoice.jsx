@@ -30,7 +30,10 @@ import {
   resolveTIProductChargesForDoc,
   getLinkedPITermsForTI,
   sanitizeProductCharges,
-  enrichTIForPrint
+  enrichTIForPrint,
+  applyUmaNewDrumCharge,
+  resolveProductChargeKey,
+  sumHdpeDrumQty
 } from '../utils/documentCharges';
 import {
   getReceiptProductLabel,
@@ -41,7 +44,8 @@ import {
   getMRReceivedQty,
   getDocProductLabel,
   findAnyPackingList,
-  receiptProductOptions
+  receiptProductOptions,
+  resolveDocNickAndPsd
 } from '../utils/receiptProducts';
 import SearchableSelect from '../components/SearchableSelect';
 
@@ -73,6 +77,8 @@ const TaxInvoice = () => {
     partyId: '',
     partyName: '',
     productName: '',
+    nickName: '',
+    psdReq: '',
     productSummaries: [],
     productCharges: {},
     hsnCode: '',
@@ -101,12 +107,11 @@ const TaxInvoice = () => {
 
   const resolveProductQty = (prodName) => getProductQty(activeMR, prodName, prodOpts);
 
-  const getProductChargeBlock = (prodName) =>
-    form.productCharges?.[prodName]
-    || form.productCharges?.[Object.keys(form.productCharges || {}).find(k =>
-      (k || '').trim().toLowerCase() === (prodName || '').trim().toLowerCase()
-    )]
-    || { charges: defaultChargeFlags(), rates: defaultChargeRates(), qtys: emptyChargeQtys() };
+  const getProductChargeBlock = (prodName) => {
+    const key = resolveProductChargeKey(form.productCharges, prodName);
+    return form.productCharges?.[key]
+      || { charges: defaultChargeFlags(), rates: defaultChargeRates(), qtys: emptyChargeQtys() };
+  };
 
   const buildFormFromPL = (pl, docDate) => {
     const freshMR = getFreshMaterialReceipt(data.materialReceipts, pl.receiptId);
@@ -118,9 +123,16 @@ const TaxInvoice = () => {
     const productSummaries = buildPLProductSummaries(pl, freshMR, opts);
     const productLabel = getReceiptProductLabel(freshMR, opts);
     const piTerms = getLinkedPITermsForTI(data.invoices, freshMR.id);
-    const productCharges = piTerms?.productCharges
+    const seededCharges = piTerms?.productCharges
       || resolveTIProductChargesForDoc(freshMR, mrParty, data.invoices, opts);
+    const productCharges = applyUmaNewDrumCharge(seededCharges, {
+      batches: pl?.batches || [],
+      party: mrParty,
+      stockItems: data.stockItems,
+      fallbackName: productSummaries[0]?.prodName || productLabel
+    });
     const prod = (mrParty?.products || []).find(p => p.name === productSummaries[0]?.prodName);
+    const nickPsd = resolveDocNickAndPsd(freshMR, mrParty, productSummaries[0]?.prodName || productLabel);
     const tiSerial = data.settings?.serials?.TI || 1;
     return {
       invoiceNo: generateDocNumber('IN', tiSerial, new Date(docDate)),
@@ -136,6 +148,8 @@ const TaxInvoice = () => {
       partyId: freshMR.partyId || mrParty?.id || '',
       partyName: freshMR.partyName,
       productName: productLabel,
+      nickName: nickPsd.nickName,
+      psdReq: nickPsd.psdReq,
       productSummaries,
       productCharges,
       hsnCode: prod?.hsn || '',
@@ -164,14 +178,32 @@ const TaxInvoice = () => {
       const receivedQty = mr ? getMRReceivedQty(mr, opts) : (parseFloat(editingDoc.qty) || 0);
       const merged = mergeSavedDocCharges(editingDoc, receivedQty);
       // Prefer saved TI values so direct edits stick (do not re-pull from PI)
-      const productCharges = editingDoc.productCharges && Object.keys(editingDoc.productCharges).length
+      const savedCharges = editingDoc.productCharges && Object.keys(editingDoc.productCharges).length
         ? sanitizeProductCharges(editingDoc.productCharges)
         : (editingDoc.productCharges || {});
+      const mrParty = opts.party || data.parties.find((p) => p.id === mr?.partyId);
+      const productCharges = sumHdpeDrumQty(savedCharges) > 0
+        ? savedCharges
+        : applyUmaNewDrumCharge(savedCharges, {
+          batches: pl?.batches || [],
+          party: mrParty,
+          stockItems: data.stockItems,
+          fallbackName: productSummaries[0]?.prodName || editingDoc.productName || ''
+        });
+      const productLabel = mr ? getReceiptProductLabel(mr, opts) : (editingDoc.productName || '');
+      const nickPsd = resolveDocNickAndPsd(
+        mr,
+        opts.party || data.parties.find((p) => p.id === mr?.partyId),
+        productSummaries[0]?.prodName || productLabel,
+        editingDoc
+      );
       setForm(prev => ({
         ...editingDoc,
         ...merged,
         qty: receivedQty > 0 ? receivedQty : (parseFloat(editingDoc.qty) || 0),
-        productName: mr ? getReceiptProductLabel(mr, opts) : (editingDoc.productName || ''),
+        productName: productLabel,
+        nickName: nickPsd.nickName,
+        psdReq: nickPsd.psdReq,
         productSummaries: productSummaries.length ? productSummaries : (editingDoc.productSummaries || []),
         productCharges,
         customCharges: editingDoc.customCharges || [],
@@ -190,14 +222,26 @@ const TaxInvoice = () => {
       const opts = receiptProductOptions(freshMR, data);
       const mrParty = opts.party || data.parties.find(p => p.id === freshMR.partyId);
       const receivedQty = getMRReceivedQty(freshMR, opts);
+      const productLabel = getReceiptProductLabel(freshMR, opts);
+      const productSummaries = buildPLProductSummaries(selectedPL, freshMR, opts);
+      const nickPsd = resolveDocNickAndPsd(freshMR, mrParty, productSummaries[0]?.prodName || productLabel);
       const piTerms = getLinkedPITermsForTI(data.invoices, freshMR.id);
       setForm(prev => ({
         ...prev,
         qty: receivedQty,
-        productName: getReceiptProductLabel(freshMR, opts),
-        productSummaries: buildPLProductSummaries(selectedPL, freshMR, opts),
-        productCharges: piTerms?.productCharges
-          || resolveTIProductChargesForDoc(freshMR, mrParty, data.invoices, opts),
+        productName: productLabel,
+        nickName: nickPsd.nickName,
+        psdReq: nickPsd.psdReq,
+        productSummaries,
+        productCharges: applyUmaNewDrumCharge(
+          piTerms?.productCharges || resolveTIProductChargesForDoc(freshMR, mrParty, data.invoices, opts),
+          {
+            batches: selectedPL?.batches || [],
+            party: mrParty,
+            stockItems: data.stockItems,
+            fallbackName: productSummaries[0]?.prodName || productLabel
+          }
+        ),
         customCharges: piTerms?.customCharges || prev.customCharges || [],
         discount: piTerms?.discount ?? prev.discount ?? 0,
         taxRate: piTerms?.taxRate ?? prev.taxRate ?? 18,
@@ -240,7 +284,9 @@ const TaxInvoice = () => {
 
   const toggleProductCharge = (prodName, key) => {
     setForm(prev => {
-      const pc = getProductChargeBlock(prodName);
+      const chargeKey = resolveProductChargeKey(prev.productCharges, prodName);
+      const pc = prev.productCharges?.[chargeKey]
+        || { charges: defaultChargeFlags(), rates: defaultChargeRates(), qtys: emptyChargeQtys() };
       const turningOn = !pc.charges[key];
       const qtys = { ...(pc.qtys || emptyChargeQtys()) };
       if (turningOn && (qtys[key] == null || qtys[key] === '')) {
@@ -250,7 +296,7 @@ const TaxInvoice = () => {
         ...prev,
         productCharges: {
           ...(prev.productCharges || {}),
-          [prodName]: {
+          [chargeKey]: {
             ...pc,
             charges: { ...pc.charges, [key]: turningOn },
             qtys
@@ -262,13 +308,14 @@ const TaxInvoice = () => {
 
   const handleProductRateChange = (prodName, key, val) => {
     setForm(prev => {
-      const pc = prev.productCharges?.[prodName]
+      const chargeKey = resolveProductChargeKey(prev.productCharges, prodName);
+      const pc = prev.productCharges?.[chargeKey]
         || { charges: defaultChargeFlags(), rates: defaultChargeRates(), qtys: emptyChargeQtys() };
       return {
         ...prev,
         productCharges: {
           ...(prev.productCharges || {}),
-          [prodName]: {
+          [chargeKey]: {
             ...pc,
             rates: { ...pc.rates, [key]: parseChargeFieldValue(val) }
           }
@@ -279,13 +326,14 @@ const TaxInvoice = () => {
 
   const handleProductQtyChange = (prodName, key, val) => {
     setForm(prev => {
-      const pc = prev.productCharges?.[prodName]
+      const chargeKey = resolveProductChargeKey(prev.productCharges, prodName);
+      const pc = prev.productCharges?.[chargeKey]
         || { charges: defaultChargeFlags(), rates: defaultChargeRates(), qtys: emptyChargeQtys() };
       return {
         ...prev,
         productCharges: {
           ...(prev.productCharges || {}),
-          [prodName]: {
+          [chargeKey]: {
             ...pc,
             qtys: { ...(pc.qtys || emptyChargeQtys()), [key]: parseChargeFieldValue(val) }
           }
@@ -689,6 +737,7 @@ const TaxInvoice = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>Sr. No</th>
                   <th style={{ padding: '0.75rem' }}>PL No</th>
                   <th style={{ padding: '0.75rem' }}>Product</th>
                   <th style={{ padding: '0.75rem' }}>Weight (Kg)</th>
@@ -697,13 +746,14 @@ const TaxInvoice = () => {
               </thead>
               <tbody>
                 {uniquePendingPLs.length === 0 ? (
-                  <tr><td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No dispatches awaiting invoices.</td></tr>
+                  <tr><td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No dispatches awaiting invoices.</td></tr>
                 ) : (
-                  uniquePendingPLs.map((pl) => {
+                  uniquePendingPLs.map((pl, idx) => {
                     const mr = (data.materialReceipts || []).find(m => m.id === pl.receiptId);
                     const label = mr ? getReceiptProductLabel(mr, receiptProductOptions(mr, data)) : pl.productName;
                     return (
                       <tr key={pl.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.75rem' }}>{idx + 1}</td>
                         <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{pl.plNo}</td>
                         <td style={{ padding: '0.75rem', fontWeight: 600 }}>{label}</td>
                         <td style={{ padding: '0.75rem' }}>{pl.totalWeight?.toFixed(1) || 0}</td>
@@ -728,6 +778,7 @@ const TaxInvoice = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>Sr. No</th>
                   <th style={{ padding: '0.75rem' }}>Invoice No</th>
                   <th style={{ padding: '0.75rem' }}>Customer</th>
                   <th style={{ padding: '0.75rem' }}>Product</th>
@@ -738,13 +789,14 @@ const TaxInvoice = () => {
               </thead>
               <tbody>
                 {filteredInvoices.length === 0 ? (
-                  <tr><td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No Tax Invoices found.</td></tr>
+                  <tr><td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No Tax Invoices found.</td></tr>
                 ) : (
-                  filteredInvoices.map(inv => {
+                  filteredInvoices.map((inv, idx) => {
                     const mr = (data.materialReceipts || []).find(m => m.id === inv.receiptId);
                     const productLabel = getDocProductLabel(inv, mr, mr ? receiptProductOptions(mr, data) : {});
                     return (
                     <tr key={inv.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem' }}>{idx + 1}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{inv.invoiceNo}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600 }}>{inv.partyName}</td>
                       <td style={{ padding: '0.75rem' }}>{productLabel}</td>
@@ -845,6 +897,35 @@ const TaxInvoice = () => {
                       ))}
                     </div>
                   )}
+                </div>
+                <div>
+                  <label>Nick Name</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="From party product master"
+                    value={form.nickName || ''}
+                    onChange={(e) => setForm({ ...form, nickName: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label>PSD Req</label>
+                  <SearchableSelect
+                    allowCustom
+                    className="input-field"
+                    placeholder="Type or select PSD requirement"
+                    value={form.psdReq || ''}
+                    onChange={(e) => setForm({ ...form, psdReq: e.target.value })}
+                    remember={false}
+                  >
+                    <option value="">Select PSD Req…</option>
+                    {(data.psdRequirements || []).map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                    {form.psdReq && !(data.psdRequirements || []).includes(form.psdReq) && (
+                      <option value={form.psdReq}>{form.psdReq}</option>
+                    )}
+                  </SearchableSelect>
                 </div>
                 <div>
                   <label>HSN Code</label>

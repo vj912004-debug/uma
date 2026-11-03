@@ -25,7 +25,7 @@ import { useAppContext } from '../context/AppContext';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import SearchableSelect from '../components/SearchableSelect';
-import { formatDate, newestFirst } from '../utils/dateUtils';
+import { formatDate, formatTime, newestFirst } from '../utils/dateUtils';
 import ExportButton from '../components/ExportButton';
 
 const FOLLOW_TYPES = ['Call', 'Meeting', 'Email', 'Visit', 'WhatsApp'];
@@ -177,8 +177,8 @@ const MarketingFollowUp = () => {
           ? `Completed follow-up with ${leadLabel(f.leadId)}`
           : `Scheduled ${f.type} for ${leadLabel(f.leadId)}`,
         time: f.createdAt
-          ? new Date(f.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
-          : `${formatDate(f.date)} ${f.time || ''}`.trim(),
+          ? new Date(f.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })
+          : `${formatDate(f.date)} ${f.time ? formatTime(f.time) : ''}`.trim(),
         tone: f.status === 'Completed' ? 'green' : 'blue'
       }));
     return items;
@@ -244,6 +244,7 @@ const MarketingFollowUp = () => {
       <table className="fu-table">
         <thead>
           <tr>
+            <th>Sr. No</th>
             <th>Company</th>
             <th>Contact</th>
             <th>Mobile</th>
@@ -255,15 +256,16 @@ const MarketingFollowUp = () => {
         </thead>
         <tbody>
           {rows.length === 0 ? (
-            <tr><td colSpan={7} className="pm-empty">{emptyText}</td></tr>
-          ) : rows.map((r) => {
+            <tr><td colSpan={8} className="pm-empty">{emptyText}</td></tr>
+          ) : rows.map((r, idx) => {
             const TypeIcon = typeIcon(r.type);
             return (
               <tr key={r.id}>
+                <td>{idx + 1}</td>
                 <td className="fu-company">{leadLabel(r.leadId)}</td>
                 <td>{contactOf(r.leadId)}</td>
                 <td>{mobileOf(r.leadId)}</td>
-                <td>{r.time || '—'}</td>
+                <td>{r.time ? formatTime(r.time) : '—'}</td>
                 <td>
                   <span className={`fu-type-badge ${typeClass(r.type)}`}>
                     <TypeIcon size={12} />

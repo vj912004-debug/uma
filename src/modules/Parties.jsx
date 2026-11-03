@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Plus, Search, Edit2, Trash2, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, ShieldAlert, ArrowLeft, X } from 'lucide-react';
 import { generateDocNumber } from '../utils/numbering';
 import { useNavigate } from 'react-router-dom';
 import SearchableSelect from '../components/SearchableSelect';
@@ -83,7 +83,7 @@ const Parties = () => {
     email2: '',
     email3: '',
     type: 'Customer',
-    products: [] // Array of { name, nickname, psdReq, psdNote, charges: { cleaning: 0, filterBag: 0, processing: 0, sieving: 0, psdReport: 0, liner: 0, courier: 0, fiberDrum: 0, transportation: 0, hdpeDrum: 0, batchChangeover: 0 } }
+    products: [] // Array of { name, nickname, psdReq, psdNote, specialNote, charges: { ... } }
   });
 
   // Product Sub-form State
@@ -95,6 +95,7 @@ const Parties = () => {
     psdReq: '90% < 10M',
     psdMethodDefault: 'Dry',
     psdNote: '',
+    specialNote: '',
     charges: {
       cleaning: 0,
       filterBag: 0,
@@ -135,19 +136,24 @@ const Parties = () => {
   };
 
   const STANDARD_CHARGE_DEFS = [
-    { key: 'cleaning',       label: 'Min Cleaning (998842)',      span: 1 },
-    { key: 'filterBag',     label: 'Filter Bag (591190)',         span: 1 },
-    { key: 'processing',    label: 'Processing (998842)',         span: 1 },
-    { key: 'sieving',       label: 'Sieving (998842)',            span: 1 },
-    { key: 'psdReportDry',  label: 'PSD Report Dry (998346)',     span: 1 },
-    { key: 'psdReportWet',  label: 'PSD Report Wet (998346)',     span: 1 },
-    { key: 'liner',         label: 'Liner (39233090)',            span: 1 },
-    { key: 'courier',       label: 'Courier (996812)',            span: 1 },
-    { key: 'fiberDrum',     label: 'Fiber Drum (7310)',           span: 1 },
-    { key: 'transportation',label: 'Transportation (996511)',     span: 1 },
-    { key: 'hdpeDrum',      label: 'HDPE Drum (39233090)',        span: 1 },
-    { key: 'batchChangeover',label: 'Batch Change Over (998842)', span: 2 },
+    { key: 'cleaning', label: 'Minimum Cleaning Charge', hint: 'Printed as Minimum Cleaning Charges (998842)' },
+    { key: 'filterBag', label: 'Filter Bag Charge', hint: 'HSN / SAC 591190' },
+    { key: 'processing', label: 'Processing Charge', hint: 'HSN / SAC 998842' },
+    { key: 'sieving', label: 'Sieving Charge', hint: 'HSN / SAC 998842' },
+    { key: 'sleeving', label: 'Sleeving Charges', hint: 'Other / optional charge' },
+    { key: 'psdReportDry', label: 'PSD Report Dry', hint: 'HSN / SAC 998346' },
+    { key: 'psdReportWet', label: 'PSD Report Wet', hint: 'HSN / SAC 998346' },
+    { key: 'liner', label: 'Liner', hint: 'HSN 39233090' },
+    { key: 'courier', label: 'Courier', hint: 'HSN / SAC 996812' },
+    { key: 'fiberDrum', label: 'Fiber Drum', hint: 'HSN 7310' },
+    { key: 'transportation', label: 'Transportation', hint: 'HSN / SAC 996511' },
+    { key: 'hdpeDrum', label: 'HDPE Drum', hint: 'HSN 39233090' },
+    { key: 'batchChangeover', label: 'Batch Change Over', hint: 'HSN / SAC 998842' }
   ];
+
+  const emptyProductCharges = () => Object.fromEntries(
+    STANDARD_CHARGE_DEFS.map((def) => [def.key, 0])
+  );
 
   const handleAddProduct = () => {
     setProductData({
@@ -156,21 +162,10 @@ const Parties = () => {
       psdReq: '90% < 10M',
       psdMethodDefault: 'Dry',
       psdNote: '',
+      specialNote: '',
       notes: '',
-      charges: {
-        cleaning: 0,
-        filterBag: 0,
-        processing: 0,
-        sieving: 0,
-        psdReportDry: 0,
-        psdReportWet: 0,
-        liner: 0,
-        courier: 0,
-        fiberDrum: 0,
-        transportation: 0,
-        hdpeDrum: 0,
-        batchChangeover: 0
-      },
+      charges: emptyProductCharges(),
+      chargeNotes: {},
       disabledCharges: [],
       customCharges: []
     });
@@ -179,7 +174,14 @@ const Parties = () => {
   };
 
   const handleEditProduct = (idx) => {
-    setProductData(formData.products[idx]);
+    const existing = formData.products[idx] || {};
+    setProductData({
+      ...existing,
+      charges: { ...emptyProductCharges(), ...(existing.charges || {}) },
+      chargeNotes: { ...(existing.chargeNotes || {}) },
+      disabledCharges: existing.disabledCharges || [],
+      customCharges: existing.customCharges || []
+    });
     setEditingProductIdx(idx);
     setIsProductModalOpen(true);
   };
@@ -313,6 +315,7 @@ const Parties = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
+                <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Sr. No</th>
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Vendor Code</th>
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Party Name</th>
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Type</th>
@@ -324,11 +327,12 @@ const Parties = () => {
             <tbody>
               {filteredParties.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No parties found.</td>
+                  <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No parties found.</td>
                 </tr>
               ) : (
-                filteredParties.map(party => (
+                filteredParties.map((party, idx) => (
                   <tr key={party.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '1rem' }}>{idx + 1}</td>
                     <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{party.vendorCode || 'N/A'}</td>
                     <td style={{ padding: '1rem', fontWeight: 600 }}>
                       <button 
@@ -737,132 +741,300 @@ const Parties = () => {
                 </div>
                 <div>
                   <label>PSD Note (200+ Characters)</label>
-                  <input 
-                    type="text" 
-                    className="input-field" 
-                    placeholder="Any special handling notes"
+                  <textarea
+                    className="input-field"
+                    rows={6}
+                    placeholder={'One detail per line\nOld mill\nNew jet\nFast ventury'}
                     value={productData.psdNote}
                     onChange={e => setProductData({...productData, psdNote: e.target.value})}
                   />
                 </div>
+                <div>
+                  <label>Special Note</label>
+                  <textarea
+                    className="input-field"
+                    rows={6}
+                    placeholder={'One detail per line\nCarries to BPR Special Note'}
+                    value={productData.specialNote || ''}
+                    onChange={e => setProductData({ ...productData, specialNote: e.target.value })}
+                  />
+                </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '1rem 0 0.5rem 0', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>Default Standard Charge Rates (₹)</h4>
-                <button type="button" className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', background: 'var(--glass-bg)', color: 'var(--accent-primary)', border: '1px solid var(--border-color)' }} onClick={() => setProductData(prev => ({ ...prev, customCharges: [...(prev.customCharges || []), { name: '', hsn: '', rate: '' }] }))}>
-                  + Add Custom Charge
-                </button>
-              </div>
-              
-              <datalist id="amountOptions">
-                <option value="5" />
-                <option value="35" />
-                <option value="70" />
-                <option value="500" />
-                <option value="550" />
-                <option value="1350" />
-                <option value="1500" />
-                <option value="3500" />
-                <option value="4500" />
-              </datalist>
+              <div style={{
+                border: '1px solid #ddd6fe',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                margin: '1rem 0',
+                background: '#fff'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.75rem 1rem',
+                  background: '#5b1c85',
+                  color: '#fff',
+                  flexWrap: 'wrap'
+                }}>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Default Standard Charge Rates (₹)</h4>
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{
+                      padding: '0.3rem 0.7rem',
+                      fontSize: '0.75rem',
+                      background: '#fff',
+                      color: '#5b1c85',
+                      border: '1px solid #c4b5fd',
+                      fontWeight: 600
+                    }}
+                    onClick={() => setProductData(prev => ({
+                      ...prev,
+                      customCharges: [...(prev.customCharges || []), { name: '', hsn: '', rate: '', note: '' }]
+                    }))}
+                  >
+                    + Add Custom Charge
+                  </button>
+                </div>
+                <p style={{ margin: 0, padding: '0.55rem 1rem', fontSize: '0.75rem', color: '#6d28d9', background: '#f5f3ff' }}>
+                  Set default rates for this product. Remove a box to hide it; restore from Hidden charges below.
+                </p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.8rem', marginBottom: '1rem' }}>
-                {STANDARD_CHARGE_DEFS.filter(def => !(productData.disabledCharges || []).includes(def.key)).map(def => (
-                  <div key={def.key} style={{ gridColumn: def.span > 1 ? `span ${def.span}` : undefined }}>
-                    <label style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                      <span style={{ textTransform: 'uppercase', letterSpacing: '0.03em' }}>{def.label}</span>
-                      <button
-                        type="button"
-                        title="Remove this charge"
-                        onClick={() => {
-                          setProductData(prev => ({
-                            ...prev,
-                            disabledCharges: [...(prev.disabledCharges || []), def.key],
-                            charges: { ...prev.charges, [def.key]: 0 }
-                          }));
-                        }}
+                <datalist id="amountOptions">
+                  <option value="5" />
+                  <option value="35" />
+                  <option value="70" />
+                  <option value="500" />
+                  <option value="550" />
+                  <option value="1350" />
+                  <option value="1500" />
+                  <option value="3500" />
+                  <option value="4500" />
+                </datalist>
+
+                <div style={{ padding: '0.75rem 1rem 1rem' }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
+                    gap: '0.65rem',
+                    marginBottom: '0.75rem'
+                  }}>
+                    {STANDARD_CHARGE_DEFS.filter(def => !(productData.disabledCharges || []).includes(def.key)).map(def => (
+                      <div
+                        key={def.key}
                         style={{
-                          background: 'none', border: 'none', cursor: 'pointer',
-                          color: 'rgba(239,68,68,0.5)', padding: '0 0 0 4px',
-                          lineHeight: 1, fontSize: '1rem', display: 'flex', alignItems: 'center'
+                          border: '1px solid #c4b5fd',
+                          borderRadius: '10px',
+                          background: '#f5f3ff',
+                          padding: '0.65rem 0.75rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.35rem',
+                          position: 'relative',
+                          minWidth: 0
                         }}
                       >
-                        ✕
-                      </button>
-                    </label>
-                    <input
-                      type="number" list="amountOptions"
-                      className="input-field"
-                      value={displayChargeRate(productData.charges[def.key])}
-                      onChange={e => setProductData(prev => ({ ...prev, charges: { ...prev.charges, [def.key]: parseChargeRateInput(e.target.value) } }))}
-                    />
-                  </div>
-                ))}
-
-                {/* Removed / hidden charges restore strip */}
-                {(productData.disabledCharges || []).length > 0 && (
-                  <div style={{ gridColumn: 'span 3', marginTop: '0.25rem' }}>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Hidden charges (click to restore):</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                      {(productData.disabledCharges || []).map(key => {
-                        const def = STANDARD_CHARGE_DEFS.find(d => d.key === key);
-                        return (
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.4rem' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#5b1c85', lineHeight: 1.25 }}>
+                            {def.label}
+                          </span>
                           <button
-                            key={key}
                             type="button"
-                            onClick={() => setProductData(prev => ({ ...prev, disabledCharges: (prev.disabledCharges || []).filter(k => k !== key) }))}
+                            title="Remove this charge"
+                            onClick={() => {
+                              setProductData(prev => ({
+                                ...prev,
+                                disabledCharges: [...(prev.disabledCharges || []), def.key],
+                                charges: { ...prev.charges, [def.key]: 0 }
+                              }));
+                            }}
                             style={{
-                              fontSize: '0.7rem', padding: '0.2rem 0.5rem',
-                              background: 'rgba(255,255,255,0.05)', border: '1px dashed var(--border-color)',
-                              borderRadius: '4px', color: 'var(--text-muted)', cursor: 'pointer',
-                              display: 'flex', alignItems: 'center', gap: '0.25rem'
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'rgba(100, 116, 139, 0.7)',
+                              padding: 0,
+                              lineHeight: 1,
+                              display: 'flex',
+                              flexShrink: 0
                             }}
                           >
-                            <span style={{ color: 'var(--accent-primary)', fontSize: '0.8rem' }}>+</span>
-                            {def?.label || key}
+                            <X size={14} />
                           </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                <div style={{ gridColumn: 'span 3', marginTop: '0.5rem', marginBottom: '0.5rem' }}>
-                  {(productData.customCharges || []).length > 0 && (
-                    (productData.customCharges || []).map((charge, idx) => (
-                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                        <input type="text" className="input-field" placeholder="Charge Name (e.g. Micronization)" value={charge.name} onChange={e => {
-                          const newCharges = [...productData.customCharges];
-                          newCharges[idx].name = e.target.value;
-                          setProductData({...productData, customCharges: newCharges});
-                        }} />
-                        <input type="text" className="input-field" placeholder="HSN Code" value={charge.hsn} onChange={e => {
-                          const newCharges = [...productData.customCharges];
-                          newCharges[idx].hsn = e.target.value;
-                          setProductData({...productData, customCharges: newCharges});
-                        }} />
-                        <input type="number" className="input-field" placeholder="Rate (₹)" value={displayChargeRate(charge.rate)} onChange={e => {
-                          const newCharges = [...productData.customCharges];
-                          newCharges[idx].rate = parseChargeRateInput(e.target.value);
-                          setProductData({...productData, customCharges: newCharges});
-                        }} />
-                        <button type="button" className="btn" style={{ padding: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none' }} onClick={() => {
-                          const newCharges = productData.customCharges.filter((_, i) => i !== idx);
-                          setProductData({...productData, customCharges: newCharges});
-                        }}><Trash2 size={14} /></button>
+                        </div>
+                        <input
+                          type="number"
+                          list="amountOptions"
+                          className="input-field"
+                          placeholder="0"
+                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.85rem', background: '#fff' }}
+                          value={displayChargeRate(productData.charges?.[def.key])}
+                          onChange={e => setProductData(prev => ({
+                            ...prev,
+                            charges: { ...prev.charges, [def.key]: parseChargeRateInput(e.target.value) }
+                          }))}
+                        />
+                        {def.hint && (
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{def.hint}</span>
+                        )}
+                        <div>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.15rem' }}>
+                            Print note
+                          </span>
+                          <input
+                            type="text"
+                            className="input-field"
+                            placeholder="Note e.g. Nil if Qty is more than 500kg"
+                            style={{ padding: '0.3rem 0.45rem', fontSize: '0.75rem', background: '#fff' }}
+                            value={productData.chargeNotes?.[def.key] || ''}
+                            onChange={e => setProductData(prev => ({
+                              ...prev,
+                              chargeNotes: { ...(prev.chargeNotes || {}), [def.key]: e.target.value }
+                            }))}
+                          />
+                        </div>
                       </div>
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </div>
 
-                <div style={{ gridColumn: 'span 3' }}>
-                  <label>Additional Notes / Remarks</label>
-                  <textarea 
-                    className="input-field" 
-                    rows="2"
-                    placeholder="Any custom terms or notes for this product"
-                    value={productData.notes}
-                    onChange={e => setProductData({...productData, notes: e.target.value})}
-                  />
+                  {(productData.disabledCharges || []).length > 0 && (
+                    <div style={{ marginBottom: '0.85rem' }}>
+                      <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
+                        Hidden charges (click to restore):
+                      </p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        {(productData.disabledCharges || []).map(key => {
+                          const def = STANDARD_CHARGE_DEFS.find(d => d.key === key);
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => setProductData(prev => ({
+                                ...prev,
+                                disabledCharges: (prev.disabledCharges || []).filter(k => k !== key)
+                              }))}
+                              style={{
+                                fontSize: '0.72rem',
+                                padding: '0.25rem 0.55rem',
+                                background: '#f5f3ff',
+                                border: '1px dashed #c4b5fd',
+                                borderRadius: '999px',
+                                color: '#5b1c85',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                fontWeight: 600
+                              }}
+                            >
+                              <Plus size={12} />
+                              {def?.label || key}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {(productData.customCharges || []).length > 0 && (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
+                      gap: '0.65rem',
+                      marginBottom: '0.85rem'
+                    }}>
+                      {(productData.customCharges || []).map((charge, idx) => (
+                        <div
+                          key={`custom-${idx}`}
+                          style={{
+                            border: '1px solid #c4b5fd',
+                            borderRadius: '10px',
+                            background: '#f5f3ff',
+                            padding: '0.65rem 0.75rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.35rem'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.4rem' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#5b1c85' }}>Custom Charge</span>
+                            <button
+                              type="button"
+                              title="Remove"
+                              onClick={() => {
+                                const newCharges = productData.customCharges.filter((_, i) => i !== idx);
+                                setProductData({ ...productData, customCharges: newCharges });
+                              }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 0 }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            className="input-field"
+                            placeholder="Charge name"
+                            style={{ padding: '0.3rem 0.45rem', fontSize: '0.8rem', background: '#fff' }}
+                            value={charge.name}
+                            onChange={e => {
+                              const newCharges = [...productData.customCharges];
+                              newCharges[idx] = { ...newCharges[idx], name: e.target.value };
+                              setProductData({ ...productData, customCharges: newCharges });
+                            }}
+                          />
+                          <input
+                            type="text"
+                            className="input-field"
+                            placeholder="HSN Code"
+                            style={{ padding: '0.3rem 0.45rem', fontSize: '0.8rem', background: '#fff' }}
+                            value={charge.hsn}
+                            onChange={e => {
+                              const newCharges = [...productData.customCharges];
+                              newCharges[idx] = { ...newCharges[idx], hsn: e.target.value };
+                              setProductData({ ...productData, customCharges: newCharges });
+                            }}
+                          />
+                          <input
+                            type="number"
+                            className="input-field"
+                            placeholder="Rate (₹)"
+                            style={{ padding: '0.3rem 0.45rem', fontSize: '0.8rem', background: '#fff' }}
+                            value={displayChargeRate(charge.rate)}
+                            onChange={e => {
+                              const newCharges = [...productData.customCharges];
+                              newCharges[idx] = { ...newCharges[idx], rate: parseChargeRateInput(e.target.value) };
+                              setProductData({ ...productData, customCharges: newCharges });
+                            }}
+                          />
+                          <input
+                            type="text"
+                            className="input-field"
+                            placeholder="Note e.g. Nil if Qty is more than 500kg"
+                            style={{ padding: '0.3rem 0.45rem', fontSize: '0.75rem', background: '#fff' }}
+                            value={charge.note || ''}
+                            onChange={e => {
+                              const newCharges = [...productData.customCharges];
+                              newCharges[idx] = { ...newCharges[idx], note: e.target.value };
+                              setProductData({ ...productData, customCharges: newCharges });
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div>
+                    <label>Additional Notes / Remarks</label>
+                    <textarea
+                      className="input-field"
+                      rows="2"
+                      placeholder="Any custom terms or notes for this product"
+                      value={productData.notes}
+                      onChange={e => setProductData({ ...productData, notes: e.target.value })}
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -252,6 +252,7 @@ const EWay = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                <th style={{ padding: '1rem' }}>Sr. No</th>
                 <th style={{ padding: '1rem' }}>Type</th>
                 <th style={{ padding: '1rem' }}>Doc No</th>
                 <th style={{ padding: '1rem' }}>Customer</th>
@@ -264,13 +265,14 @@ const EWay = () => {
             <tbody>
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                     No E-Way records match this filter.
                   </td>
                 </tr>
               ) : (
-                filteredRows.map((row) => (
+                filteredRows.map((row, idx) => (
                   <tr key={row.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '1rem' }}>{idx + 1}</td>
                     <td style={{ padding: '1rem' }}>
                       <span
                         style={{

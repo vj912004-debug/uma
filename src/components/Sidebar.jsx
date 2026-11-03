@@ -43,7 +43,8 @@ import {
   Fingerprint,
   RefreshCw,
   CheckCircle2,
-  BarChart3
+  BarChart3,
+  ClipboardCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePortal } from '../context/PortalContext';
@@ -85,6 +86,7 @@ const Sidebar = () => {
       icon: Truck,
       items: [
         { name: 'Packing List', icon: Package, path: '/packing-list', roles: ['Admin', 'Staff'] },
+        { name: 'Stock Register', icon: Archive, path: '/stock-register', roles: ['Admin', 'Staff'] },
         { name: 'Delivery Challan', icon: Truck, path: '/dc', roles: ['Admin', 'Staff'] },
         { name: 'E-Way Bill', icon: FileSpreadsheet, path: '/eway', roles: ['Admin', 'Staff'], permissionIds: ['/eway', '/eway-dc', '/eway-ti'] },
         { name: 'BPR Record', icon: Activity, path: '/bpr', roles: ['Admin', 'Staff'] },
@@ -171,6 +173,7 @@ const Sidebar = () => {
       icon: Grid,
       items: [
         { name: 'Processing Sheet', icon: Grid, path: '/processing-sheet', roles: ['Admin', 'Staff'] },
+        { name: 'TD Module', icon: ClipboardCheck, path: '/td-module', roles: ['Admin', 'Staff'] },
         { name: 'Quotations', icon: PlusSquare, path: '/quotations', roles: ['Admin', 'Staff'] },
         { name: 'Tasks & Alerts', icon: Bell, path: '/tasks', roles: ['Admin', 'Staff'] }
       ]
@@ -245,7 +248,8 @@ const Sidebar = () => {
           <div className="sidebar-brand-logo">M</div>
           <div>
             <h1>UMA MICRON</h1>
-            <p>{isMarketing ? 'Marketing Portal' : 'ERP'}</p>
+            <p className="sidebar-brand-tagline">Micronization of API&apos;s</p>
+            <p className="sidebar-brand-portal">{isMarketing ? 'Marketing Portal' : 'ERP'}</p>
           </div>
         </div>
       </div>

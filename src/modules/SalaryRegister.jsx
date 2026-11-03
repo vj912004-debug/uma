@@ -370,6 +370,7 @@ const SalaryRegister = () => {
                       checked={pageRows.length > 0 && pageRows.every((r) => selectedIds.includes(r.id))}
                     />
                   </th>
+                  <th style={{ padding: '10px 8px' }}>Sr. No</th>
                   <th style={{ padding: '10px 8px' }}>Emp ID</th>
                   <th style={{ padding: '10px 8px' }}>Employee Name</th>
                   <th style={{ padding: '10px 8px' }}>Department</th>
@@ -388,12 +389,12 @@ const SalaryRegister = () => {
               <tbody>
                 {pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={14} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                    <td colSpan={15} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                       No register records found for {formatMonthLabel(selectedMonth)}.
                     </td>
                   </tr>
                 ) : (
-                  pageRows.map((r) => (
+                  pageRows.map((r, idx) => (
                     <tr key={r.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                       <td style={{ padding: '10px 8px' }}>
                         <input
@@ -402,6 +403,7 @@ const SalaryRegister = () => {
                           onChange={() => handleToggleRow(r.id)}
                         />
                       </td>
+                      <td style={{ padding: '10px 8px' }}>{(page - 1) * pageSize + idx + 1}</td>
                       <td style={{ padding: '10px 8px', fontWeight: 700, color: 'var(--text-main)' }}>{r.empId}</td>
                       <td style={{ padding: '10px 8px', fontWeight: 600 }}>{r.name}</td>
                       <td style={{ padding: '10px 8px', color: 'var(--text-muted)' }}>{r.department}</td>

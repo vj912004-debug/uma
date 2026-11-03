@@ -5,6 +5,7 @@ import ExportButton from '../components/ExportButton';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatDateTime } from '../utils/dateUtils';
 
 const SystemLogs = () => {
   const { data } = useAppContext();
@@ -116,7 +117,7 @@ const SystemLogs = () => {
           </button>
           <ExportButton
             data={lastActions.map((log) => ({
-              time: log.timestamp ? new Date(log.timestamp).toLocaleString() : '',
+              time: log.timestamp ? formatDateTime(log.timestamp) : '',
               user: log.user || '',
               action: log.action || '',
               module: log.module || '',
@@ -146,6 +147,7 @@ const SystemLogs = () => {
         <table className="data-table">
           <thead>
             <tr>
+              <th>Sr. No</th>
               <th>Time</th>
               <th>User</th>
               <th>Action</th>
@@ -155,11 +157,12 @@ const SystemLogs = () => {
           </thead>
           <tbody>
             {logs.length === 0 ? (
-              <tr><td colSpan="5" style={{textAlign:'center'}}>No logs available.</td></tr>
+              <tr><td colSpan="6" style={{textAlign:'center'}}>No logs available.</td></tr>
             ) : (
-              lastActions.map(log => (
+              lastActions.map((log, idx) => (
                 <tr key={log.id}>
-                  <td>{new Date(log.timestamp).toLocaleString()}</td>
+                  <td>{idx + 1}</td>
+                  <td>{formatDateTime(log.timestamp)}</td>
                   <td>{log.user}</td>
                   <td>
                     <span style={{ 

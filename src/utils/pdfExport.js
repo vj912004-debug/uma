@@ -24,6 +24,7 @@ import { renderQuotationPdf } from './quotationPdf';
 import { getStoredPrintPrefs } from './printPrefs';
 import { promptPrintPrefs } from './promptPrintPrefs';
 import { fillPrintPartyFields, loadUmaAppData } from './printTheme';
+import { formatTime } from './dateUtils';
 
 const getProfile = (data) => mergeCompanyProfile(data?.companyProfile || getStoredCompanyProfile());
 
@@ -419,7 +420,7 @@ const buildBPR = (doc, data) => {
       ['Total Quantity (kg) :', data.totalInputQty || 0, 'Batch No. :', primaryBatchNo, `Total No. Batch : ${totalNoBatch}`, `Total Drum : ${totalDrums}`],
       [{ content: 'Material Received', colSpan: 2, styles: { halign: 'center' } }, { content: 'Committed', styles: { halign: 'center' } }, { content: 'Processing Start', colSpan: 2, styles: { halign: 'center' } }, { content: 'Processing supervisor', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }],
       ['Date', data.materialReceivedDate ? fmtDate(data.materialReceivedDate) : '', data.committedDate ? fmtDate(data.committedDate) : '', data.processingStartDate ? fmtDate(data.processingStartDate) : '', ''],
-      ['Time', data.materialReceivedTime || '', data.committedTime || '', data.processingStartTime || '', data.processingSupervisor || ''],
+      ['Time', formatTime(data.materialReceivedTime) || '', formatTime(data.committedTime) || '', formatTime(data.processingStartTime) || '', data.processingSupervisor || ''],
       [{ content: 'Particle size require', colSpan: 2, styles: { halign: 'center' } }, { content: 'Sizing report require', colSpan: 2, styles: { halign: 'center' } }, { content: 'Particle size result', colSpan: 2, styles: { halign: 'center' } }],
       [{ content: data.psdRequirement || '', colSpan: 2 }, { content: data.sizingReportRequired || '', colSpan: 2 }, { content: data.particleSizeResult || '', colSpan: 2 }],
       [{ content: 'PSD Note', colSpan: 2, styles: { halign: 'center', fontStyle: 'bold' } }, { content: data.psdNote || '', colSpan: 4 }],
@@ -436,7 +437,7 @@ const buildBPR = (doc, data) => {
       [{ content: 'Dispatch Material Quantity Details', colSpan: 6, styles: { fontStyle: 'bold' } }],
       ['Micronized Material net weight', 'Lumps Net weight', 'Floor Dust Net weight', { content: 'Net Process Loss', colSpan: 2 }, 'Remark'],
       [dispatchedNet !== '0.00' ? dispatchedNet : '', data.lumpsNetWeight || '', data.floorDustNetWeight || '', { content: data.processLoss || '', colSpan: 2 }, data.dispatchRemark || ''],
-      ['Process completion', 'Date', data.processCompletionDate ? fmtDate(data.processCompletionDate) : '', 'Time', data.processCompletionTime || '', ''],
+      ['Process completion', 'Date', data.processCompletionDate ? fmtDate(data.processCompletionDate) : '', 'Time', formatTime(data.processCompletionTime) || '', ''],
       [{ content: 'Is Filter Bag Packed in HDPE bag and lable & stored properly after processing ?', colSpan: 5 }, bprCheck(data.filterBagPacked)],
       [{ content: 'Remark', colSpan: 6, styles: { fontStyle: 'bold' } }],
       [{ content: data.remark || '\n\n\n\n', colSpan: 6, styles: { minCellHeight: 28, valign: 'top' } }],

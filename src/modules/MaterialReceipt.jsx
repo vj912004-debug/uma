@@ -1,4 +1,4 @@
-import { formatDate, newestFirst } from '../utils/dateUtils';
+import { formatDate, formatTime, newestFirst } from '../utils/dateUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateDocNumber } from '../utils/numbering';
@@ -36,11 +36,51 @@ const emptyChargeRates = () =>
 const emptyChargeQtys = () =>
   Object.fromEntries(CHARGE_KEYS.map(k => [k, '']));
 
+const normSlot = (s) => String(s || '').trim().toLowerCase();
+
+/** Distinct settings key when same product name has multiple PSD / charge rows. */
+const productSlotKey = (name, micron = '') => {
+  const n = String(name || '').trim();
+  const m = String(micron || '').trim();
+  if (!n) return '';
+  return m ? `${n}|||${m}` : n;
+};
+
+const parseProductSlotKey = (key) => {
+  const raw = String(key || '');
+  if (raw.includes('|||')) {
+    const [n, ...rest] = raw.split('|||');
+    return { name: String(n || '').trim(), micron: rest.join('|||').trim() };
+  }
+  return { name: raw.trim(), micron: '' };
+};
+
+/** Prefer master row matching both product name and PSD (processing charge differs per PSD). */
+const findPartyProdConfig = (party, name, micron = '') => {
+  const products = party?.products || [];
+  const n = normSlot(name);
+  if (!n) return null;
+  const m = normSlot(micron);
+  if (m) {
+    const hit = products.find((p) => normSlot(p.name) === n && normSlot(p.psdReq) === m);
+    if (hit) return hit;
+  }
+  return products.find((p) => normSlot(p.name) === n) || null;
+};
+
+const batchMatchesSlot = (batch, name, micron = '') => {
+  if (!batch || batch.isEmptyDrums) return false;
+  if (normSlot(batch.productName) !== normSlot(name)) return false;
+  if (!String(micron || '').trim()) return true;
+  return normSlot(batch.psdReq) === normSlot(micron);
+};
+
 const buildProductSettingsFromParty = (prodConfig) => {
   if (!prodConfig) {
     return {
       nickName: '',
       micronSize: '',
+      value: '',
       rates: emptyChargeRates(),
       charges: emptyChargeFlags(),
       qtys: emptyChargeQtys(),
@@ -70,6 +110,7 @@ const buildProductSettingsFromParty = (prodConfig) => {
   return {
     nickName: prodConfig.nickname || '',
     micronSize: prodConfig.psdReq || '',
+    value: '',
     rates,
     charges,
     qtys: emptyChargeQtys(),
@@ -80,6 +121,12 @@ const buildProductSettingsFromParty = (prodConfig) => {
     }))
   };
 };
+
+const sumDeclaredValues = (productSettings = {}) =>
+  Object.values(productSettings).reduce((sum, block) => {
+    const v = parseFloat(block?.value);
+    return sum + (Number.isFinite(v) && v > 0 ? v : 0);
+  }, 0);
 
 const CHARGE_ITEMS = [
   { key: 'cleaning', label: 'Minimum cleaning charges (998842)', isQtyRate: true },
@@ -135,14 +182,34 @@ const applyCommonChargesToProductSettings = (productSettings, charges, rates, qt
   return next;
 };
 
-const getProductSettings = (formData, party, prodName) =>
-  formData.productSettings?.[prodName]
-  || buildProductSettingsFromParty((party?.products || []).find(p => p.name === prodName));
+const getProductSettings = (formData, party, prodName, micron = '') => {
+  const map = formData.productSettings || {};
+  const key = productSlotKey(prodName, micron);
+  if (key && map[key]) return map[key];
+  if (micron) {
+    const match = Object.entries(map).find(([k, v]) => {
+      const parsed = parseProductSlotKey(k);
+      return normSlot(parsed.name || k) === normSlot(prodName)
+        && (normSlot(parsed.micron) === normSlot(micron) || normSlot(v?.micronSize) === normSlot(micron));
+    });
+    if (match) return match[1];
+  }
+  const plain = map[prodName];
+  if (plain) {
+    const plainMicron = String(plain.micronSize || '').trim();
+    if (!micron || !plainMicron || normSlot(plainMicron) === normSlot(micron)) return plain;
+  }
+  return buildProductSettingsFromParty(findPartyProdConfig(party, prodName, micron));
+};
 
-const makeDefaultBatch = (prodName, party, productSettings = {}) => {
-  const prodConfig = (party?.products || []).find(p => p.name === prodName);
-  const settings = productSettings[prodName] || buildProductSettingsFromParty(prodConfig);
-  const micronSize = settings.micronSize || prodConfig?.psdReq || '90% < 10M';
+const makeDefaultBatch = (prodName, party, productSettings = {}, micronOverride = '') => {
+  const micronHint = String(micronOverride || '').trim();
+  const key = productSlotKey(prodName, micronHint);
+  const prodConfig = findPartyProdConfig(party, prodName, micronHint);
+  const settings = (key && productSettings[key])
+    || productSettings[prodName]
+    || buildProductSettingsFromParty(prodConfig);
+  const micronSize = micronHint || settings.micronSize || prodConfig?.psdReq || '90% < 10M';
   return {
     batchNo: '',
     drums: '',
@@ -168,21 +235,29 @@ const prepareReceiptEditData = (mr, parties) => {
     if (!pName && summaryNames.length === 1) {
       pName = summaryNames[0];
     }
-    const prodConfig = (party?.products || []).find(p => p.name === pName);
-    const settings = mr.productSettings?.[pName] || buildProductSettingsFromParty(prodConfig);
+    const micron = String(b.psdReq || '').trim();
+    const slotKey = productSlotKey(pName, micron);
+    const prodConfig = findPartyProdConfig(party, pName, micron);
+    const settings = mr.productSettings?.[slotKey]
+      || mr.productSettings?.[pName]
+      || buildProductSettingsFromParty(prodConfig);
     return {
       ...b,
       productName: pName,
-      nickName: b.nickName || settings.nickName || prodConfig?.nickname || ''
+      nickName: b.nickName || settings.nickName || prodConfig?.nickname || '',
+      psdReq: b.psdReq || settings.micronSize || prodConfig?.psdReq || ''
     };
   });
 
   let productSettings = { ...(mr.productSettings || {}) };
   const productNames = getReceiptProductNames({ ...mr, batches }, { party });
   productNames.forEach(pName => {
-    if (!productSettings[pName]) {
-      const prodConfig = (party?.products || []).find(p => p.name === pName);
-      productSettings[pName] = buildProductSettingsFromParty(prodConfig);
+    const sample = batches.find((b) => !b.isEmptyDrums && normSlot(b.productName) === normSlot(pName));
+    const micron = String(sample?.psdReq || '').trim();
+    const slotKey = productSlotKey(pName, micron);
+    if (!productSettings[slotKey] && !productSettings[pName]) {
+      const prodConfig = findPartyProdConfig(party, pName, micron);
+      productSettings[slotKey || pName] = buildProductSettingsFromParty(prodConfig);
     }
   });
 
@@ -190,11 +265,26 @@ const prepareReceiptEditData = (mr, parties) => {
   if (firstProduct && !productSettings[firstProduct] && mr.rates) {
     productSettings[firstProduct] = {
       nickName: mr.nickName || '',
+      value: '',
       rates: { ...mr.rates },
       charges: { ...mr.charges },
       qtys: { ...(mr.qtys || emptyChargeQtys()) },
       customCharges: JSON.parse(JSON.stringify(mr.customCharges || []))
     };
+  }
+
+  // Migrate legacy single MR value onto product settings when none are set
+  const legacyValue = parseFloat(mr.value);
+  const anyProductValue = productNames.some((n) => parseFloat(productSettings[n]?.value) > 0);
+  if (!anyProductValue && Number.isFinite(legacyValue) && legacyValue > 0 && productNames.length) {
+    if (productNames.length === 1) {
+      productSettings[productNames[0]] = {
+        ...(productSettings[productNames[0]] || {}),
+        value: legacyValue
+      };
+    } else {
+      // Keep top-level mr.value as fallback via getMRMaterialValue until user splits per product
+    }
   }
 
   return {
@@ -307,14 +397,15 @@ const MaterialReceipt = () => {
     });
   };
 
-  const patchProductSettings = (prodName, updater) => {
+  const patchProductSettings = (prodName, updater, micron = '') => {
     setFormData(prev => {
       const party = data.parties.find(p => p.id === prev.partyId);
-      const current = getProductSettings(prev, party, prodName);
+      const current = getProductSettings(prev, party, prodName, micron);
       const next = typeof updater === 'function' ? updater(current) : { ...current, ...updater };
+      const key = productSlotKey(prodName, micron || next.micronSize || '');
       return {
         ...prev,
-        productSettings: { ...prev.productSettings, [prodName]: next }
+        productSettings: { ...prev.productSettings, [key || prodName]: next }
       };
     });
   };
@@ -349,28 +440,24 @@ const MaterialReceipt = () => {
     setFormData(prev => {
       const party = data.parties.find(p => p.id === prev.partyId);
       const productSettings = { ...(prev.productSettings || {}) };
-      if (!productSettings[prodName]) {
-        const prodConfig = (party?.products || []).find(p => p.name === prodName);
-        productSettings[prodName] = buildProductSettingsFromParty(prodConfig);
-      }
-      const micronSize = String(micronOverride || productSettings[prodName]?.micronSize || '').trim();
-      if (micronSize) {
-        productSettings[prodName] = {
-          ...productSettings[prodName],
-          micronSize
-        };
-      }
-      const defaultBatch = makeDefaultBatch(prodName, party, productSettings);
+      const micronSize = String(micronOverride || '').trim();
+      const slotKey = productSlotKey(prodName, micronSize);
+      const prodConfig = findPartyProdConfig(party, prodName, micronSize);
+      const seeded = {
+        ...buildProductSettingsFromParty(prodConfig),
+        micronSize: micronSize || prodConfig?.psdReq || ''
+      };
+      productSettings[slotKey || prodName] = seeded;
+      const defaultBatch = makeDefaultBatch(prodName, party, productSettings, micronSize);
       const hasCommon = COMMON_CHARGE_KEYS.some(k => prev.charges?.[k] || (parseFloat(prev.rates?.[k]) || 0) > 0);
       let charges = { ...emptyChargeFlags(), ...(prev.charges || {}) };
       let rates = { ...emptyChargeRates(), ...(prev.rates || {}) };
       let qtys = { ...emptyChargeQtys(), ...(prev.qtys || {}) };
       if (!hasCommon) {
-        const seed = productSettings[prodName] || {};
         COMMON_CHARGE_KEYS.forEach((k) => {
-          charges[k] = !!seed.charges?.[k];
-          rates[k] = parseFloat(seed.rates?.[k]) || 0;
-          qtys[k] = parseFloat(seed.qtys?.[k]) || 0;
+          charges[k] = !!seeded.charges?.[k];
+          rates[k] = parseFloat(seeded.rates?.[k]) || 0;
+          qtys[k] = parseFloat(seeded.qtys?.[k]) || 0;
         });
       }
       return {
@@ -384,19 +471,41 @@ const MaterialReceipt = () => {
     });
   };
 
-  const handleProductMicronSizeChange = (prodName, micronSize) => {
+  const handleProductMicronSizeChange = (prodName, micronSize, prevMicron = '') => {
     const value = String(micronSize || '').trim();
     setFormData(prev => {
       const party = data.parties.find(p => p.id === prev.partyId);
-      const current = getProductSettings(prev, party, prodName);
+      const current = getProductSettings(prev, party, prodName, prevMicron);
+      const master = findPartyProdConfig(party, prodName, value);
+      const fromMaster = buildProductSettingsFromParty(master);
+      const nextBlock = {
+        ...fromMaster,
+        nickName: current.nickName || fromMaster.nickName,
+        value: current.value,
+        customCharges: current.customCharges?.length ? current.customCharges : fromMaster.customCharges,
+        micronSize: value
+      };
+      const oldKey = productSlotKey(prodName, prevMicron || current.micronSize || '');
+      const newKey = productSlotKey(prodName, value);
+      const productSettings = { ...(prev.productSettings || {}) };
+      if (oldKey && oldKey !== newKey && productSettings[oldKey]) delete productSettings[oldKey];
+      if (!prevMicron && productSettings[prodName] && oldKey !== prodName) {
+        const plainMic = String(productSettings[prodName]?.micronSize || '').trim();
+        if (!plainMic || normSlot(plainMic) === normSlot(prevMicron || current.micronSize)) {
+          delete productSettings[prodName];
+        }
+      }
+      productSettings[newKey || prodName] = nextBlock;
       return {
         ...prev,
-        productSettings: {
-          ...prev.productSettings,
-          [prodName]: { ...current, micronSize: value }
-        },
+        productSettings: applyCommonChargesToProductSettings(
+          productSettings,
+          prev.charges,
+          prev.rates,
+          prev.qtys
+        ),
         batches: prev.batches.map((b) => (
-          !b.isEmptyDrums && (b.productName || '') === prodName
+          batchMatchesSlot(b, prodName, prevMicron || current.micronSize)
             ? { ...b, psdReq: value }
             : b
         ))
@@ -436,11 +545,11 @@ const MaterialReceipt = () => {
     }));
   };
 
-  const handleProductQtyChange = (prodName, raw) => {
+  const handleProductQtyChange = (prodName, raw, micron = '') => {
     setFormData((prev) => {
       const idxs = prev.batches
         .map((b, i) => ({ b, i }))
-        .filter(({ b }) => !b.isEmptyDrums && (b.productName || '') === prodName)
+        .filter(({ b }) => batchMatchesSlot(b, prodName, micron))
         .map(({ i }) => i);
       if (!idxs.length) return prev;
       const next = [...prev.batches];
@@ -470,23 +579,32 @@ const MaterialReceipt = () => {
 
   const handleEdit = (mr) => {
     const prepared = prepareReceiptEditData(mr, data.parties);
-    // Keep settings only for products that have received batches on this receipt
-    const receivedNames = new Set(
-      (prepared.baseForm.batches || [])
-        .filter(b => !b.isEmptyDrums && b.productName)
-        .map(b => b.productName.trim().toLowerCase())
-    );
+    // Keep settings for product+PSD slots that have batches on this receipt
+    const receivedSlots = [];
+    (prepared.baseForm.batches || []).forEach((b) => {
+      if (b.isEmptyDrums || !b.productName) return;
+      const name = b.productName.trim();
+      const micron = String(b.psdReq || '').trim();
+      const key = productSlotKey(name, micron);
+      if (receivedSlots.some((s) => s.key === key)) return;
+      receivedSlots.push({ name, micron, key });
+    });
+    const receivedNames = new Set(receivedSlots.map((s) => s.name.toLowerCase()));
     const productSettings = {};
     Object.entries(prepared.baseForm.productSettings || {}).forEach(([name, settings]) => {
-      if (receivedNames.has(name.trim().toLowerCase())) {
+      const parsed = parseProductSlotKey(name);
+      const base = parsed.name || name;
+      if (
+        receivedNames.has(base.trim().toLowerCase())
+        || receivedSlots.some((s) => s.key === name || normSlot(s.name) === normSlot(name))
+      ) {
         productSettings[name] = settings;
       }
     });
-    (prepared.party?.products || []).forEach(prod => {
-      if (!receivedNames.has(prod.name.trim().toLowerCase())) return;
-      if (!productSettings[prod.name]) {
-        productSettings[prod.name] = buildProductSettingsFromParty(prod);
-      }
+    receivedSlots.forEach(({ name, micron, key }) => {
+      if (productSettings[key] || (!micron && productSettings[name])) return;
+      const prod = findPartyProdConfig(prepared.party, name, micron);
+      if (prod) productSettings[key || name] = buildProductSettingsFromParty(prod);
     });
     const firstSettings = Object.values(productSettings)[0];
     const seededCharges = { ...emptyChargeFlags(), ...(prepared.baseForm.charges || {}) };
@@ -572,7 +690,7 @@ const MaterialReceipt = () => {
       .filter(b => !b.isEmptyDrums)
       .map((batch, idx) => {
         const batchProduct = batch.productName || receipt.productName?.split(',')[0]?.trim() || '';
-        const prodConfig = (party?.products || []).find(p => p.name === batchProduct);
+        const prodConfig = findPartyProdConfig(party, batchProduct, batch.psdReq);
         return {
           id: `${receipt.id}_batch_${idx}`,
           receiptId: receipt.id,
@@ -582,6 +700,7 @@ const MaterialReceipt = () => {
           productNickName: batch.nickName || prodConfig?.nickname || receipt.nickName || '',
           psdReq: batch.psdReq || prodConfig?.psdReq || '',
           psdNote: prodConfig?.psdNote || '',
+          specialNote: prodConfig?.specialNote || '',
           batchNo: batch.batchNo || '',
           qty: batch.qty ?? '',
           priorityLevel: '',
@@ -629,15 +748,23 @@ const MaterialReceipt = () => {
       );
 
       const syncedProductSettings = {};
-      (selectedPartyObj?.products || []).forEach(prod => {
-        const hasBatch = formData.batches.some(
-          b => !b.isEmptyDrums
-            && (b.productName || '').trim().toLowerCase() === prod.name.trim().toLowerCase()
-        );
-        if (!hasBatch) return;
-        const live = getProductSettings(formData, selectedPartyObj, prod.name);
-        syncedProductSettings[prod.name] = {
+      const saveSlots = [];
+      (formData.batches || []).forEach((b) => {
+        if (b.isEmptyDrums) return;
+        const name = String(b.productName || '').trim();
+        if (!name) return;
+        const micron = String(b.psdReq || '').trim();
+        if (saveSlots.some((s) => normSlot(s.name) === normSlot(name) && normSlot(s.micron) === normSlot(micron))) return;
+        saveSlots.push({ name, micron, key: productSlotKey(name, micron) });
+      });
+      saveSlots.forEach(({ name, micron, key }) => {
+        const live = getProductSettings(formData, selectedPartyObj, name, micron);
+        const declared = live.value === '' || live.value == null ? '' : (parseFloat(live.value) || '');
+        const settingsKey = key || name;
+        syncedProductSettings[settingsKey] = {
           nickName: live.nickName || '',
+          micronSize: micron || live.micronSize || '',
+          value: declared,
           charges: {
             ...emptyChargeFlags(),
             ...(formData.charges || {}),
@@ -658,15 +785,21 @@ const MaterialReceipt = () => {
         };
       });
 
+      const declaredTotal = sumDeclaredValues(syncedProductSettings);
       const receiptPayload = isEditing
-        ? { ...formData, ...productSummary, productSettings: syncedProductSettings, id: isEditing }
-        : { ...formData, ...productSummary, productSettings: syncedProductSettings, id: Date.now().toString(), status: 'Pending', createdAt: new Date().toISOString() };
+        ? { ...formData, ...productSummary, productSettings: syncedProductSettings, value: declaredTotal || formData.value || '', id: isEditing }
+        : { ...formData, ...productSummary, productSettings: syncedProductSettings, value: declaredTotal || formData.value || '', id: Date.now().toString(), status: 'Pending', createdAt: new Date().toISOString() };
 
       const chargeFlatten = flattenMRChargeSnapshot(receiptPayload, selectedPartyObj);
       if (chargeFlatten) {
         receiptPayload.charges = chargeFlatten.charges;
         receiptPayload.rates = chargeFlatten.rates;
-        receiptPayload.qtys = chargeFlatten.qtys;
+        // Keep user-entered common qtys (cleaning etc.) — do not sum per product (2 → 4)
+        receiptPayload.qtys = {
+          ...emptyChargeQtys(),
+          ...(chargeFlatten.qtys || {}),
+          ...(formData.qtys || {})
+        };
         receiptPayload.customCharges = chargeFlatten.customCharges;
       }
       receiptPayload.chargeNotes = { ...emptyChargeNotes(), ...(formData.chargeNotes || {}) };
@@ -716,30 +849,83 @@ const MaterialReceipt = () => {
   const selectedPartyObj = data.parties.find(p => p.id === formData.partyId);
   const partyProducts = selectedPartyObj?.products || [];
   const micronsForProduct = (productName) => {
-    const prod = (partyProducts || []).find(
-      (p) => String(p.name || '').trim().toLowerCase() === String(productName || '').trim().toLowerCase()
-    );
-    const saved = String(prod?.psdReq || '').trim();
-    return saved ? [saved] : [];
+    const target = String(productName || '').trim().toLowerCase();
+    if (!target) return [];
+    const seen = new Set();
+    const list = [];
+    (partyProducts || []).forEach((p) => {
+      if (String(p.name || '').trim().toLowerCase() !== target) return;
+      const saved = String(p.psdReq || '').trim();
+      if (!saved) return;
+      const key = saved.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      list.push(saved);
+    });
+    return list;
   };
-  // Products on this receipt, including a name typed in Add Product that is not on the party master
+
+  // Products on this receipt — same name + different PSD count as separate slots
   const receivedProducts = (() => {
-    const names = [];
+    const slots = [];
     (formData.batches || []).forEach((b) => {
       if (b.isEmptyDrums) return;
       const name = String(b.productName || '').trim();
       if (!name) return;
-      if (names.some((n) => n.toLowerCase() === name.toLowerCase())) return;
-      names.push(name);
+      const micron = String(
+        b.psdReq
+        || getProductSettings(formData, selectedPartyObj, name).micronSize
+        || ''
+      ).trim();
+      if (slots.some((s) => normSlot(s.name) === normSlot(name) && normSlot(s.micron) === normSlot(micron))) {
+        return;
+      }
+      const partyProd = findPartyProdConfig(selectedPartyObj, name, micron);
+      slots.push({
+        name,
+        micron,
+        key: productSlotKey(name, micron),
+        ...(partyProd || { name, psdReq: micron, charges: {} }),
+        psdReq: micron || partyProd?.psdReq || ''
+      });
     });
-    return names.map((name) => {
-      const partyProd = partyProducts.find((p) => p.name.trim().toLowerCase() === name.toLowerCase());
-      return partyProd || { name, psdReq: '', charges: {} };
-    });
+    return slots;
   })();
-  const productsAvailableToAdd = partyProducts.filter(prod =>
-    !receivedProducts.some(r => r.name.trim().toLowerCase() === prod.name.trim().toLowerCase())
-  );
+
+  // One dropdown row per master product; same-name rows stay distinct via micron label.
+  // Do not merge remembered custom products from other parties into this list.
+  const productsAvailableToAdd = (() => {
+    const nameCounts = {};
+    (partyProducts || []).forEach((prod) => {
+      const key = String(prod?.name || '').trim().toLowerCase();
+      if (!key) return;
+      nameCounts[key] = (nameCounts[key] || 0) + 1;
+    });
+    return (partyProducts || [])
+      .filter((prod) => {
+        const name = String(prod?.name || '').trim();
+        if (!name) return false;
+        const micron = String(prod.psdReq || '').trim();
+        return !receivedProducts.some((r) =>
+          normSlot(r.name) === normSlot(name)
+          && normSlot(r.micron || r.psdReq) === normSlot(micron)
+        );
+      })
+      .map((prod, idx) => {
+        const name = String(prod.name || '').trim();
+        const micron = String(prod.psdReq || '').trim();
+        const dup = (nameCounts[name.toLowerCase()] || 0) > 1;
+        const label = dup && micron ? `${name} (${micron})` : name;
+        // Unique value so duplicate master names both appear in the select
+        const optionValue = dup && micron ? `${name}|||${micron}` : name;
+        return {
+          ...prod,
+          _optionLabel: label,
+          _optionValue: optionValue,
+          _optionKey: `${name}::${micron}::${idx}`
+        };
+      });
+  })();
 
   const chooseProductToAdd = (rawName) => {
     const typed = String(rawName || '').trim();
@@ -748,18 +934,42 @@ const MaterialReceipt = () => {
       setPendingMicronSize('');
       return;
     }
-    const partyProd = partyProducts.find((p) => p.name.trim().toLowerCase() === typed.toLowerCase());
-    const name = partyProd?.name || typed;
-    if (receivedProducts.some((p) => p.name.trim().toLowerCase() === name.toLowerCase())) return;
+    const fromEncoded = typed.includes('|||')
+      ? (() => {
+          const [n, m] = typed.split('|||');
+          return { name: String(n || '').trim(), micron: String(m || '').trim() };
+        })()
+      : null;
+    const labeled = productsAvailableToAdd.find((p) =>
+      String(p._optionValue || '').trim().toLowerCase() === typed.toLowerCase()
+      || String(p._optionLabel || '').trim().toLowerCase() === typed.toLowerCase()
+      || String(p.name || '').trim().toLowerCase() === typed.toLowerCase()
+    );
+    const name = labeled?.name || fromEncoded?.name || typed.replace(/\s*\([^)]*\)\s*$/, '').trim() || typed;
+    const micron = labeled?.psdReq || fromEncoded?.micron || '';
+    if (receivedProducts.some((p) =>
+      normSlot(p.name) === normSlot(name)
+      && (!micron || normSlot(p.micron || p.psdReq) === normSlot(micron))
+    )) return;
+    // Master option already carries PSD — add immediately with that row's charges
+    if (micron && (labeled || fromEncoded)) {
+      handleAddBatchForProduct(name, micron);
+      setPendingProductName('');
+      setPendingMicronSize('');
+      return;
+    }
     setPendingProductName(name);
-    setPendingMicronSize(partyProd?.psdReq || '');
+    setPendingMicronSize(micron || micronsForProduct(name)[0] || '');
   };
 
   const confirmProductMicron = (micron) => {
     const name = String(pendingProductName || '').trim();
     const value = String(micron || '').trim();
     if (!name || !value) return;
-    if (receivedProducts.some((p) => p.name.trim().toLowerCase() === name.toLowerCase())) return;
+    if (receivedProducts.some((p) =>
+      normSlot(p.name) === normSlot(name)
+      && normSlot(p.micron || p.psdReq) === normSlot(value)
+    )) return;
     handleAddBatchForProduct(name, value);
     setPendingProductName('');
     setPendingMicronSize('');
@@ -1003,6 +1213,7 @@ const MaterialReceipt = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
+                <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Sr. No</th>
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>M.R. Number</th>
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Received Date</th>
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Party Name</th>
@@ -1016,10 +1227,10 @@ const MaterialReceipt = () => {
             <tbody>
               {filteredReceipts.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No receipts found.</td>
+                  <td colSpan="9" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No receipts found.</td>
                 </tr>
               ) : (
-                filteredReceipts.map(mr => {
+                filteredReceipts.map((mr, idx) => {
                   const prodOpts = receiptProductOptions(mr, data);
                   const productNames = getReceiptProductNames(mr, prodOpts);
                   const productSummaries = getReceiptProductSummaries(mr, prodOpts);
@@ -1027,8 +1238,9 @@ const MaterialReceipt = () => {
                   const isMultiProduct = productSummaries.length > 1;
                   return (
                     <tr key={mr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '1rem' }}>{idx + 1}</td>
                       <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{mr.receiptNo}</td>
-                      <td style={{ padding: '1rem' }}>{formatDate(mr.date)} {mr.time}</td>
+                      <td style={{ padding: '1rem' }}>{formatDate(mr.date)} {mr.time ? formatTime(mr.time) : ''}</td>
                       <td style={{ padding: '1rem', fontWeight: 600 }}>{mr.partyName}</td>
                       <td style={{ padding: '1rem' }}>
                         {productNames.length === 0 ? (
@@ -1193,10 +1405,102 @@ const MaterialReceipt = () => {
                   <input type="text" className="input-field" value={formData.gstinShip} onChange={e => setFormData({...formData, gstinShip: e.target.value})} style={{ background: 'var(--glass-bg)', opacity: 0.8 }} />
                 </div>
 
-                <div>
-                  <label>Material Declared Value (₹)</label>
-                  <input type="number" className="input-field" placeholder="Editable" value={formData.value} onChange={e => setFormData({...formData, value: parseFloat(e.target.value) || ''})} />
-                </div>
+                {receivedProducts.length > 1 ? (
+                  <div style={{ gridColumn: 'span 4' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span>Material Declared Value (₹)</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)' }}>(Separate value for each product)</span>
+                      {sumDeclaredValues(formData.productSettings) > 0 && (
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', marginLeft: 'auto' }}>
+                          Total: ₹ {sumDeclaredValues(formData.productSettings).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+                      {receivedProducts.map((prod, pIdx) => {
+                        const slotMicron = prod.micron || prod.psdReq || '';
+                        const settings = getProductSettings(formData, selectedPartyObj, prod.name, slotMicron);
+                        const settingsKey = prod.key || productSlotKey(prod.name, slotMicron) || prod.name;
+                        return (
+                          <div key={`declared-${settingsKey || pIdx}`} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', background: 'var(--bg-card)' }}>
+                            <label style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--accent-primary)', marginBottom: '0.4rem', display: 'block' }}>
+                              Product {pIdx + 1}: {prod.name}{slotMicron ? ` (${slotMicron})` : ''}
+                            </label>
+                            <input
+                              type="number"
+                              className="input-field"
+                              min="0"
+                              step="0.01"
+                              placeholder="Editable"
+                              value={settings.value === 0 || settings.value === '' || settings.value == null ? '' : settings.value}
+                              onChange={(e) => {
+                                const nextVal = e.target.value === '' ? '' : (parseFloat(e.target.value) || '');
+                                setFormData((prev) => {
+                                  const current = getProductSettings(prev, selectedPartyObj, prod.name, slotMicron);
+                                  const productSettings = {
+                                    ...(prev.productSettings || {}),
+                                    [settingsKey]: { ...current, value: nextVal, micronSize: slotMicron || current.micronSize }
+                                  };
+                                  return {
+                                    ...prev,
+                                    productSettings,
+                                    value: sumDeclaredValues(productSettings) || ''
+                                  };
+                                });
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label>Material Declared Value (₹)</label>
+                    <input
+                      type="number"
+                      className="input-field"
+                      min="0"
+                      step="0.01"
+                      placeholder="Editable"
+                      value={(() => {
+                        const only = receivedProducts[0];
+                        if (only?.name) {
+                          const settings = getProductSettings(
+                            formData,
+                            selectedPartyObj,
+                            only.name,
+                            only.micron || only.psdReq || ''
+                          );
+                          if (settings.value !== '' && settings.value != null) return settings.value;
+                        }
+                        return formData.value === 0 || formData.value === '' || formData.value == null ? '' : formData.value;
+                      })()}
+                      onChange={(e) => {
+                        const nextVal = e.target.value === '' ? '' : (parseFloat(e.target.value) || '');
+                        const only = receivedProducts[0];
+                        if (!only?.name) {
+                          setFormData({ ...formData, value: nextVal });
+                          return;
+                        }
+                        const slotMicron = only.micron || only.psdReq || '';
+                        const settingsKey = only.key || productSlotKey(only.name, slotMicron) || only.name;
+                        setFormData((prev) => {
+                          const current = getProductSettings(prev, selectedPartyObj, only.name, slotMicron);
+                          const productSettings = {
+                            ...(prev.productSettings || {}),
+                            [settingsKey]: { ...current, value: nextVal, micronSize: slotMicron || current.micronSize }
+                          };
+                          return {
+                            ...prev,
+                            productSettings,
+                            value: nextVal
+                          };
+                        });
+                      }}
+                    />
+                  </div>
+                )}
 
                 {receivedProducts.length > 1 ? (
                   <div style={{ gridColumn: 'span 4' }}>
@@ -1341,30 +1645,39 @@ const MaterialReceipt = () => {
                   {receivedProducts.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                       {receivedProducts.map((prod, pIdx) => {
-                        const settings = getProductSettings(formData, selectedPartyObj, prod.name);
+                        const slotMicron = prod.micron || prod.psdReq || '';
+                        const settings = getProductSettings(formData, selectedPartyObj, prod.name, slotMicron);
                         const productBatchEntries = formData.batches
                           .map((batch, idx) => ({ batch, idx }))
-                          .filter(({ batch }) => !batch.isEmptyDrums && batch.productName === prod.name);
+                          .filter(({ batch }) => batchMatchesSlot(batch, prod.name, slotMicron));
                         const productDrums = productBatchEntries.reduce((sum, { batch }) => sum + (parseInt(batch.drums) || 0), 0);
                         const productQty = productBatchEntries.reduce((sum, { batch }) => sum + (parseFloat(batch.qty) || 0), 0);
+                        const patchSlot = (updater) => patchProductSettings(prod.name, updater, slotMicron);
 
                         return (
-                          <div key={prod.name} style={{ border: '1px solid var(--border-color)', borderRadius: '10px', background: 'var(--bg-card)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                          <div key={prod.key || `${prod.name}::${slotMicron}::${pIdx}`} style={{ border: '1px solid var(--border-color)', borderRadius: '10px', background: 'var(--bg-card)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 0.9rem', background: 'rgba(155, 98, 196, 0.08)', borderBottom: '1px solid var(--border-color)' }}>
                               <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--accent-primary)', minWidth: 0 }}>
-                                {pIdx + 1}. Product: {prod.name}
+                                {pIdx + 1}. Product: {prod.name}{slotMicron ? ` (${slotMicron})` : ''}
                               </div>
                               <button
                                 type="button"
                                 style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.95)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, padding: 0, flexShrink: 0 }}
                                 onClick={() => {
-                                  if (!window.confirm(`Remove all batches for "${prod.name}" from this receipt?`)) return;
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    batches: prev.batches.filter(
-                                      b => b.isEmptyDrums || (b.productName || '').trim().toLowerCase() !== prod.name.trim().toLowerCase()
-                                    )
-                                  }));
+                                  const label = slotMicron ? `${prod.name} (${slotMicron})` : prod.name;
+                                  if (!window.confirm(`Remove all batches for "${label}" from this receipt?`)) return;
+                                  const removeKey = productSlotKey(prod.name, slotMicron);
+                                  setFormData(prev => {
+                                    const nextSettings = { ...(prev.productSettings || {}) };
+                                    if (removeKey && nextSettings[removeKey]) delete nextSettings[removeKey];
+                                    return {
+                                      ...prev,
+                                      productSettings: nextSettings,
+                                      batches: prev.batches.filter(
+                                        (b) => b.isEmptyDrums || !batchMatchesSlot(b, prod.name, slotMicron)
+                                      )
+                                    };
+                                  });
                                 }}
                               >
                                 Remove
@@ -1378,7 +1691,7 @@ const MaterialReceipt = () => {
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
                               <div>
                                 <label>Nick Name</label>
-                                <input type="text" className="input-field" value={settings.nickName || ''} onChange={e => patchProductSettings(prod.name, s => ({ ...s, nickName: e.target.value }))} />
+                                <input type="text" className="input-field" value={settings.nickName || ''} onChange={e => patchSlot(s => ({ ...s, nickName: e.target.value }))} />
                               </div>
                               <div>
                                 <label>Micron Size</label>
@@ -1386,7 +1699,7 @@ const MaterialReceipt = () => {
                                   allowCustom
                                   className="input-field"
                                   value={settings.micronSize || prod.psdReq || ''}
-                                  onChange={(e) => handleProductMicronSizeChange(prod.name, e.target.value)}
+                                  onChange={(e) => handleProductMicronSizeChange(prod.name, e.target.value, slotMicron)}
                                   placeholder="Type or select micron size"
                                   remember={false}
                                 >
@@ -1404,7 +1717,7 @@ const MaterialReceipt = () => {
                                   min="0"
                                   step="any"
                                   value={rateInputValue(settings.rates?.processing)}
-                                  onChange={e => patchProductSettings(prod.name, s => {
+                                  onChange={e => patchSlot(s => {
                                     const nextRate = parseChargeFieldValue(e.target.value);
                                     return {
                                       ...s,
@@ -1434,54 +1747,81 @@ const MaterialReceipt = () => {
                                     className="input-field"
                                     placeholder="NIL"
                                     value={qtyInputValue(productQty)}
-                                    onChange={(e) => handleProductQtyChange(prod.name, e.target.value)}
+                                    onChange={(e) => handleProductQtyChange(prod.name, e.target.value, slotMicron)}
                                     style={{ paddingRight: '2.5rem' }}
                                   />
                                   <span style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, pointerEvents: 'none' }}>Kg</span>
                                 </div>
+                              </div>
+                              <div>
+                                <label>Material Declared Value (₹)</label>
+                                <input
+                                  type="number"
+                                  className="input-field"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="Editable"
+                                  value={settings.value === 0 || settings.value === '' || settings.value == null ? '' : settings.value}
+                                  onChange={(e) => {
+                                    const nextVal = e.target.value === '' ? '' : (parseFloat(e.target.value) || '');
+                                    setFormData((prev) => {
+                                      const current = getProductSettings(prev, selectedPartyObj, prod.name, slotMicron);
+                                      const key = productSlotKey(prod.name, slotMicron) || prod.name;
+                                      const productSettings = {
+                                        ...(prev.productSettings || {}),
+                                        [key]: { ...current, value: nextVal, micronSize: slotMicron || current.micronSize }
+                                      };
+                                      return {
+                                        ...prev,
+                                        productSettings,
+                                        value: sumDeclaredValues(productSettings) || ''
+                                      };
+                                    });
+                                  }}
+                                />
                               </div>
                               </div>
 
                     <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                         <label style={{ margin: 0, color: 'var(--accent-primary)', fontSize: '0.85rem', fontWeight: 600 }}>Manual Custom Charges</label>
-                        <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => patchProductSettings(prod.name, s => ({ ...s, customCharges: [...(s.customCharges || []), { id: Date.now() + Math.random(), name: '', hsn: '', rate: '', qty: '', checked: true }] }))}>
+                        <button type="button" className="btn" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => patchSlot(s => ({ ...s, customCharges: [...(s.customCharges || []), { id: Date.now() + Math.random(), name: '', hsn: '', rate: '', qty: '', checked: true }] }))}>
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Row
                         </button>
                       </div>
                       {(settings.customCharges || []).map((charge, cIdx) => (
                         <div key={charge.id || cIdx} style={{ display: 'grid', gridTemplateColumns: 'auto minmax(140px, 1.4fr) minmax(70px, 0.6fr) 110px 110px minmax(120px, 1fr) 28px', gap: '0.4rem', marginBottom: '0.5rem', alignItems: 'center' }}>
-                          <input type="checkbox" checked={charge.checked !== false} onChange={e => patchProductSettings(prod.name, s => {
+                          <input type="checkbox" checked={charge.checked !== false} onChange={e => patchSlot(s => {
                             const newC = [...(s.customCharges || [])];
                             newC[cIdx] = { ...newC[cIdx], checked: e.target.checked };
                             return { ...s, customCharges: newC };
                           })} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-primary)' }} />
-                          <input type="text" className="input-field" placeholder="Description" value={charge.name} onChange={e => patchProductSettings(prod.name, s => {
+                          <input type="text" className="input-field" placeholder="Description" value={charge.name} onChange={e => patchSlot(s => {
                             const newC = [...(s.customCharges || [])];
                             newC[cIdx] = { ...newC[cIdx], name: e.target.value };
                             return { ...s, customCharges: newC };
                           })} />
-                          <input type="text" className="input-field" placeholder="HSN" value={charge.hsn} onChange={e => patchProductSettings(prod.name, s => {
+                          <input type="text" className="input-field" placeholder="HSN" value={charge.hsn} onChange={e => patchSlot(s => {
                             const newC = [...(s.customCharges || [])];
                             newC[cIdx] = { ...newC[cIdx], hsn: e.target.value };
                             return { ...s, customCharges: newC };
                           })} />
-                          <input type="number" className="input-field" placeholder="NIL" value={qtyInputValue(charge.qty)} onChange={e => patchProductSettings(prod.name, s => {
+                          <input type="number" className="input-field" placeholder="NIL" value={qtyInputValue(charge.qty)} onChange={e => patchSlot(s => {
                             const newC = [...(s.customCharges || [])];
                             newC[cIdx] = { ...newC[cIdx], qty: e.target.value };
                             return { ...s, customCharges: newC };
                           })} min="0" step="any" />
-                          <input type="number" className="input-field" placeholder="Rate" value={rateInputValue(charge.rate)} onChange={e => patchProductSettings(prod.name, s => {
+                          <input type="number" className="input-field" placeholder="Rate" value={rateInputValue(charge.rate)} onChange={e => patchSlot(s => {
                             const newC = [...(s.customCharges || [])];
                             newC[cIdx] = { ...newC[cIdx], rate: parseChargeFieldValue(e.target.value) };
                             return { ...s, customCharges: newC };
                           })} min="0" step="any" />
-                          <input type="text" className="input-field" list="mr-charge-note-options" placeholder="Note" value={charge.note || ''} onChange={e => patchProductSettings(prod.name, s => {
+                          <input type="text" className="input-field" list="mr-charge-note-options" placeholder="Note" value={charge.note || ''} onChange={e => patchSlot(s => {
                             const newC = [...(s.customCharges || [])];
                             newC[cIdx] = { ...newC[cIdx], note: e.target.value };
                             return { ...s, customCharges: newC };
                           })} />
-                          <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => patchProductSettings(prod.name, s => ({ ...s, customCharges: (s.customCharges || []).filter((_, i) => i !== cIdx) }))}>
+                          <button type="button" style={{ background: 'transparent', border: 'none', color: 'rgba(239, 68, 68, 0.8)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => patchSlot(s => ({ ...s, customCharges: (s.customCharges || []).filter((_, i) => i !== cIdx) }))}>
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                           </button>
                         </div>
@@ -1493,7 +1833,7 @@ const MaterialReceipt = () => {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <h4 style={{ fontSize: '0.95rem', fontWeight: 600, margin: 0 }}>Batch Details</h4>
-                      <button type="button" className="btn btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => handleAddBatchForProduct(prod.name)}>
+                      <button type="button" className="btn btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => handleAddBatchForProduct(prod.name, slotMicron)}>
                         <Plus size={14} /> Add Batch Row
                       </button>
                     </div>
@@ -1546,16 +1886,18 @@ const MaterialReceipt = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.45rem' }}>
                     <SearchableSelect
                       allowCustom
+                      remember={false}
                       className="input-field"
                       style={{ width: '220px', maxWidth: '100%', padding: '0.35rem 0.6rem', fontSize: '0.82rem' }}
                       value={pendingProductName}
                       onCommit={chooseProductToAdd}
                       placeholder="Type or add product"
-                      memoryKey="mr-add-product"
                     >
                       <option value="">Type or add product</option>
-                      {productsAvailableToAdd.map(prod => (
-                        <option key={prod.name} value={prod.name}>{prod.name}</option>
+                      {productsAvailableToAdd.map((prod) => (
+                        <option key={prod._optionKey} value={prod._optionValue || prod.name}>
+                          {prod._optionLabel || prod.name}
+                        </option>
                       ))}
                     </SearchableSelect>
                     {pendingProductName ? (

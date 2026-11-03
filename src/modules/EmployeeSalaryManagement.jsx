@@ -25,7 +25,7 @@ import ExportButton from '../components/ExportButton';
 import SearchableSelect from '../components/SearchableSelect';
 import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
-import { formatDate, newestFirst } from '../utils/dateUtils';
+import { formatDate, formatDateTime, newestFirst } from '../utils/dateUtils';
 import { DEPARTMENTS } from './EmployeeManagement';
 import { generateEmployeeId, systemCodeFor } from '../utils/auth';
 import {
@@ -580,6 +580,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                 <table className="att-table">
                   <thead>
                     <tr>
+                      <th>Sr. No</th>
                       <th>System Code</th>
                       <th>Employee Code</th>
                       <th>Employee Name</th>
@@ -595,8 +596,8 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                   </thead>
                   <tbody>
                     {filteredMaster.length === 0 ? (
-                      <tr><td colSpan={11} className="pm-empty">No employees yet. Edit Staff under Employees, then set rates here.</td></tr>
-                    ) : filteredMaster.map((u) => {
+                      <tr><td colSpan={12} className="pm-empty">No employees yet. Edit Staff under Employees, then set rates here.</td></tr>
+                    ) : filteredMaster.map((u, idx) => {
                       const rate = getEffectiveRate(u);
                       return (
                         <tr
@@ -606,6 +607,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                           style={{ cursor: 'pointer' }}
                           title="Click to open employee details"
                         >
+                          <td>{idx + 1}</td>
                           <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{systemCodeFor(u)}</td>
                           <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{u.employeeId}</td>
                           <td className="att-emp">{u.name || u.username}</td>
@@ -808,7 +810,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
               </div>
               <div className="esm-essl-meta">
                 <span>Last Sync</span>
-                <strong>{essl.lastSync ? new Date(essl.lastSync).toLocaleString('en-IN') : 'Never'}</strong>
+                <strong>{essl.lastSync ? formatDateTime(essl.lastSync) : 'Never'}</strong>
               </div>
               <div className="esm-essl-actions">
                 {!essl.connected ? (
@@ -839,6 +841,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
               <table className="att-table">
                 <thead>
                   <tr>
+                    <th>Sr. No</th>
                     <th>Emp. ID</th>
                     <th>eSSL ID</th>
                     <th>Name</th>
@@ -847,10 +850,11 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {newestFirst((data.users || []).filter((u) => !u.isDeleted && u.active !== false && u.role !== 'Admin')).map((u) => {
+                  {newestFirst((data.users || []).filter((u) => !u.isDeleted && u.active !== false && u.role !== 'Admin')).map((u, idx) => {
                     const pending = isPendingApproval(u);
                     return (
                       <tr key={u.id}>
+                        <td>{idx + 1}</td>
                         <td>{u.employeeId}</td>
                         <td>{u.esslId || '—'}</td>
                         <td>{u.name || u.username}</td>
@@ -862,7 +866,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                               </button>
                             ) : <span className="att-badge is-half">Pending Approval</span>
                           ) : (
-                            <span className="att-badge is-present" title={u.approvedAt ? `Approved ${new Date(u.approvedAt).toLocaleString('en-IN')}${u.approvedBy ? ` by ${u.approvedBy}` : ''}` : ''}>
+                            <span className="att-badge is-present" title={u.approvedAt ? `Approved ${formatDateTime(u.approvedAt)}${u.approvedBy ? ` by ${u.approvedBy}` : ''}` : ''}>
                               Approved{u.approvedAt ? ` · ${formatDate(u.approvedAt.slice(0, 10))}` : ''}
                             </span>
                           )}
@@ -942,6 +946,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                   <table className="att-table">
                     <thead>
                       <tr>
+                        <th>Sr. No</th>
                         <th>Date</th>
                         <th>Emp. ID</th>
                         <th>Employee Name</th>
@@ -957,9 +962,10 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                     </thead>
                     <tbody>
                       {filteredAtt.length === 0 ? (
-                        <tr><td colSpan={11} className="pm-empty">No attendance records. Use eSSL Sync or Add Entry.</td></tr>
-                      ) : filteredAtt.map((r) => (
+                        <tr><td colSpan={12} className="pm-empty">No attendance records. Use eSSL Sync or Add Entry.</td></tr>
+                      ) : filteredAtt.map((r, idx) => (
                         <tr key={r.id}>
+                          <td>{idx + 1}</td>
                           <td>{formatDate(r.date)}</td>
                           <td style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{r.employeeId}</td>
                           <td className="att-emp">{r.username}</td>
@@ -1151,6 +1157,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
               <table className="att-table">
                 <thead>
                   <tr>
+                    <th>Sr. No</th>
                     <th>Emp. ID</th>
                     <th>Name</th>
                     <th>Department</th>
@@ -1165,9 +1172,10 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                 </thead>
                 <tbody>
                   {monthSummaryRows.length === 0 ? (
-                    <tr><td colSpan={10} className="pm-empty">No salary data for {month}. Set rates and sync attendance first.</td></tr>
-                  ) : monthSummaryRows.map((r) => (
+                    <tr><td colSpan={11} className="pm-empty">No salary data for {month}. Set rates and sync attendance first.</td></tr>
+                  ) : monthSummaryRows.map((r, idx) => (
                     <tr key={r.user.id}>
+                      <td>{idx + 1}</td>
                       <td style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{r.user.employeeId}</td>
                       <td className="att-emp">{r.user.name || r.user.username}</td>
                       <td>{r.user.department}</td>
@@ -1325,6 +1333,7 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                 <table className="pm-table">
                   <thead>
                     <tr>
+                      <th>Sr. No</th>
                       <th>Punch ID</th>
                       <th>Device</th>
                       <th>Device User ID</th>
@@ -1338,9 +1347,10 @@ const EmployeeSalaryManagement = ({ defaultTab = 'master' }) => {
                   </thead>
                   <tbody>
                     {punches.length === 0 ? (
-                      <tr><td colSpan={9} className="pm-empty">No machine punches recorded for this employee on this day.</td></tr>
-                    ) : punches.map((p) => (
+                      <tr><td colSpan={10} className="pm-empty">No machine punches recorded for this employee on this day.</td></tr>
+                    ) : punches.map((p, idx) => (
                       <tr key={p.id}>
+                        <td>{idx + 1}</td>
                         <td><strong>{p.punchId}</strong></td>
                         <td>{p.deviceName || '—'}</td>
                         <td>{p.deviceUserId}</td>

@@ -17,6 +17,7 @@ import InvoicesPI from './modules/InvoicesPI';
 import BPR from './modules/BPR';
 import PSD from './modules/PSD';
 import PackingList from './modules/PackingList';
+import StockRegister from './modules/StockRegister';
 import DeliveryChallan from './modules/DeliveryChallan';
 import EWay from './modules/EWay';
 import TaxInvoice from './modules/TaxInvoice';
@@ -33,6 +34,7 @@ import DebitNotes from './modules/DebitNotes';
 import CreditNotes from './modules/CreditNotes';
 import MonthlyBilling from './modules/MonthlyBilling';
 import MonthlySummary from './modules/MonthlySummary';
+import TdModule from './modules/TdModule';
 import PurchaseManagement from './modules/PurchaseManagement';
 import UtilityRecord from './modules/UtilityRecord';
 import UtilityTempRecord from './modules/UtilityTempRecord';
@@ -96,6 +98,7 @@ const AppLayout = () => {
         <Route path="/bpr" element={<BPR />} />
         <Route path="/psd" element={<PSD />} />
         <Route path="/packing-list" element={<PackingList />} />
+        <Route path="/stock-register" element={<StockRegister />} />
         <Route path="/dc" element={<DeliveryChallan />} />
         <Route path="/eway" element={<EWay />} />
         <Route path="/eway-dc" element={<Navigate to="/eway" replace />} />
@@ -113,6 +116,7 @@ const AppLayout = () => {
         <Route path="/credit-notes" element={<CreditNotes />} />
         <Route path="/monthly-billing" element={<MonthlyBilling />} />
         <Route path="/monthly-summary" element={<MonthlySummary />} />
+        <Route path="/td-module" element={<TdModule />} />
         <Route path="/purchase-management" element={<PurchaseManagement />} />
         <Route path="/utility-record" element={<UtilityRecord />} />
         <Route path="/utility-record-list" element={<Navigate to="/utility-record" replace />} />

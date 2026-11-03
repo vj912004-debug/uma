@@ -21,7 +21,7 @@ import DateField from '../components/DateField';
 import TimeField from '../components/TimeField';
 import SearchableSelect from '../components/SearchableSelect';
 import StatusTabBar from '../components/StatusTabBar';
-import { formatDate, newestFirst } from '../utils/dateUtils';
+import { formatDate, formatTime, newestFirst } from '../utils/dateUtils';
 import ExportButton from '../components/ExportButton';
 
 const LEAD_SOURCES = ['Website', 'Referral', 'Cold Call', 'Exhibition', 'Email', 'Walk-in', 'Other'];
@@ -741,6 +741,7 @@ const MarketingManagement = () => {
             <table className="pm-table mkt-table">
               <thead>
                 <tr>
+                  <th>Sr. No</th>
                   <th>Date</th>
                   <th>Time</th>
                   <th>Company</th>
@@ -752,11 +753,12 @@ const MarketingManagement = () => {
               </thead>
               <tbody>
                 {followRows.length === 0 ? (
-                  <tr><td colSpan={7} className="pm-empty">No follow-ups scheduled yet.</td></tr>
-                ) : followRows.map((r) => (
+                  <tr><td colSpan={8} className="pm-empty">No follow-ups scheduled yet.</td></tr>
+                ) : followRows.map((r, idx) => (
                   <tr key={r.id}>
+                    <td>{(followPageSafe - 1) * PAGE_SIZE + idx + 1}</td>
                     <td>{formatDate(r.date)}</td>
-                    <td>{r.time || '—'}</td>
+                    <td>{r.time ? formatTime(r.time) : '—'}</td>
                     <td>{leadLabel(r.leadId)}</td>
                     <td>{r.type}</td>
                     <td><span className={`mkt-badge ${badgeClass(r.status)}`}>{r.status}</span></td>
@@ -795,6 +797,7 @@ const MarketingManagement = () => {
             <table className="pm-table mkt-table">
               <thead>
                 <tr>
+                  <th>Sr. No</th>
                   <th>Enquiry No.</th>
                   <th>Date</th>
                   <th>Company</th>
@@ -807,9 +810,10 @@ const MarketingManagement = () => {
               </thead>
               <tbody>
                 {enquiries.length === 0 ? (
-                  <tr><td colSpan={8} className="pm-empty">No enquiries converted yet.</td></tr>
-                ) : enquiries.map((r) => (
+                  <tr><td colSpan={9} className="pm-empty">No enquiries converted yet.</td></tr>
+                ) : enquiries.map((r, idx) => (
                   <tr key={r.id}>
+                    <td>{idx + 1}</td>
                     <td className="purch-inq-no">{r.enquiryNo}</td>
                     <td>{formatDate(r.date)}</td>
                     <td>{leadLabel(r.leadId)}</td>
@@ -843,6 +847,7 @@ const MarketingManagement = () => {
             <table className="pm-table mkt-table">
               <thead>
                 <tr>
+                  <th>Sr. No</th>
                   <th>Order No.</th>
                   <th>Date</th>
                   <th>Company</th>
@@ -854,9 +859,10 @@ const MarketingManagement = () => {
               </thead>
               <tbody>
                 {orders.length === 0 ? (
-                  <tr><td colSpan={7} className="pm-empty">No orders yet.</td></tr>
-                ) : orders.map((r) => (
+                  <tr><td colSpan={8} className="pm-empty">No orders yet.</td></tr>
+                ) : orders.map((r, idx) => (
                   <tr key={r.id}>
+                    <td>{idx + 1}</td>
                     <td className="purch-inq-no">{r.orderNo}</td>
                     <td>{formatDate(r.date)}</td>
                     <td>{leadLabel(r.leadId)}</td>
@@ -954,10 +960,10 @@ const MarketingManagement = () => {
                         key={item.id}
                         type="button"
                         className="mkt-cal-event"
-                        title={`${item.time || ''} ${leadLabel(item.leadId)} — ${item.type}`}
+                        title={`${item.time ? formatTime(item.time) : ''} ${leadLabel(item.leadId)} — ${item.type}`}
                         onClick={() => setActiveTab('followups')}
                       >
-                        {item.time || item.type}
+                        {item.time ? formatTime(item.time) : item.type}
                       </button>
                     ))}
                     {cell.items.length > 2 ? <span className="mkt-cal-more">+{cell.items.length - 2}</span> : null}

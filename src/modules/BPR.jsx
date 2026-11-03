@@ -6,7 +6,7 @@ import DocDownloadButtons from '../components/DocDownloadButtons';
 import { buildBlankBprPayload } from '../utils/bprHtml';
 import { getStoredCompanyProfile } from '../utils/companyProfile';
 import ExportButton from '../components/ExportButton';
-import { formatDate, newestFirst } from '../utils/dateUtils';
+import { currentLocalDateTime, formatDate, newestFirst } from '../utils/dateUtils';
 import { Plus, Edit2, Trash2, Printer, FileText, List } from 'lucide-react';
 import { numberInputValue, parseOptionalNumber } from '../utils/numberInput';
 import SearchableSelect from '../components/SearchableSelect';
@@ -22,7 +22,8 @@ import {
   getProductDrums,
   receiptProductOptions,
   enrichBPRForPrint,
-  findDedicatedReceiptDoc,
+  findBprForProductMicron,
+  getProductMicronSlots,
   buildBprRowsForProduct,
   resolveReceiptProductName
 } from '../utils/receiptProducts';
@@ -110,6 +111,7 @@ const BPR = () => {
     totalInputQty: 0,
     psdRequirement: '90% < 10M',
     psdNote: '',
+    specialNote: '',
     totalDrums: 0,
     doubleDispatch: false,
     receivedBatches: [],
@@ -125,8 +127,8 @@ const BPR = () => {
     materialReceivedTime: '',
     committedDate: '',
     committedTime: '',
-    processingStartDate: '',
-    processingStartTime: '',
+    processingStartDate: currentLocalDateTime().date,
+    processingStartTime: currentLocalDateTime().time,
     sizingReportRequired: '',
     particleSizeResult: '',
     lumpsNetWeight: '',
@@ -154,6 +156,7 @@ const BPR = () => {
     totalInputQty: '',
     psdRequirement: '90% < 10M',
     psdNote: '',
+    specialNote: '',
     totalDrums: 0,
     doubleDispatch: false,
     receivedBatches: padBPRBatchRows([emptyRow('', '1')]),
@@ -169,8 +172,8 @@ const BPR = () => {
     materialReceivedTime: '',
     committedDate: '',
     committedTime: '',
-    processingStartDate: '',
-    processingStartTime: '',
+    processingStartDate: currentLocalDateTime().date,
+    processingStartTime: currentLocalDateTime().time,
     sizingReportRequired: '',
     particleSizeResult: '',
     lumpsNetWeight: '',
@@ -195,7 +198,7 @@ const BPR = () => {
     setIsModalOpen(true);
   };
 
-  const handleCreate = (mr, productName = '', openTab = 'page1') => {
+  const handleCreate = (mr, productName = '', openTab = 'page1', psdReq = '') => {
     setSelectedMR(mr);
     setEditingBPR(null);
     setActiveTab(openTab);
@@ -205,17 +208,24 @@ const BPR = () => {
     const prodOpts = receiptProductOptions(mr, data);
     const productNames = getReceiptProductNames(mr, prodOpts);
     const liveBprs = (data.bprs || []).filter((b) => !b.isDeleted);
-    const pendingName = productNames.find((n) => !findDedicatedReceiptDoc(liveBprs, mr.id, n));
+    const pendingName = productNames.find((n) => {
+      const slots = getProductMicronSlots(mr, n, prodOpts);
+      return slots.some((m) => !findBprForProductMicron(liveBprs, mr.id, n, m));
+    });
     const prod = resolveReceiptProductName(
       mr,
       productName || pendingName || productNames[0] || mr.productName,
       prodOpts
     ) || productName || pendingName || productNames[0] || mr.productName || '';
-    const built = buildBprRowsForProduct(mr, prod, prodOpts);
-    const prodConfig = getPartyProductForMR(mr, data, prod);
+    const micron = String(psdReq || '').trim()
+      || getProductMicronSlots(mr, prod, prodOpts).find((m) => !findBprForProductMicron(liveBprs, mr.id, prod, m))
+      || '';
+    const built = buildBprRowsForProduct(mr, prod, { ...prodOpts, psdReq: micron });
+    const prodConfig = getPartyProductForMR(mr, data, prod, micron);
     const firstBatch = built.batches[0];
-    const psdRequirement = firstBatch?.psdReq || prodConfig?.psdReq || '90% < 10M';
+    const psdRequirement = micron || firstBatch?.psdReq || built.psdReq || prodConfig?.psdReq || '90% < 10M';
     const psdNote = prodConfig?.psdNote || '';
+    const specialNote = prodConfig?.specialNote || '';
     const drumTotal = built.drums || 0;
     const paddedReceived = padBPRBatchRows(built.receivedRows);
     const paddedDispatched = padBPRBatchRows(built.dispatchedRows);
@@ -228,6 +238,7 @@ const BPR = () => {
       totalInputQty: built.qty,
       psdRequirement,
       psdNote,
+      specialNote,
       totalDrums: drumTotal,
       doubleDispatch: false,
       receivedBatches: paddedReceived,
@@ -252,8 +263,8 @@ const BPR = () => {
       materialReceivedTime: mr.time || '',
       committedDate: '',
       committedTime: '',
-      processingStartDate: '',
-      processingStartTime: '',
+      processingStartDate: currentLocalDateTime().date,
+      processingStartTime: currentLocalDateTime().time,
       sizingReportRequired: '',
       particleSizeResult: '',
       lumpsNetWeight: '',
@@ -288,6 +299,7 @@ const BPR = () => {
       totalDrums: drumTotal,
       psdRequirement: prodConfig?.psdReq || prev.psdRequirement || '90% < 10M',
       psdNote: prodConfig?.psdNote || '',
+      specialNote: prodConfig?.specialNote || prev.specialNote || '',
       receivedBatches: padBPRBatchRows(built.receivedRows),
       dispatchedBatches: padBPRBatchRows(built.dispatchedRows),
       packingConsumables: {
@@ -322,6 +334,7 @@ const BPR = () => {
     setForm({
       ...bpr,
       psdNote: bpr.psdNote || prodConfig?.psdNote || '',
+      specialNote: bpr.specialNote || prodConfig?.specialNote || bpr.remarks || '',
       psdRequirement: bpr.psdRequirement || prodConfig?.psdReq || '90% < 10M',
       totalDrums: drumTotal,
       receivedBatches,
@@ -334,6 +347,16 @@ const BPR = () => {
         drumUsed: bpr.packingConsumables?.drumUsed || bpr.packingMaterials?.drumUsed || (drumTotal ? String(drumTotal) : '')
       },
       machineParams: { ...emptyMachineParams(), ...(bpr.machineParams || {}) },
+      pressureMetrics: {
+        grindingPressure: '',
+        injectionPressure: '',
+        feedingSP: '',
+        feedingDP: '',
+        feedingTP: '',
+        millingFP: '',
+        millingFiP: '',
+        ...(bpr.pressureMetrics || {})
+      },
       previousBulkDensity: { ...emptyPreviousBulkDensity(), ...(bpr.previousBulkDensity || {}) },
       bulkDensity: { ...emptyBulkDensity(), ...(bpr.bulkDensity || {}) }
     });
@@ -521,14 +544,20 @@ const BPR = () => {
       const products = names.length ? names : [mr.productName].filter(Boolean);
       if (!products.length) products.push('');
       products.forEach((productName) => {
-        if (!findDedicatedReceiptDoc(liveBprs, mr.id, productName || '')) {
+        const slots = productName ? getProductMicronSlots(mr, productName, prodOpts) : [''];
+        slots.forEach((micron) => {
+          if (findBprForProductMicron(liveBprs, mr.id, productName || '', micron)) return;
+          const built = productName
+            ? buildBprRowsForProduct(mr, productName, { ...prodOpts, psdReq: micron })
+            : null;
           jobs.push({
             mr,
             productName,
-            qty: productName ? getProductQty(mr, productName, prodOpts) : (mr.totalQty || 0),
-            drums: productName ? getProductDrums(mr, productName, prodOpts) : (mr.totalDrums || 0)
+            psdReq: micron,
+            qty: built ? built.qty : (mr.totalQty || 0),
+            drums: built ? built.drums : (mr.totalDrums || 0)
           });
-        }
+        });
       });
     });
     return newestFirst(jobs, (job) => job.mr);
@@ -678,6 +707,7 @@ const BPR = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>Sr. No</th>
                   <th style={{ padding: '0.75rem' }}>M.R. Number</th>
                   <th style={{ padding: '0.75rem' }}>Party</th>
                   <th style={{ padding: '0.75rem' }}>Product</th>
@@ -687,16 +717,22 @@ const BPR = () => {
               </thead>
               <tbody>
                 {pendingBprJobs.length === 0 ? (
-                  <tr><td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No receipts awaiting processing.</td></tr>
+                  <tr><td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No receipts awaiting processing.</td></tr>
                 ) : (
-                  pendingBprJobs.map((job) => (
-                    <tr key={`${job.mr.id}_${job.productName || 'default'}`} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  pendingBprJobs.map((job, idx) => (
+                    <tr key={`${job.mr.id}_${job.productName || 'default'}_${job.psdReq || ''}`} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem' }}>{idx + 1}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{job.mr.receiptNo}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600 }}>{job.mr.partyName}</td>
-                      <td style={{ padding: '0.75rem' }}>{job.productName || job.mr.productName}</td>
+                      <td style={{ padding: '0.75rem' }}>
+                        {job.productName || job.mr.productName}
+                        {job.psdReq ? (
+                          <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{job.psdReq}</span>
+                        ) : null}
+                      </td>
                       <td style={{ padding: '0.75rem' }}>{job.qty} Kg ({job.drums} Drums)</td>
                       <td style={{ padding: '0.75rem' }}>
-                        <button type="button" className="btn btn-primary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem' }} onClick={() => handleCreate(job.mr, job.productName)}>
+                        <button type="button" className="btn btn-primary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem' }} onClick={() => handleCreate(job.mr, job.productName, 'page1', job.psdReq)}>
                           Generate BPR
                         </button>
                       </td>
@@ -715,6 +751,7 @@ const BPR = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>Sr. No</th>
                   <th style={{ padding: '0.75rem' }}>BPR No</th>
                   <th style={{ padding: '0.75rem' }}>Party Name</th>
                   <th style={{ padding: '0.75rem' }}>Product</th>
@@ -724,10 +761,11 @@ const BPR = () => {
               </thead>
               <tbody>
                 {filteredBPRs.length === 0 ? (
-                  <tr><td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No BPR records found.</td></tr>
+                  <tr><td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No BPR records found.</td></tr>
                 ) : (
-                  filteredBPRs.map(bpr => (
+                  filteredBPRs.map((bpr, idx) => (
                     <tr key={bpr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem' }}>{idx + 1}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{bpr.bprNo}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600 }}>{bpr.partyName}</td>
                       <td style={{ padding: '0.75rem' }}>{bpr.productName}</td>
@@ -786,6 +824,7 @@ const BPR = () => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                   <thead>
                     <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '0.5rem 0.75rem' }}>Sr. No</th>
                       <th style={{ padding: '0.5rem 0.75rem' }}>M.R. Number</th>
                       <th style={{ padding: '0.5rem 0.75rem' }}>Product</th>
                       <th style={{ padding: '0.5rem 0.75rem' }}>Drums</th>
@@ -793,8 +832,9 @@ const BPR = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {pendingBprJobs.map((job) => (
+                    {pendingBprJobs.map((job, idx) => (
                       <tr key={`${job.mr.id}_${job.productName || 'default'}`} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.5rem 0.75rem' }}>{idx + 1}</td>
                         <td style={{ padding: '0.5rem 0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{job.mr.receiptNo}</td>
                         <td style={{ padding: '0.5rem 0.75rem' }}>{job.productName || job.mr.productName}</td>
                         <td style={{ padding: '0.5rem 0.75rem' }}>{job.drums || 0}</td>
@@ -820,6 +860,7 @@ const BPR = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>Sr. No</th>
                   <th style={{ padding: '0.75rem' }}>BPR No</th>
                   <th style={{ padding: '0.75rem' }}>Party</th>
                   <th style={{ padding: '0.75rem' }}>Product</th>
@@ -831,10 +872,11 @@ const BPR = () => {
               </thead>
               <tbody>
                 {filteredBPRs.length === 0 ? (
-                  <tr><td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No BPR weight records found.</td></tr>
+                  <tr><td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No BPR weight records found.</td></tr>
                 ) : (
-                  filteredBPRs.map(bpr => (
+                  filteredBPRs.map((bpr, idx) => (
                     <tr key={bpr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem' }}>{idx + 1}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{bpr.bprNo}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 600 }}>{bpr.partyName}</td>
                       <td style={{ padding: '0.75rem' }}>{bpr.productName}</td>
@@ -944,9 +986,13 @@ const BPR = () => {
                   <label>PSD Requirement *</label>
                   <input type="text" className="input-field" required value={form.psdRequirement} onChange={e => setForm({...form, psdRequirement: e.target.value})} />
                 </div>
-                <div style={{ gridColumn: 'span 2' }}>
+                <div>
                   <label>PSD Note</label>
-                  <input type="text" className="input-field" value={form.psdNote || ''} onChange={e => setForm({...form, psdNote: e.target.value})} placeholder="From party product master" />
+                  <textarea className="input-field" rows={5} value={form.psdNote || ''} onChange={e => setForm({...form, psdNote: e.target.value})} placeholder={'One detail per line'} />
+                </div>
+                <div>
+                  <label>Special Note</label>
+                  <textarea className="input-field" rows={5} value={form.specialNote || ''} onChange={e => setForm({...form, specialNote: e.target.value})} placeholder={'One detail per line'} />
                 </div>
               </div>
 
@@ -1005,11 +1051,11 @@ const BPR = () => {
                       <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--accent-primary)' }}>Pressure Metrics</h4>
                       <div style={{ marginBottom: '0.5rem' }}>
                         <label style={{ fontSize: '0.85rem' }}>Grinding Pressure (kg/cm²)</label>
-                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.pressureMetrics.grindingPressure} onChange={e => setForm({...form, pressureMetrics: {...form.pressureMetrics, grindingPressure: e.target.value}})} />
+                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.pressureMetrics?.grindingPressure || ''} onChange={e => setForm({...form, pressureMetrics: {...(form.pressureMetrics || {}), grindingPressure: e.target.value}})} />
                       </div>
                       <div>
                         <label style={{ fontSize: '0.85rem' }}>Injection Pressure (kg/cm²)</label>
-                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.pressureMetrics.injectionPressure} onChange={e => setForm({...form, pressureMetrics: {...form.pressureMetrics, injectionPressure: e.target.value}})} />
+                        <input type="text" className="input-field" style={{ padding: '0.3rem', fontSize: '0.85rem' }} placeholder="—" value={form.pressureMetrics?.injectionPressure || ''} onChange={e => setForm({...form, pressureMetrics: {...(form.pressureMetrics || {}), injectionPressure: e.target.value}})} />
                       </div>
                       <div style={{ marginTop: '0.75rem' }}>
                         <label style={{ fontSize: '0.85rem' }}>Processing Supervisor</label>

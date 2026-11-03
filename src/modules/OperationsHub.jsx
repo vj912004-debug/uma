@@ -108,6 +108,7 @@ const OperationsHub = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ background: 'var(--glass-bg)' }}>
               <tr style={{ textAlign: 'left' }}>
+                <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Sr. No</th>
                 <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Date</th>
                 <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Party</th>
                 <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Product</th>
@@ -117,10 +118,11 @@ const OperationsHub = () => {
             </thead>
             <tbody>
               {filteredList.length === 0 ? (
-                <tr><td colSpan="5" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>No records matching your criteria.</td></tr>
+                <tr><td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>No records matching your criteria.</td></tr>
               ) : (
-                filteredList.map(item => (
+                filteredList.map((item, idx) => (
                   <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }}>
+                    <td style={{ padding: '1rem', fontSize: '0.875rem' }}>{idx + 1}</td>
                     <td style={{ padding: '1rem', fontSize: '0.875rem' }}>{formatDate(item.date)}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

@@ -1163,6 +1163,7 @@ const EmployeeMaster = () => {
             <table className="pm-table">
               <thead>
                 <tr>
+                  <th>Sr. No</th>
                   <th>System Code</th>
                   <th>Employee Code</th>
                   <th>Employee Name</th>
@@ -1180,8 +1181,8 @@ const EmployeeMaster = () => {
               </thead>
               <tbody>
                 {filteredEmployees.length === 0 ? (
-                  <tr><td colSpan={13} className="pm-empty">No employees found matching filters.</td></tr>
-                ) : filteredEmployees.map((u) => {
+                  <tr><td colSpan={14} className="pm-empty">No employees found matching filters.</td></tr>
+                ) : filteredEmployees.map((u, idx) => {
                   const rate = getEffectiveRate(u);
                   const userStatus = u.status || (u.active === false ? 'Inactive' : 'Active');
                   const statusObj = EMPLOYEE_STATUS_OPTIONS.find((s) => s.value === userStatus) || EMPLOYEE_STATUS_OPTIONS[0];
@@ -1189,6 +1190,7 @@ const EmployeeMaster = () => {
 
                   return (
                     <tr key={u.id} className="pm-click-row" title="Click to view employee details" onClick={() => selectEmployee(u)}>
+                      <td>{idx + 1}</td>
                       <td><strong>{systemCodeFor(u)}</strong></td>
                       <td><strong>{u.employeeId || '—'}</strong></td>
                       <td>

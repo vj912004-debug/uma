@@ -3,7 +3,7 @@ import { Calendar, Edit2, FileText, Search, Trash2, X } from 'lucide-react';
 import DateField from './DateField';
 import StatusTabBar from './StatusTabBar';
 import { formatDate, getDefaultFiscalYearRange, newestFirst } from '../utils/dateUtils';
-import { formatCreatedAt, resolveCreatedAt, resolveCreatedBy } from '../utils/docCreator';
+import { formatCreatedAt, resolveCreatedAt, resolveUpdatedBy } from '../utils/docCreator';
 
 const PAGE_SIZE = 10;
 const DEFAULT_RANGE = getDefaultFiscalYearRange();
@@ -42,10 +42,10 @@ const DocCreationLogModal = ({
 
   const enriched = useMemo(
     () => newestFirst((rows || []).filter((r) => !r.isDeleted)).map((row) => {
-      const doneBy = resolveCreatedBy(row, auditLogs, module);
+      const updatedBy = resolveUpdatedBy(row, auditLogs, module);
       return {
         ...row,
-        _doneBy: doneBy || '—',
+        _updatedBy: updatedBy || '—',
         _createdAtLabel: formatCreatedAt(resolveCreatedAt(row, auditLogs, module))
       };
     }),
@@ -62,7 +62,7 @@ const DocCreationLogModal = ({
       if (statusTab === 'completed' && isPending(row)) return false;
       if (!inRange(row.date || String(row.createdAt || '').slice(0, 10), rangeFrom, rangeTo)) return false;
       if (!q) return true;
-      const blob = `${getSearchText(row)} ${row._doneBy} ${row._createdAtLabel}`.toLowerCase();
+      const blob = `${getSearchText(row)} ${row._updatedBy} ${row._createdAtLabel}`.toLowerCase();
       return blob.includes(q);
     });
   }, [enriched, search, rangeFrom, rangeTo, statusTab, getSearchText, isPending]);
@@ -75,7 +75,7 @@ const DocCreationLogModal = ({
 
   const tableCols = [
     ...columns,
-    { key: '_doneBy', label: 'Done By' },
+    { key: '_updatedBy', label: 'Updated By' },
     { key: '_createdAtLabel', label: 'Created At' }
   ];
   const colSpan = tableCols.length + (onEdit || onDelete ? 2 : 1);

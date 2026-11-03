@@ -38,6 +38,31 @@ import { getCurrentFYKey, getFYKeysThroughCurrent, getFYOfDate } from '../utils/
 
 const DATE_COLUMNS = new Set(['date', 'bprDate', 'dcDate', 'invoiceDate']);
 
+/** Master table columns the user can show/hide on screen. */
+const MASTER_SCREEN_COLS = [
+  { key: 'srNo', label: 'Sr No' },
+  { key: 'date', label: 'M.R. Date' },
+  { key: 'partyName', label: 'Party Name' },
+  { key: 'productName', label: 'Product' },
+  { key: 'receivedQty', label: 'Recd Qty' },
+  { key: 'invPiNo', label: 'Inv / PI No' },
+  { key: 'bprNo', label: 'BPR No' },
+  { key: 'bprDate', label: 'BPR Generation Date' },
+  { key: 'dcNo', label: 'DC No' },
+  { key: 'dcDate', label: 'Dispatch Date' },
+  { key: 'invoiceDate', label: 'Invoice Date' },
+  { key: 'totalBill', label: 'Bill Amount' },
+  { key: 'paid', label: 'Amount Paid' },
+  { key: 'tdsDeduction', label: 'TDS Amount' },
+  { key: 'paymentDates', label: 'Total Recd Date' },
+  { key: 'amountsReceived', label: 'Total Recd' },
+  { key: 'outstanding', label: 'Outstanding' },
+  { key: 'dueStatus', label: 'Status' },
+  { key: 'action', label: 'Action' }
+];
+
+const DEFAULT_VISIBLE_COLS = MASTER_SCREEN_COLS.map((c) => c.key);
+
 const toDateInputValue = (val) => {
   if (!val) return '';
   const str = String(val).trim();
@@ -73,7 +98,7 @@ const StatMini = ({ title, value, icon: Icon, color, bg }) => {
 };
 
 const ProcessingSheet = () => {
-  const { data, updateItem } = useAppContext();
+  const { data, setData, updateItem } = useAppContext();
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [partyFilter, setPartyFilter] = useState(location.state?.partyName || '');
@@ -82,6 +107,38 @@ const ProcessingSheet = () => {
   const [expandedRows, setExpandedRows] = useState({});
   const [viewMode, setViewMode] = useState('master'); // 'master' | 'sections'
   const [openSections, setOpenSections] = useState({ receipt: true, billing: false, recon: false });
+  const [showColumnPicker, setShowColumnPicker] = useState(true);
+
+  const savedVisible = data.settings?.processingSheetVisibleColumns;
+  const visibleColumns = useMemo(() => {
+    if (Array.isArray(savedVisible) && savedVisible.length) {
+      const allowed = new Set(DEFAULT_VISIBLE_COLS);
+      return savedVisible.filter((k) => allowed.has(k));
+    }
+    return DEFAULT_VISIBLE_COLS;
+  }, [savedVisible]);
+
+  const showCol = (key) => visibleColumns.includes(key);
+  const visibleColCount = visibleColumns.length;
+
+  const setVisibleColumns = (nextKeys) => {
+    const allowed = new Set(DEFAULT_VISIBLE_COLS);
+    const cleaned = [...new Set(nextKeys)].filter((k) => allowed.has(k));
+    setData((prev) => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        processingSheetVisibleColumns: cleaned.length ? cleaned : ['srNo', 'partyName', 'productName']
+      }
+    }));
+  };
+
+  const toggleColumn = (key) => {
+    const next = new Set(visibleColumns);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setVisibleColumns(Array.from(next));
+  };
 
   useEffect(() => {
     if (location.state?.partyName) {
@@ -634,6 +691,84 @@ const ProcessingSheet = () => {
         completedLabel="Cleared"
       />
 
+      {/* Column visibility — only checked details show on the master table */}
+      <div
+        style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '12px',
+          padding: '0.85rem 1.1rem',
+          marginBottom: '1rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginBottom: showColumnPicker ? '0.75rem' : 0 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)' }}>
+              Show Columns
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>
+              Tick the boxes for details you want on screen. Unticked columns stay hidden.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <button type="button" className="btn" style={{ fontSize: '0.78rem', padding: '4px 10px' }} onClick={() => setVisibleColumns(DEFAULT_VISIBLE_COLS)}>
+              Select All
+            </button>
+            <button
+              type="button"
+              className="btn"
+              style={{ fontSize: '0.78rem', padding: '4px 10px' }}
+              onClick={() => setVisibleColumns(['srNo', 'date', 'partyName', 'productName', 'receivedQty', 'invPiNo', 'bprNo'])}
+            >
+              Basic Only
+            </button>
+            <button
+              type="button"
+              className="btn"
+              style={{ fontSize: '0.78rem', padding: '4px 10px' }}
+              onClick={() => setShowColumnPicker((v) => !v)}
+            >
+              {showColumnPicker ? 'Hide Boxes' : 'Show Boxes'}
+            </button>
+          </div>
+        </div>
+        {showColumnPicker && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            {MASTER_SCREEN_COLS.map((col) => {
+              const checked = showCol(col.key);
+              return (
+                <label
+                  key={col.key}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '999px',
+                    border: checked ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                    background: checked ? 'rgba(61, 43, 125, 0.1)' : 'var(--bg-input, #f8fafc)',
+                    color: checked ? 'var(--accent-primary)' : 'var(--text-muted)',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleColumn(col.key)}
+                    style={{ accentColor: 'var(--accent-primary)', margin: 0 }}
+                  />
+                  {col.label}
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Filter Row */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', flex: 1, minWidth: '260px', padding: '0 1rem' }}>
@@ -717,25 +852,25 @@ const ProcessingSheet = () => {
                 <thead>
                   <tr>
                     <th style={{ ...thStyle, width: '40px', padding: '0.85rem 0.5rem' }}></th>
-                    <th style={thStyle}>Sr No</th>
-                    <th style={thStyle}>M.R. Date</th>
-                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '160px' }}>Party Name</th>
-                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '140px' }}>Product</th>
-                    <th style={thStyle}>Recd Qty</th>
-                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '140px' }}>Inv / PI No</th>
-                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '130px' }}>BPR No</th>
-                    <th style={thStyle}>BPR Generation Date</th>
-                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '130px' }}>DC No</th>
-                    <th style={thStyle}>Dispatch Date</th>
-                    <th style={thStyle}>Invoice Date</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Bill Amount</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Amount Paid</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>TDS Amount</th>
-                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '120px' }}>Total Recd Date</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Total Recd</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Outstanding</th>
-                    <th style={thStyle}>Status</th>
-                    <th style={{ ...thStyle, textAlign: 'center', width: '120px' }}>Action</th>
+                    {showCol('srNo') && <th style={thStyle}>Sr No</th>}
+                    {showCol('date') && <th style={thStyle}>M.R. Date</th>}
+                    {showCol('partyName') && <th style={{ ...thStyle, textAlign: 'left', minWidth: '160px' }}>Party Name</th>}
+                    {showCol('productName') && <th style={{ ...thStyle, textAlign: 'left', minWidth: '140px' }}>Product</th>}
+                    {showCol('receivedQty') && <th style={thStyle}>Recd Qty</th>}
+                    {showCol('invPiNo') && <th style={{ ...thStyle, textAlign: 'left', minWidth: '140px' }}>Inv / PI No</th>}
+                    {showCol('bprNo') && <th style={{ ...thStyle, textAlign: 'left', minWidth: '130px' }}>BPR No</th>}
+                    {showCol('bprDate') && <th style={thStyle}>BPR Generation Date</th>}
+                    {showCol('dcNo') && <th style={{ ...thStyle, textAlign: 'left', minWidth: '130px' }}>DC No</th>}
+                    {showCol('dcDate') && <th style={thStyle}>Dispatch Date</th>}
+                    {showCol('invoiceDate') && <th style={thStyle}>Invoice Date</th>}
+                    {showCol('totalBill') && <th style={{ ...thStyle, textAlign: 'right' }}>Bill Amount</th>}
+                    {showCol('paid') && <th style={{ ...thStyle, textAlign: 'right' }}>Amount Paid</th>}
+                    {showCol('tdsDeduction') && <th style={{ ...thStyle, textAlign: 'right' }}>TDS Amount</th>}
+                    {showCol('paymentDates') && <th style={{ ...thStyle, textAlign: 'left', minWidth: '120px' }}>Total Recd Date</th>}
+                    {showCol('amountsReceived') && <th style={{ ...thStyle, textAlign: 'right' }}>Total Recd</th>}
+                    {showCol('outstanding') && <th style={{ ...thStyle, textAlign: 'right' }}>Outstanding</th>}
+                    {showCol('dueStatus') && <th style={thStyle}>Status</th>}
+                    {showCol('action') && <th style={{ ...thStyle, textAlign: 'center', width: '120px' }}>Action</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -765,70 +900,80 @@ const ProcessingSheet = () => {
                               {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                             </button>
                           </td>
-                          <td style={tdStyle}>{row.srNo}</td>
-                          <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'date' })}</td>
-                          <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'partyName' })}</td>
-                          <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'productName' })}</td>
-                          <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'receivedQty' })}</td>
-                          <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
-                            {renderCell(row, { key: row.tiNo && row.tiNo !== 'Pending' ? 'tiNo' : 'piNo' })}
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'bprNo' })}</td>
-                          <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'bprDate' })}</td>
-                          <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'dcNo' })}</td>
-                          <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'dcDate' })}</td>
-                          <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'invoiceDate' })}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'totalBill' })}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'paid' })}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'tdsDeduction' })}</td>
-                          <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'paymentDates' })}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                            ₹{parseFloat(row.amountsReceivedTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td
-                            style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: isPaidOff ? '#10b981' : '#ef4444' }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {renderCell(row, { key: 'outstanding' })}
-                          </td>
-                          <td style={tdStyle}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '4px 10px',
-                              borderRadius: '12px',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              background: isPaidOff ? '#ecfdf5' : isOverdue ? '#fef2f2' : '#fefce8',
-                              color: isPaidOff ? '#047857' : isOverdue ? '#dc2626' : '#d97706'
-                            }}>
-                              {isPaidOff ? <CheckCircle2 size={12} /> : isOverdue ? <AlertTriangle size={12} /> : <Clock size={12} />}
-                              {isPaidOff ? 'Cleared' : isOverdue ? 'Overdue' : 'Due'}
-                            </span>
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); toggleRowExpanded(row.rowKey); }}
-                              className="btn btn-sm"
-                              style={{
-                                fontSize: '0.75rem',
-                                padding: '4px 10px',
-                                background: isExpanded ? 'var(--accent-primary)' : 'var(--bg-input, #f1f5f9)',
-                                color: isExpanded ? '#fff' : 'var(--text-main)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '6px'
-                              }}
+                          {showCol('srNo') && <td style={tdStyle}>{row.srNo}</td>}
+                          {showCol('date') && <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'date' })}</td>}
+                          {showCol('partyName') && <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'partyName' })}</td>}
+                          {showCol('productName') && <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'productName' })}</td>}
+                          {showCol('receivedQty') && <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'receivedQty' })}</td>}
+                          {showCol('invPiNo') && (
+                            <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
+                              {renderCell(row, { key: row.tiNo && row.tiNo !== 'Pending' ? 'tiNo' : 'piNo' })}
+                            </td>
+                          )}
+                          {showCol('bprNo') && <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'bprNo' })}</td>}
+                          {showCol('bprDate') && <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'bprDate' })}</td>}
+                          {showCol('dcNo') && <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'dcNo' })}</td>}
+                          {showCol('dcDate') && <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'dcDate' })}</td>}
+                          {showCol('invoiceDate') && <td style={tdStyle} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'invoiceDate' })}</td>}
+                          {showCol('totalBill') && <td style={{ ...tdStyle, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'totalBill' })}</td>}
+                          {showCol('paid') && <td style={{ ...tdStyle, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'paid' })}</td>}
+                          {showCol('tdsDeduction') && <td style={{ ...tdStyle, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'tdsDeduction' })}</td>}
+                          {showCol('paymentDates') && <td style={{ ...tdStyle, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>{renderCell(row, { key: 'paymentDates' })}</td>}
+                          {showCol('amountsReceived') && (
+                            <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                              ₹{parseFloat(row.amountsReceivedTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </td>
+                          )}
+                          {showCol('outstanding') && (
+                            <td
+                              style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: isPaidOff ? '#10b981' : '#ef4444' }}
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              {isExpanded ? 'Close' : 'Details'}
-                            </button>
-                          </td>
+                              {renderCell(row, { key: 'outstanding' })}
+                            </td>
+                          )}
+                          {showCol('dueStatus') && (
+                            <td style={tdStyle}>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                background: isPaidOff ? '#ecfdf5' : isOverdue ? '#fef2f2' : '#fefce8',
+                                color: isPaidOff ? '#047857' : isOverdue ? '#dc2626' : '#d97706'
+                              }}>
+                                {isPaidOff ? <CheckCircle2 size={12} /> : isOverdue ? <AlertTriangle size={12} /> : <Clock size={12} />}
+                                {isPaidOff ? 'Cleared' : isOverdue ? 'Overdue' : 'Due'}
+                              </span>
+                            </td>
+                          )}
+                          {showCol('action') && (
+                            <td style={{ ...tdStyle, textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); toggleRowExpanded(row.rowKey); }}
+                                className="btn btn-sm"
+                                style={{
+                                  fontSize: '0.75rem',
+                                  padding: '4px 10px',
+                                  background: isExpanded ? 'var(--accent-primary)' : 'var(--bg-input, #f1f5f9)',
+                                  color: isExpanded ? '#fff' : 'var(--text-main)',
+                                  border: '1px solid var(--border-color)',
+                                  borderRadius: '6px'
+                                }}
+                              >
+                                {isExpanded ? 'Close' : 'Details'}
+                              </button>
+                            </td>
+                          )}
                         </tr>
 
                         {isExpanded && (
                           <tr key={`expanded-panel-${row.rowKey}`} style={{ background: '#f8fafc' }}>
-                            <td colSpan={20} style={{ padding: '0.75rem', borderBottom: '2px solid var(--accent-primary)' }}>
+                            <td colSpan={Math.max(2, visibleColCount + 1)} style={{ padding: '0.75rem', borderBottom: '2px solid var(--accent-primary)' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
                                   <div style={{ background: '#f8fafc', padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1157,6 +1302,7 @@ const ProcessingSheet = () => {
           <table style={sheetStyle}>
             <thead>
               <tr>
+                <th style={{ ...thStyle, textAlign: 'left' }}>Sr. No</th>
                 <th style={{ ...thStyle, textAlign: 'left', minWidth: '180px' }}>Party Name</th>
                 {fyKeys.map((fy) => (
                   <th key={fy} style={{ ...thStyle, textAlign: 'right' }}>Dues FY {fy}</th>
@@ -1167,12 +1313,13 @@ const ProcessingSheet = () => {
             <tbody>
               {partyDueRows.length === 0 ? (
                 <tr>
-                  <td colSpan={fyKeys.length + 2} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td colSpan={fyKeys.length + 3} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
                     No party has an outstanding due.
                   </td>
                 </tr>
-              ) : partyDueRows.map((party) => (
+              ) : partyDueRows.map((party, idx) => (
                 <tr key={party.name}>
+                  <td style={{ ...tdStyle }}>{idx + 1}</td>
                   <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 700 }}>{party.name}</td>
                   {fyKeys.map((fy) => {
                     const typed = party.overrides && Object.prototype.hasOwnProperty.call(party.overrides, fy);

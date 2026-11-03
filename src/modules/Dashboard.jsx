@@ -1,468 +1,732 @@
-import React, { useMemo } from 'react';
-import { useAppContext } from '../context/AppContext';
-import {
-  Package,
-  Users,
-  DollarSign,
-  FileText,
-  Truck,
-  MessageSquarePlus,
-  ClipboardList,
-  ShoppingCart,
-  Activity,
-  PlusSquare,
-  ArrowRight
-} from 'lucide-react';
-import ExportButton from '../components/ExportButton';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { buildUnderProcessRows, getProductQty, receiptProductOptions } from '../utils/receiptProducts';
-import { listProcessingSheetDueRows } from '../utils/paymentTotals';
-import { getCurrentFYKey, getFYOfDate } from '../utils/financialYear';
+import {
+  IndianRupee,
+  Factory,
+  ClipboardList,
+  FlaskConical,
+  Truck,
+  Eye,
+  ArrowRight,
+  TrendingUp,
+  Users,
+  Package,
+  Activity,
+  Sparkles
+} from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
+import SearchableSelect from '../components/SearchableSelect';
+import DateField from '../components/DateField';
+import { formatDate, formatTime, newestFirst } from '../utils/dateUtils';
+import { uniqueSortedOptions } from '../components/ListFilterBar';
 
 const PURPLE = '#5b1c85';
-const PURPLE_SOFT = '#9333ea';
 
-const inCurrentMonth = (dateStr) => {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return false;
-  const now = new Date();
-  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+const toDate = (value) => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  // Prefer YYYY-MM-DD local noon to avoid UTC day-shift
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    const d = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), 12, 0, 0, 0);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(raw.includes('T') ? raw : `${raw}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
 };
 
-const weekOfMonth = (dateStr) => {
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return 0;
-  return Math.min(4, Math.ceil(d.getDate() / 7));
+/** Best available document date for dashboard filtering. */
+const docDateValue = (doc) =>
+  doc?.date
+  || doc?.invoiceDate
+  || doc?.dcDate
+  || doc?.plDate
+  || (typeof doc?.createdAt === 'string' ? doc.createdAt.slice(0, 10) : '')
+  || '';
+
+const invoiceAmount = (inv) =>
+  parseFloat(inv?.total)
+  || parseFloat(inv?.grandTotal)
+  || parseFloat(inv?.netAmount)
+  || parseFloat(inv?.amount)
+  || parseFloat(inv?.subtotal)
+  || 0;
+
+const isTaxInvoiceDoc = (inv) => {
+  if (!inv || inv.isDeleted) return false;
+  const no = String(inv.invoiceNo || inv.docNo || '');
+  if (no.includes('/PI/') || inv.docType === 'PI' || inv.type === 'proforma') return false;
+  if (no.includes('/IN/') || /\/TI\//i.test(no)) return true;
+  if (inv.docType === 'TI' || inv.type === 'tax' || inv.kind === 'taxInvoice') return true;
+  // Legacy records sometimes omit /IN/ — count if total exists and not marked PI
+  return Boolean(no) && invoiceAmount(inv) > 0;
 };
 
-const StatCard = ({ title, value, icon: Icon, iconBg, iconColor, subtext, subtextColor, path }) => {
-  const navigate = useNavigate();
-  return (
-    <div className="dash-kpi" onClick={() => path && navigate(path)} style={{ cursor: path ? 'pointer' : 'default' }}>
-      <div className="dash-kpi-icon" style={{ background: iconBg, color: iconColor }}>
-        <Icon size={20} />
-      </div>
-      <div className="dash-kpi-body">
-        <span className="dash-kpi-label">{title}</span>
-        <span className="dash-kpi-value">{value}</span>
-        <span className="dash-kpi-sub" style={{ color: subtextColor || 'var(--text-muted)' }}>{subtext}</span>
-      </div>
-    </div>
-  );
+const startOfDay = (d) => {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
 };
+
+const endOfDay = (d) => {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+};
+
+const inRange = (dateStr, from, to) => {
+  const d = toDate(dateStr);
+  if (!d) return false;
+  if (from && d < startOfDay(from)) return false;
+  if (to && d > endOfDay(to)) return false;
+  return true;
+};
+
+const daysBetween = (from, to) => {
+  const a = startOfDay(from).getTime();
+  const b = startOfDay(to).getTime();
+  return Math.max(1, Math.round((b - a) / 86400000) + 1);
+};
+
+const shiftRange = (from, to, direction = -1) => {
+  const len = daysBetween(from, to);
+  const nextTo = new Date(startOfDay(from));
+  nextTo.setDate(nextTo.getDate() + direction);
+  const nextFrom = new Date(nextTo);
+  nextFrom.setDate(nextFrom.getDate() - (len - 1) * (direction < 0 ? 1 : -1));
+  if (direction < 0) {
+    const end = new Date(startOfDay(from));
+    end.setDate(end.getDate() - 1);
+    const start = new Date(end);
+    start.setDate(start.getDate() - (len - 1));
+    return { from: start, to: end };
+  }
+  return { from: nextFrom, to: nextTo };
+};
+
+const money = (n) =>
+  `₹ ${Math.round(parseFloat(n) || 0).toLocaleString('en-IN')}`;
+
+const pctChange = (current, previous) => {
+  if (!previous) return current ? 100 : 0;
+  return Math.round(((current - previous) / Math.abs(previous)) * 100);
+};
+
+const initials = (name) =>
+  String(name || '?')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join('')
+    .toUpperCase();
+
+const StatusDot = ({ tone }) => (
+  <span className={`dash-att-dot dash-att-dot--${tone}`} />
+);
 
 const StatusPill = ({ status }) => {
+  const key = String(status || 'Pending').toLowerCase().replace(/\s+/g, '-');
   const map = {
-    'In Process': 'in-process',
-    Completed: 'completed',
-    Dispatched: 'dispatched',
-    Pending: 'pending'
+    'in-progress': 'in-process',
+    planned: 'pending',
+    completed: 'completed',
+    done: 'completed',
+    present: 'completed',
+    late: 'in-process',
+    absent: 'absent'
   };
-  return <span className={`dash-status ${map[status] || 'pending'}`}>{status}</span>;
+  return <span className={`dash-status ${map[key] || 'pending'}`}>{status || 'Pending'}</span>;
 };
 
-const DonutChart = ({ segments, total }) => {
-  const size = 148;
-  const stroke = 18;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  let offset = 0;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="dash-donut">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#eef0f4" strokeWidth={stroke} />
-      {segments.map((seg) => {
-        const len = total > 0 ? (seg.value / total) * c : 0;
-        const el = (
-          <circle
-            key={seg.label}
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke={seg.color}
-            strokeWidth={stroke}
-            strokeDasharray={`${len} ${c - len}`}
-            strokeDashoffset={-offset}
-            strokeLinecap="butt"
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          />
-        );
-        offset += len;
-        return el;
-      })}
-      <text x="50%" y="48%" textAnchor="middle" className="dash-donut-total">{total}</text>
-      <text x="50%" y="60%" textAnchor="middle" className="dash-donut-caption">Total</text>
-    </svg>
-  );
-};
-
-const LineChart = ({ points }) => {
-  const w = 320;
-  const h = 160;
-  const pad = { t: 16, r: 12, b: 28, l: 28 };
-  const maxY = Math.max(10, ...points.map((p) => p.y));
-  const innerW = w - pad.l - pad.r;
-  const innerH = h - pad.t - pad.b;
-  const coords = points.map((p, i) => {
-    const x = pad.l + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
-    const y = pad.t + innerH - (p.y / maxY) * innerH;
-    return { x, y, ...p };
-  });
-  const line = coords.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-  const area = `${line} L${coords[coords.length - 1].x},${pad.t + innerH} L${coords[0].x},${pad.t + innerH} Z`;
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="dash-line-chart" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="dashLineFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={PURPLE} stopOpacity="0.22" />
-          <stop offset="100%" stopColor={PURPLE} stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      {[0, 0.5, 1].map((t) => {
-        const y = pad.t + innerH * (1 - t);
-        return <line key={t} x1={pad.l} x2={w - pad.r} y1={y} y2={y} stroke="#eef0f4" strokeWidth="1" />;
-      })}
-      <path d={area} fill="url(#dashLineFill)" />
-      <path d={line} fill="none" stroke={PURPLE} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-      {coords.map((p) => (
-        <circle key={p.label} cx={p.x} cy={p.y} r="4" fill="#fff" stroke={PURPLE} strokeWidth="2" />
-      ))}
-      {coords.map((p) => (
-        <text key={`${p.label}-x`} x={p.x} y={h - 8} textAnchor="middle" className="dash-axis-label">{p.label}</text>
-      ))}
-    </svg>
-  );
-};
-
-const BarChart = ({ rows }) => {
-  const max = Math.max(1, ...rows.map((r) => r.value));
-  return (
-    <div className="dash-bars">
-      {rows.map((row) => (
-        <div key={row.label} className="dash-bar-row">
-          <span className="dash-bar-label" title={row.label}>{row.label}</span>
-          <div className="dash-bar-track">
-            <div className="dash-bar-fill" style={{ width: `${(row.value / max) * 100}%` }} />
-          </div>
-          <span className="dash-bar-value">{row.value.toLocaleString('en-IN')} kg</span>
-        </div>
-      ))}
+const Panel = ({ title, actionLabel = 'View All', onAction, children, className = '' }) => (
+  <div className={`premium-card dash-card ${className}`.trim()}>
+    <div className="dash-card-head">
+      <h3>{title}</h3>
+      {onAction && (
+        <button type="button" className="dash-link" onClick={onAction}>
+          {actionLabel} <ArrowRight size={14} />
+        </button>
+      )}
+    </div>
+    {children}
     </div>
   );
-};
-
-const resolveJobStatus = (row, data) => {
-  const { mr, productName } = row;
-  const dc = (data.deliveryChallans || []).find((d) => d.receiptId === mr.id && (!productName || d.productName === productName || String(d.productName || '').includes(productName)));
-  const ti = (data.invoices || []).find((inv) => inv.receiptId === mr.id && inv.type === 'Tax Invoice' && !inv.isDeleted);
-  const pl = (data.packingLists || []).find((p) => p.receiptId === mr.id);
-  if (dc || ti) return 'Dispatched';
-  if (pl) return 'Completed';
-  return 'In Process';
-};
 
 const Dashboard = () => {
   const { data } = useAppContext();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const currentFY = useMemo(() => getCurrentFYKey(), []);
 
-  const allRows = useMemo(
-    () => buildUnderProcessRows(data.materialReceipts || [], data).map((row) => ({
-      ...row,
-      prodOpts: receiptProductOptions(row.mr, data),
-      status: resolveJobStatus(row, data)
-    })),
-    [data]
+  const today = useMemo(() => new Date(), []);
+  const monthStart = useMemo(() => new Date(today.getFullYear(), today.getMonth(), 1), [today]);
+  const monthEnd = useMemo(() => new Date(today.getFullYear(), today.getMonth() + 1, 0), [today]);
+  const toLocalYmd = (d) => {
+    const x = d instanceof Date ? d : new Date(d);
+    return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  };
+
+  const [rangeFrom, setRangeFrom] = useState(() => toLocalYmd(monthStart));
+  const [rangeTo, setRangeTo] = useState(() => toLocalYmd(monthEnd));
+  const [partyFilter, setPartyFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
+
+  const displayName = currentUser?.name || currentUser?.username || 'Admin';
+
+  const partyOptions = useMemo(
+    () => uniqueSortedOptions((data.parties || []).filter((p) => !p.isDeleted).map((p) => p.name)),
+    [data.parties]
   );
 
-  const activeRows = useMemo(
-    () => allRows.filter((row) => {
-      if (row.mr?.movedToProcessingSheet === true) return false;
-      const movedMap = row.mr?.movedToProcessingSheet;
-      if (movedMap && typeof movedMap === 'object') {
-        const key = String(row.productName || '_').trim() || '_';
-        if (movedMap[key]) return false;
-      }
-      const pi = (data.invoices || []).find((inv) => inv.receiptId === row.mr.id && inv.invoiceNo?.includes('/PI/'));
-      const bpr = (data.bprs || []).find((b) => b.receiptId === row.mr.id && b.productName === row.productName);
-      const psd = (data.psds || []).find((p) => p.receiptId === row.mr.id && p.productName === row.productName);
-      const pl = (data.packingLists || []).find((p) => p.receiptId === row.mr.id && p.productName === row.productName);
-      const dc = (data.deliveryChallans || []).find((d) => d.receiptId === row.mr.id && d.productName === row.productName);
-      const ti = (data.invoices || []).find((inv) => inv.receiptId === row.mr.id && inv.invoiceNo?.includes('/IN/') && inv.productName === row.productName);
-      const manual = row.mr?.processManualDone?.[String(row.productName || '_').trim() || '_'] || {};
-      return !(
-        (pi || manual.PI) &&
-        (bpr || manual.BPR) &&
-        (psd || manual.PSD) &&
-        (pl || manual.PL) &&
-        (dc || manual.DC) &&
-        (ti || manual.TI)
-      );
-    }),
-    [allRows, data]
-  );
-
-  const totalOutstanding = useMemo(() => listProcessingSheetDueRows(data).reduce((sum, row) => {
-    if (getFYOfDate(row.fyDate) !== currentFY) return sum;
-    return sum + (parseFloat(row.outstanding) || 0);
-  }, 0), [data, currentFY]);
-
-  const partiesCount = (data.parties || []).filter((p) => !p.isDeleted).length;
-  const inquiriesThisMonth = (data.quotations || []).filter((q) => !q.isDeleted && inCurrentMonth(q.date)).length;
-  const dispatchesThisMonth = (data.deliveryChallans || []).filter((d) => !d.isDeleted && inCurrentMonth(d.date)).length;
-  const inProcessCount = activeRows.filter((r) => r.status === 'In Process').length;
-
-  const statusCounts = useMemo(() => {
-    const counts = { 'In Process': 0, Completed: 0, Dispatched: 0 };
-    allRows.forEach((r) => {
-      counts[r.status] = (counts[r.status] || 0) + 1;
-    });
-    return counts;
-  }, [allRows]);
-
-  const statusTotal = Object.values(statusCounts).reduce((a, b) => a + b, 0) || 0;
-  const statusSegments = [
-    { label: 'In Process', value: statusCounts['In Process'], color: '#f97316' },
-    { label: 'Completed', value: statusCounts.Completed, color: '#22c55e' },
-    { label: 'Dispatched', value: statusCounts.Dispatched, color: PURPLE }
-  ];
-
-  const recentJobs = useMemo(() => [...allRows]
-    .sort((a, b) => String(b.mr.date || '').localeCompare(String(a.mr.date || '')))
-    .slice(0, 6), [allRows]);
-
-  const inquiryWeeks = useMemo(() => {
-    const weeks = [0, 0, 0, 0];
-    (data.quotations || []).filter((q) => !q.isDeleted && inCurrentMonth(q.date)).forEach((q) => {
-      const w = weekOfMonth(q.date);
-      if (w >= 1 && w <= 4) weeks[w - 1] += 1;
-    });
-    return weeks.map((y, i) => ({ label: `Week ${i + 1}`, y }));
-  }, [data.quotations]);
-
-  const topProducts = useMemo(() => {
-    const map = {};
-    (data.materialReceipts || []).filter((mr) => !mr.isDeleted).forEach((mr) => {
-      const opts = receiptProductOptions(mr, data);
-      const names = (mr.productSummaries || []).map((p) => p.prodName).filter(Boolean);
-      const list = names.length ? names : (mr.productName ? [mr.productName] : []);
-      list.forEach((name) => {
-        const qty = getProductQty(mr, name, opts) || parseFloat(mr.totalQty) || 0;
-        map[name] = (map[name] || 0) + qty;
+  const productOptions = useMemo(() => {
+    const names = [];
+    (data.parties || []).forEach((p) => {
+      (p.products || []).forEach((prod) => {
+        if (prod?.name) names.push(prod.name);
       });
     });
-    return Object.entries(map)
-      .map(([label, value]) => ({ label, value: Math.round(value) }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-  }, [data]);
+    (data.materialReceipts || []).forEach((mr) => {
+      if (mr.productName) names.push(mr.productName);
+      (mr.productSummaries || []).forEach((s) => {
+        if (s.prodName || s.productName) names.push(s.prodName || s.productName);
+      });
+    });
+    return uniqueSortedOptions(names);
+  }, [data.parties, data.materialReceipts]);
 
-  const quickActions = [
-    { label: 'New Quotation', icon: PlusSquare, path: '/quotations', bg: 'rgba(91,28,133,0.1)', color: PURPLE },
-    { label: 'Material Receipt', icon: ClipboardList, path: '/material-receipt', bg: 'rgba(34,197,94,0.12)', color: '#15803d' },
-    { label: 'Under Process', icon: Activity, path: '/under-process', bg: 'rgba(249,115,22,0.12)', color: '#c2410c' },
-    { label: 'Purchase Order', icon: ShoppingCart, path: '/purchase-orders', bg: 'rgba(147,51,234,0.12)', color: PURPLE_SOFT },
-    { label: 'Delivery Challan', icon: Truck, path: '/dc', bg: 'rgba(14,165,233,0.12)', color: '#0284c7' },
-    { label: 'Tax Invoice', icon: FileText, path: '/tax-invoice', bg: 'rgba(91,28,133,0.1)', color: PURPLE }
+  const matchParty = (name) => !partyFilter || String(name || '').trim() === partyFilter;
+  const matchProduct = (name) =>
+    !productFilter
+    || String(name || '').toLowerCase().includes(String(productFilter).toLowerCase());
+
+  const filterFrom = useMemo(() => toDate(rangeFrom) || monthStart, [rangeFrom, monthStart]);
+  const filterTo = useMemo(() => toDate(rangeTo) || monthEnd, [rangeTo, monthEnd]);
+  const prevFilter = useMemo(() => shiftRange(filterFrom, filterTo, -1), [filterFrom, filterTo]);
+
+  const matchesDoc = (doc, from, to) => {
+    if (!doc || doc.isDeleted) return false;
+    if (!inRange(docDateValue(doc), from, to)) return false;
+    const partyName = doc.partyName || doc.customer || doc.customerName || '';
+    const productName = doc.productName || doc.product || '';
+    return matchParty(partyName) && matchProduct(productName);
+  };
+
+  const taxInvoices = useMemo(
+    () => (data.invoices || []).filter(isTaxInvoiceDoc),
+    [data.invoices]
+  );
+
+  const mrsById = useMemo(() => {
+    const map = new Map();
+    (data.materialReceipts || []).forEach((mr) => {
+      if (mr?.id) map.set(String(mr.id), mr);
+    });
+    return map;
+  }, [data.materialReceipts]);
+
+  const bprProcessValue = (bprList) => {
+    let invoiceSum = 0;
+    let netKg = 0;
+    let mrValue = 0;
+    const receiptIds = new Set();
+    (bprList || []).forEach((b) => {
+      netKg += parseFloat(b.totalDispatchedNet) || parseFloat(b.totalInputQty) || 0;
+      if (b.receiptId) receiptIds.add(String(b.receiptId));
+    });
+    taxInvoices.forEach((inv) => {
+      if (inv.receiptId && receiptIds.has(String(inv.receiptId))) {
+        invoiceSum += invoiceAmount(inv);
+      }
+    });
+    if (invoiceSum > 0) return invoiceSum;
+    receiptIds.forEach((id) => {
+      const mr = mrsById.get(id);
+      if (!mr) return;
+      const v = parseFloat(mr.value);
+      if (Number.isFinite(v) && v > 0) mrValue += v;
+      else {
+        Object.values(mr.productSettings || {}).forEach((s) => {
+          const pv = parseFloat(s?.value);
+          if (Number.isFinite(pv) && pv > 0) mrValue += pv;
+        });
+      }
+    });
+    if (mrValue > 0) return mrValue;
+    // Fallback: show processed kg as numeric value (not fake ₹ rate)
+    return netKg;
+  };
+
+  const salesNow = useMemo(
+    () => taxInvoices.filter((inv) => matchesDoc(inv, filterFrom, filterTo)).reduce((s, inv) => s + invoiceAmount(inv), 0),
+    [taxInvoices, filterFrom, filterTo, partyFilter, productFilter]
+  );
+  const salesPrev = useMemo(
+    () => taxInvoices.filter((inv) => matchesDoc(inv, prevFilter.from, prevFilter.to)).reduce((s, inv) => s + invoiceAmount(inv), 0),
+    [taxInvoices, prevFilter, partyFilter, productFilter]
+  );
+
+  const bprsNow = useMemo(
+    () => (data.bprs || []).filter((b) => matchesDoc(b, filterFrom, filterTo)),
+    [data.bprs, filterFrom, filterTo, partyFilter, productFilter]
+  );
+  const bprsPrev = useMemo(
+    () => (data.bprs || []).filter((b) => matchesDoc(b, prevFilter.from, prevFilter.to)),
+    [data.bprs, prevFilter, partyFilter, productFilter]
+  );
+  const bprValueNow = useMemo(() => bprProcessValue(bprsNow), [bprsNow, taxInvoices, mrsById]);
+  const bprValuePrev = useMemo(() => bprProcessValue(bprsPrev), [bprsPrev, taxInvoices, mrsById]);
+  const bprIsMoney = useMemo(() => {
+    // Money when invoices or MR declared value contributed; otherwise value is kg
+    let hasMoney = false;
+    const receiptIds = new Set(bprsNow.map((b) => b.receiptId).filter(Boolean).map(String));
+    if (taxInvoices.some((inv) => inv.receiptId && receiptIds.has(String(inv.receiptId)) && invoiceAmount(inv) > 0)) {
+      hasMoney = true;
+    } else {
+      receiptIds.forEach((id) => {
+        const mr = mrsById.get(id);
+        if (!mr) return;
+        if (parseFloat(mr.value) > 0) hasMoney = true;
+        Object.values(mr.productSettings || {}).forEach((s) => {
+          if (parseFloat(s?.value) > 0) hasMoney = true;
+        });
+      });
+    }
+    return hasMoney;
+  }, [bprsNow, taxInvoices, mrsById]);
+
+  const packingNow = useMemo(
+    () => (data.packingLists || []).filter((p) => matchesDoc(p, filterFrom, filterTo)),
+    [data.packingLists, filterFrom, filterTo, partyFilter, productFilter]
+  );
+  const packingPrev = useMemo(
+    () => (data.packingLists || []).filter((p) => matchesDoc(p, prevFilter.from, prevFilter.to)),
+    [data.packingLists, prevFilter, partyFilter, productFilter]
+  );
+
+  const psdNow = useMemo(
+    () => (data.psds || []).filter((p) => matchesDoc(p, filterFrom, filterTo)),
+    [data.psds, filterFrom, filterTo, partyFilter, productFilter]
+  );
+  const psdPrev = useMemo(
+    () => (data.psds || []).filter((p) => matchesDoc(p, prevFilter.from, prevFilter.to)),
+    [data.psds, prevFilter, partyFilter, productFilter]
+  );
+
+  const dcNow = useMemo(
+    () => (data.deliveryChallans || []).filter((d) => matchesDoc(d, filterFrom, filterTo)),
+    [data.deliveryChallans, filterFrom, filterTo, partyFilter, productFilter]
+  );
+
+  const kpis = [
+    {
+      title: 'Total Sales',
+      value: money(salesNow),
+      delta: pctChange(salesNow, salesPrev),
+      deltaLabel: 'vs prior period',
+      icon: IndianRupee,
+      path: '/tax-invoice',
+      tone: 'purple'
+    },
+    {
+      title: 'BPR Processing',
+      value: bprIsMoney ? money(bprValueNow) : `${Math.round(bprValueNow).toLocaleString('en-IN')} Kg`,
+      delta: pctChange(bprValueNow, bprValuePrev),
+      deltaLabel: `${bprsNow.length} BPR · vs prior`,
+      icon: Factory,
+      path: '/bpr',
+      tone: 'violet'
+    },
+    {
+      title: 'Packing List',
+      value: String(packingNow.length),
+      delta: pctChange(packingNow.length, packingPrev.length),
+      deltaLabel: 'vs prior period',
+      icon: ClipboardList,
+      path: '/packing-list',
+      tone: 'blue'
+    },
+    {
+      title: 'PSD Record',
+      value: String(psdNow.length),
+      delta: pctChange(psdNow.length, psdPrev.length),
+      deltaLabel: 'vs prior period',
+      icon: FlaskConical,
+      path: '/psd',
+      tone: 'teal'
+    },
+    {
+      title: 'Dispatches',
+      value: String(packingNow.length + dcNow.length),
+      deltaLabel: `${packingNow.length} PL, ${dcNow.length} DC`,
+      icon: Truck,
+      path: '/dc',
+      tone: 'orange',
+      hideTrend: true
+    }
   ];
 
+  const productionRows = useMemo(() => {
+    const plans = newestFirst((data.productionPlans || []).filter((p) => !p.isDeleted));
+    return plans
+      .filter((p) => matchParty(p.customer || p.partyName) && matchProduct(p.productName || p.product))
+      .slice(0, 6)
+      .map((p, idx) => {
+        const statusRaw = String(p.status || '').trim();
+        let status = 'Planned';
+        if (/done|complete/i.test(statusRaw)) status = 'Completed';
+        else if (statusRaw && !/cancel/i.test(statusRaw)) status = 'In Progress';
+        return {
+          id: p.id || `plan-${idx}`,
+          bprNo: p.batchNo || p.planNo || p.bprNo || '—',
+          product: p.productName || p.product || '—',
+          qty: p.qty ? `${p.qty} Drums` : '—',
+          status
+        };
+      });
+  }, [data.productionPlans, partyFilter, productFilter]);
+
+  const attendanceRows = useMemo(() => {
+    const todayIso = today.toISOString().slice(0, 10);
+    const rows = (data.attendance || []).filter((a) => !a.isDeleted && a.date === todayIso);
+    const source = rows.length
+      ? rows
+      : (data.users || [])
+        .filter((u) => u.active !== false && u.role !== 'Admin')
+        .slice(0, 6)
+        .map((u) => ({
+          id: u.id,
+          employeeName: u.name || u.username,
+          shiftType: u.shiftType || '9hr',
+          status: '—'
+        }));
+    return source.slice(0, 6).map((row) => {
+      const status = String(row.status || row.attendance || 'Present');
+      let tone = 'present';
+      if (/late/i.test(status)) tone = 'late';
+      else if (/absent/i.test(status)) tone = 'absent';
+      else if (status === '—') tone = 'pending';
+      const shift = row.shiftType === '12hr' || /night|12/i.test(row.shift || '')
+        ? 'Night 12 hrs'
+        : (row.shift || 'Day 9 hrs');
+      return {
+        id: row.id || row.userId || row.employeeName,
+        name: row.employeeName || row.name || row.username || '—',
+        shift,
+        status: status === '—' ? 'Pending' : status,
+        tone
+      };
+    });
+  }, [data.attendance, data.users, today]);
+
+  const dispatchRows = useMemo(() => {
+    const rows = [
+      ...dcNow.map((d) => ({
+        id: `dc-${d.id}`,
+        party: d.partyName || '—',
+        product: d.productName || '—',
+        qty: d.qty != null ? `${Number(d.qty).toLocaleString('en-IN')} kg` : '—',
+        date: formatDate(docDateValue(d)) || '—'
+      })),
+      ...packingNow.map((p) => ({
+        id: `pl-${p.id}`,
+        party: p.partyName || '—',
+        product: p.productName || '—',
+        qty: p.totalWeight != null
+          ? `${Number(p.totalWeight).toLocaleString('en-IN')} kg`
+          : (p.qty != null ? `${Number(p.qty).toLocaleString('en-IN')} kg` : '—'),
+        date: formatDate(docDateValue(p)) || '—'
+      }))
+    ];
+    return rows.slice(0, 6);
+  }, [dcNow, packingNow]);
+
+  const recentActivity = useMemo(() => {
+    const logs = newestFirst(data.auditLogs || []).slice(0, 8);
+    return logs.map((log) => {
+      const ts = toDate(log.timestamp || log.createdAt);
+      const time = ts ? formatTime(ts) : '—';
+      const action = log.action || 'UPDATE';
+      const module = log.module || 'Record';
+      const label = action === 'CREATE'
+        ? `Created ${module}`
+        : action === 'UPDATE'
+          ? `Updated ${module}`
+          : action === 'DELETE'
+            ? `Deleted ${module}`
+            : `${action} ${module}`;
+      const docId = log.refNo || log.newValue?.quotationNo || log.newValue?.invoiceNo
+        || log.newValue?.dcNo || log.newValue?.bprNo || log.newValue?.receiptNo
+        || log.details || '—';
+      return {
+        id: log.id || `${time}-${label}`,
+        time,
+        user: log.user || log.username || 'System',
+        activity: label,
+        docId: String(docId).slice(0, 28)
+      };
+    });
+  }, [data.auditLogs]);
+
+  const customers = (data.parties || []).filter((p) => !p.isDeleted).length;
+  const products = productOptions.length;
+  const filteredRangeLabel = `${formatDate(rangeFrom) || rangeFrom} - ${formatDate(rangeTo) || rangeTo}`;
+  const kpiCards = kpis;
+
   return (
-    <div className="dash-page">
-      <header className="page-header dash-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+    <div className="dash-page dash-page--admin">
+      <header className="dash-welcome">
         <div>
-          <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle">Welcome to Uma Micron Management System</p>
+          <h1 className="dash-welcome-title">Welcome, {displayName}</h1>
+          <p className="dash-welcome-sub">Here&apos;s what&apos;s happening with your business today.</p>
         </div>
-        <ExportButton
-          data={allRows.map((row) => ({
-            joNo: row.mr.receiptNo || '',
-            partyName: row.mr.partyName || '',
-            productName: row.productName || '',
-            qty: row.productName
-              ? getProductQty(row.mr, row.productName, row.prodOpts)
-              : (row.mr.totalQty || 0),
-            status: row.status || ''
-          }))}
-          columns={[
-            { label: 'JO No.', key: 'joNo' },
-            { label: 'Party Name', key: 'partyName' },
-            { label: 'Product', key: 'productName' },
-            { label: 'Qty (kg)', key: 'qty' },
-            { label: 'Status', key: 'status' }
-          ]}
-          filename="Dashboard_Job_Orders"
-          title="Job Orders"
-        />
+        <div className="dash-filters">
+          <div className="dash-filter">
+            <span className="dash-filter-label">Date Range</span>
+            <div className="dash-filter-dates">
+              <DateField className="input-field" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} />
+              <span>–</span>
+              <DateField className="input-field" value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} />
+            </div>
+          </div>
+          <div className="dash-filter">
+            <span className="dash-filter-label">Party</span>
+            <SearchableSelect
+              className="input-field"
+              value={partyFilter}
+              onChange={(e) => setPartyFilter(e.target.value)}
+              placeholder="All Parties"
+              remember={false}
+            >
+              <option value="">All Parties</option>
+              {partyOptions.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </SearchableSelect>
+          </div>
+          <div className="dash-filter">
+            <span className="dash-filter-label">Products</span>
+            <SearchableSelect
+              className="input-field"
+              value={productFilter}
+              onChange={(e) => setProductFilter(e.target.value)}
+              placeholder="All Products"
+              remember={false}
+            >
+              <option value="">All Products</option>
+              {productOptions.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </SearchableSelect>
+          </div>
+        </div>
       </header>
 
+      <p className="dash-range-hint">Showing {filteredRangeLabel}</p>
+
       <div className="dash-kpi-grid">
-        <StatCard
-          title="Total Parties"
-          value={partiesCount}
-          icon={Users}
-          iconBg="rgba(91, 28, 133, 0.12)"
-          iconColor={PURPLE}
-          subtext="Active"
-          subtextColor="#16a34a"
-          path="/parties"
-        />
-        <StatCard
-          title="Total Inquiries"
-          value={inquiriesThisMonth}
-          icon={MessageSquarePlus}
-          iconBg="rgba(34, 197, 94, 0.12)"
-          iconColor="#15803d"
-          subtext="This Month"
-          subtextColor={PURPLE}
-          path="/quotations"
-        />
-        <StatCard
-          title="Job Orders"
-          value={activeRows.length}
-          icon={Package}
-          iconBg="rgba(147, 51, 234, 0.12)"
-          iconColor={PURPLE_SOFT}
-          subtext={`${inProcessCount} In Process`}
-          subtextColor="#ea580c"
-          path="/under-process"
-        />
-        <StatCard
-          title="Dispatches"
-          value={dispatchesThisMonth}
-          icon={Truck}
-          iconBg="rgba(249, 115, 22, 0.12)"
-          iconColor="#ea580c"
-          subtext="This Month"
-          subtextColor={PURPLE}
-          path="/dc"
-        />
-        <StatCard
-          title="Outstanding"
-          value={`₹ ${Math.round(totalOutstanding).toLocaleString('en-IN')}`}
-          icon={DollarSign}
-          iconBg="rgba(20, 184, 166, 0.14)"
-          iconColor="#0f766e"
-          subtext="Total"
-          subtextColor="#dc2626"
-          path="/payment-follow-up"
-        />
+        {kpiCards.map((kpi) => (
+          <button
+            key={kpi.title}
+            type="button"
+            className={`dash-kpi dash-kpi--${kpi.tone}`}
+            onClick={() => kpi.path && navigate(kpi.path)}
+          >
+            <div className="dash-kpi-top">
+              <span className="dash-kpi-label">{kpi.title}</span>
+              <span className="dash-kpi-icon">
+                <kpi.icon size={18} />
+              </span>
+            </div>
+            <span className="dash-kpi-value">{kpi.value}</span>
+            <span className={`dash-kpi-sub ${kpi.hideTrend ? '' : (kpi.delta >= 0 ? 'up' : 'down')}`}>
+              {!kpi.hideTrend && (
+                <>
+                  <TrendingUp size={12} style={{ transform: kpi.delta < 0 ? 'rotate(180deg)' : undefined }} />
+                  {Math.abs(kpi.delta)}% {kpi.deltaLabel}
+                </>
+              )}
+              {kpi.hideTrend && kpi.deltaLabel}
+            </span>
+          </button>
+        ))}
       </div>
 
-      <div className="dash-mid-grid">
-        <div className="premium-card dash-card">
-          <div className="dash-card-head">
-            <h3>Recent Job Orders</h3>
-            <button type="button" className="dash-link" onClick={() => navigate('/under-process')}>
-              View All <ArrowRight size={14} />
-            </button>
-          </div>
+      <div className="dash-mid-grid dash-mid-grid--3">
+        <Panel title="Production Planning" onAction={() => navigate('/production-planning')}>
           <div className="dash-table-wrap">
             <table className="dash-table">
               <thead>
                 <tr>
-                  <th>JO No.</th>
-                  <th>Party Name</th>
+                  <th>Sr. No</th>
+                  <th>BPR No.</th>
                   <th>Product</th>
-                  <th>Qty (kg)</th>
+                  <th>Planned Qty</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productionRows.length === 0 ? (
+                  <tr><td colSpan={6} className="dash-empty">No production plans yet.</td></tr>
+                ) : productionRows.map((row, idx) => (
+                  <tr key={row.id} onClick={() => navigate('/production-planning')}>
+                    <td>{idx + 1}</td>
+                    <td className="dash-strong">{row.bprNo}</td>
+                    <td>{row.product}</td>
+                    <td>{row.qty}</td>
+                    <td><StatusPill status={row.status} /></td>
+                    <td>
+                      <button type="button" className="dash-icon-btn" title="View" onClick={(e) => { e.stopPropagation(); navigate('/production-planning'); }}>
+                        <Eye size={15} />
+            </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+
+        <Panel title="Employee Attendance" onAction={() => navigate('/attendance')} actionLabel="View Details">
+          <div className="dash-table-wrap">
+            <table className="dash-table">
+              <thead>
+                <tr>
+                  <th>Sr. No</th>
+                  <th>Name</th>
+                  <th>Shift</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {recentJobs.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="dash-empty">No job orders yet.</td>
+                {attendanceRows.length === 0 ? (
+                  <tr><td colSpan={4} className="dash-empty">No attendance for today.</td></tr>
+                ) : attendanceRows.map((row, idx) => (
+                  <tr key={row.id} onClick={() => navigate('/attendance')}>
+                    <td>{idx + 1}</td>
+                    <td>
+                      <div className="dash-person">
+                        <span className="dash-avatar">{initials(row.name)}</span>
+                        <span>{row.name}</span>
+                      </div>
+                    </td>
+                    <td>{row.shift}</td>
+                    <td>
+                      <span className="dash-att-status">
+                        <StatusDot tone={row.tone} />
+                        {row.status}
+                      </span>
+                    </td>
                   </tr>
-                ) : (
-                  recentJobs.map((row, idx) => {
-                    const qty = row.productName
-                      ? getProductQty(row.mr, row.productName, row.prodOpts)
-                      : (row.mr.totalQty || 0);
-                    return (
-                      <tr key={`${row.mr.id}-${row.productName || idx}`} onClick={() => navigate('/under-process')}>
-                        <td>
-                          <button type="button" className="dash-jo-link" onClick={() => navigate('/under-process')}>
-                            {row.mr.receiptNo || '—'}
-                          </button>
-                        </td>
-                        <td>{row.mr.partyName || '—'}</td>
-                        <td>{row.productName || '—'}</td>
-                        <td>{Number(qty || 0).toLocaleString('en-IN')}</td>
-                        <td><StatusPill status={row.status} /></td>
-                      </tr>
-                    );
-                  })
-                )}
+                ))}
               </tbody>
             </table>
           </div>
+        </Panel>
+
+        <Panel title="Dispatches for the Week" onAction={() => navigate('/dc')}>
+          <div className="dash-table-wrap">
+            <table className="dash-table">
+              <thead>
+                <tr>
+                  <th>Sr. No</th>
+                  <th>Party</th>
+                  <th>Product</th>
+                  <th>Qty</th>
+                  <th>Dispatch Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dispatchRows.length === 0 ? (
+                  <tr><td colSpan={5} className="dash-empty">No dispatches this week.</td></tr>
+                ) : dispatchRows.map((row, idx) => (
+                  <tr key={row.id} onClick={() => navigate('/dc')}>
+                    <td>{idx + 1}</td>
+                    <td className="dash-strong">{row.party}</td>
+                    <td>{row.product}</td>
+                    <td>{row.qty}</td>
+                    <td>{row.date}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
         </div>
 
-        <div className="premium-card dash-card">
-          <div className="dash-card-head">
-            <h3>Job Order Status Overview</h3>
+      <div className="dash-bottom-grid dash-bottom-grid--2">
+        <Panel title="Recent Activity" onAction={() => navigate('/system-logs')} actionLabel="View All">
+          <div className="dash-table-wrap">
+            <table className="dash-table">
+              <thead>
+                <tr>
+                  <th>Sr. No</th>
+                  <th>Time</th>
+                  <th>User</th>
+                  <th>Activity</th>
+                  <th>Document</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentActivity.length === 0 ? (
+                  <tr><td colSpan={5} className="dash-empty">No recent activity.</td></tr>
+                ) : recentActivity.map((row, idx) => (
+                  <tr key={row.id}>
+                    <td>{idx + 1}</td>
+                    <td>{row.time}</td>
+                    <td>{row.user}</td>
+                    <td>{row.activity}</td>
+                    <td className="dash-strong">{row.docId}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="dash-status-wrap">
-            <DonutChart segments={statusSegments} total={statusTotal || allRows.length} />
-            <div className="dash-legend">
-              {statusSegments.map((seg) => {
-                const pct = statusTotal ? Math.round((seg.value / statusTotal) * 100) : 0;
-                return (
-                  <div key={seg.label} className="dash-legend-row">
-                    <span className="dash-legend-dot" style={{ background: seg.color }} />
-                    <span className="dash-legend-label">{seg.label}</span>
-                    <span className="dash-legend-meta">{seg.value} · {pct}%</span>
+        </Panel>
+
+        <Panel title="Company Highlights" className="dash-highlights-card">
+          <div className="dash-highlights">
+            <div className="dash-highlight">
+              <Users size={18} />
+              <div>
+                <span className="dash-highlight-label">Total Customers</span>
+                <strong>{customers}</strong>
                   </div>
-                );
-              })}
             </div>
+            <div className="dash-highlight">
+              <Package size={18} />
+              <div>
+                <span className="dash-highlight-label">Total Products</span>
+                <strong>{products}</strong>
           </div>
         </div>
+            <div className="dash-highlight">
+              <Factory size={18} />
+              <div>
+                <span className="dash-highlight-label">Processing Capacity</span>
+                <strong>300 MT / Month</strong>
       </div>
-
-      <div className="dash-bottom-grid">
-        <div className="premium-card dash-card">
-          <div className="dash-card-head">
-            <h3>Quick Actions</h3>
           </div>
-          <div className="dash-actions">
-            {quickActions.map((action) => (
-              <button
-                key={action.label}
-                type="button"
-                className="dash-action"
-                onClick={() => navigate(action.path)}
-              >
-                <span className="dash-action-icon" style={{ background: action.bg, color: action.color }}>
-                  <action.icon size={18} />
-                </span>
-                <span>{action.label}</span>
-              </button>
-            ))}
+            <div className="dash-highlight">
+              <Activity size={18} />
+              <div>
+                <span className="dash-highlight-label">Factory Uptime</span>
+                <strong>98%</strong>
           </div>
         </div>
-
-        <div className="premium-card dash-card">
-          <div className="dash-card-head">
-            <h3>Inquiries This Month</h3>
           </div>
-          <LineChart points={inquiryWeeks} />
-        </div>
-
-        <div className="premium-card dash-card">
-          <div className="dash-card-head">
-            <h3>Top Products</h3>
+          <div className="dash-banner">
+            <Sparkles size={16} />
+            Let&apos;s achieve more together.
           </div>
-          {topProducts.length === 0 ? (
-            <p className="dash-empty">No product volume yet.</p>
-          ) : (
-            <BarChart rows={topProducts} />
-          )}
-        </div>
+        </Panel>
       </div>
 
       <footer className="dash-footer">
-        © {new Date().getFullYear()} UMA MICRON - Micronize for API. All rights reserved.
+        <span>© {new Date().getFullYear()} UMA MICRON — Micronization of API&apos;s</span>
+        <span>Version 1.0</span>
       </footer>
     </div>
   );

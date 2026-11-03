@@ -147,10 +147,10 @@ const AttendanceReports = ({ data }) => {
       <div style={{ overflowX: 'auto', minHeight: '300px' }}>
         {subReport === 'Daily' && (
           <table className="data-table" style={{ fontSize: '0.85rem' }}>
-            <thead><tr><th>Date</th><th>Employee</th><th>In Time</th><th>Out Time</th><th>Status</th></tr></thead>
+            <thead><tr><th>Sr. No</th><th>Date</th><th>Employee</th><th>In Time</th><th>Out Time</th><th>Status</th></tr></thead>
             <tbody>
-              {dailyData.length === 0 ? <tr><td colSpan="5" style={{ textAlign: 'center' }}>No records for today ({todayStr}).</td></tr> : 
-                dailyData.map(d => <tr key={d.id}><td>{d.date}</td><td>{d.username}</td><td>{d.inTime||'-'}</td><td>{d.outTime||'-'}</td><td>{d.status}</td></tr>)
+              {dailyData.length === 0 ? <tr><td colSpan="6" style={{ textAlign: 'center' }}>No records for today ({todayStr}).</td></tr> : 
+                dailyData.map((d, i) => <tr key={d.id}><td>{i + 1}</td><td>{d.date}</td><td>{d.username}</td><td>{d.inTime||'-'}</td><td>{d.outTime||'-'}</td><td>{d.status}</td></tr>)
               }
             </tbody>
           </table>
@@ -164,10 +164,10 @@ const AttendanceReports = ({ data }) => {
 
         {subReport === 'Late' && (
           <table className="data-table" style={{ fontSize: '0.85rem' }}>
-            <thead><tr><th>Employee Name</th><th>Total Late Days (All Time)</th></tr></thead>
+            <thead><tr><th>Sr. No</th><th>Employee Name</th><th>Total Late Days (All Time)</th></tr></thead>
             <tbody>
-              {lateList.length === 0 ? <tr><td colSpan="2" style={{ textAlign: 'center' }}>No late records found.</td></tr> : 
-                lateList.map((l, i) => <tr key={i}><td>{l.name}</td><td style={{ color: '#f87171', fontWeight: 'bold' }}>{l.count} Days</td></tr>)
+              {lateList.length === 0 ? <tr><td colSpan="3" style={{ textAlign: 'center' }}>No late records found.</td></tr> : 
+                lateList.map((l, i) => <tr key={i}><td>{i + 1}</td><td>{l.name}</td><td style={{ color: '#f87171', fontWeight: 'bold' }}>{l.count} Days</td></tr>)
               }
             </tbody>
           </table>
@@ -175,10 +175,10 @@ const AttendanceReports = ({ data }) => {
 
         {subReport === 'OT' && (
           <table className="data-table" style={{ fontSize: '0.85rem' }}>
-            <thead><tr><th>Date</th><th>Employee</th><th>Shift</th><th>Total Hrs</th><th>OT Hrs</th></tr></thead>
+            <thead><tr><th>Sr. No</th><th>Date</th><th>Employee</th><th>Shift</th><th>Total Hrs</th><th>OT Hrs</th></tr></thead>
             <tbody>
-              {otData.length === 0 ? <tr><td colSpan="5" style={{ textAlign: 'center' }}>No overtime records found.</td></tr> : 
-                otData.map(d => <tr key={d.id}><td>{d.date}</td><td>{d.username}</td><td>{d.shift}</td><td>{d.totalHours}</td><td style={{ color: 'var(--accent-primary)', fontWeight: 'bold' }}>{d.otHours}</td></tr>)
+              {otData.length === 0 ? <tr><td colSpan="6" style={{ textAlign: 'center' }}>No overtime records found.</td></tr> : 
+                otData.map((d, i) => <tr key={d.id}><td>{i + 1}</td><td>{d.date}</td><td>{d.username}</td><td>{d.shift}</td><td>{d.totalHours}</td><td style={{ color: 'var(--accent-primary)', fontWeight: 'bold' }}>{d.otHours}</td></tr>)
               }
             </tbody>
           </table>
@@ -186,9 +186,9 @@ const AttendanceReports = ({ data }) => {
 
         {subReport === 'Leave' && (
           <table className="data-table" style={{ fontSize: '0.85rem' }}>
-            <thead><tr><th>Employee Name</th><th>Total Leaves</th><th>Used Leaves</th><th>Balance</th></tr></thead>
+            <thead><tr><th>Sr. No</th><th>Employee Name</th><th>Total Leaves</th><th>Used Leaves</th><th>Balance</th></tr></thead>
             <tbody>
-              {leaveBalance.map((l, i) => <tr key={i}><td>{l.name}</td><td>{l.total}</td><td>{l.used}</td><td style={{ fontWeight: 'bold' }}>{l.balance}</td></tr>)}
+              {leaveBalance.map((l, i) => <tr key={i}><td>{i + 1}</td><td>{l.name}</td><td>{l.total}</td><td>{l.used}</td><td style={{ fontWeight: 'bold' }}>{l.balance}</td></tr>)}
             </tbody>
           </table>
         )}
@@ -203,9 +203,9 @@ const AttendanceReports = ({ data }) => {
               ]} filename={`Salary_Sheet_${currentMonth}`} title="Salary Attendance Sheet" />
             </div>
             <table className="data-table" style={{ fontSize: '0.85rem' }}>
-              <thead><tr><th>Emp ID</th><th>Employee Name</th><th>Month</th><th>Present Days</th><th>Absent Days</th><th>Total OT Hrs</th></tr></thead>
+              <thead><tr><th>Sr. No</th><th>Emp ID</th><th>Employee Name</th><th>Month</th><th>Present Days</th><th>Absent Days</th><th>Total OT Hrs</th></tr></thead>
               <tbody>
-                {salarySheet.map((s, i) => <tr key={i}><td>{s.empId}</td><td>{s.name}</td><td>{s.month}</td><td style={{ color: '#34d399', fontWeight: 'bold' }}>{s.presents}</td><td style={{ color: '#f87171' }}>{s.absents}</td><td style={{ color: 'var(--accent-primary)' }}>{s.totalOT}</td></tr>)}
+                {salarySheet.map((s, i) => <tr key={i}><td>{i + 1}</td><td>{s.empId}</td><td>{s.name}</td><td>{s.month}</td><td style={{ color: '#34d399', fontWeight: 'bold' }}>{s.presents}</td><td style={{ color: '#f87171' }}>{s.absents}</td><td style={{ color: 'var(--accent-primary)' }}>{s.totalOT}</td></tr>)}
               </tbody>
             </table>
           </div>
@@ -219,11 +219,11 @@ const AttendanceReports = ({ data }) => {
 const SalesTable = ({ data }) => (
   <div style={{ overflowX: 'auto' }}>
     <table className="data-table">
-      <thead><tr><th>Invoice No</th><th>Date</th><th>Party</th><th>Taxable</th><th>GST</th><th>Total</th></tr></thead>
+      <thead><tr><th>Sr. No</th><th>Invoice No</th><th>Date</th><th>Party</th><th>Taxable</th><th>GST</th><th>Total</th></tr></thead>
       <tbody>
-        {data.map(inv => (
+        {data.map((inv, idx) => (
           <tr key={inv.id}>
-            <td>{inv.invoiceNo}</td><td>{formatDate(inv.date)}</td><td>{inv.partyName}</td>
+            <td>{idx + 1}</td><td>{inv.invoiceNo}</td><td>{formatDate(inv.date)}</td><td>{inv.partyName}</td>
             <td>₹{inv.subtotal.toLocaleString()}</td><td>₹{inv.taxAmount.toLocaleString()}</td>
             <td style={{ fontWeight: 600 }}>₹{inv.total.toLocaleString()}</td>
           </tr>
@@ -236,15 +236,15 @@ const SalesTable = ({ data }) => (
 const GSTTable = ({ data }) => (
   <div style={{ overflowX: 'auto' }}>
     <table className="data-table">
-      <thead><tr><th>Invoice No</th><th>Party GSTIN</th><th>Rate</th><th>CGST</th><th>SGST</th><th>IGST</th></tr></thead>
+      <thead><tr><th>Sr. No</th><th>Invoice No</th><th>Party GSTIN</th><th>Rate</th><th>CGST</th><th>SGST</th><th>IGST</th></tr></thead>
       <tbody>
-        {data.map(inv => {
+        {data.map((inv, idx) => {
           const tax = parseFloat(inv.taxAmount) || 0;
           const isIgst = normalizeGstType(inv.gstType) === GST_TYPE_IGST;
           const half = tax / 2;
           return (
             <tr key={inv.id}>
-              <td>{inv.invoiceNo}</td><td>{inv.partyGstin || 'URD'}</td><td>{inv.taxRate}%</td>
+              <td>{idx + 1}</td><td>{inv.invoiceNo}</td><td>{inv.partyGstin || 'URD'}</td><td>{inv.taxRate}%</td>
               <td>{isIgst ? '-' : `₹${half.toLocaleString()}`}</td>
               <td>{isIgst ? '-' : `₹${half.toLocaleString()}`}</td>
               <td>{isIgst ? `₹${tax.toLocaleString()}` : '-'}</td>
@@ -259,11 +259,11 @@ const GSTTable = ({ data }) => (
 const PaymentTable = ({ data }) => (
   <div style={{ overflowX: 'auto' }}>
     <table className="data-table">
-      <thead><tr><th>Date</th><th>Invoice</th><th>Party</th><th>Mode</th><th>Reference</th><th>Amount</th></tr></thead>
+      <thead><tr><th>Sr. No</th><th>Date</th><th>Invoice</th><th>Party</th><th>Mode</th><th>Reference</th><th>Amount</th></tr></thead>
       <tbody>
-        {data.map(pay => (
+        {data.map((pay, idx) => (
           <tr key={pay.id}>
-            <td>{formatDate(pay.date)}</td><td>{pay.invoiceNo}</td><td>{pay.partyName}</td>
+            <td>{idx + 1}</td><td>{formatDate(pay.date)}</td><td>{pay.invoiceNo}</td><td>{pay.partyName}</td>
             <td>{pay.paymentMode}</td><td>{pay.referenceNo}</td><td style={{ fontWeight: 600 }}>₹{Number(pay.amount).toLocaleString()}</td>
           </tr>
         ))}

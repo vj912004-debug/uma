@@ -402,6 +402,28 @@ export const buildPrintPrefsCss = (prefs) => {
     overflow: hidden !important;
     text-overflow: ellipsis !important;
   }
+  /* Quotation meta: pull values left so long QT No / email are not cut by the right border */
+  .uma-print-root .qt-page .meta-row {
+    grid-template-columns: 14px 92px 8px minmax(0, 1fr) !important;
+    column-gap: 3px !important;
+    white-space: normal !important;
+    padding-right: 4px !important;
+  }
+  .uma-print-root .qt-page .meta-row .m-label,
+  .uma-print-root .qt-page .meta-row .m-colon,
+  .uma-print-root .qt-page .meta-row .m-value {
+    white-space: normal !important;
+  }
+  .uma-print-root .qt-page .meta-row .m-value {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    padding-right: 6px !important;
+  }
+  .uma-print-root .qt-page .invoice-meta .block {
+    padding: 7px 16px 7px 8px !important;
+  }
   .uma-print-root .invoice-meta {
     min-width: 300px !important;
   }
@@ -690,9 +712,9 @@ export const buildPrintPrefsCss = (prefs) => {
   .uma-print-root table.footer3 .sig-space {
     display: block !important;
     flex: none !important;
-    height: 56px !important;
-    min-height: 56px !important;
-    max-height: 56px !important;
+    height: 88px !important;
+    min-height: 88px !important;
+    max-height: 88px !important;
   }
   .uma-print-root .f3-body,
   .uma-print-root .f3-body ol,

@@ -50,7 +50,7 @@ const timeText = (iso) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
   const sameDay = d.toDateString() === new Date().toDateString();
-  const time = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  const time = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
   return sameDay ? time : `${formatDate(d.toISOString().slice(0, 10))} ${time}`;
 };
 
@@ -58,7 +58,10 @@ const stampText = (iso) => {
   const d = new Date(iso);
   if (!iso || Number.isNaN(d.getTime())) return '—';
   const p = (n) => String(n).padStart(2, '0');
-  return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  const h24 = d.getHours();
+  const ampm = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = h24 % 12 || 12;
+  return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()} ${p(h12)}:${p(d.getMinutes())}:${p(d.getSeconds())} ${ampm}`;
 };
 
 const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -343,6 +346,7 @@ const DeviceManagement = () => {
           <table className="pm-table">
             <thead>
               <tr>
+                <th>Sr. No</th>
                 <th>Device</th>
                 <th>Location</th>
                 <th>IP/Connection</th>
@@ -354,8 +358,8 @@ const DeviceManagement = () => {
             </thead>
             <tbody>
               {devices.length === 0 ? (
-                <tr><td colSpan={7} className="pm-empty">No devices. Click Add Device.</td></tr>
-              ) : devices.map((d) => {
+                <tr><td colSpan={8} className="pm-empty">No devices. Click Add Device.</td></tr>
+              ) : devices.map((d, idx) => {
                 const online = d.status === 'Online';
                 return (
                   <tr
@@ -364,6 +368,7 @@ const DeviceManagement = () => {
                     title="Click to select this device"
                     onClick={() => setSelectedId(d.id)}
                   >
+                    <td>{idx + 1}</td>
                     <td>
                       <strong>{d.name}</strong>
                       {d.model ? <div className="dm-sub">{d.model}{d.serialNo ? ` · ${d.serialNo}` : ''}</div> : null}
@@ -433,6 +438,7 @@ const DeviceManagement = () => {
           <table className="pm-table">
             <thead>
               <tr>
+                <th>Sr. No</th>
                 <th>Time</th>
                 <th>Device</th>
                 <th>Fetched Since</th>
@@ -444,9 +450,10 @@ const DeviceManagement = () => {
             </thead>
             <tbody>
               {syncHistory.length === 0 ? (
-                <tr><td colSpan={7} className="pm-empty">No sync runs yet.</td></tr>
-              ) : syncHistory.map((h) => (
+                <tr><td colSpan={8} className="pm-empty">No sync runs yet.</td></tr>
+              ) : syncHistory.map((h, idx) => (
                 <tr key={h.id}>
+                  <td>{idx + 1}</td>
                   <td>
                     {timeText(h.at)}
                     {h.status === 'Failed' && h.attempts > 1 ? <div className="dm-sub">{h.attempts} attempts since {timeText(h.firstFailedAt)}</div> : null}
@@ -529,6 +536,7 @@ const DeviceManagement = () => {
               <table className="pm-table">
                 <thead>
                   <tr>
+                    <th>Sr. No</th>
                     <th>Punch ID</th>
                     <th>Employee ID</th>
                     <th>Device ID</th>
@@ -543,9 +551,10 @@ const DeviceManagement = () => {
                 </thead>
                 <tbody>
                   {logRows.length === 0 ? (
-                    <tr><td colSpan={10} className="pm-empty">No raw punches. Click Sync Now to pull punches from the device.</td></tr>
-                  ) : logRows.map((l) => (
+                    <tr><td colSpan={11} className="pm-empty">No raw punches. Click Sync Now to pull punches from the device.</td></tr>
+                  ) : logRows.map((l, idx) => (
                     <tr key={l.id}>
+                      <td>{(logPage - 1) * LOG_PAGE_SIZE + idx + 1}</td>
                       <td><strong>{l.punchId}</strong></td>
                       <td title={l.employeeName || ''}>{l.employeeId || <span className="dm-sub dm-fail">Unmapped</span>}</td>
                       <td>{l.deviceName || '—'}</td>
@@ -594,6 +603,7 @@ const DeviceManagement = () => {
               <table className="pm-table">
                 <thead>
                   <tr>
+                    <th>Sr. No</th>
                     <th>Emp. Code</th>
                     <th>Employee Name</th>
                     <th>Department</th>
@@ -604,9 +614,10 @@ const DeviceManagement = () => {
                 </thead>
                 <tbody>
                   {mapRows.length === 0 ? (
-                    <tr><td colSpan={6} className="pm-empty">No employees found.</td></tr>
-                  ) : mapRows.map((u) => (
+                    <tr><td colSpan={7} className="pm-empty">No employees found.</td></tr>
+                  ) : mapRows.map((u, idx) => (
                     <tr key={u.id}>
+                      <td>{idx + 1}</td>
                       <td><strong>{u.employeeId || '—'}</strong></td>
                       <td>{u.name || u.username}</td>
                       <td>{u.department || '—'}</td>

@@ -55,7 +55,6 @@ const MonthlySummary = () => {
   const [dateFrom, setDateFrom] = useState(monthStart);
   const [dateTo, setDateTo] = useState(monthEnd);
   const [refNo, setRefNo] = useState('');
-  const [invoiceNo, setInvoiceNo] = useState('');
   const [summaryDate, setSummaryDate] = useState(todayValue());
   const [doneBy, setDoneBy] = useState(() => defaultDoneBy(currentUser) || actorDisplayName(data));
   const [showCreationLog, setShowCreationLog] = useState(false);
@@ -88,29 +87,22 @@ const MonthlySummary = () => {
       dateFrom,
       dateTo,
       refNo,
-      invoiceNo,
+      invoiceNo: '',
       summaryDate
     });
-  }, [ready, data, companyId, companyName, dateFrom, dateTo, refNo, invoiceNo, summaryDate]);
+  }, [ready, data, companyId, companyName, dateFrom, dateTo, refNo, summaryDate]);
 
   useEffect(() => {
-    setInvoiceNo('');
     setRefNo('');
     setDoneBy(defaultDoneBy(currentUser) || actorDisplayName(data));
   }, [companyValue, dateFrom, dateTo, currentUser, data.currentUser]);
 
   useEffect(() => {
-    if (!statement?.suggestedInvoiceNo) return;
-    setInvoiceNo((current) => current || statement.suggestedInvoiceNo);
-  }, [statement?.suggestedInvoiceNo, companyValue, dateFrom, dateTo]);
-
-  // When invoice number is filled/suggested, also generate Ref No. with it.
-  useEffect(() => {
     if (!ready) return;
     setRefNo((current) => current || nextSummaryRefNo(data));
-  }, [ready, companyValue, dateFrom, dateTo, invoiceNo, data.settings?.serials?.MS, data.monthlySummaries]);
+  }, [ready, companyValue, dateFrom, dateTo, data.settings?.serials?.MS, data.monthlySummaries]);
 
-  const downloadPdf = () => {
+  const downloadPdf = async () => {
     if (!dateFrom || !dateTo) {
       alert('Select a From date and a To date.');
       return;
@@ -126,7 +118,6 @@ const MonthlySummary = () => {
 
     const who = String(doneBy || defaultDoneBy(currentUser) || actorDisplayName(data)).trim();
     const finalRef = String(refNo || nextSummaryRefNo(data)).trim();
-    const finalInvoice = String(invoiceNo || statement.suggestedInvoiceNo || '').trim();
     const finalStatement = buildMonthlySummaryStatement({
       data,
       companyId,
@@ -134,16 +125,18 @@ const MonthlySummary = () => {
       dateFrom,
       dateTo,
       refNo: finalRef,
-      invoiceNo: finalInvoice,
+      invoiceNo: '',
       summaryDate
     });
 
-    downloadMonthlySummaryPdf(finalStatement);
+    await downloadMonthlySummaryPdf(finalStatement, {
+      companyProfile: data.companyProfile
+    });
 
     updateData('monthlySummaries', {
       id: Date.now().toString(),
       refNo: finalRef,
-      invoiceNo: finalInvoice,
+      invoiceNo: '',
       date: summaryDate,
       dateFrom,
       dateTo,
@@ -163,7 +156,6 @@ const MonthlySummary = () => {
     }
 
     setRefNo(finalRef);
-    setInvoiceNo(finalInvoice);
     setDoneBy(who);
     // Show the new entry in history right after generate/download.
     setShowCreationLog(true);
@@ -174,7 +166,6 @@ const MonthlySummary = () => {
     setDateFrom(row.dateFrom || monthStart());
     setDateTo(row.dateTo || monthEnd());
     setRefNo(String(row.refNo || ''));
-    setInvoiceNo(String(row.invoiceNo || ''));
     setSummaryDate(row.date || todayValue());
     setDoneBy(String(row.doneBy || row.createdBy || ''));
     setShowCreationLog(false);
@@ -214,13 +205,12 @@ const MonthlySummary = () => {
         rows={summaryLogs}
         auditLogs={data.auditLogs}
         module="monthlySummaries"
-        searchPlaceholder="Search by ref no, invoice no, company, or done by..."
-        getSearchText={(row) => `${row.refNo || ''} ${row.invoiceNo || ''} ${row.partyName || ''} ${row.title || ''}`}
+        searchPlaceholder="Search by ref no, company, or done by..."
+        getSearchText={(row) => `${row.refNo || ''} ${row.partyName || ''} ${row.title || ''}`}
         onEdit={reloadHistoryRow}
         onDelete={deleteHistoryRow}
         columns={[
           { key: 'refNo', label: 'Ref No.' },
-          { key: 'invoiceNo', label: 'Invoice No.' },
           { key: 'date', label: 'Summary Date', render: (r) => formatDate(r.date) },
           { key: 'partyName', label: 'Company' },
           {
@@ -279,16 +269,6 @@ const MonthlySummary = () => {
               value={refNo}
               onChange={(e) => setRefNo(e.target.value)}
               placeholder="Auto when ready"
-            />
-          </div>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label htmlFor="monthly-summary-invoice">Invoice No.</label>
-            <input
-              id="monthly-summary-invoice"
-              className="input-field"
-              value={invoiceNo}
-              onChange={(e) => setInvoiceNo(e.target.value)}
-              placeholder="e.g. 267"
             />
           </div>
           <div className="form-group" style={{ margin: 0 }}>
@@ -393,7 +373,7 @@ const MonthlySummary = () => {
             </table>
           </div>
           <p style={{ margin: 0, padding: '0.65rem 1rem', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-            Summary date {summaryDateText(summaryDate, '/') || '—'}. Ref No. and Invoice No. generate together; each download is saved in Summary History below.
+            Summary date {summaryDateText(summaryDate, '/') || '—'}. Ref No. generates automatically; each download is saved in Summary History below.
           </p>
         </section>
       )}
@@ -411,7 +391,6 @@ const MonthlySummary = () => {
               <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
                 <th style={{ padding: '0.75rem' }}>Sr.</th>
                 <th style={{ padding: '0.75rem' }}>Ref No.</th>
-                <th style={{ padding: '0.75rem' }}>Invoice No.</th>
                 <th style={{ padding: '0.75rem' }}>Date</th>
                 <th style={{ padding: '0.75rem' }}>Company</th>
                 <th style={{ padding: '0.75rem' }}>Period</th>
@@ -424,7 +403,7 @@ const MonthlySummary = () => {
             <tbody>
               {summaryLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={10} style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td colSpan={9} style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                     No monthly summaries generated yet. Download a PDF to add it here.
                   </td>
                 </tr>
@@ -432,7 +411,6 @@ const MonthlySummary = () => {
                 <tr key={row.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                   <td style={{ padding: '0.75rem' }}>{idx + 1}</td>
                   <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{row.refNo || '—'}</td>
-                  <td style={{ padding: '0.75rem' }}>{row.invoiceNo || '—'}</td>
                   <td style={{ padding: '0.75rem' }}>{formatDate(row.date)}</td>
                   <td style={{ padding: '0.75rem', fontWeight: 600 }}>{row.partyName || '—'}</td>
                   <td style={{ padding: '0.75rem' }}>{formatDate(row.dateFrom)} – {formatDate(row.dateTo)}</td>

@@ -42,8 +42,7 @@ const syncValidityInTerms = (terms, isoDate) => {
 
 const MAIN_CHARGES = [
   { key: 'cleaning', label: 'Minimum Cleaning Charges (998842)', isQtyRate: true },
-  { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true },
-  { key: 'sieving', label: 'Sieving Charges (998842)', isQtyRate: true }
+  { key: 'processing', label: 'Processing Charges (998842)', isQtyRate: true }
 ];
 
 const OPTIONAL_SERVICE_CHARGES = [
@@ -81,14 +80,13 @@ const mergeChargeDefs = (catalog = [], own = []) => {
   return [...byKey.values()];
 };
 
-/** Company quote header charges; `sectionKey` is the charge key used for print / drag. */
+/** Company quote header charges; `sectionKey` is the charge key used for print / drag.
+ *  Minimum + Cleaning are one charge on print ("Minimum Cleaning Charges"). */
 const COMPANY_HEADER_CHARGES = [
-  { field: 'minimum', sectionKey: 'cleaning', label: 'Minimum Charge', hint: 'Prints with Cleaning' },
+  { field: 'minimum', sectionKey: 'cleaning', label: 'Minimum Cleaning Charge', hint: 'Printed as Minimum Cleaning Charges' },
   { field: 'filterBag', sectionKey: 'filterBag', label: 'Filter Bag Charge' },
-  { field: 'sieving', sectionKey: 'sieving', label: 'Sieving Charge' },
   { field: 'processing', sectionKey: 'processing', label: 'Processing Charge' },
-  { field: 'cleaning', sectionKey: 'cleaning', label: 'Cleaning Charge' },
-  { field: 'other', sectionKey: 'other', label: 'Other Charges (If Any)' }
+  { field: 'other', sectionKey: 'other', label: 'Sleeving Charges' }
 ];
 
 const COMPANY_HEADER_KEYS = new Set(COMPANY_HEADER_CHARGES.map((item) => item.sectionKey));
@@ -623,7 +621,12 @@ const Quotations = () => {
     patchCompanyQuote((prev) => {
       const previous = prev.defaultRates?.[key];
       const defaultRates = { ...(prev.defaultRates || {}), [key]: value };
-      const column = key === 'minimum' ? null : key;
+      // Minimum and cleaning are the same charge — keep both fields aligned.
+      if (key === 'minimum' || key === 'cleaning') {
+        defaultRates.minimum = value;
+        defaultRates.cleaning = value;
+      }
+      const column = (key === 'minimum' || key === 'cleaning') ? 'cleaning' : key;
       if (!column || column === 'other') return { defaultRates };
       const quoteLinesNext = (prev.quoteLines || []).map((line) => {
         const current = line.rates?.[column];
@@ -699,7 +702,7 @@ const Quotations = () => {
         companySettings[line.name] = {
           qty: '',
           psdRequirement: line.psdReq || '',
-          charges: { ...DEFAULT_CHARGES, cleaning: true, filterBag: true, processing: true, sieving: true },
+          charges: { ...DEFAULT_CHARGES, cleaning: true, filterBag: true, processing: true },
           rates: { ...DEFAULT_RATES, ...(line.rates || {}) },
           chargeNotes: emptyChargeNotes(),
           chargeSection: {},
@@ -1069,7 +1072,12 @@ const handleSameCompanyQuote = (q) => {
       .filter((item) => getChargeSection(formData.chargeSection, item.sectionKey) === section)
       .map((item) => ({ ...item, kind: 'header', id: `h-${item.field}`, key: item.sectionKey }));
     const extra = chargeDefsOf(formData)
-      .filter((item) => !COMPANY_HEADER_KEYS.has(item.key) && item.key !== 'processing' && sectionOfDef(formData.chargeSection, item) === section)
+      .filter((item) =>
+        !COMPANY_HEADER_KEYS.has(item.key)
+        && item.key !== 'processing'
+        && item.key !== 'sieving' // same as Sleeving Charges (other)
+        && sectionOfDef(formData.chargeSection, item) === section
+      )
       .map((item) => ({ ...item, kind: 'catalog', id: item.key, sectionKey: item.key }));
     return [...header, ...extra];
   };
@@ -1133,7 +1141,11 @@ const handleSameCompanyQuote = (q) => {
               step="any"
               className="input-field"
               style={{ padding: '0.3rem 0.45rem', fontSize: '0.8rem' }}
-              value={formData.defaultRates?.[card.field] ?? ''}
+              value={
+                card.field === 'minimum'
+                  ? (formData.defaultRates?.minimum ?? formData.defaultRates?.cleaning ?? '')
+                  : (formData.defaultRates?.[card.field] ?? '')
+              }
               onChange={(e) => setDefaultCharge(card.field, e.target.value)}
             />
             {card.hint && <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{card.hint}</span>}
@@ -1154,7 +1166,13 @@ const handleSameCompanyQuote = (q) => {
               min="0"
               step="any"
               className="input-field quote-charge-rate-input"
-              value={isHeader ? (formData.defaultRates?.[card.field] ?? '') : rateInputValue(formData.rates?.[card.key])}
+              value={
+                isHeader
+                  ? (card.field === 'minimum'
+                    ? (formData.defaultRates?.minimum ?? formData.defaultRates?.cleaning ?? '')
+                    : (formData.defaultRates?.[card.field] ?? ''))
+                  : rateInputValue(formData.rates?.[card.key])
+              }
               placeholder="0"
               onChange={(e) => isHeader ? setDefaultCharge(card.field, e.target.value) : handleMaterialRateChange(card.key, e.target.value)}
             />
@@ -1352,6 +1370,7 @@ const handleSameCompanyQuote = (q) => {
           <table className="data-table">
             <thead>
               <tr>
+                <th>Sr. No</th>
                 <th>Date</th>
                 <th>Quotation No</th>
                 <th>Party Name</th>
@@ -1361,8 +1380,9 @@ const handleSameCompanyQuote = (q) => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(q => (
+              {filtered.map((q, idx) => (
                 <tr key={q.id}>
+                  <td>{idx + 1}</td>
                   <td>{formatDate(q.date)}</td>
                   <td style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{q.quotationNo}</td>
                   <td>{q.partyName}</td>
@@ -1543,7 +1563,7 @@ const handleSameCompanyQuote = (q) => {
                     </span>
                   </div>
                   <p style={{ margin: 0, padding: '0.55rem 1rem', fontSize: '0.75rem', color: '#6d28d9', background: '#f5f3ff' }}>
-                    Minimum charge, filter charge, sieving, processing charge and other common charges are applied once for the entire quotation (all products). Drag charges between Main and Optional sections to shift them easily.
+                    Minimum cleaning charge, filter charge, processing charge, sleeving and other common charges are applied once for the entire quotation (all products). Drag charges between Main and Optional sections to shift them easily.
                   </p>
                   {renderCompanyChargeZone('main')}
                   {renderCompanyChargeZone('optional')}
@@ -1696,7 +1716,6 @@ const handleSameCompanyQuote = (q) => {
                           <th style={{ padding: '0.5rem' }}>Cleaning Chg</th>
                           <th style={{ padding: '0.5rem' }}>Filter Bag</th>
                           <th style={{ padding: '0.5rem' }}>Processing</th>
-                          <th style={{ padding: '0.5rem' }}>Sieving</th>
                           <th style={{ padding: '0.5rem' }}>Actions</th>
                         </tr>
                       </thead>
@@ -1720,7 +1739,6 @@ const handleSameCompanyQuote = (q) => {
                               <td style={{ padding: '0.5rem' }}>₹{displayRates.cleaning ?? prod.charges?.cleaning ?? 0}</td>
                               <td style={{ padding: '0.5rem' }}>₹{displayRates.filterBag ?? prod.charges?.filterBag ?? 0}</td>
                               <td style={{ padding: '0.5rem' }}>₹{displayRates.processing ?? prod.charges?.processing ?? 0}</td>
-                              <td style={{ padding: '0.5rem' }}>₹{displayRates.sieving ?? prod.charges?.sieving ?? 0}</td>
                               <td style={{ padding: '0.5rem' }}>
                                 <button
                                   type="button"

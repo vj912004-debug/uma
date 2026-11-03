@@ -138,6 +138,7 @@ const Invoices = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
+                  <th style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Sr. No</th>
                   <th style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Inv No</th>
                   <th style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Party</th>
                   <th style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Total</th>
@@ -146,10 +147,11 @@ const Invoices = () => {
               </thead>
               <tbody>
                 {data.invoices.length === 0 ? (
-                  <tr><td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No invoices found.</td></tr>
+                  <tr><td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No invoices found.</td></tr>
                 ) : (
-                  data.invoices.map(inv => (
+                  data.invoices.map((inv, idx) => (
                     <tr key={inv.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '1rem' }}>{idx + 1}</td>
                       <td style={{ padding: '1rem', fontWeight: 600 }}>{inv.invoiceNo}</td>
                       <td style={{ padding: '1rem' }}>{inv.partyName}</td>
                       <td style={{ padding: '1rem', fontWeight: 700 }}>₹{inv.total.toLocaleString()}</td>
